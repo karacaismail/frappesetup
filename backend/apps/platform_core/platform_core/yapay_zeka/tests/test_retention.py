@@ -35,7 +35,7 @@ class TestRetentionPeriods(YzTestCase):
 		return self.human(client, "POST", "purge_logs", body={}).json["message"]
 
 	def purge(self, client, **body) -> dict:
-		response = self.human(client, "POST", "purge_logs", body={"dry_run": False, **body})
+		response = self.confirmed_purge(client, **body)
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
 		return response.json["message"]
 
@@ -137,9 +137,15 @@ class TestRetentionPeriods(YzTestCase):
 			dry = self.count_only(manager)
 			real = self.purge(manager)
 
-		self.assertEqual(calls, [(True, MANAGER), (False, MANAGER)])
-		self.assertEqual(dry["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 0})
-		self.assertEqual(real["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 500})
+		# Counting calls come first: the preview and the count again at the confirmation.
+		# Exactly one call deletes, and it is the last one.
+		self.assertEqual([dry_run for dry_run, _user in calls].count(False), 1)
+		self.assertEqual(calls[-1], (False, MANAGER))
+		self.assertEqual({user for _dry_run, user in calls}, {MANAGER})
+		self.assertEqual(dry["usage_logs"], {"status": "ok", "eligible": 501, "to_delete": 500, "deleted": 0})
+		self.assertEqual(
+			real["usage_logs"], {"status": "ok", "eligible": 501, "to_delete": 500, "deleted": 500}
+		)
 
 	def test_missing_gateway_function_is_reported_as_not_run(self):
 		manager = self.login(MANAGER)
@@ -157,7 +163,7 @@ class TestRetentionPeriods(YzTestCase):
 			raise frappe.PermissionError("leak-marker in a gateway error")
 
 		with self.gateway(refuse):
-			response = self.human(manager, "POST", "purge_logs", body={"dry_run": False})
+			response = self.confirmed_purge(manager)
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(
@@ -185,8 +191,8 @@ class TestRetentionPeriods(YzTestCase):
 
 		# V-10: without `dry_run` the command only counts, and the gateway is asked to count too.
 		self.assertEqual(calls, [True, False])
-		self.assertEqual(counted["usage_logs"], {"status": "ok", "eligible": 2, "deleted": 0})
-		self.assertEqual(result["usage_logs"], {"status": "ok", "eligible": 2, "deleted": 2})
+		self.assertEqual(counted["usage_logs"], {"status": "ok", "eligible": 2, "to_delete": 2, "deleted": 0})
+		self.assertEqual(result["usage_logs"], {"status": "ok", "eligible": 2, "to_delete": 2, "deleted": 2})
 		self.assertEqual(missing["usage_logs"]["status"], "not_run")
 
 	def test_result_has_the_fields_the_contract_requires(self):
@@ -202,8 +208,11 @@ class TestRetentionPeriods(YzTestCase):
 
 		result = self.count_only(manager)
 
-		self.assertEqual(sorted(result), sorted(schema["required"]))
-		self.assertEqual(sorted(schema["properties"]), sorted(schema["required"]))
+		# The counting mode adds the confirmation token. Every other field is required.
+		self.assertEqual(sorted(set(result) - {"confirmation_token"}), sorted(schema["required"]))
+		self.assertEqual(
+			sorted(set(schema["properties"]) - {"confirmation_token"}), sorted(schema["required"])
+		)
 		self.assertIn(
 			result["usage_logs"]["status"], schema["properties"]["usage_logs"]["properties"]["status"]["enum"]
 		)
@@ -231,7 +240,9 @@ class TestRetentionPeriods(YzTestCase):
 		self.assertGreaterEqual(details["proposals_waiting"], 4)
 		self.assertEqual(details["older_than_days"], 800)
 		# For the usage log `eligible` is what waits. The gateway deletes it in batches.
-		self.assertEqual(details["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 0})
+		self.assertEqual(
+			details["usage_logs"], {"status": "ok", "eligible": 501, "to_delete": 500, "deleted": 0}
+		)
 
 	def test_approved_purge_counts_again_when_it_runs(self):
 		"""Records that became old after the preview stop the approval: the human saw another count."""

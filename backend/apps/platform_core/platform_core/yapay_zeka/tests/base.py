@@ -238,6 +238,16 @@ class YzTestCase(IntegrationTestCase):
 	def human(self, client, method: str, endpoint: str, body=None, query=None):
 		return self.send(client, method, API + endpoint, body=body, query=query)
 
+	def confirmed_purge(self, client, **body):
+		"""Delete through the web endpoint the way a human does: read the preview, then confirm it."""
+		preview = self.human(client, "POST", "purge_logs", body=body)
+		if preview.status_code != 200:
+			return preview
+		token = preview.json["message"]["confirmation_token"]
+		return self.human(
+			client, "POST", "purge_logs", body={**body, "dry_run": False, "confirmation_token": token}
+		)
+
 	def age_session(self, sid: str, last_update) -> None:
 		"""Make a session look unused since `last_update`, in the cache and in the session table.
 

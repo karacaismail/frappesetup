@@ -66,6 +66,12 @@ def resolve_proposal(proposal_id: str, outcome: str) -> dict:
 
 # Checked in `retention.purge`: `frappe.only_for("System Manager")`.
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
-def purge_logs(older_than_days: int = retention.MIN_DAYS, dry_run: bool = True) -> dict:
-	"""Delete log and proposal records past retention. Destructive. Only counts by default."""
-	return access.human_call("call", "purge_logs", lambda: retention.purge(older_than_days, dry_run=dry_run))
+def purge_logs(
+	older_than_days: int = retention.MIN_DAYS, dry_run: bool = True, confirmation_token: str | None = None
+) -> dict:
+	"""Count records past retention, or delete them with the confirmation token of that count. Destructive."""
+	return access.human_call(
+		"call",
+		"purge_logs",
+		lambda: retention.purge_from_web(older_than_days, dry_run, confirmation_token),
+	)

@@ -207,7 +207,7 @@ class TestBoundedQueries(YzTestCase):
 
 		with patch.object(retention, "BATCH_SIZE", 3):
 			dry = self.human(manager, "POST", "purge_logs", body={}).json["message"]
-			first = self.human(manager, "POST", "purge_logs", body={"dry_run": False}).json["message"]
+			first = self.confirmed_purge(manager).json["message"]
 
 		self.assertGreaterEqual(waiting, 4)
 		self.assertEqual((dry["logs"], dry["logs_waiting"]), (3, waiting))

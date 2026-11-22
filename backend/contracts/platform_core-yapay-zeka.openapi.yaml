@@ -325,7 +325,11 @@ paths:
       summary: Deletes log and proposal records whose retention period has passed.
       description: |
         DESTRUCTIVE. Cannot be undone. Only the "System Manager" role and a human session can call it.
-        If `dry_run` is true, nothing is deleted. The response returns the number of records that would be deleted. This is the default.
+        If `dry_run` is true, nothing is deleted. The response returns the number of records that would be deleted and a
+        `confirmation_token`. This is the default, and it is the preview a human reads.
+        A delete (`dry_run` false) must carry that `confirmation_token`. The token lives 10 minutes and works once. It is bound
+        to the user, the period and the previewed numbers. Without a valid token nothing is deleted and the answer is 417
+        with the deny reason `preview_required`. If the numbers changed after the preview, ask for a new preview.
         Retention periods:
         - "AI Action Log" records go after `older_than_days`, at least 365 days.
         - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
@@ -349,6 +353,7 @@ paths:
               properties:
                 older_than_days: {type: integer, minimum: 365, maximum: 36500, default: 365}
                 dry_run: {type: boolean, default: true}
+                confirmation_token: {type: string, maxLength: 128, description: "Token of the preview the human confirmed. Required when `dry_run` is false."}
       responses:
         "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
@@ -361,7 +366,7 @@ paths:
                 properties:
                   message: {$ref: "#/components/schemas/PurgeResult"}
         "403": {description: The request did not come from a human session or the user is not an administrator.}
-        "417": {description: The retention period given was shorter than 365 days.}
+        "417": {description: "The retention period is out of range, or a delete came without a valid confirmation token."}
 
 components:
   securitySchemes:
@@ -466,6 +471,7 @@ components:
         - transaction_active
         - token_call_limit
         - unknown_tool
+        - preview_required
         - not_owner
         - not_pending
         - expired
@@ -552,6 +558,7 @@ components:
         dry_run: {type: boolean}
         older_than_days: {type: integer, description: Retention period of the AI Action Log in days.}
         proposal_days: {type: integer, description: "Retention period of proposals in days, counted from the decision or the expiry. Fixed at 30."}
+        confirmation_token: {type: string, description: "Only in the counting mode: the single-use token a delete must send back."}
         batch_size: {type: integer, description: "Most records of each kind one run deletes. It is 500. A preview shows it, so the human sees that one run may not delete everything that waits."}
         logs: {type: integer, description: "Number of AI Action Log records this run deletes. One run takes at most 500 records of each kind, oldest first."}
         logs_waiting: {type: integer, description: Number of AI Action Log records past their period when the run started.}
@@ -565,6 +572,7 @@ components:
               enum: [ok, not_run, error]
               description: "`ok`: the gateway ran. `not_run`: the gateway offers no such function. `error`: the gateway refused."
             eligible: {type: integer, description: "With `ok`: number of records past 365 days that waited when the run started."}
+            to_delete: {type: integer, description: "With `ok`: number of records one run deletes. It is `eligible`, capped at the gateway's batch of 500. A preview shows this number."}
             deleted: {type: integer, description: "With `ok`: number of records this run deleted. The gateway deletes in batches, so it may be smaller than `eligible`. Zero in the counting mode."}
             reason: {type: string, description: "With `not_run`: `gateway_purge_unavailable`. With `error`: the type of the error, never its text."}
         proposals: {type: integer, description: Number of AI Action Proposal records this run deletes.}

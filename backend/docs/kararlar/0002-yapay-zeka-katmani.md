@@ -594,6 +594,18 @@ Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `web
 
 Frappe'nin liste süzgeci boş tarihi çok eski bir tarih sayar. Kaynak Frappe 16.56.0 sürümünde `frappe/database/query.py` dosyasının 745. satırıdır. Bu yüzden komut önce karar tarihi dolu olan önerileri ister.
 
+### On ikinci tur: web ucunda onaylı silme
+
+Altıncı birleştirme incelemesi web ucunun silmeyi onaysız başlattığını buldu. Katman bunu düzeltti. Testler `tests/test_purge_confirmation.py` dosyasındadır.
+
+- **Sayım çağrısı önizlemedir.** `purge_logs` ucu `dry_run` açıkken sayıları ve bir onay belirteci döner.
+- **Silme çağrısı belirteci ister.** Belirteç yoksa ya da geçersizse hiçbir kayıt silinmez. Yanıt 417 olur ve ret nedeni `preview_required` olur.
+- **Belirteç tek kullanımlıktır.** Belirteç 10 dakika yaşar. Katman belirteci tek adımda alır ve siler.
+- **Belirteç önizlemeye bağlıdır.** Kullanıcı, süre ve önizlemedeki sayılar belirtece girer. Sayılar önizlemeden sonra değiştiyse silme reddedilir.
+- **Terminal komutu belirteç istemez.** Komutu terminalde bir insan başlatır. Komut `dry_run` verilmezse yalnız sayar.
+- **Yapay zekâ aracı öneri yolunu kullanır.** `purge_action_log` aracı önizleme ve insan onayı ister.
+- **Kullanım günlüğü üç sayı taşır.** `eligible` bekleyen toplamdır. `to_delete` bu çalıştırmanın sileceği sayıdır ve en çok 500 olur. `deleted` gerçekten silinen sayıdır.
+
 ### On birinci tur: kural öz denetimi
 
 Katman `docs/standartlar/` dosyalarındaki kurallara göre denetlendi. Üç yardımcı ajan kodu kural kural okudu. Bulguların testleri `tests/test_standards.py` dosyasındadır.

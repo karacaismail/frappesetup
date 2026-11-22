@@ -287,7 +287,7 @@ class TestAdminTools(YzTestCase):
 		dry = self.human(manager, "POST", "purge_logs", body={}).json["message"]
 		still_there = frappe.db.exists("AI Action Log", old)
 		short = self.human(manager, "POST", "purge_logs", body={"older_than_days": 10, "dry_run": False})
-		real = self.human(manager, "POST", "purge_logs", body={"dry_run": False}).json["message"]
+		real = self.confirmed_purge(manager).json["message"]
 
 		self.assertEqual(forbidden.status_code, 403)
 		self.assertTrue(dry["dry_run"])

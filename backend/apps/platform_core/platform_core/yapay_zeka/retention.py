@@ -8,10 +8,14 @@ There is no scheduled job (D-6). The command starts in these three ways:
 - the `purge_action_log` tool for AI. This way requires a preview and human approval.
 """
 
+import hashlib
+import json
+import secrets
+
 import frappe
 from frappe import _
 
-from platform_core.yapay_zeka import store
+from platform_core.yapay_zeka import access, store
 from platform_core.yapay_zeka.errors import CONTEXT, log_tool_error
 
 # Retention periods of the project record, personal data section.
@@ -23,6 +27,12 @@ PROPOSAL_DAYS = 30
 MAX_DAYS = 36_500
 # Records of each kind one run deletes at most. Each delete loads its document, so a run is bounded.
 BATCH_SIZE = 500
+# Records the model gateway deletes from its usage log in one run, unless its interface names another number.
+USAGE_BATCH_SIZE = 500
+# A web delete needs the confirmation of a preview. The confirmation lives this long and works once.
+CONFIRMATION_SECONDS = 600
+CONFIRMATION_KEY = "yz_purge_confirmation:"
+MAX_TOKEN_CHARS = 128
 
 
 def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
@@ -57,6 +67,50 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
 	}
 
 
+def purge_from_web(
+	older_than_days: int = MIN_DAYS, dry_run: bool = True, confirmation_token: str | None = None
+) -> dict:
+	"""The web endpoint's way in: a delete needs the confirmation of a preview, and only once.
+
+	The counting call is the preview. It returns a confirmation token that lives for
+	`CONFIRMATION_SECONDS`. The delete call must carry it. The token is bound to the user, the
+	period and the previewed numbers, and it is claimed in one step, so it works once.
+	A preview whose numbers have changed since is refused: the human confirmed other numbers.
+	"""
+	if dry_run:
+		result = purge(older_than_days, dry_run=True)
+		token = secrets.token_urlsafe(32)
+		frappe.cache.set_value(_confirmation_key(token, result), 1, expires_in_sec=CONFIRMATION_SECONDS)
+		return {**result, "confirmation_token": token}
+	current = purge(older_than_days, dry_run=True)
+	valid = isinstance(confirmation_token, str) and 0 < len(confirmation_token) <= MAX_TOKEN_CHARS
+	if (
+		not valid
+		or frappe.cache.getdel(frappe.cache.make_key(_confirmation_key(confirmation_token, current))) is None
+	):
+		raise access.PreviewRequired(
+			_(
+				"Ask for a preview first, then send its confirmation token. Nothing was deleted.",
+				context=CONTEXT,
+			)
+		)
+	return purge(older_than_days, dry_run=False)
+
+
+def _confirmation_key(token: str, counted: dict) -> str:
+	"""Cache key of a confirmation. It holds a digest, never the token itself."""
+	usage = counted["usage_logs"]
+	bound = [
+		token,
+		frappe.session.user,
+		counted["older_than_days"],
+		counted["logs"],
+		counted["proposals"],
+		usage.get("to_delete"),
+	]
+	return CONFIRMATION_KEY + hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+
+
 def _purge_usage_logs(dry_run: bool) -> dict:
 	"""Clean the "AI Usage Log" through the model gateway's shared function. Say plainly what happened.
 
@@ -75,7 +129,15 @@ def _purge_usage_logs(dry_run: bool) -> dict:
 		return {"status": "not_run", "reason": "gateway_purge_unavailable"}
 	try:
 		result = purge(dry_run=dry_run)
-		return {"status": "ok", "eligible": int(result["eligible"]), "deleted": int(result["deleted"])}
+		eligible = int(result["eligible"])
+		# `eligible` is what waited. `to_delete` is what one run takes. `deleted` is what it took.
+		limit = int(getattr(gateway, "USAGE_PURGE_BATCH_SIZE", USAGE_BATCH_SIZE))
+		return {
+			"status": "ok",
+			"eligible": eligible,
+			"to_delete": min(eligible, limit),
+			"deleted": int(result["deleted"]),
+		}
 	except Exception as error:
 		# The text of the gateway's error may carry a value. Only its type is returned.
 		log_tool_error("purge_usage_logs", error)

@@ -95,6 +95,10 @@ class WrongState(frappe.ValidationError):
 	"""The proposal is not in the right state for this action."""
 
 
+class PreviewRequired(frappe.ValidationError):
+	"""A destructive call came without the confirmation of a preview the caller has seen."""
+
+
 def human_call(stage: str, tool: str, action, *, proposal: str | None = None, log_success: bool = True):
 	"""Run the action of a human endpoint and write the result to the log.
 
@@ -105,6 +109,7 @@ def human_call(stage: str, tool: str, action, *, proposal: str | None = None, lo
 	codes = (
 		(frappe.DoesNotExistError, "not_found"),
 		(WrongState, "not_pending"),
+		(PreviewRequired, "preview_required"),
 		(frappe.PermissionError, "role_required" if proposal is None else "not_owner"),
 		(frappe.ValidationError, "invalid_arguments"),
 	)
