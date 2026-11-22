@@ -219,6 +219,10 @@ class LeaveHttpTest(unittest.TestCase):
         )
         self.assertEqual(status, 403, result.get("exception"))
         lookup = "/api/method/hrms_tr.api.get_leave_approver"
+        for invalid_query in ("", "?employee=", f"?employee={'x' * 141}"):
+            with self.subTest(query=invalid_query):
+                code, error = client.send(f"{lookup}{invalid_query}")
+                self.assertEqual(code, 417, error.get("exc_type"))
         for actor in ("outsider", "guest"):
             with self.subTest(actor=actor):
                 caller = self.login(actor) if actor != "guest" else Client(self, None)
@@ -513,14 +517,24 @@ class LeaveHttpTest(unittest.TestCase):
         cancel = "/api/method/hrms_tr.api.cancel_leave"
         submitted = self.document(hr, "hr_approve")
         args = self.approval_payload(submitted)
+        status, result = Client(self, None).send(cancel, args)
+        self.assertEqual((status, result.get("exc_type")), (403, "PermissionError"))
+        status, result = hr.send(f"{cancel}?{urlencode(args)}")
+        self.assertEqual((status, result.get("exc_type")), (403, "PermissionError"))
         for actor in ("manager", "employee"):
             with self.subTest(actor=actor):
                 status, result = self.login(actor).send(cancel, args)
                 self.assertEqual(
                     (status, result.get("exc_type")), (403, "PermissionError")
                 )
-        status, result = hr.send(cancel, {"name": name})
-        self.assertEqual((status, result.get("exc_type")), (417, "ValidationError"))
+        for invalid_args in (
+            {"name": name},
+            {**args, "version": ""},
+            {**args, "version": "x" * 41},
+        ):
+            with self.subTest(args=invalid_args):
+                status, result = hr.send(cancel, invalid_args)
+                self.assertEqual(status, 417, result.get("exc_type"))
         status, result = hr.send(cancel, self.approval_payload(target))
         self.assertEqual(
             (status, result.get("exc_type")), (417, "TimestampMismatchError")

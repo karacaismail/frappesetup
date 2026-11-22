@@ -149,6 +149,18 @@ Yalnız düzeltme gereken kullanıcı belgesi yüklenir ve kaydedilir.
 Bu sistem sorgusu, kullanıcıya dönen bir liste üretmez.
 Liste sözleşmesi eşit değişiklik saatleri için kayıt adı sırası verir.
 
+### Test araçları
+
+HTTP testleri, OpenAPI yanıtlarını elle yazılan alan denetimleriyle sınayabilirdi.
+Ancak elle yazılan denetimler şemadaki kuralları tekrar eder.
+Testler, OpenAPI dosyasını okumak için PyYAML 6.0.3 kullanır.
+Bu sürüm, Frappe test imajında gözlenen sürümdür. PyYAML, dosyayı `safe_load` ile okur.
+Testler, yanıtları şemaya göre sınamak için jsonschema 4.26.0 kullanır.
+İki yayımlanmış sürüm de MIT lisanslıdır. Paketler yalnız test imajına kurulur.
+Tarayıcıya paket gönderilmez. Geri dönüş için önce eşdeğer testler hazırlanır.
+[PyYAML sürüm kaydı](https://pypi.org/project/PyYAML/6.0.3/)
+[jsonschema sürüm kaydı](https://pypi.org/project/jsonschema/4.26.0/)
+
 İzin kaydı çalışana olan bağı, izin tarihlerini ve talep açıklamasını tutar.
 Öneri ayrıntısı yalnız kayıt adını tutar.
 Saklama süresi ve silme yolu MVP yayını öncesinde proje kaydında karara bağlanır.

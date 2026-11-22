@@ -31,5 +31,7 @@ def cancel_leave(name: LeaveName, version: LeaveVersion | None = None) -> dict[s
 
 # The HRMS lookup checks the caller's access to this employee before returning the approver.
 @frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
-def get_leave_approver(employee: Annotated[str, StringConstraints(min_length=1, max_length=140)]):
+def get_leave_approver(
+	employee: Annotated[str, StringConstraints(min_length=1, max_length=140)],
+) -> dict[str, str | None]:
 	return {"approver": leave.get_approver(employee)}

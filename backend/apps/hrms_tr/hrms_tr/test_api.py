@@ -1,5 +1,6 @@
-"""Check the approval endpoint's transport and record permission boundaries."""
+"""Check the leave endpoints' transport and record permission boundaries."""
 
+from inspect import signature
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -14,6 +15,9 @@ def raise_permission_error(message, exc=frappe.PermissionError, **kwargs):
 
 
 class ApprovalEndpointTest(TestCase):
+	def test_get_leave_approver_has_typed_response(self):
+		self.assertEqual(signature(get_leave_approver).return_annotation, dict[str, str | None])
+
 	def test_approve_leave_guest_denied(self):
 		self.assert_guest_denied(approve_leave)
 

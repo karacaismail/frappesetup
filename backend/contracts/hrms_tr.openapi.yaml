@@ -392,7 +392,7 @@ components:
         docstatus: {type: integer, enum: [0, 1, 2]}
         modified:
           type: string
-          description: Record version sent as version in the approval request.
+          description: Frappe returns this version in the site time zone without a UTC offset. Send it unchanged in approval and cancellation requests.
         total_leave_days: {type: [number, "null"]}
         leave_balance:
           type: [number, "null"]
