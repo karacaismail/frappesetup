@@ -158,6 +158,27 @@ test('MCP rejects an agent token sent with a session cookie', async ({ request }
   expect(allowed.isError).toBe(false);
   expect(allowed.structuredContent.documents).toEqual([{ name: visible }]);
 
+  const identity = await request.get(
+    `${localUrl('tenant1.localhost', 1)}/api/method/frappe.auth.get_logged_user`,
+    { headers: sessionHeaders('reader'), maxRedirects: 0 },
+  );
+  expect(identity.status()).toBe(200);
+  const { message: reader } = await identity.json();
+  expect(typeof reader).toBe('string');
+  expect(reader).not.toBe('Guest');
+  const latestDenial = async () => {
+    const logs = await resource(request, 'PLT AI Action Log', undefined, 'operator', {
+      fields: JSON.stringify(['name', 'deny_reason']),
+      filters: JSON.stringify({ user: reader, principal: 'agent_token', stage: 'auth', decision: 'denied' }),
+      order_by: 'creation desc, name desc',
+      limit_page_length: 1,
+    });
+    expect(logs.status()).toBe(200);
+    const { data } = await logs.json();
+    return data[0];
+  };
+  const previousDenial = await latestDenial();
+
   await withFreshRequest(async (agent) => {
     const response = await agent.post(aiMethod('mcp'), {
       headers: { ...sessionHeaders('reader'), ...bearer(token), 'Mcp-Conversation-Id': randomUUID() },
@@ -167,10 +188,10 @@ test('MCP rejects an agent token sent with a session cookie', async ({ request }
     expect(response.status()).toBe(403);
     const body = await response.json();
     expect(body.exc_type).toBe('PermissionError');
-    const messages = (JSON.parse(body._server_messages) as string[])
-      .map((entry) => JSON.parse(entry).message);
-    expect(messages).toContain('Send either a session cookie or an agent token, not both.');
   });
+  const denial = await latestDenial();
+  expect(denial).toMatchObject({ name: expect.any(String), deny_reason: 'cookie_with_token' });
+  expect(denial.name).not.toBe(previousDenial?.name);
 });
 
 test('an update takes effect only after one valid human approval', async ({ request }) => {
