@@ -109,7 +109,7 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - Yapay zekâ uygunluk kapısı yasaklı adı SHA-256 özetiyle tanır. Böylece kapının kendisi de adı taşımaz.
   - Eski commit mesajlarında ad geçer. Geçmiş yeniden yazılmadı, çünkü bu on dört dalı bozar. `backend` dalı `main` dalına birleşirken geçmiş tek commit'e indirilebilir.
 
-- **D-14. Geçmiş adlar ad verme kuralları raporuna göre düzeltilir.** Proje sahibi şöyle yazdı: “oluşturunca, onu da paralel ayrı bir pane görevi ile başlatıp, geçmişi düzelttirirsin.” Rapor `~/Documents/rules ai/naming_rules_report.md` dosyasıdır (AV-1..AV-73). İşi `naming-history-fix` yapar. Bu iş bitene kadar öteki işçiler var olan adları kendileri değiştirmez. Değişikliği ortak betik yapar.
+- **D-14. Geçmiş adlar ad verme kuralları raporuna göre düzeltilir.** Proje sahibi şöyle yazdı: “oluşturunca, onu da paralel ayrı bir pane görevi ile başlatıp, geçmişi düzelttirirsin.” Rapor `naming_rules_report.md` dosyasıdır (AV-1..AV-73). Rapor depoda değildir. Asıl kopya proje sahibinin `rules ai` klasöründedir. İşi `naming-history-fix` yapar. Bu iş bitene kadar öteki işçiler var olan adları kendileri değiştirmez. Değişikliği ortak betik yapar.
   - Uygulama ön ekleri (AV-69) şunlardır: `platform_core` için `PLT`, `press_tr` için `PTR`, `hrms_tr` için `HRT`. Ön ek DocType, rapor, rol, çalışma alanı ve yazdırma biçimi adlarına girer.
   - `press_tr` ve `hrms_tr` adlarındaki `tr`, Türkiye'nin ülke kodudur. Bu anlam terim sözlüğüne yazılır.
   - Keycloak rol adları küçük harfle ve tireyle yazılır. Örnek: `leave-approver`.

@@ -121,7 +121,7 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 
 kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler öteki projelere dokunmaz.
 
-1. **Klasör bağlama çalışmaz.** `colima-factory` profili yalnız `~/Developer/software-factory` klasörünü görür. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
+1. **Klasör bağlama çalışmaz.** Bu not proje sahibinin Mac'indeki yerel `factory` profilini anlatır. Bu profil yalnız bir klasörü görür. O klasör depo klasörü değildir. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kendi bilgisayarınızda bağlı klasörleri profil ayarı gösterir. Ayar `~/.colima/<profil>/colima.yaml` dosyasının `mounts` bölümündedir. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
 2. **Yeni portlar bilgisayara açılmaz.** Profilin port yönlendirmesi bozuk. Portu bilgisayara ayrı bir ssh tüneliyle taşıyın. Örnek: `backend/identity/keycloak/bin/kc-dev.sh tunel`.
 3. **`docker pull` hata verebilir.** Docker ayarındaki şifre yardımcısı eksik. İmajı boş bir `DOCKER_CONFIG` klasörüyle çekin. Kullanıcının Docker ayarını değiştirmeyin.
 4. **Disk dar.** `colima-factory` profilinin Docker diski 22 Kasım 2026 Pazar günü %99 doldu. Kullanılmayan derleme önbelleği silindi. Boş yer yaklaşık 8 GB'tır.

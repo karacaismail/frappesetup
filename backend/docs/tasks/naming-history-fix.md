@@ -1,10 +1,10 @@
 # İş: naming-history-fix
 
-Bu iş var olan adları adlandırma kurallarına göre düzeltir. Kurallar ayrı bir oturumun raporundadır. Rapor `~/Documents/rules ai/naming_rules_report.md` dosyasıdır. Proje sahibi bu işi şöyle istedi: “oluşturunca, onu da paralel ayrı bir pane görevi ile başlatıp, geçmişi düzelttirirsin.”
+Bu iş var olan adları adlandırma kurallarına göre düzeltir. Kurallar ayrı bir oturumun raporundadır. Rapor `naming_rules_report.md` dosyasıdır. Rapor depoda değildir. Asıl kopya proje sahibinin `rules ai` klasöründedir. Raporu orkestratörden isteyin. Proje sahibi bu işi şöyle istedi: “oluşturunca, onu da paralel ayrı bir pane görevi ile başlatıp, geçmişi düzelttirirsin.”
 
 Önce şu dosyaları okuyun:
 
-1. `~/Documents/rules ai/naming_rules_report.md`. Dosyanın son hâlini okuyun. Rapor sonradan güncellenebilir.
+1. `naming_rules_report.md` raporu. Raporun son hâlini orkestratörden isteyin ve okuyun. Rapor sonradan güncellenebilir.
 2. `backend/AGENTS.md`, özellikle “Ad dili” bölümü
 3. `backend/PROJECT-RECORD.md`, özellikle D-12
 4. `backend/docs/contracts.md`
@@ -72,7 +72,7 @@ Aynı anda on bir işçi kendi dalında çalışıyor. Adlar yalnız `backend` d
 6. Betiğin testlerini yazın. Testler geçici bir git deposunda çalışsın.
 7. Koddaki Türkçe yorum ve iletilerin İngilizce karşılığını eşleşmeye koymayın. Onları bu iş kendi dalında elle çevirir. Öteki işçiler kendi dosyalarındakini çevirir.
 8. Commit atın ve `ready` raporlayın. Raporda eşleşme tablosunun özetini verin.
-9. Betiği `--dry-run` ile öteki işlerin dallarında salt okunur çalıştırın. Dallar `~/Documents/frappesetup/worktrees/` altındadır. Başka dalda dosya değiştirmeyin. Her dal için değişecek dosya sayısını ve çakışma riskini durum dosyasına yazın.
+9. Betiği `--dry-run` ile öteki işlerin dallarında salt okunur çalıştırın. Dalların çalışma ağaçlarını `git worktree list` komutu gösterir. Başka dalda dosya değiştirmeyin. Her dal için değişecek dosya sayısını ve çakışma riskini durum dosyasına yazın.
 
 ## Kontrol noktası 2: backend dalında uygulama
 
