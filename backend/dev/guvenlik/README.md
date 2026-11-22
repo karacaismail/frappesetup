@@ -39,7 +39,16 @@ Eksik test adı kapıyı durdurur. Betik testin içeriğini veya sonucunu ölçm
 
 ## Kuralların kapsamı
 
-Semgrep kodda tanımlı kalıpları arar. Yardımcı işlevlerin içini izleyerek karar vermez.
+Semgrep kodda tanımlı kalıpları arar.
+Yeni kurallar aynı işlev içinde verinin kaynaktan kullanıldığı yere akışını izler.
+Kurallar, yardımcı işlevler ve dosyalar arasındaki akışı kapsamaz.
+
+- Ham istek adresi ve yanıt gövdesi günlükte görünmemeli.
+- Testin hata iletisi ham yanıt içermemeli. Durum kodu yeterliyse onu kullanın.
+- İşletim sistemine verilen komut argümanında gizli değer bulunmamalı.
+  Aracın desteklediği korumalı giriş yolunu kullanın.
+
+Olumlu ve olumsuz denemeler `backend/dev/guvenlik/fixtures/` altındadır.
 Misafir uçta Frappe'nin `rate_limit` işaretini kullanın.
 `rate_limit` satırını `whitelist` satırının altına yazın.
 Uç listesi bu sırayı ve işaretin içe aktarıldığı yeri denetler.

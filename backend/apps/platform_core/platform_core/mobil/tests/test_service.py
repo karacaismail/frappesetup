@@ -44,8 +44,8 @@ class Transaction:
 	def remember_operation(self, key, digest, result):
 		self.operations[key] = (digest, result)
 
-	def append_change(self, record_type, record_id, kind):
-		self.changes.append((record_type, record_id, kind))
+	def append_changes(self, changes):
+		self.changes.extend(changes)
 
 
 class PushTest(unittest.TestCase):
@@ -70,6 +70,32 @@ class PushTest(unittest.TestCase):
 			principal="principal",
 			disabled_commands=disabled_commands,
 		)
+
+	def test_batch_publishes_only_after_operation_receipts_are_written(self):
+		events = []
+		remember = self.store.remember_operation
+
+		def remember_operation(*args):
+			remember(*args)
+			events.append("receipt")
+
+		def append_changes(changes):
+			events.append("publish")
+			self.store.changes.extend(changes)
+
+		self.store.remember_operation = remember_operation
+		self.store.append_changes = append_changes
+		second = dict(self.operation, operation_id="2e80bd91-16c5-4abc-8ac4-c843976316e7", version="2")
+		push(
+			self.store,
+			{"sample.update": self.command},
+			"site",
+			"account",
+			[self.operation, second],
+			principal="principal",
+		)
+		self.assertEqual(events, ["receipt", "receipt", "publish"])
+		self.assertEqual(len(self.store.changes), 2)
 
 	def test_retry_returns_first_result_and_does_not_write_again(self):
 		result = self.submit()

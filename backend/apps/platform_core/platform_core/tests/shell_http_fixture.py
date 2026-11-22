@@ -258,7 +258,7 @@ class ShellHTTPFixture(unittest.TestCase):
 		cls.desk_sid = cls.login(DESK)
 
 	@classmethod
-	def request(cls, path, sid=None, method="GET", data=None, headers=None):
+	def request(cls, path, sid=None, method="GET", data=None, headers=None, *, response_header_type=dict):
 		connection = http.client.HTTPConnection(
 			"127.0.0.1", int(os.environ.get("KABUK_TEST_PORT", "8000")), timeout=30
 		)
@@ -272,7 +272,7 @@ class ShellHTTPFixture(unittest.TestCase):
 		try:
 			connection.request(method, path, body=data, headers=request_headers)
 			response = connection.getresponse()
-			return response.status, dict(response.getheaders()), response.read()
+			return response.status, response_header_type(response.getheaders()), response.read()
 		finally:
 			connection.close()
 

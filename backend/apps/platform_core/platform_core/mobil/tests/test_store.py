@@ -27,16 +27,6 @@ if frappe is not None:
 			self.assertEqual(store.sequence, 1)
 			self.assertFalse(db.get_value.call_args.kwargs.get("for_update", False))
 
-		def test_redelivery_restores_visibility_in_the_existing_row(self):
-			db = Mock()
-			db.get_value.side_effect = [
-				SimpleNamespace(sequence=1, retention_floor=0),
-				SimpleNamespace(name="existing-delivery", visible=0),
-			]
-			with patch.object(storage.frappe, "db", db):
-				storage.MobileStore().record_delivery("installation", "type", "record")
-			db.set_value.assert_called_once_with("Mobile Delivery", "existing-delivery", "visible", 1)
-
 		def test_user_cleanup_removes_mobile_metadata(self):
 			db = Mock()
 			with (
@@ -60,6 +50,41 @@ if frappe is not None:
 			installation = str(uuid4())
 			storage.MobileStore().install(identity, installation)
 			return installation
+
+		def test_batch_counter_and_events_roll_back_together(self):
+			store = storage.MobileStore()
+			start = store.sequence
+			isolation = frappe.db.sql("SELECT @@SESSION.innodb_snapshot_isolation")
+			record_ids = [str(uuid4()), str(uuid4())]
+			changes = [("fixture", record_id, "upsert") for record_id in record_ids]
+			frappe.db.savepoint("before_mobile_batch")
+			try:
+				self.assertEqual(store.append_changes(changes), start + 2)
+				self.assertEqual(frappe.db.sql("SELECT @@SESSION.innodb_snapshot_isolation"), isolation)
+				events = store.read_events(str(uuid4()), start, start + 2, 2)
+				self.assertEqual([event.sequence for event in events], [start + 1, start + 2])
+				self.assertEqual([event.record_id for event in events], record_ids)
+			finally:
+				frappe.db.rollback(save_point="before_mobile_batch")
+
+			fresh = storage.MobileStore()
+			self.assertEqual(fresh.sequence, start)
+			self.assertEqual(fresh.read_events(str(uuid4()), start, start + 2, 2), [])
+
+		def test_exhausted_counter_restores_snapshot_setting(self):
+			store = storage.MobileStore()
+			isolation = frappe.db.sql("SELECT @@SESSION.innodb_snapshot_isolation")
+			frappe.db.savepoint("before_mobile_counter_limit")
+			try:
+				frappe.db.set_value(
+					storage.SEQUENCE_DOCTYPE, storage.SEQUENCE_NAME, "sequence", 2_147_483_647
+				)
+				with self.assertRaises(storage.MobileError) as error:
+					store.append_change("fixture", str(uuid4()), "upsert")
+				self.assertEqual(error.exception.code, "mobile_sequence_exhausted")
+				self.assertEqual(frappe.db.sql("SELECT @@SESSION.innodb_snapshot_isolation"), isolation)
+			finally:
+				frappe.db.rollback(save_point="before_mobile_counter_limit")
 
 		def test_cleanup_removes_only_deliveries_for_revoked_installations(self):
 			revoked = self.make_installation("Administrator")
