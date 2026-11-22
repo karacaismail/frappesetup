@@ -1,7 +1,7 @@
 """Tests of `platform_core.api.identity.anonymize_user` (PROJE-KAYDI.md O-27).
 
 Expected behaviour comes from docs/sozlesmeler.md section 7, anonymization rules and the third
-review decisions E1, E2, E3 and Ö1 (D-1):
+review decisions E1, E2, E3 and minor finding 1 (D-1):
 - only an `azp=identity-sync` service token may call it,
 - step 1 disables the user, revokes API keys, records the deletion and closes every session page by page;
   step 2 anonymizes. Both steps are safe to repeat,
@@ -511,7 +511,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertEqual(frappe.db.count("Email Queue Recipient", {"recipient": DELETED}), 0)
 
 	def test_api_keys_are_revoked_even_if_the_account_comes_back(self):
-		# Ö1: the key and its stored secret are deleted, not only refused for a disabled account.
+		# Minor finding 1: the key and its stored secret are deleted, not only refused for a disabled account.
 		from frappe.utils.password import set_encrypted_password
 
 		secret = frappe.generate_hash(length=15)

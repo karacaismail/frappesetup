@@ -13,7 +13,7 @@
  ],
  "fields": [
   {
-   "description": "HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The key is the site setting kimlik_deletion_hmac_key. The raw pair is not stored.",
+   "description": "HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The site supplies the deletion HMAC key. The raw pair is not stored.",
    "fieldname": "identity_hash",
    "fieldtype": "Data",
    "in_list_view": 1,

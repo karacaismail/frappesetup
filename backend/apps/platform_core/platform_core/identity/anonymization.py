@@ -56,20 +56,25 @@ def identity_hash(issuer: str, subject: str) -> str:
 
 
 def lock_identity(
-	issuer: str, subject: str, *, require_key: bool = True
+	issuer: str, subject: str, *, require_key: bool = True, candidate_user: str | None = None
 ) -> tuple[frappe._dict | None, frappe._dict | None]:
-	"""Locks the identity link and then the deletion record of `(iss, sub)`. Same order everywhere.
+	"""Locks the existing User, then the identity link, then the deletion record.
 
-	Sign-in passes `require_key=False`: without the key no deletion can have happened, so only the link
-	is locked. Identity changes keep failing closed with 503.
+	Frappe renames the User before updating its link fields. Follow the same order.
+
+	Sign-in may skip the deletion record if the deletion key is missing.
+	Identity changes still fail with 503 when the key is missing.
 	"""
-	link = frappe.db.get_value(
-		provisioning.LINK,
-		{"issuer": issuer, "subject": subject},
-		["name", "user"],
-		as_dict=True,
-		for_update=True,
-	)
+	filters = {"issuer": issuer, "subject": subject}
+	linked_user = frappe.db.get_value(provisioning.LINK, filters, "user")
+	user = linked_user or candidate_user
+	locked_user = None
+	if user and (linked_user or frappe.db.exists("User", user)):
+		locked_user = frappe.db.get_value("User", user, "name", for_update=True)
+	link = frappe.db.get_value(provisioning.LINK, filters, ["name", "user"], as_dict=True, for_update=True)
+	if link and link.user != locked_user:
+		# The optimistic lookup is only for lock ordering. Do not use a different link under this lock.
+		raise frappe.QueryDeadlockError("Identity link changed while acquiring locks")
 	if not require_key and not frappe.conf.get(KEY_SETTING):
 		return link, None
 	record = frappe.db.get_value(
@@ -78,9 +83,9 @@ def lock_identity(
 	return link, record
 
 
-def refuse_if_deleted(issuer: str, subject: str) -> frappe._dict | None:
+def refuse_if_deleted(issuer: str, subject: str, *, candidate_user: str | None = None) -> frappe._dict | None:
 	"""For provisioning, enabling and e-mail changes. Returns the locked link, or raises 410."""
-	link, record = lock_identity(issuer, subject)
+	link, record = lock_identity(issuer, subject, candidate_user=candidate_user)
 	if record:
 		frappe.throw(
 			_("This identity was deleted and cannot be used again.", context="platform_core.identity"),

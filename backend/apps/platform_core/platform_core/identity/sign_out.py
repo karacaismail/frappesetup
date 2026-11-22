@@ -132,8 +132,8 @@ def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
 	"""Sessions of the user that were created before the logout token was issued. A replayed or
 	delayed token therefore never closes a session that was opened after it.
 
-	Merge review Ö3: every page is read, up to the last one. There is no page cap, so an old session is
-	never left open behind newer ones.
+	Important finding 3 in the merge review: read through the last page. Without a page cap, newer
+	sessions cannot hide an older session that should be closed.
 	"""
 	sessions = frappe.qb.DocType("Sessions")
 	now = now_datetime()
