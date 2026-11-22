@@ -17,6 +17,19 @@ from platform_core.model_gecidi import api, gateway, ledger, maintenance, manage
 
 
 class PreviewRequiredTests(unittest.TestCase):
+	def test_public_purge_previews_without_writes(self):
+		with (
+			patch.object(maintenance, "frappe") as framework,
+			patch.object(policy, "require_user"),
+			patch.object(maintenance, "now_datetime", return_value=datetime(2026, 1, 1)),
+		):
+			framework.get_roles.return_value = ["System Manager"]
+			framework.db.count.return_value = 3
+			self.assertEqual(api.purge_usage_logs(dry_run=True), {"eligible": 3, "deleted": 0})
+			framework.delete_doc.assert_not_called()
+			framework.get_doc.assert_not_called()
+			self.assertEqual(framework.cache.mock_calls, [])
+
 	def test_public_purge_rejects_an_ai_manager(self):
 		with (
 			patch.object(policy, "require_user"),
@@ -132,13 +145,15 @@ class PreviewRequiredTests(unittest.TestCase):
 
 
 class TestUsageMaintenance(IntegrationTestCase):
-	def test_public_purge_uses_fixed_retention_and_returns_deleted_count(self):
+	def test_public_purge_uses_fixed_retention_and_returns_counts(self):
 		now = now_datetime()
 		old = self._usage("success", now - timedelta(days=366))
 		recent = self._usage("success", now - timedelta(days=364))
 		pending = self._usage("pending", now - timedelta(days=366))
 		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 36500}):
-			self.assertEqual(api.purge_usage_logs(), 1)
+			self.assertEqual(api.purge_usage_logs(dry_run=True), {"eligible": 1, "deleted": 0})
+			self.assertTrue(frappe.db.exists("AI Usage Log", old.name))
+			self.assertEqual(api.purge_usage_logs(), {"eligible": 1, "deleted": 1})
 		self.assertFalse(frappe.db.exists("AI Usage Log", old.name))
 		self.assertTrue(frappe.db.exists("AI Usage Log", recent.name))
 		self.assertTrue(frappe.db.exists("AI Usage Log", pending.name))

@@ -152,21 +152,21 @@ def _load_purge_preview(token):
 	return preview
 
 
-def purge_usage_logs(*, preview_token: str | None = None) -> int:
-	"""Permanently delete up to 500 expired, settled logs as a System Manager."""
+def purge_usage_logs(*, dry_run: bool = False) -> dict[str, int]:
+	"""Count or permanently delete expired, settled logs as a System Manager."""
 	_require_retention_manager()
+	if type(dry_run) is not bool:
+		raise policy.Denied(400, "invalid_request")
 	now = now_datetime()
-	preview = _load_purge_preview(preview_token) if preview_token is not None else None
-	cutoff = preview["cutoff"] if preview is not None else now - timedelta(days=RETENTION_DAYS)
-	rows = _purge_batch(_retention_filters(cutoff), for_update=True)
-	batch = [(row.name, row.modified) for row in rows]
-	if preview is not None:
-		if preview["batch"] != batch:
-			raise policy.Denied(409, "preview_invalid")
-		# Claim at most once, including empty batches with no database rows to lock.
-		key = _purge_preview_key(preview_token)
-		if frappe.cache.getdel(frappe.cache.make_key(key)) is None:
-			raise policy.Denied(409, "preview_invalid")
+	filters = _retention_filters(now - timedelta(days=RETENTION_DAYS))
+	if dry_run:
+		return {"eligible": frappe.db.count(USAGE_LOG, filters), "deleted": 0}
+	batch = [(row.name, row.modified) for row in _purge_batch(filters, for_update=True)]
+	deleted = _delete_usage_batch(batch, now)
+	return {"eligible": deleted + frappe.db.count(USAGE_LOG, filters), "deleted": deleted}
+
+
+def _delete_usage_batch(batch, now):
 	for name, _modified in batch:
 		# The System Manager check and locking query restrict this O-32 deletion.
 		frappe.delete_doc(  # nosemgrep: frappe-ignore-permissions
@@ -206,9 +206,16 @@ def purge_usage(dry_run=True, preview_token=None):
 		)
 	else:
 		preview = _load_purge_preview(preview_token)
-		batch = preview["batch"]
-		deleted = purge_usage_logs(preview_token=preview_token)
-		eligible = deleted + frappe.db.count(USAGE_LOG, _retention_filters(preview["cutoff"]))
+		filters = _retention_filters(preview["cutoff"])
+		batch = [(row.name, row.modified) for row in _purge_batch(filters, for_update=True)]
+		if preview["batch"] != batch:
+			raise policy.Denied(409, "preview_invalid")
+		# Claim at most once, including empty batches with no database rows to lock.
+		key = _purge_preview_key(preview_token)
+		if frappe.cache.getdel(frappe.cache.make_key(key)) is None:
+			raise policy.Denied(409, "preview_invalid")
+		deleted = _delete_usage_batch(batch, now_datetime())
+		eligible = deleted + frappe.db.count(USAGE_LOG, filters)
 		preview_token = None
 	return {
 		"eligible": eligible,
