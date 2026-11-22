@@ -25,7 +25,7 @@ Proje sahibi iki giriş yolunu MVP'ye aldı (O-6). Birincisi sihirli bağlantıd
 
 ## Karar
 
-- Sihirli bağlantı için `sky-cloak/keycloak-magic-link` v0.3.0 seçilmişti. Güvenlik incelemesi sonrası MVP'den çıkarıldı. Ayrıntı aşağıdaki durum bölümündedir.
+- Sihirli bağlantı için önce `sky-cloak/keycloak-magic-link` v0.3.0 seçilmişti. Güvenlik incelemesi sonrası yerine `cloudflightio/keycloak-magic-link` geldi. Ayrıntı aşağıdaki durum bölümündedir.
 - Apple ile giriş için `klausbetz/apple-identity-provider-keycloak` 1.17.0 seçildi.
 
 ### Gerekçe
@@ -46,23 +46,29 @@ Proje sahibi iki giriş yolunu MVP'ye aldı (O-6). Birincisi sihirli bağlantıd
 - Skycloak eklentisinin yönetici ucu (`/realms/platform/skycloak-magic-link`) `manage-users` rolü ister. Bu uç hesaba giriş vermekle eşdeğerdir. Bu turda hiçbir servis bu ucu çağırmaz.
 - İki depoda da yayımlanmış bir güvenlik açığı kaydı bulunmadı (GitHub Security Advisories, 22 Kasım 2026).
 
-## Durum: sihirli bağlantı eklentisi MVP'den çıkarıldı (22 Kasım 2026, ikinci güvenlik incelemesi)
+## Durum: sihirli bağlantı güvenli kurulumla MVP'de (22 Kasım 2026, orkestratör kararı)
 
-Bağımsız güvenlik incelemesi iki engelleyici buldu. Orkestratör eklentiyi MVP'den tamamen çıkardı.
+Proje sahibinin kararı açıktır: sihirli bağlantı ve Apple ile giriş MVP'ye girer (KARARLAR.md, Karar 17). İkinci güvenlik incelemesinden sonra orkestratör beş koşul koydu. Sihirli bağlantı bu koşullarla kalır.
 
-- E1: Eklentinin v0.3.0 sürümü bağlantıya tıklanınca tarayıcı akışının kalan adımlarını çalıştırmıyor. `MagicLinkActionTokenHandler.handleToken` doğrudan `redirectToRequiredActions` çağırıyor (119 ve 121. satırlar). İkinci doğrulama atlanıyor. Bu durum canlı testle gösterildi.
-- E2: Eklentinin yönetici ucu (`/realms/platform/skycloak-magic-link`) belirtecin hedefini ve rolünü denetlemiyor. Hesabın kayıtlı rolüne bakıyor (`MagicLinkResource.java` 334 ve 346. satırlar). Kiracı hedefli bir servis belirteci ele geçirilirse bu uçla giriş bağlantısı üretilebilir.
+| Koşul | Nasıl sağlandı | Kanıt |
+| --- | --- | --- |
+| 1. Bağlantı akışın içinde bir adım. Tıklamadan sonra akış sürer, ikinci doğrulama atlanmaz. | `cloudflightio/keycloak-magic-link` eklentisinin “normal” doğrulayıcısı seçildi. Bağlantı, akışın kendi `login-actions/authenticate` adresine `magickey` ekler. Tıklama `authenticate()` içinde doğrulanır ve `context.success()` ile akış sürer (`MagicLinkAuthenticatorNormal.java`). Realm'de `magiclink` adımından sonra koşullu ikinci adım alt akışı gelir. | `test_link_does_not_skip_totp`: TOTP'li kullanıcı bağlantıdan sonra OTP formu görür. Yanlış kod reddedilir. Doğru kod girişi tamamlar. |
+| 2. Bağlantı giriş isteğine ve tarayıcı oturumuna bağlı. | Bağlantı o giriş isteğinin yürütme adresidir. Doğrulayıcı kullanıcıyı tarayıcının kimlik doğrulama oturumundan okur. Başka tarayıcıda oturum yoktur. | `test_link_logs_in_only_in_the_requesting_browser_and_only_once` ve `test_other_user_cannot_use_a_link_meant_for_someone_else`: başka tarayıcı kod alamaz. |
+| 3. En çok 300 saniye, tek kullanım, e-posta önizlemesi tüketmez (MT-7). | `magickey.validity.duration = 300`. Anahtar doğrulamada silinir (`removeMagicLinkSession`). Önizleme tarayıcı oturumu taşımadığı için doğrulayıcıya ulaşmaz ve anahtar tüketilmez. | Aynı testler: yabancı tarayıcının denemesinden sonra asıl tarayıcı giriş yapar. İkinci tıklama kod vermez. Ömür dosya ve canlı ayardan okunur. |
+| 4. Servis hesabı ya da kiracı belirteciyle bağlantı üreten yönetim ucu yok. | Eklentinin bağlantı üreten ucu yoktur. Çapraz cihaz “continuation” REST kaynağı ve doğrulayıcısı Keycloak SPI ayarıyla kapalıdır: `KC_SPI_REALM_RESTAPI_EXTENSION__MAGICLINK_LOGIN__ENABLED=false` ve `KC_SPI_AUTHENTICATOR__MAGICLINK_CONTINUATION__ENABLED=false`. | `test_rest_resource_answers_404` ve `test_continuation_authenticator_is_not_available`. Eski eklentinin ucu da 404 verir. |
+| 5. Lisans Apache-2.0 ya da MIT. | Depodaki `LICENSE` dosyası Apache License 2.0 (resmî depo, 22 Kasım 2026). | Bu not. |
 
-Yapılan şudur: Dockerfile eklentiyi yüklemez. Realm'de ilgili yürütme ve ayar yoktur. Kullanıcı parola ve passkey ile girer.
+### Seçim
 
-### Teknik borç ve geri dönüş koşulu
+`sky-cloak/keycloak-magic-link` v0.3.0 koşul 1 ve 4'ü sağlamaz. Bağlantı işleyicisi akışı `redirectToRequiredActions` ile bitirir ve bir yönetici ucu vardır. Bu yüzden çıkarıldı.
 
-Sihirli bağlantı ancak şu iki koşulu sağlayan bir sürümle geri gelir:
+`cloudflightio/keycloak-magic-link` seçildi. Yayımlanmış sürümü yoktur. Kaynak `7b4ee949a39a7ee953987162479ae1da2c57c3cb` commit'ine sabitlendi (4 Haziran 2025). Arşivin SHA-256 özeti Dockerfile'da sabittir. Eklenti imaj derlemesinde Maven ile derlenir. Derleme hedefi `-Dkeycloak.version=26.8.2` verilir. Böylece uyumsuzluk derlemede görünür. Maven imajı özetle sabittir. Eklenti veritabanına `MAGIC_LINK_SESSION` tablosunu ekler (Liquibase).
 
-1. Eklenti, bağlantıdan sonra tarayıcı akışını sürdürür ya da ikinci doğrulamayı kendisi ister. Kabul testi: TOTP'li kullanıcı bağlantıdan sonra OTP formu görür. Yanlış kod reddedilir. Doğru kod girişi tamamlar.
-2. Eklentinin yönetici ucu belirtecin hedefini ve belirteçteki rolü denetler. Kabul testi: kiracı hedefli servis belirteci bu uca gönderilir ve 401 ya da 403 alır.
+### Borç
 
-Bugünkü kabul testi eklentinin uçlarının 404 döndüğünü gösterir: `tests/test_eklentiler.py` içindeki `test_magic_link_endpoints_are_gone`. Sorumlusu kimlik-realm işidir. Eklenti deposuna sorun kaydı açmak proje sahibinin kararıdır.
+- Eklentinin kendi hedefi Keycloak 26.1.4'tür. 26.8.2 ile derlendi ve canlı testleri geçti. Keycloak yükseltmesinde yeniden derlenir ve sınanır.
+- Eklenti bir yıldır değişmedi. Güvenlik düzeltmesi gerekirse çatal alınır. Bu karar o zaman yeniden açılır.
+- Giriş ve e-posta şablonları eklentinin jar dosyasından gelir. Türkçe metinler kimlik-tema işinin `atonota` temasında verilir.
 
 ### identity-sync en az yetki
 
@@ -74,8 +80,8 @@ Google ve Apple sağlayıcıları `postBrokerLoginFlowAlias` olarak `atonota-pos
 
 ## Kurulum
 
-- `backend/identity/keycloak/Dockerfile` Apple jar dosyasını `/opt/keycloak/providers/` klasörüne ekler. Özet sabittir.
-- Realm'in tarayıcı akışı `atonota-browser` adını taşır. Kullanıcı parola ve passkey ekranını görür.
+- `backend/identity/keycloak/Dockerfile` Apple jar dosyasını ve derlenen sihirli bağlantı jar dosyasını `/opt/keycloak/providers/` klasörüne ekler. Özetler sabittir.
+- Realm'in tarayıcı akışı `atonota-browser` adını taşır. Kullanıcı parola ve passkey ekranını görür. “Başka yol dene” bağlantısı sihirli bağlantı yolunu açar. İki yolda da ikinci adım sorulur.
 - Apple sağlayıcısı realm'de kapalı durur. Anahtarlar `.env` dosyasındaki yer tutuculardan gelir. Gerçek anahtar yoktur.
 
 ## Geri dönüş

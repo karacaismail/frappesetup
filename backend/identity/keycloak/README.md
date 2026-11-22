@@ -12,7 +12,7 @@ Bu klasör Atonota kimlik servisinin geliştirme kurulumunu tutar. Atonota, Keyc
 | `realm/password-blacklists/yaygin-parolalar.txt` | Parola politikasının yaygın parola listesi. Kaynağı `KAYNAK.md` dosyasındadır. |
 | `.env.example` | Gerekli ortam değişkenleri ve sahte değerler |
 | `bin/kc-dev.sh` | Ortamı açan, kapatan ve testleri çalıştıran betik |
-| `Dockerfile` | Realm dosyalarını ve Apple eklentisini imaja ekler |
+| `Dockerfile` | Realm dosyalarını, Apple eklentisini ve derlenen sihirli bağlantı eklentisini imaja ekler |
 | `tests/` | Realm dosyası testleri, canlı Keycloak testleri ve eklenti testleri |
 
 ## Çalıştırma
@@ -66,10 +66,14 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 
 ## Eklentiler
 
-Apple eklentisi imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
+İki eklenti imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
 
-- Sihirli bağlantı eklentisi MVP'den çıkarıldı. Güvenlik incelemesi iki engelleyici buldu. Geri dönüş koşulu karar notundadır.
+- Sihirli bağlantıyı `cloudflightio/keycloak-magic-link` eklentisi sağlar. Eklenti imaj derlemesinde sabit bir commit'ten derlenir. Bağlantı akışın adımıdır. Tıklamadan sonra ikinci adım sorulur. Bağlantı yalnız isteyen tarayıcıda, 300 saniye ve tek kullanım geçerlidir. Çapraz cihaz ucu kapalıdır.
 - Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.
+
+## İmaj çekme hatası
+
+Bu Mac'te Docker istemcisi `osxkeychain` yardımcısını arar ama yardımcı kurulu değil. İlk çekimde “error getting credentials” hatası çıkar. Çözüm: boş bir Docker ayar klasörü verin ve içine `contexts` ile `cli-plugins` klasörlerini kopyalayın. Sonra çekimi `DOCKER_CONFIG=<klasör>` ile yapın. İmaj yerelde olunca `kc-dev.sh up` normal çalışır.
 
 ## Kapatma
 

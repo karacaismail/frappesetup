@@ -871,7 +871,7 @@
   "authenticationFlows": [
     {
       "alias": "atonota-browser",
-      "description": "Atonota tarayıcı girişi: çerez, dış sağlayıcı, parola ve passkey, ikinci adım.",
+      "description": "Atonota tarayıcı girişi: çerez, dış sağlayıcı, sonra parola ya da sihirli bağlantı. İkinci adım her yolda sorulur.",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -895,7 +895,30 @@
           "requirement": "ALTERNATIVE",
           "priority": 30,
           "userSetupAllowed": false,
+          "flowAlias": "atonota-browser-giris"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-browser-giris",
+      "description": "Kullanıcı parola yolunu ya da sihirli bağlantı yolunu seçer.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false,
           "flowAlias": "atonota-browser-parola"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-browser-sihirli"
         }
       ]
     },
@@ -925,6 +948,68 @@
     {
       "alias": "atonota-browser-2fa",
       "description": "İkinci adım: kullanıcı TOTP ya da güvenlik anahtarı kurduysa sorulur. Passkey ile girildiyse atlanır.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "atonota-passkey-kosulu"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "userSetupAllowed": false,
+          "authenticator": "webauthn-authenticator"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-browser-sihirli",
+      "description": "Sihirli bağlantı yolu. Bağlantı akışın adımıdır; tıklamadan sonra akış ikinci adımla sürer.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "magiclink",
+          "authenticatorConfig": "atonota-sihirli-baglanti"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-sihirli-2fa"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-sihirli-2fa",
+      "description": "Sihirli bağlantıdan sonraki ikinci adım.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1020,6 +1105,12 @@
       "alias": "atonota-passkey-kosulu",
       "config": {
         "credentials": "webauthn-passwordless"
+      }
+    },
+    {
+      "alias": "atonota-sihirli-baglanti",
+      "config": {
+        "magickey.validity.duration": "300"
       }
     }
   ],

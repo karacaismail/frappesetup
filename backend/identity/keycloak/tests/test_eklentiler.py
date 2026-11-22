@@ -27,16 +27,17 @@ class EklentiDosyaTesti(unittest.TestCase):
         cls.dockerfile = DOCKERFILE.read_text(encoding="utf-8")
 
     def test_eklenti_jarlari_sabit_surum_ve_ozetle_eklenir(self):
-        # The magic link extension is out of the MVP (second review, E1 and E2). Only Apple remains.
-        self.assertNotIn("keycloak-magic-link", self.dockerfile)
+        # The sky-cloak extension is out (second review, E1 and E2). Apple jar and the cloudflight
+        # magic link source archive are pinned by checksum; the Maven image is pinned by digest.
+        self.assertNotIn("sky-cloak", self.dockerfile)
         self.assertIn("klausbetz/apple-identity-provider-keycloak/releases/download/1.17.0/", self.dockerfile)
-        self.assertEqual(self.dockerfile.count("--checksum=sha256:"), 1)
+        self.assertEqual(self.dockerfile.count("--checksum=sha256:"), 2)
+        self.assertRegex(self.dockerfile, r"FROM maven:[0-9.]+-eclipse-temurin-21@sha256:[0-9a-f]{64} AS magiclink-build")
 
     def test_tarayici_akisinda_sihirli_baglanti_yok(self):
         self.assertEqual(self.realm["browserFlow"], AKIS)
         yurutmeler = [y for a in self.realm["authenticationFlows"] for y in a["authenticationExecutions"]]
         self.assertEqual([y for y in yurutmeler if y.get("authenticator") == SIHIRLI], [])
-        self.assertNotIn("atonota-sihirli-baglanti", {a["alias"] for a in self.realm["authenticatorConfig"]})
         parola = [y for y in yurutmeler if y.get("authenticator") == "auth-username-password-form"]
         self.assertEqual(len(parola), 1, "password path stays")
         otp = [y for y in yurutmeler if y.get("authenticator") == "auth-otp-form"]

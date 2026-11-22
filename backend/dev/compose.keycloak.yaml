@@ -22,6 +22,9 @@ services:
       KC_HTTP_PORT: ${KC_PORT:?}
       KC_HOSTNAME: ${KC_PUBLIC_URL:?}
       KC_HEALTH_ENABLED: "true"
+      # Magic link extension: no REST endpoint and no cross-device variant (security review condition 4).
+      KC_SPI_REALM_RESTAPI_EXTENSION__MAGICLINK_LOGIN__ENABLED: "false"
+      KC_SPI_AUTHENTICATOR__MAGICLINK_CONTINUATION__ENABLED: "false"
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
