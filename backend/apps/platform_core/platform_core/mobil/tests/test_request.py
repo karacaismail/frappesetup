@@ -1,5 +1,6 @@
 """Exercise the real mobile request boundary with isolated Frappe state."""
 
+import json
 import time
 import unittest
 from types import SimpleNamespace
@@ -48,6 +49,7 @@ class MobileRequestTest(unittest.TestCase):
 					"site": "test-mobile.localhost",
 					"account": "test@example.test",
 					"scope": "mobile",
+					"installation": "12345678-1234-4234-8234-123456789abc",
 					"issuer": "fixture",
 					"subject": "fixture-user",
 					"iat": self.issued_at,
@@ -70,6 +72,24 @@ class MobileRequestTest(unittest.TestCase):
 		with self.assertRaises(MobileError) as raised:
 			request.mobile_request("v1_register")
 		self.assertEqual((raised.exception.code, raised.exception.status), (code, status))
+
+	def test_contract_identity_accepts_five_fields_and_binds_the_installation(self):
+		claims = self.frappe.local.mobile_identity
+		for key in ("issuer", "subject", "iat"):
+			del claims[key]
+		self.frappe.db.get_value.return_value = ("fixture", "fixture-user")
+		self.request.get_data.return_value = json.dumps({"installation_id": claims["installation"]}).encode()
+		identity, _ = request.mobile_request("v1_register")
+		self.assertEqual(identity.installation, claims["installation"])
+		self.assertIsNone(identity.issued_at)
+		self.request.get_data.return_value = b'{"installation_id":"12345678-1234-4234-8234-123456789abd"}'
+		self.assert_rejected("installation_unavailable", 403)
+		self.request.path = "/api/method/platform_core.api.mobile.v1_revoke"
+		_, body = request.mobile_request("v1_revoke")
+		self.assertNotEqual(body["installation_id"], claims["installation"])
+		self.request.path = "/api/method/platform_core.api.mobile.v1_register"
+		claims.pop("installation")
+		self.assert_rejected("mobile_token_required", 401)
 
 	def test_verified_issued_at_is_required_and_propagated(self):
 		identity, _ = request.mobile_request("v1_register")

@@ -389,3 +389,16 @@ Aşağıdaki olayları sunucu eşitleme yanıtıyla iletir.
 | Bildirim bağı silindi | Gönderilmez | Sunucu bildirim adresini kaldırır. |
 
 Telefon bildirimi sonraki turun işidir. Olay listesi o turda onaylanır.
+
+## Telefon kimliği ve Website User yöntemleri
+
+Kimlik kancası doğrulanmış hesabı, kapsamı, siteyi, kurulumu ve oturum kimliğini verir.
+Mobil kayıt, çekme, gönderme ve etkinlik uçları doğrulanmış kurulumu kullanır.
+Hesap sahibi, aynı hesaba bağlı başka bir kurulumu da iptal edebilir.
+
+İptal sınırından sonra yeni kurulum için kimlik kancası doğrulanmış `iat` değerini verir.
+Bu değer, erişim belirtecinin verildiği zamanı gösterir.
+Bu bilgi eksikse sunucu yeni kurulumu reddeder. Böylece eski belirteç yeniden kurulum açamaz.
+
+Website User, aynı kökenden ve çerezle beş PWA yöntemini çağırabilir.
+Kanca, belirteçli uçları ve toplu servis iptalini listeye almaz.

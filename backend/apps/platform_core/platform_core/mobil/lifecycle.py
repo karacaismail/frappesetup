@@ -25,7 +25,11 @@ def lock_account(identity):
 
 def check_new_installation(identity):
 	state = _account_state(identity.account)
-	if state is not None and identity.issued_at <= int(state.revoked_through):
+	if (
+		state is not None
+		and int(state.revoked_through) > 0
+		and (identity.issued_at is None or identity.issued_at <= int(state.revoked_through))
+	):
 		raise MobileError("mobile_token_revoked", 403)
 
 	active = frappe.db.get_values(

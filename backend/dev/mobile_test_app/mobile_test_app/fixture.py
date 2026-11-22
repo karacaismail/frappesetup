@@ -1,10 +1,12 @@
 """Synthetic identities and records for a disposable mobile sync test site."""
 
+import json
 import time
 
 import frappe
 from platform_core.mobil.protocol import (
 	Command,
+	UUID_PATTERN,
 	content_digest,
 	scoped_record_key,
 	unavailable_record,
@@ -126,11 +128,20 @@ def authenticate():
 	if not account:
 		return
 
+	try:
+		body = json.loads(request.get_data(cache=True))
+	except (ValueError, UnicodeError):
+		body = None
+	installation = body.get("installation_id") if isinstance(body, dict) else None
+	if not isinstance(installation, str) or not UUID_PATTERN.fullmatch(installation):
+		installation = "12345678-1234-4234-8234-123456789abc"
+
 	frappe.set_user(account)
 	frappe.local.mobile_identity = {
 		"site": SITE,
 		"account": account,
 		"scope": "mobile",
+		"installation": installation,
 		"issuer": "fixture",
 		"subject": account,
 		"iat": int(request.headers.get("X-Mobile-Test-Iat", time.time())),

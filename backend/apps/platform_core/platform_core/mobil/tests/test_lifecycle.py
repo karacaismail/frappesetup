@@ -63,7 +63,7 @@ class MobileLifecycleTest(IntegrationTestCase):
 		with patch("platform_core.mobil.lifecycle.time.time", return_value=self.now):
 			self.assertEqual(_register(old, first), first)
 			self.assertEqual(_revoke(old, first), {"revoked": 1})
-			for issued_at in (self.now - 1, self.now, self.now + 30):
+			for issued_at in (None, self.now - 1, self.now, self.now + 30):
 				with self.assertRaises(MobileError) as raised:
 					_register(self.identity(issued_at), second)
 				self.assertEqual(raised.exception.code, "mobile_token_revoked")

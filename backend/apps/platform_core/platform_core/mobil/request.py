@@ -12,7 +12,14 @@ from zoneinfo import ZoneInfo
 import frappe
 from frappe.utils import get_system_timezone
 
-from .protocol import BODY_BYTES, REQUESTS_PER_MINUTE, TOKEN_CLOCK_SKEW_SECONDS, MobileError, content_digest
+from .protocol import (
+	BODY_BYTES,
+	REQUESTS_PER_MINUTE,
+	TOKEN_CLOCK_SKEW_SECONDS,
+	UUID_PATTERN,
+	MobileError,
+	content_digest,
+)
 from .sessions import is_session_revoked, valid_session_id
 
 APP_VERSION = re.compile(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}")
@@ -35,8 +42,9 @@ class Identity:
 	account: str
 	principal: str
 	scope: str
-	issued_at: int
+	issued_at: int | None
 	sid: str | None
+	installation: str | None = None
 
 
 def _unique_keys(pairs):
@@ -106,24 +114,44 @@ def mobile_request(endpoint):
 		raise MobileError("mobile_token_required", 401)
 	account = identity.get("account")
 	scope = identity.get("scope")
-	if account != frappe.session.user or not account or account == "Guest" or scope != "mobile":
+	if (
+		not isinstance(account, str)
+		or account != frappe.session.user
+		or not account
+		or account == "Guest"
+		or scope != "mobile"
+	):
 		raise MobileError("mobile_token_required", 401)
 
-	issuer = identity.get("issuer")
-	subject = identity.get("subject")
-	if not isinstance(issuer, str) or not issuer or not isinstance(subject, str) or not subject:
+	installation = identity.get("installation")
+	if not isinstance(installation, str) or not UUID_PATTERN.fullmatch(installation):
 		raise MobileError("mobile_token_required", 401)
 	issued_at = identity.get("iat")
-	if type(issued_at) is not int or not 0 < issued_at <= int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS:
+	if "iat" in identity and (
+		type(issued_at) is not int or not 0 < issued_at <= int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS
+	):
 		raise MobileError("mobile_token_required", 401)
 	sid = identity.get("sid")
 	if not valid_session_id(sid):
 		raise MobileError("mobile_token_required", 401)
 	if is_session_revoked(sid):
 		raise MobileError("mobile_session_revoked", 401)
-	principal = content_digest([issuer, subject])
 
-	return _sync_payload(request, Identity(frappe.local.site, account, principal, scope, issued_at, sid))
+	issuer, subject = identity.get("issuer"), identity.get("subject")
+	if not issuer and not subject:
+		issuer, subject = frappe.db.get_value(
+			"Platform Identity Link", {"user": account}, ["issuer", "subject"]
+		) or (None, None)
+	if not isinstance(issuer, str) or not issuer or not isinstance(subject, str) or not subject:
+		raise MobileError("mobile_token_required", 401)
+	principal = content_digest([issuer, subject])
+	mobile_identity, body = _sync_payload(
+		request, Identity(frappe.local.site, account, principal, scope, issued_at, sid, installation)
+	)
+	# Account owners may revoke a different installation from their current one.
+	if endpoint != "v1_revoke" and "installation_id" in body and body["installation_id"] != installation:
+		raise MobileError("installation_unavailable", 403)
+	return mobile_identity, body
 
 
 def pwa_request(endpoint):

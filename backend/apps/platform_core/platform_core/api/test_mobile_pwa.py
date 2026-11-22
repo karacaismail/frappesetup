@@ -57,6 +57,31 @@ class MobilePwaTest(IntegrationTestCase):
 		frappe.delete_doc("User", account)
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- WSGI committed the test writes.
 
+	def test_website_user_can_call_only_declared_mobile_cookie_methods(self):
+		methods = {
+			f"platform_core.api.mobile_pwa.v1_{name}"
+			for name in ("activity", "pull", "push", "register", "revoke")
+		}
+		configured = set(frappe.get_hooks("website_user_allowed_methods"))
+		self.assertEqual({method for method in configured if ".api.mobile" in method}, methods)
+		client, sid, headers = self.login()
+		self.assertEqual(frappe.cache.hget("session", sid)["data"]["user_type"], "Website User")
+		body = {"installation_id": str(uuid4())}
+		response = self.post(client, "v1_register", body, headers)
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.json["message"], body)
+		for path in (
+			"platform_core.api.mobile.v1_register",
+			"platform_core.api.mobile.revoke_user_installations",
+		):
+			response = make_request(
+				client.open,
+				args=(),
+				kwargs={"path": f"/api/method/{path}", "method": "POST", "json": body, "headers": headers},
+				site=self.site,
+			)
+			self.assertIn(response.status_code, (401, 403))
+
 	def test_background_sync_does_not_extend_the_cookie_session(self):
 		client, sid, headers = self.login()
 		session = frappe.cache.hget("session", sid)
