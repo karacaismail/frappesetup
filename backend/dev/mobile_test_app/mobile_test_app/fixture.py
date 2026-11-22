@@ -126,6 +126,7 @@ def authenticate():
 		"issuer": "fixture",
 		"subject": account,
 		"iat": int(request.headers.get("X-Mobile-Test-Iat", time.time())),
+		"sid": request.headers.get("X-Mobile-Test-Sid") or content_digest(["fixture-session", account]),
 	}
 	mismatch = request.headers.get("X-Mobile-Test-Identity-Mismatch")
 	if mismatch in {"site", "scope", "account"}:

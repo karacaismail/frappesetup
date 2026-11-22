@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .lifecycle import ACCOUNT_STATE, lock_revocation_scope, record_revocation
 from .protocol import UUID_PATTERN, MobileError, content_digest
 from .retention import cleanup
+from .sessions import is_session_closure_pending
 from .store import MobileStore, _select
 
 ADMIN_ROLE = "System Manager"
@@ -122,7 +123,15 @@ def _plan_revocation(account, installation_id=None):
 		target, cutoff, created_at = lock_revocation_scope(account)
 	except MobileError as error:
 		raise frappe.ValidationError(_("The mobile account is unavailable.")) from error
-	installation_ids = tuple(row.name for row in MobileStore().revocation_targets(account, installation_id))
+	rows = MobileStore().revocation_targets(
+		account, installation_id, include_revoked=installation_id is not None
+	)
+	targets = [
+		(row.name, bool(row.revoked))
+		for row in rows
+		if not row.revoked or is_session_closure_pending(row.session_id)
+	]
+	installation_ids = tuple(name for name, _ in targets)
 	if installation_id is not None and not installation_ids:
 		raise frappe.ValidationError(_("The mobile installation is unavailable."))
 	return RevocationPlan(
@@ -130,7 +139,7 @@ def _plan_revocation(account, installation_id=None):
 		installation_ids,
 		installation_id or account,
 		target,
-		content_digest([account, created_at, cutoff, installation_ids]),
+		content_digest([account, created_at, cutoff, targets]),
 	)
 
 
@@ -163,13 +172,13 @@ def _preview_revocation(plan, summary):
 def preview_revoke_installation(installation_id):
 	return _preview_revocation(
 		prepare_revoke_installation(installation_id),
-		_("Revoke one installation and block earlier tokens from registering."),
+		_("Revoke one installation and request Keycloak session closure."),
 	)
 
 
 def preview_revoke_all(account):
 	return _preview_revocation(
-		prepare_revoke_all(account), _("Revoke all installations and block earlier tokens from registering.")
+		prepare_revoke_all(account), _("Revoke all installations and request Keycloak session closure.")
 	)
 
 

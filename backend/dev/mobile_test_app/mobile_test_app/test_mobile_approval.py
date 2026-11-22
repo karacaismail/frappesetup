@@ -8,7 +8,6 @@ from uuid import uuid4
 
 import frappe
 from frappe.utils import now_datetime
-
 from platform_core.mobil.store import MobileStore
 
 AI_LAYER_AVAILABLE = find_spec("platform_core.yapay_zeka.registry") is not None

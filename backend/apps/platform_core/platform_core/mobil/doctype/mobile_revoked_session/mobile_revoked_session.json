@@ -1,0 +1,31 @@
+{
+ "doctype": "DocType",
+ "name": "Mobile Revoked Session",
+ "module": "Mobil",
+ "engine": "InnoDB",
+ "autoname": "field:session_key",
+ "description": "Prevents a revoked Keycloak session from accessing mobile sync.",
+ "permissions": [],
+ "field_order": [
+  "session_key",
+  "delivery_pending"
+ ],
+ "fields": [
+  {
+   "fieldname": "session_key",
+   "fieldtype": "Data",
+   "label": "Session key",
+   "description": "A digest of the revoked Keycloak session identifier.",
+   "length": 64,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "delivery_pending",
+   "fieldtype": "Check",
+   "label": "Closure pending",
+   "default": "1",
+   "description": "Identity-sync has not confirmed closure of this Keycloak session."
+  }
+ ]
+}

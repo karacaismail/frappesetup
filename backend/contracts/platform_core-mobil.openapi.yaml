@@ -18,7 +18,9 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Hesaba bir telefon kurulumu bağlar. İptal edilen kimlik yeniden açılamaz.
+      description: |
+        Telefon kurulumunu doğrulanmış Keycloak oturumuna bağlar.
+        İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
       requestBody:
         required: true
         content:
@@ -26,6 +28,7 @@ paths:
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200': { $ref: '#/components/responses/DeviceSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -36,7 +39,10 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Hesabın bir kurulumunu veya bütün kurulumlarını iptal eder.
+      description: |
+        Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+        Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+        Başka bir geçerli oturumla tekli iptal yinelenebilir.
       requestBody:
         required: true
         content:
@@ -51,6 +57,7 @@ paths:
                     all: { const: true }
       responses:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -82,6 +89,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
         '409': { $ref: '#/components/responses/Error', description: İşlem içeriği değişti veya kayıt sürümü eski. }
+        '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -108,6 +116,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Page' }
         '410': { $ref: '#/components/responses/Error', description: İmleç geçersiz veya süresi doldu. Tam kopya alın. }
+        '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -130,6 +139,7 @@ paths:
                 dry_run: { type: boolean, default: false }
       responses:
         '200': { $ref: '#/components/responses/CleanupResultSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -242,6 +252,7 @@ components:
             - mixed_authentication
             - mobile_busy
             - mobile_schema_unavailable
+            - mobile_session_revoked
             - mobile_sequence_exhausted
             - mobile_token_required
             - mobile_token_revoked

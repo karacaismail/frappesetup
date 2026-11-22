@@ -15,6 +15,7 @@ INTERNAL_TYPES = frozenset(
 		SEQUENCE_DOCTYPE,
 		"Mobile Account State",
 		"Mobile Installation",
+		"Mobile Revoked Session",
 		"Mobile Operation",
 		"Mobile Change",
 		"Mobile Delivery",
@@ -74,6 +75,7 @@ class MobileStore:
 		self.pending_events = False
 
 	def install(self, identity, installation_id, *, check_new=None):
+		sid = getattr(identity, "sid", None)
 		current = self._installation(installation_id, for_update=True)
 		if current is None:
 			if check_new is not None:
@@ -84,16 +86,19 @@ class MobileStore:
 				account=identity.account,
 				scope=identity.scope,
 				principal=identity.principal,
+				session_id=sid,
 			)
-		elif not self._matches(current, identity):
+		elif not self._matches(current, identity) or (current.session_id and current.session_id != sid):
 			raise MobileError("installation_unavailable", 403)
+		elif sid and not current.session_id:
+			frappe.db.set_value("Mobile Installation", installation_id, "session_id", sid)
 		return {"installation_id": installation_id}
 
 	def _installation(self, installation_id, *, for_update=False):
 		return frappe.db.get_value(
 			"Mobile Installation",
 			installation_id,
-			["account", "scope", "principal", "revoked"],
+			["account", "scope", "principal", "revoked", "session_id"],
 			as_dict=True,
 			for_update=for_update,
 		)
@@ -108,7 +113,8 @@ class MobileStore:
 		)
 
 	def require_installation(self, identity, installation_id, *, for_update=False):
-		if not self._matches(self._installation(installation_id, for_update=for_update), identity):
+		row = self._installation(installation_id, for_update=for_update)
+		if not self._matches(row, identity) or (row.session_id or None) != getattr(identity, "sid", None):
 			raise MobileError("installation_unavailable", 403)
 
 	def revoke(self, identity, installation_id):
@@ -117,24 +123,51 @@ class MobileStore:
 			installation_id,
 			scope=identity.scope,
 			principal=identity.principal,
+			include_revoked=installation_id is not None,
 		)
 		return {"revoked": self.revoke_targets(row.name for row in rows)}
 
-	def revocation_targets(self, account, installation_id=None, *, scope=None, principal=None):
-		filters = {"account": account, "revoked": 0}
+	def revocation_targets(
+		self, account, installation_id=None, *, scope=None, principal=None, include_revoked=False
+	):
+		filters = {"account": account}
+		if not include_revoked:
+			filters["revoked"] = 0
 		if scope is not None:
 			filters["scope"] = scope
 		if principal is not None:
 			filters["principal"] = principal
 		if installation_id is not None:
 			filters["name"] = installation_id
-		return _select("Mobile Installation", ["name"], filters, order_by="name asc", for_update=True)
+		return _select(
+			"Mobile Installation",
+			["name", "revoked", "session_id"],
+			filters,
+			order_by="name asc",
+			for_update=True,
+		)
 
 	def revoke_targets(self, installation_ids):
+		from .sessions import revoke_after_commit
+
 		count = 0
+		session_ids = set()
 		for installation_id in installation_ids:
-			frappe.db.set_value("Mobile Installation", installation_id, "revoked", 1)
-			count += 1
+			row = frappe.db.get_value(
+				"Mobile Installation",
+				installation_id,
+				["revoked", "session_id"],
+				as_dict=True,
+				for_update=True,
+			)
+			if row is None:
+				continue
+			if row.session_id:
+				session_ids.add(row.session_id)
+			if not row.revoked:
+				frappe.db.set_value("Mobile Installation", installation_id, "revoked", 1)
+				count += 1
+		revoke_after_commit(session_ids)
 		return count
 
 	def get_operation(self, key):

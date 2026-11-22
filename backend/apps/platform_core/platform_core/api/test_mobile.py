@@ -107,14 +107,15 @@ class MobileHTTPTest(unittest.TestCase):
 		token = "fixture-revoke-one" if FIXTURE else TOKEN
 		body = self.register(token=token)
 		self.assertEqual(self.post("v1_revoke", body, token=token)[0], 200)
-		self.assertEqual(self.post("v1_pull", body, token=token)[0], 403)
-		self.assertEqual(self.post("v1_register", body, token=token)[0], 403)
+		for endpoint in ("v1_pull", "v1_register"):
+			status, result, _ = self.post(endpoint, body, token=token)
+			self.assertEqual((status, result.get("code")), (401, "mobile_session_revoked"), result)
 		if FIXTURE:
 			status, payload, _ = self.post(
 				"v1_register",
 				{"installation_id": str(uuid4())},
 				token=token,
-				extra_headers={"X-Mobile-Test-Iat": str(int(time()) - 60)},
+				extra_headers={"X-Mobile-Test-Iat": str(int(time()) - 60), "X-Mobile-Test-Sid": str(uuid4())},
 			)
 			self.assertEqual(status, 403, payload)
 
@@ -131,12 +132,12 @@ class MobileHTTPTest(unittest.TestCase):
 			token="fixture-revoke",
 			extra_headers=old,
 		)
-		self.assertEqual(status, 403, payload)
-		# Send a new issuance after the cutoff, within the allowed clock skew.
+		self.assertEqual((status, payload.get("code")), (401, "mobile_session_revoked"), payload)
+		# Send a new issuance and session after the cutoff, within the allowed clock skew.
 		issued_after = int(time()) + 31
 		while int(time()) + 30 < issued_after:
 			sleep(0.02)
-		fresh = {"X-Mobile-Test-Iat": str(issued_after)}
+		fresh = {"X-Mobile-Test-Iat": str(issued_after), "X-Mobile-Test-Sid": str(uuid4())}
 		status, payload, _ = self.post(
 			"v1_register",
 			fresh_installation,

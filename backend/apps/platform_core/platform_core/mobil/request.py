@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import frappe
 
 from .protocol import BODY_BYTES, REQUESTS_PER_MINUTE, TOKEN_CLOCK_SKEW_SECONDS, MobileError, content_digest
+from .sessions import is_session_revoked, valid_session_id
 
 APP_VERSION = re.compile(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}")
 CONTRACT_VERSION = re.compile(r"[1-9][0-9]{0,2}")
@@ -31,6 +32,7 @@ class Identity:
 	principal: str
 	scope: str
 	issued_at: int
+	sid: str
 
 
 def _unique_keys(pairs):
@@ -110,6 +112,11 @@ def mobile_request(endpoint):
 	issued_at = identity.get("iat")
 	if type(issued_at) is not int or not 0 < issued_at <= int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS:
 		raise MobileError("mobile_token_required", 401)
+	sid = identity.get("sid")
+	if not valid_session_id(sid):
+		raise MobileError("mobile_token_required", 401)
+	if is_session_revoked(sid):
+		raise MobileError("mobile_session_revoked", 401)
 	principal = content_digest([issuer, subject])
 
 	app_version = request.headers.get("X-Mobile-App-Version", "")
@@ -122,7 +129,7 @@ def mobile_request(endpoint):
 	body = _read_json(request)
 	if "cmd" in body:
 		raise MobileError("invalid_mobile_route")
-	return Identity(frappe.local.site, account, principal, scope, issued_at), body
+	return Identity(frappe.local.site, account, principal, scope, issued_at, sid), body
 
 
 def _error_response(error):

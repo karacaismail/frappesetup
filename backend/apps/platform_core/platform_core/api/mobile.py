@@ -15,6 +15,7 @@ from platform_core.mobil.protocol import PAGE_SIZE, MobileError, uuid4_id
 from platform_core.mobil.request import endpoint_response
 from platform_core.mobil.retention import cleanup
 from platform_core.mobil.service import COMMANDS, pull, push
+from platform_core.mobil.sessions import require_active_session
 from platform_core.mobil.store import MobileStore
 
 # The shared request guard and each action check the installation, record or
@@ -35,10 +36,17 @@ def _keys(body, required, optional=()):
 		raise MobileError("invalid_request")
 
 
+def _lock_mobile_account(identity):
+	lock_account(identity)
+	sid = getattr(identity, "sid", None)
+	if sid is not None:
+		require_active_session(sid, for_update=True)
+
+
 def _register(identity, body):
 	_keys(body, {"installation_id"})
 	installation = uuid4_id(body["installation_id"])
-	lock_account(identity)
+	_lock_mobile_account(identity)
 	return MobileStore().install(identity, installation, check_new=check_new_installation)
 
 
@@ -49,7 +57,7 @@ def _revoke(identity, body):
 		_keys(body, {"installation_id"})
 		installation = uuid4_id(body["installation_id"])
 
-	lock_account(identity)
+	_lock_mobile_account(identity)
 	result = MobileStore().revoke(identity, installation)
 	if revoke_all or result["revoked"]:
 		record_revocation(identity.account)
@@ -58,7 +66,7 @@ def _revoke(identity, body):
 
 def _push(identity, body):
 	_keys(body, {"installation_id", "operations"})
-	lock_account(identity)
+	_lock_mobile_account(identity)
 	store = MobileStore()
 	store.require_installation(identity, uuid4_id(body["installation_id"]), for_update=True)
 	disabled = frappe.conf.get("mobile_disabled_commands", [])

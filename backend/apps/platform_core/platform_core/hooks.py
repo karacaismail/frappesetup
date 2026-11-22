@@ -12,3 +12,5 @@ after_migrate = ["platform_core.mobil.store.seed_sequence"]
 doc_events = {"User": {"on_trash": "platform_core.mobil.store.delete_user_state"}}
 
 ai_tools = ["platform_core.mobil.ai_tools.declarations"]
+
+ai_write_closed_doctypes = ["Mobile Revoked Session"]

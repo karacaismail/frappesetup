@@ -22,7 +22,7 @@ Bu uçlar, kimlik sunucusunun doğruladığı sonucu arar.
 Yalnız Frappe kullanıcı adının dolu olması yeterli olmaz.
 Kanca izinli adres listesini tam adresle eşler.
 Kanca doğrulamadan sonra `frappe.local.mobile_identity` alanını doldurur.
-Bu alan `site`, `account`, `issuer`, `subject`, `scope` ve `iat` değerlerini taşır.
+Bu alan `site`, `account`, `issuer`, `subject`, `scope`, `iat` ve `sid` değerlerini taşır.
 `iat`, belirtecin verildiği anı saniye olarak gösterir.
 `account`, Frappe kullanıcısıdır. `scope` bu uçlarda `mobile` olur.
 Sistem hesap anahtarını sabit veren ve kullanıcı kimliğinden üretir.
@@ -267,9 +267,42 @@ Liste, kurulum kimliğini ve iptal durumunu gösterir.
 Yapay zekâ tek kurulumu veya bütün kurulumları iptal etmek için öneri açar.
 Kullanıcı öneriyi onaylayana kadar sunucu hiçbir kurulumu iptal etmez.
 Onaydan önce kurulumlar değişirse sunucu yeni bir önizleme ister.
+Kurulum, doğrulanmış Keycloak oturum kimliğini `sid` alanından alır.
+Eski kurulumlar yeniden kayıt olurken oturum kimliğini bağlar.
+Yeni oturum, yeni kurulum kimliği ister.
+Sunucu iptal edilen oturumun özetini saklar.
+Aynı oturumla gelen mobil istekler reddedilir.
+
 Kurulum iptali tek başına Keycloak oturumunu kapatmaz.
+Veritabanı işlemi kesinleşince sunucu `POST /v1/sessions/revoke` çağrısı yapar.
+Bu çağrı kimlik servisi için ayrı bir servis belirteci kullanır.
 Kimlik servisi oturumu kapatana kadar yenileme belirteci geçerli kalabilir.
-Bu sırada yönetici oturumu kimlik tarafında ayrıca kapatır.
+Uzak çağrı başarısız olursa yerel iptal geçerli kalır.
+Sunucu kapanma doğrulanana kadar bekleyen durumunu saklar.
+Toplu iptal yalnız etkin kurulumlardan kapanma isteği çıkarır.
+Yönetici bekleyen kapanma için tekli iptali yeniden onaylayabilir.
+Başka geçerli oturumdan tekli iptal isteği de yeniden gönderilebilir.
+Kapanma sonucu ayrı veritabanı işleminde saklanır.
+Yönetici gerekirse oturumu kimlik tarafında ayrıca kapatır.
+Eski kurulumda oturum kimliği varsa çağrı yapılır.
+Oturuma bağlanmamış eski kurulum için yönetici kimlik tarafını kullanır.
+
+Servis adresi `mobile_identity_sync_url` ayarında bulunur.
+Belirteç adresi `mobile_identity_sync_token_url` ayarından okunur.
+Servis hesabı `mobile_identity_sync_client_id` ve `mobile_identity_sync_client_secret` kullanır.
+Gerekirse kapsam `mobile_identity_sync_scope` ayarına yazılır.
+Sunucu bu ayarları güvenli site yapılandırmasından okur.
+Canlı servis için kimlik ekibi servis hesabını ve kapsamı tanımlar.
+
+O-25 uyarınca erişim belirteci 5 dakika geçerlidir.
+Çalışanın Keycloak oturumu 1 saat boşta kalabilir. Toplam süre 24 saattir.
+Müşterinin oturumu 7 gün boşta kalabilir. Toplam süre 30 gündür.
+Yenileme belirteci her kullanımda değişir.
+Bu oturum sürelerini kimlik tarafı uygular.
+
+O-27 uyarınca hesap silme akışını kimlik servisi başlatır.
+Kullanıcı silinince mobil kurulumlar ve bağlı teslim kayıtları temizlenir.
+İş kayıtlarının anonim yapılması hesap silme akışının ayrı adımıdır.
 
 Yapay zekâ temizlik denemesini de öneri olarak açar.
 Önizleme süresi dolan kayıtların sayısını gösterir.

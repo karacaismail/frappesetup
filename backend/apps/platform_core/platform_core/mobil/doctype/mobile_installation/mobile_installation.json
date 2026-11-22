@@ -10,7 +10,8 @@
   "principal",
   "scope",
   "revoked",
-  "last_audit_at"
+  "last_audit_at",
+  "session_id"
  ],
  "fields": [
   {
@@ -58,6 +59,14 @@
    "fieldname": "last_audit_at",
    "fieldtype": "Datetime",
    "label": "Last Audit At"
+  },
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "label": "Keycloak session ID",
+   "length": 140,
+   "description": "The verified Keycloak session that registered this installation.",
+   "hidden": 1
   }
  ],
  "links": [],

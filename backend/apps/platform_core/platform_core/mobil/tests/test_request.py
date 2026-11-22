@@ -51,6 +51,7 @@ class MobileRequestTest(unittest.TestCase):
 					"issuer": "fixture",
 					"subject": "fixture-user",
 					"iat": self.issued_at,
+					"sid": "session-01",
 				},
 				response={},
 				response_headers={},
@@ -63,6 +64,7 @@ class MobileRequestTest(unittest.TestCase):
 		self.addCleanup(patch.stopall)
 		patch.object(request, "frappe", self.frappe).start()
 		patch.object(request, "_limit_and_count").start()
+		self.revoked = patch.object(request, "is_session_revoked", return_value=False, create=True).start()
 
 	def assert_rejected(self, code, status):
 		with self.assertRaises(MobileError) as raised:
@@ -76,6 +78,15 @@ class MobileRequestTest(unittest.TestCase):
 			with self.subTest(invalid=invalid):
 				self.frappe.local.mobile_identity["iat"] = invalid
 				self.assert_rejected("mobile_token_required", 401)
+
+	def test_mobile_identity_requires_sid_and_rejects_revoked_session(self):
+		identity, _ = request.mobile_request("v1_register")
+		self.assertEqual(identity.sid, "session-01")
+		for sid in (None, "", "bad\nsid", "x" * 141):
+			with self.subTest(sid=sid), patch.dict(self.frappe.local.mobile_identity, {"sid": sid}):
+				self.assert_rejected("mobile_token_required", 401)
+		self.revoked.return_value = True
+		self.assert_rejected("mobile_session_revoked", 401)
 
 	def test_issued_at_allows_thirty_seconds_of_clock_skew(self):
 		with patch.object(request.time, "time", return_value=self.issued_at):

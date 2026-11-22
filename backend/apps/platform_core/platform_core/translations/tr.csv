@@ -13,8 +13,16 @@ Request approval to run mobile cleanup in dry-run mode.,Temizlik denemesi için 
 Only a System Manager can administer mobile installations.,Telefon kurulumlarını yalnız sistem yöneticisi yönetebilir.
 The mobile account is unavailable.,Telefon hesabına erişilemiyor.
 The mobile installation is unavailable.,Telefon kurulumuna erişilemiyor.
-Revoke one installation and block earlier tokens from registering.,Bir kurulumu iptal et ve eski belirteçlerle yeni kurulumu engelle.
-Revoke all installations and block earlier tokens from registering.,Bütün kurulumları iptal et ve eski belirteçlerle yeni kurulumu engelle.
+Revoke one installation and request Keycloak session closure.,Bir kurulumu iptal et ve Keycloak oturumunun kapanmasını iste.
+Revoke all installations and request Keycloak session closure.,Bütün kurulumları iptal et ve Keycloak oturumlarının kapanmasını iste.
 A prepared mobile revocation is required.,Önce telefon kurulumu için iptal önerisi hazırlayın.
 Count expired mobile records without deleting them.,Süresi dolan mobil kayıtları say.
 A prepared mobile cleanup preview is required.,Önce mobil temizlik önerisi hazırlayın.
+Mobile Revoked Session,İptal Edilen Mobil Oturum
+Prevents a revoked Keycloak session from accessing mobile sync.,İptal edilen Keycloak oturumunun eşitlemeye erişimini engeller.
+Session key,Oturum anahtarı
+A digest of the revoked Keycloak session identifier.,İptal edilen Keycloak oturum kimliğinin özeti.
+Keycloak session ID,Keycloak oturum kimliği
+The verified Keycloak session that registered this installation.,Kurulumu açan doğrulanmış Keycloak oturumu.
+Closure pending,Kapatma bekliyor
+Identity-sync has not confirmed closure of this Keycloak session.,Kimlik servisi bu Keycloak oturumunun kapandığını henüz doğrulamadı.
