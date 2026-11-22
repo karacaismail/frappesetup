@@ -38,6 +38,7 @@ scan_rules() (
 )
 
 status=0
+uv run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py bandit || status=1
 "${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
 scan_rules || status=1
 python3 -B -m unittest discover -s backend/dev/security -p test_semgrep_exceptions.py || status=1

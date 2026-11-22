@@ -86,7 +86,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.match(readFileSync(join(root, 'memory-probe'), 'utf8'), /--pull never --network none --read-only/);
     const webhook = new URL(readFileSync(join(root, 'webhook'), 'utf8').trim());
     assert.equal(webhook.protocol, 'http:');
-    assert.equal(webhook.hostname, 'event-sink.localhost');
+    assert.equal(webhook.hostname, 'identity-sync.localhost');
     assert.equal(webhook.pathname, '/v1/events');
     assert.match(readFileSync(join(root, 'sync-create'), 'utf8'), /--network-alias identity-sync(?: |\n)/);
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);
@@ -123,4 +123,28 @@ test('factory mode probes the factory Docker context before creating resources',
   } finally {
     rmSync(root, { recursive: true });
   }
+});
+
+
+test('the HTTPS-enabled tenant uses the preview trust store for Python requests', () => {
+  const script = readFileSync(runtime, 'utf8');
+  assert.match(script, /tenant_web_options\+=\(-e REQUESTS_CA_BUNDLE=\/etc\/ssl\/certs\/ca-certificates\.crt\)/);
+  assert.ok(script.includes('"${tenant_web_options[@]}" "$tenant" bash -c'));
+});
+
+
+test('preview exit removes the shared directory for raw Playwright artifacts', () => {
+  const script = readFileSync(runtime, 'utf8');
+  const cleanup = script.match(/^cleanup\(\) \{\n([\s\S]*?)^\}/m)?.[1];
+  assert.ok(cleanup, 'runtime must define cleanup()');
+  assert.match(cleanup, /^\s*rm -rf -- [^\n]*"\$PREVIEW_DIR\/playwright-output"(?:\s|$)/m);
+  assert.match(script, /^trap cleanup EXIT$/m);
+  const runner = readFileSync(new URL('../preview/run-tests.mjs', import.meta.url), 'utf8');
+  assert.ok(runner.includes("join(previewDir, 'playwright-output', label)"));
+});
+
+test('the TLS relay certificate is a server leaf without certificate signing permission', () => {
+  const script = readFileSync(new URL('../preview/session-tls.sh', import.meta.url), 'utf8');
+  assert.match(script, /^basicConstraints=critical,CA:FALSE$/m);
+  assert.doesNotMatch(script, /^keyUsage=.*keyCertSign/m);
 });

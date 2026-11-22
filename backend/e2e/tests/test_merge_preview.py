@@ -1,12 +1,16 @@
 """Exercise the preview command without Docker or the developer's Git repository."""
 
+import contextlib
+import io
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SUITE = Path(__file__).resolve().parents[1]
 COMMAND = SUITE / "bin" / "merge-preview"
@@ -22,7 +26,7 @@ class MergePreviewTest(unittest.TestCase):
         self.root = Path(self.sandbox.name)
         self.repo = self.root / "repo"
         self.repo.mkdir()
-        self.artifacts = self.root / "scratch"
+        self.artifacts = self.repo / ".pane" / "scratch"
         self.env = {
             **os.environ,
             "PANE_SCRATCH_DIR": str(self.artifacts),
@@ -32,6 +36,7 @@ class MergePreviewTest(unittest.TestCase):
         for variable in ("GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
             self.env.pop(variable, None)
         self.git("init", "-b", "backend")
+        (self.repo / ".git" / "info" / "exclude").write_text("/.pane/\n")
         self.git("config", "user.name", self.env["GIT_AUTHOR_NAME"])
         self.git("config", "user.email", self.env["GIT_AUTHOR_EMAIL"])
         self.commit_file(HOOKS, 'auth_hooks = ["base"]\n')
@@ -193,6 +198,67 @@ class MergePreviewTest(unittest.TestCase):
         self.assertIn("GIT_INDEX_FILE", result.stderr)
         self.assertFalse(self.artifacts.exists())
         self.assertEqual(before, self.refs())
+
+    def run_in_process(self, env):
+        """Run the command's main function without starting a separate process."""
+        namespace = runpy.run_path(str(COMMAND))
+        errors = io.StringIO()
+        current = os.getcwd()
+        os.chdir(self.repo)
+        try:
+            with (
+                patch.dict(os.environ, env, clear=True),
+                patch("sys.argv", [str(COMMAND), "--merge-only"]),
+                contextlib.redirect_stderr(errors),
+            ):
+                try:
+                    code = namespace["main"]()
+                except SystemExit as error:
+                    code = error.code
+        finally:
+            os.chdir(current)
+        return code, errors.getvalue()
+
+    def test_rejects_scratch_outside_the_repository_pane_directory(self):
+        before = self.refs()
+        outside = self.root / "outside"
+        alias = self.repo / ".pane" / "alias"
+        alias.parent.mkdir(parents=True)
+        alias.symlink_to(outside, target_is_directory=True)
+        for scratch in (outside, self.repo / ".pane" / ".." / "escape", alias, self.repo / ".pane"):
+            with self.subTest(scratch=scratch):
+                code, errors = self.run_in_process({**self.env, "PANE_SCRATCH_DIR": str(scratch)})
+                self.assertEqual(code, 2, errors)
+                self.assertIn("PANE_SCRATCH_DIR", errors)
+        self.assertFalse(outside.exists())
+        self.assertFalse((self.repo / "escape").exists())
+        self.assertEqual(before, self.refs())
+
+    def test_rejects_a_pane_directory_that_is_a_symbolic_link(self):
+        before = self.refs()
+        for target in (self.root / "outside-pane", self.repo / "inside-pane"):
+            with self.subTest(target=target):
+                target.mkdir()
+                pane = self.repo / ".pane"
+                pane.symlink_to(target, target_is_directory=True)
+                try:
+                    code, errors = self.run_in_process({**self.env, "PANE_SCRATCH_DIR": str(pane / "scratch")})
+                finally:
+                    pane.unlink()
+                self.assertEqual(code, 2, errors)
+                self.assertIn(".pane", errors)
+                self.assertEqual(list(target.iterdir()), [])
+                target.rmdir()
+        self.assertEqual(before, self.refs())
+
+    def test_live_run_refuses_a_worktree_outside_the_trusted_scratch(self):
+        namespace = runpy.run_path(str(COMMAND))
+        root = self.artifacts.resolve()
+        outside = self.root / "outside" / "worktree"
+        with patch("subprocess.Popen", side_effect=AssertionError("Bash must not start")):
+            with self.assertRaisesRegex(namespace["MergeError"], "trusted scratch"):
+                namespace["run_live"](outside, {}, root)
+        self.assertFalse(outside.exists())
 
     def test_cleans_worktree_when_git_reports_a_partial_add_failure(self):
         fake_bin = self.root / "bin"

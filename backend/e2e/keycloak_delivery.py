@@ -9,6 +9,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import sqlite3
 import sys
@@ -19,7 +20,50 @@ import urllib.request
 import uuid
 
 
-def request(url, *, method="GET", data=None, token=None, headers=None):
+DEFAULT_PORTS = {"http": 80, "https": 443}
+RECEIVER = "http://127.0.0.1:6115"
+USER_PATH = re.compile(r"/admin/realms/platform/users/([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})")
+
+# Only plain HTTP(S) handlers: no proxy, no file or FTP scheme, and no redirect
+# handler. A 3xx reply becomes an HTTPError, so credentials never move on.
+OPENER = urllib.request.OpenerDirector()
+for handler in (
+    urllib.request.HTTPHandler(),
+    urllib.request.HTTPSHandler(),
+    urllib.request.HTTPDefaultErrorHandler(),
+    urllib.request.HTTPErrorProcessor(),
+):
+    OPENER.add_handler(handler)
+
+
+def origin(url):
+    """Return scheme, host and port of an http(s) URL without user info."""
+    parts = urllib.parse.urlsplit(url)
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+        parts = parts._replace(netloc="")
+    if parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username is not None:
+        raise ValueError("The Keycloak URL must use http or https and must not contain credentials.")
+    return f"{parts.scheme}://{parts.hostname.lower()}:{port or DEFAULT_PORTS[parts.scheme]}"
+
+
+def user_id(location):
+    match = USER_PATH.fullmatch(urllib.parse.urlsplit(location).path)
+    if not match or urllib.parse.urlsplit(location).query:
+        raise ValueError("Keycloak returned an unexpected user ID location.")
+    return match.group(1)
+
+
+def request(url, *, origins, method="GET", data=None, token=None, headers=None):
+    """Send one request to an allowed origin and refuse any redirect."""
+    try:
+        allowed = origin(url) in {origin(value) for value in origins}
+    except ValueError:
+        allowed = False
+    if not allowed:
+        raise ValueError("The request URL is not allowed.")
     headers = dict(headers or {})
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -28,8 +72,11 @@ def request(url, *, method="GET", data=None, token=None, headers=None):
         headers["Content-Type"] = "application/json"
     call = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        response = urllib.request.urlopen(call, timeout=15)
+        response = OPENER.open(call, timeout=15)
     except urllib.error.HTTPError as error:
+        if 300 <= error.code < 400:
+            error.close()
+            raise ValueError("The server sent a redirect. Redirects are not followed.") from None
         response = error
     with response:
         raw = response.read()
@@ -41,9 +88,11 @@ def inside():
     from identity_sync.events import from_keycloak, parse_event
 
     settings = load_settings(os.environ)
-    origin = settings.keycloak_base_url
+    base = settings.keycloak_base_url
+    keycloak = {origin(base)}
     status, _, auth = request(
-        origin + "/realms/master/protocol/openid-connect/token",
+        base + "/realms/master/protocol/openid-connect/token",
+        origins=keycloak,
         method="POST",
         data=urllib.parse.urlencode(
             {
@@ -57,10 +106,11 @@ def inside():
     )
     assert status == 200, f"Admin authentication returned {status}"
     token = auth["access_token"]
-    root = origin + "/admin/realms/platform"
+    root = base + "/admin/realms/platform"
     email = "delivery-" + uuid.uuid4().hex + "@example.test"
     status, headers, _ = request(
         root + "/users",
+        origins=keycloak,
         method="POST",
         token=token,
         data={
@@ -73,15 +123,17 @@ def inside():
         },
     )
     assert status == 201, f"User creation returned {status}"
-    subject = headers["Location"].rsplit("/", 1)[1]
-    status, _, _ = request(root + "/users/" + subject, method="PUT", token=token, data={"lastName": "After"})
+    subject = user_id(headers["Location"])
+    status, _, _ = request(
+        root + "/users/" + subject, origins=keycloak, method="PUT", token=token, data={"lastName": "After"}
+    )
     assert status == 204, f"User update returned {status}"
     query = urllib.parse.urlencode({"resourcePath": "users/" + subject, "operationTypes": "UPDATE"})
     deadline = time.monotonic() + 60
     event_id = None
     with sqlite3.connect("file:" + os.environ["IDENTITY_SYNC_DB"] + "?mode=ro", uri=True) as database:
         while time.monotonic() < deadline:
-            status, _, events = request(root + "/admin-events?" + query, token=token)
+            status, _, events = request(root + "/admin-events?" + query, origins=keycloak, token=token)
             assert status == 200, f"Admin event lookup returned {status}"
             for payload in events:
                 if (
@@ -125,7 +177,8 @@ def inside():
                 secret.encode(), str(timestamp).encode() + b".execute." + body, hashlib.sha256
             ).hexdigest()
             status, _, reply = request(
-                "http://127.0.0.1:6115/v1/events",
+                RECEIVER + "/v1/events",
+                origins={RECEIVER},
                 method="POST",
                 data=body,
                 headers={

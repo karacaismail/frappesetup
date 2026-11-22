@@ -42,6 +42,14 @@ Kiracı ortamınızı kapatmak için `backend/dev/bin/stop` komutunu çalıştı
    Dosya yalnız sahibince okunabilir. Git bu dosyayı izlemez.
    Betik mevcut parolaları değiştirmez. Çıktı parolaları içermez.
    `E2E_ENV_FILE` değişkeniyle başka bir özel dosya seçebilirsiniz.
+   Bu dosya deponun içinde olmalı. Git de bu dosyayı yok saymalı.
+   Betik parolaları önce aynı klasörde geçici bir dosyaya yazar.
+   Git bu geçici dosyayı yalnız iki klasörde yok sayar.
+   Bu klasörler `backend/e2e/` ve `.pane/` klasörleridir.
+   Bu yüzden dosyayı bu iki klasörden birine koyun.
+   Örneğin `backend/e2e/.env.production` ya da `.pane/scratch/e2e.env` olabilir.
+   Betik depo dışındaki yolu reddeder. Git'in izleyebileceği yolu da reddeder.
+   Yol bir sembolik bağsa betik onu da reddeder.
 
 3. Bütün ortamı açın.
 

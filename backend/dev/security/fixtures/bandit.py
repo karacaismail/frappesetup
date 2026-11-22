@@ -1,1 +1,1 @@
-assert False
+assert False  # nosec B101

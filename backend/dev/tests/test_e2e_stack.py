@@ -1,5 +1,7 @@
 """The shared stack must isolate services and never expose credentials."""
 
+import contextlib
+import io
 import json
 import os
 import re
@@ -13,6 +15,14 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "backend/e2e/stack"
+CONTAINER_ID = "0123456789ab"
+# setup() derives the URLs. The credential file supplies the two fake client values.
+PRESS_ENVIRONMENT = {
+    "ATONOTA_PRESS_URL": "http://press.localhost:7153",
+    "KC_PUBLIC_URL": "http://identity.localhost:7150",
+    "ATONOTA_PRESS_SECRET": "fake-press-client-value",
+    "ATONOTA_PRESS_SERVICE_SECRET": "fake-press-service-value",
+}
 
 
 class StackTests(unittest.TestCase):
@@ -79,7 +89,7 @@ class StackTests(unittest.TestCase):
         namespace = runpy.run_path(str(STACK))
         for realm_id in ("", "first-id\nsecond-id\n", "invalid realm"):
             with self.subTest(realm_id=realm_id):
-                environment = {}
+                environment = dict(PRESS_ENVIRONMENT)
                 with (
                     patch.dict(
                         namespace["up"].__globals__,
@@ -298,6 +308,62 @@ class StackTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Service is not ready: web"):
                 check(["compose"], {})
 
+    def test_up_names_missing_press_settings_before_any_command(self):
+        namespace = runpy.run_path(str(STACK))
+        for missing in PRESS_ENVIRONMENT:
+            with self.subTest(missing=missing):
+                environment = {key: value for key, value in PRESS_ENVIRONMENT.items() if key != missing}
+                with (
+                    patch.dict(
+                        namespace["up"].__globals__,
+                        {
+                            "resources": lambda *args: self.fail("Must reject before measuring"),
+                            "run": lambda *args, **kwargs: self.fail("Must reject before Docker"),
+                        },
+                    ),
+                    patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
+                ):
+                    with self.assertRaisesRegex(ValueError, missing) as caught:
+                        namespace["up"](["docker"], ["compose"], environment)
+                for value in PRESS_ENVIRONMENT.values():
+                    self.assertNotIn(value, str(caught.exception))
+
+    def test_up_command_names_missing_press_settings_before_any_docker_call(self):
+        namespace = runpy.run_path(str(STACK))
+        for missing in (("ATONOTA_PRESS_SECRET",), ("ATONOTA_PRESS_URL", "ATONOTA_PRESS_SERVICE_SECRET")):
+            with self.subTest(missing=missing):
+                environment = {key: value for key, value in PRESS_ENVIRONMENT.items() if key not in missing}
+                errors = io.StringIO()
+                with (
+                    patch("sys.argv", [str(STACK), "up"]),
+                    patch.dict(
+                        namespace["main"].__globals__,
+                        {
+                            "setup": lambda: (dict(environment), ["docker"], ["compose"]),
+                            "run": lambda *args, **kwargs: self.fail("Must reject before Docker"),
+                        },
+                    ),
+                    patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
+                    patch("subprocess.Popen", side_effect=AssertionError("Direct process start")),
+                    contextlib.redirect_stderr(errors),
+                ):
+                    self.assertEqual(namespace["main"](), 2)
+                message = errors.getvalue()
+                for key in PRESS_ENVIRONMENT:
+                    if key in missing:
+                        self.assertIn(key, message)
+                    else:
+                        self.assertNotIn(key, message)
+                for value in PRESS_ENVIRONMENT.values():
+                    self.assertNotIn(value, message)
+
+    def test_setup_supplies_every_press_setting_from_the_templates(self):
+        namespace = runpy.run_path(str(STACK))
+        with patch.dict(os.environ, self.env):
+            environment, _, _ = namespace["setup"]()
+        for key in PRESS_ENVIRONMENT:
+            self.assertTrue(environment.get(key), key)
+
     def test_up_refuses_low_resources_before_building(self):
         namespace = runpy.run_path(str(STACK))
         up = namespace["up"]
@@ -313,7 +379,7 @@ class StackTests(unittest.TestCase):
                 ),
             ):
                 with self.assertRaisesRegex(ValueError, "Startup requires"):
-                    up([], [], {})
+                    up([], [], dict(PRESS_ENVIRONMENT))
 
     def test_credentials_are_not_published_when_write_fails(self):
         namespace = runpy.run_path(str(STACK))
@@ -327,7 +393,7 @@ class StackTests(unittest.TestCase):
     def test_owner_rejects_foreign_containers_before_mutation(self):
         namespace = runpy.run_path(str(STACK))
         outputs = [
-            "container-id",
+            CONTAINER_ID,
             json.dumps(
                 [
                     {
@@ -346,7 +412,7 @@ class StackTests(unittest.TestCase):
         ) as execute:
             with self.assertRaisesRegex(ValueError, "another worktree"):
                 namespace["assert_owner"](
-                    ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}, create=True
+                    ["docker"], ["compose", "--env-file", self.env["E2E_ENV_FILE"]], {"PANE_PORT": "7150"}, create=True
                 )
         self.assertEqual(execute.call_count, 2)
 
@@ -364,7 +430,7 @@ class StackTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ValueError, "saved volumes belong"):
                 namespace["assert_owner"](
-                    ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}
+                    ["docker"], ["compose", "--env-file", self.env["E2E_ENV_FILE"]], {"PANE_PORT": "7150"}
                 )
 
     def test_owner_rejects_unclaimed_volumes_before_creating_marker(self):
@@ -378,7 +444,7 @@ class StackTests(unittest.TestCase):
         ) as execute:
             with self.assertRaisesRegex(ValueError, "Unclaimed stack volumes"):
                 namespace["assert_owner"](
-                    ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}, create=True
+                    ["docker"], ["compose", "--env-file", self.env["E2E_ENV_FILE"]], {"PANE_PORT": "7150"}, create=True
                 )
         self.assertEqual(execute.call_count, 2)
 
@@ -413,7 +479,7 @@ class StackTests(unittest.TestCase):
 
         def record(command, environment, **kwargs):
             calls.append(command)
-            return subprocess.CompletedProcess(command, 0, stdout="container-id")
+            return subprocess.CompletedProcess(command, 0, stdout=CONTAINER_ID)
 
         with (
             patch.dict(
@@ -428,7 +494,7 @@ class StackTests(unittest.TestCase):
             ),
             patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
         ):
-            namespace["up"](["docker"], ["compose"], {})
+            namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
         migrations = [
             command for command in calls if "bench --site press.localhost migrate" in " ".join(command)
         ]
@@ -473,7 +539,7 @@ class StackTests(unittest.TestCase):
             calls.append(command)
             if "bench --site press.localhost migrate" in " ".join(command):
                 raise subprocess.CalledProcessError(1, command)
-            return subprocess.CompletedProcess(command, 0, stdout="container-id")
+            return subprocess.CompletedProcess(command, 0, stdout=CONTAINER_ID)
 
         with (
             patch.dict(
@@ -489,8 +555,211 @@ class StackTests(unittest.TestCase):
             patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
         ):
             with self.assertRaises(subprocess.CalledProcessError):
-                namespace["up"](["docker"], ["compose"], {})
+                namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
         self.assertFalse(any("exec bench start" in " ".join(command) for command in calls))
+
+    def test_rejects_environment_file_outside_the_repository(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        path = Path(outside.name) / ".env"
+        result = self.run_stack("config", E2E_ENV_FILE=str(path))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("E2E_ENV_FILE", result.stderr)
+        self.assertFalse(path.exists())
+
+    def test_refuses_an_environment_file_that_git_could_track(self):
+        candidates = (
+            ROOT / "backend/e2e/stack-candidate.env",
+            ROOT / "backend/e2e/tests/stack-candidate",
+        )
+        for path in candidates:
+            with self.subTest(path=path):
+                self.addCleanup(path.unlink, missing_ok=True)
+                result = self.run_stack("config", E2E_ENV_FILE=str(path))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("ignored by Git", result.stderr)
+                self.assertFalse(path.exists())
+
+    def written_staging_paths(self, target):
+        """Create credentials and return each staging file seen before publication."""
+        namespace = runpy.run_path(str(STACK))
+        seen = []
+        real_link = os.link
+
+        def link(source, destination):
+            source = Path(source)
+            self.assertTrue(source.is_file())
+            self.assertEqual(source.parent, target.parent)
+            namespace["assert_ignored"](source)
+            seen.append(source)
+            return real_link(source, destination)
+
+        with patch("os.link", side_effect=link):
+            namespace["credentials"](target)
+        return seen
+
+    def test_staging_name_does_not_depend_on_the_target_name(self):
+        target = ROOT / "backend/e2e/.env.production"
+        if target.exists() or target.is_symlink():
+            self.skipTest("A developer file already uses this path.")
+        self.addCleanup(target.unlink, missing_ok=True)
+        for candidate in (target, Path(self.env["E2E_ENV_FILE"])):
+            with self.subTest(target=candidate):
+                seen = self.written_staging_paths(candidate)
+                self.assertEqual(len(seen), 1)
+                self.assertRegex(seen[0].name, r"\A\.fs-stack-env\.[0-9a-f]{16}\.tmp\Z")
+                self.assertFalse(seen[0].exists())
+                self.assertEqual(candidate.stat().st_mode & 0o777, 0o600)
+
+    def test_first_run_creates_a_custom_ignored_target_and_removes_staging(self):
+        target = ROOT / "backend/e2e/.env.production"
+        if target.exists() or target.is_symlink():
+            self.skipTest("A developer file already uses this path.")
+        self.addCleanup(target.unlink, missing_ok=True)
+        staging_before = set((ROOT / "backend/e2e").glob(".fs-stack-env.*"))
+        result = self.run_stack("config", E2E_ENV_FILE=str(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(target.is_file())
+        self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(set((ROOT / "backend/e2e").glob(".fs-stack-env.*")), staging_before)
+
+    def test_refuses_a_staging_path_that_git_could_track(self):
+        folder = ROOT / "backend/e2e" / ("staging-test-" + os.urandom(4).hex())
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        folder.mkdir()
+        target = folder / ".env"
+        namespace = runpy.run_path(str(STACK))
+        namespace["assert_ignored"](target)
+        with self.assertRaisesRegex(ValueError, "ignored by Git"):
+            namespace["credentials"](target)
+        self.assertEqual(list(folder.iterdir()), [])
+
+    def test_staging_ignore_rule_is_narrow(self):
+        namespace = runpy.run_path(str(STACK))
+        namespace["assert_ignored"](ROOT / "backend/e2e/.fs-stack-env.0123456789abcdef.tmp")
+        for near in (
+            "backend/e2e/.fs-stack-env.0123456789abcdef.tmp.md",
+            "backend/e2e/.fs-stack-env.notes.tmp",
+            "backend/e2e/docs/.fs-stack-env.0123456789abcdef.tmp",
+            "src/.fs-stack-env.0123456789abcdef.tmp",
+            "backend/e2e/.env.tmp-review.md",
+            "src/.env.tmp-review",
+        ):
+            with self.subTest(path=near):
+                with self.assertRaisesRegex(ValueError, "ignored by Git"):
+                    namespace["assert_ignored"](ROOT / near)
+
+    def test_git_ignore_check_cannot_be_redirected_by_git_variables(self):
+        path = ROOT / "backend/e2e/stack-candidate.env"
+        self.addCleanup(path.unlink, missing_ok=True)
+        foreign = Path(self.temp.name) / "foreign"
+        # Reuse the stack's validated runner so the test adds no new process call site.
+        runpy.run_path(str(STACK))["run"]([shutil.which("git"), "init", "-q", str(foreign)], dict(os.environ))
+        (foreign / ".gitignore").write_text("*\n")
+        result = self.run_stack(
+            "config",
+            E2E_ENV_FILE=str(path),
+            GIT_DIR=str(foreign / ".git"),
+            GIT_WORK_TREE=str(ROOT),
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(path.exists())
+
+    def test_rejects_environment_file_that_escapes_through_a_parent_symlink(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        alias = Path(self.temp.name) / "alias"
+        alias.symlink_to(outside.name, target_is_directory=True)
+        result = self.run_stack("config", E2E_ENV_FILE=str(alias / ".env"))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(list(Path(outside.name).iterdir()), [])
+
+    def test_rejects_environment_file_names_with_control_characters(self):
+        for name in ("bad\nname.env", "bad\rname.env", "..", "."):
+            with self.subTest(name=name):
+                result = self.run_stack("config", E2E_ENV_FILE=str(Path(self.temp.name) / name))
+                self.assertEqual(result.returncode, 2, result.stderr)
+        # The OS refuses NUL in environment values, so check the validator directly.
+        with self.assertRaisesRegex(ValueError, "control character"):
+            runpy.run_path(str(STACK))["env_file"](str(Path(self.temp.name) / "bad\x00name.env"))
+
+    def test_run_rejects_an_unvalidated_environment_file_before_execution(self):
+        namespace = runpy.run_path(str(STACK))
+        with patch("subprocess.run") as execute:
+            for command in (
+                ["docker", "compose", "--env-file", "/elsewhere/.env", "ps"],
+                ["docker", "compose", "--env-file"],
+                ["docker", "ps", "bad\x00argument"],
+                ["docker", "ps", 7],
+                [],
+            ):
+                with self.subTest(command=command):
+                    with self.assertRaises(ValueError):
+                        namespace["run"](command, {})
+        execute.assert_not_called()
+
+    def test_owner_rejects_malformed_container_ids_before_inspect(self):
+        namespace = runpy.run_path(str(STACK))
+        for output in ("--format={{json .}}", "0123456789ab;rm", "XYZ", "0123"):
+            with self.subTest(output=output):
+                with patch(
+                    "subprocess.run", return_value=subprocess.CompletedProcess([], 0, stdout=output)
+                ) as execute:
+                    with self.assertRaisesRegex(ValueError, "container ID"):
+                        namespace["assert_owner"](
+                            ["docker"],
+                            ["compose", "--env-file", self.env["E2E_ENV_FILE"]],
+                            {"PANE_PORT": "7150"},
+                        )
+                self.assertEqual(execute.call_count, 1)
+
+    def test_up_rejects_malformed_container_ids_before_stats(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, **kwargs):
+            calls.append(command)
+            stdout = "--no-trunc\n" if command[-2:] == ["ps", "-q"] else CONTAINER_ID
+            return subprocess.CompletedProcess(command, 0, stdout=stdout)
+
+        with patch.dict(
+            namespace["up"].__globals__,
+            {
+                "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                "config": lambda *args: {},
+                "ensure_images": lambda *args: None,
+                "check": lambda *args: None,
+                "run": record,
+            },
+        ):
+            with self.assertRaisesRegex(ValueError, "container ID"):
+                namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
+        self.assertFalse(any("stats" in command for command in calls))
+
+    def test_ready_probe_uses_the_validating_runner(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, check=True, **kwargs):
+            calls.append((command, check))
+            return subprocess.CompletedProcess(command, 0, stdout=CONTAINER_ID)
+
+        with (
+            patch.dict(
+                namespace["up"].__globals__,
+                {
+                    "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                    "config": lambda *args: {},
+                    "ensure_images": lambda *args: None,
+                    "check": lambda *args: None,
+                    "run": record,
+                },
+            ),
+            patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
+        ):
+            namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
+        probe = ["compose", "exec", "-T", "web", "test", "-f", "/home/frappe/benches/.stack-installed"]
+        self.assertIn((probe, False), calls)
 
     def owner_with_container(self, label_path, port="7150", volumes=""):
         namespace = runpy.run_path(str(STACK))
@@ -508,7 +777,7 @@ class StackTests(unittest.TestCase):
         with patch(
             "subprocess.run",
             side_effect=[
-                subprocess.CompletedProcess([], 0, stdout="container-id"),
+                subprocess.CompletedProcess([], 0, stdout=CONTAINER_ID),
                 subprocess.CompletedProcess([], 0, stdout=json.dumps(containers)),
                 subprocess.CompletedProcess([], 0, stdout=volumes),
             ],

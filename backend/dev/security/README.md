@@ -1,22 +1,28 @@
 # Backend güvenlik denetimi
 
 Depo kökünde `backend/dev/bin/security-audit` komutunu çalıştırın.
-Komut için Python 3.9 veya üstü, `uvx` ve çalışan Colima gerekir.
+Komut için Python 3.9 veya üstü, `uv`, `uvx` ve çalışan Colima gerekir.
+Bandit adımı sabitlenmiş Python 3.12 ortamında çalışır.
 İlk çalıştırmada araç paketlerinin ve Gitleaks imajının indirilmesi gerekebilir.
 
 Komut aşağıdaki işleri yapar.
 
-1. Semgrep kurallarını doğru ve hatalı örneklerle sınar.
-2. Backend kaynak kodunu Semgrep ile denetler.
-3. Gitleaks ile koda yazılmış gizli bilgileri arar.
-4. Uç listesi betiğinin birim testlerini çalıştırır.
-5. Tüm uçları ve misafire açık uçları ayrı ayrı listeler.
-6. Her uç için iki yetki testi adı arar.
+1. Bandit ile Git’in izlediği backend Python dosyalarını tarar.
+2. Semgrep kurallarını doğru ve hatalı örneklerle sınar.
+3. Backend kaynak kodunu Semgrep ile denetler.
+4. Gitleaks ile koda yazılmış gizli bilgileri arar.
+5. Uç listesi betiğinin birim testlerini çalıştırır.
+6. Tüm uçları ve misafire açık uçları ayrı ayrı listeler.
+7. Her uç için iki yetki testi adı arar.
 
 Bir adım başarısız olursa komut hata koduyla çıkar.
 Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
 Tarama, Git geçmişini kapsamaz.
 Gitleaks sonucu gösterirken gizli değerleri örter.
+Bandit önce bilinen hatalı örneği sınar. Ardından örnek klasörlerini kapsam dışında tutar.
+Bandit, Python ile başlayan uzantısız betikleri de tarar.
+`# nosec` yorumu tarama sonucunu değiştirmez.
+Kullanılmayan Bandit istisnası ya da açık bulgu kapıyı durdurur.
 
 ## Her uç için iki test
 
@@ -58,10 +64,10 @@ Kod incelemesinde değişkene taşınan seçenekleri de denetleyin.
 Zorunlu bir istisnayı ilgili işin karar kaydında açıklayın.
 
 Press istisnalarının gerekçeleri `semgrep-exceptions.json` dosyasındadır.
-Kapı, Press uygulamasının ve ilgili Semgrep kural dosyasının özetini karşılaştırır.
+Kapı, listedeki dosyaların ve Semgrep kural dosyasının özetini karşılaştırır.
 Özet taramadan önce veya sonra farklıysa kapı istisnayı uygulamaz.
 Dosya, satır ve kural kimliği de birebir eşleşmelidir.
-Press kodu veya kural değişirse istisnaları yeniden inceleyin.
+Listedeki dosyalardan biri veya Semgrep kuralı değişirse istisnaları yeniden inceleyin.
 İnceleme bitince depo kökünde şu komutu çalıştırın.
 
 ```sh
@@ -72,6 +78,21 @@ Komut her kapsam için bir özet yazdırır.
 Özet `null` ise kapsama ait onayları yenilemeyin.
 Onayları inceleyince yeni özeti aynı kapsamın `sha256` alanına yazın.
 Ardından `backend/dev/bin/security-audit` komutunu çalıştırın.
+
+Press onaylarının tam listesi ilk kaydın `files` alanındadır.
+`--snapshot` çıktısında bu kayıt `backend` anahtarının altında görünür.
+Liste şu dosyaları kapsar.
+
+- `backend/apps/press_tr/press_tr/api/` altındaki beş onaylı uç dosyası.
+- `press_identity/` altındaki hesap, kimlik, oturum ve anonimleştirme dosyaları.
+- Aynı klasördeki silme, servis, OIDC, makine ucu ve istek denetimi yardımcıları.
+- Kimlik bağının ve oturum eşlemesinin DocType tanımı ile kodu.
+- Press kancaları, Press paket bildirimi ve `backend/libs/oidc_verify/` doğrulama kitaplığının kaynakları.
+- OIDC kitaplığının paket bildirimi.
+
+Takım alanının tekilliğini tanımlayan `press_identity/custom/team.json` da özete girer.
+Press belgeleri ve test çalıştırma betikleri bu özete girmez.
+Ansible köprüsü yalnız yükleyiciyi ayarlar. Yetki kararı vermediği için özete girmez.
 
 Erişim onayları yalnız listelenen dosyalara bağlıdır.
 Aşağıdaki yollar `backend/apps/platform_core/platform_core/` klasörüne göredir.

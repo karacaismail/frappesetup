@@ -177,9 +177,24 @@ def bandit_findings(command, paths):
     return all_findings
 
 
+def is_python_source(path):
+    if not path.is_file() or path.is_symlink():
+        return False
+    if path.suffix:
+        return path.suffix == ".py"
+    with path.open("rb") as source:
+        shebang = source.readline(512)
+    return bool(re.match(
+        rb"^#![ \t]*/(?:[^\s]*/)?"
+        rb"(?:env[ \t]+(?:-S[ \t]+|--split-string(?:=|[ \t]+))?)?"
+        rb"python(?:[0-9]+(?:\.[0-9]+)*)?(?:\s|$)",
+        shebang,
+    ))
+
+
 def scan_bandit():
     command = ["uvx", "--python", "3.12", "--exclude-newer", VERSIONS["TOOL_CUTOFF"],
-               f"bandit@{BANDIT}", "-q", "-f", "json"]
+               f"bandit@{BANDIT}", "--ignore-nosec", "-q", "-f", "json"]
     result = Result("Bandit", BANDIT, shlex.join(command) + " TRACKED_PYTHON_FILES", "fail")
     try:
         fixture = bandit_findings(command, [str(FIXTURES / "bandit.py")])
@@ -201,9 +216,7 @@ def scan_bandit():
         ):
             raise ValueError("Invalid or duplicate Bandit exception signature.")
         files = [path for path in git("ls-files", "-z", "--", "backend").split("\0")
-                 if path.endswith(".py") and not path.startswith(
-                     ("backend/dev/security/fixtures/", f"{FIXTURES}/"))
-                 and (ROOT / path).is_file() and not (ROOT / path).is_symlink()]
+                 if not path.startswith(f"{FIXTURES}/") and is_python_source(ROOT / path)]
         if not files:
             raise ValueError("No tracked Python files to scan.")
         sources = {}
@@ -744,6 +757,7 @@ def main():
     local.add_argument("target")
     for scan in (full, local):
         scan.add_argument("--ci", action="store_true", default=os.environ.get("CI", "").lower() in ("1", "true"))
+    subcommands.add_parser("bandit")
     subcommands.add_parser("report")
     subcommands.add_parser("compile-lock")
     card = subcommands.add_parser("scorecard")
@@ -762,6 +776,8 @@ def main():
             return scan_local(args.target, ci=args.ci)
         except ValueError as error:
             parser.error(str(error))
+    if args.mode == "bandit":
+        return int(scan_bandit().status != "pass")
     if args.mode == "compile-lock":
         compile_lock()
         return 0

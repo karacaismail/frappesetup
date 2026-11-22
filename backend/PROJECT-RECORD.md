@@ -284,7 +284,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 - **O-42. Erişim Semgrep onayları dosya listesine bağlıdır.**
   - Özet, beş onayın geçtiği iki dosyayı ve yetki yardımcılarını kapsar.
-  - Dosya listesi `backend/dev/security/README.md` içindedir.
+  - Dosya listesi `backend/dev/security/semgrep-exceptions.json` içindedir.
   - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
   - Onay kapsamları çakışırsa kapı hata verir.
 - **O-43. Anonim yapma adımında 404 sonuç sayılmaz.** Karar 22 Kasım 2026 Pazar günü inceleme 18 ile alındı.
@@ -299,6 +299,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Başarılı yanıtta `anonymized` ve `found` alanları `true` olur. Yanıt `user`, `enabled` ve `status` alanlarını da taşır.
   - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
   - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur. İş `unknown` kalır ve Keycloak hesabı silinmez (O-43).
+
+- **O-43. Press Semgrep onayları dosya listesine bağlıdır.**
+  - Liste, 19 onayın geçtiği dosyaları ve yetki yardımcılarını kapsar.
+  - Liste, ortak OIDC doğrulama kitaplığını da kapsar.
+  - Kapsam dışı belge ve test değişiklikleri Press onaylarını düşürmez.
+  - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
+  - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
 
 ## Karar sitesine işlenecek farklar
 

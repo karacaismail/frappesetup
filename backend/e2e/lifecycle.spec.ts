@@ -1,9 +1,14 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { localUrl, required } from './local';
+import { previewMobileToken } from './mobile-fixture';
+import { postMobile } from './mobile-request';
+
+const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 
 const LOGIN_METHOD = '/api/method/platform_core.api.auth.get_login_url';
 const LOGGED_USER = '/api/method/frappe.auth.get_logged_user';
+const PRESS_ACCOUNT = '/api/method/press.api.account.get';
 const CALLBACK = '/api/method/platform_core.api.auth.keycloak_callback';
 const IDLE_MS = 60 * 60 * 1000;
 
@@ -69,11 +74,20 @@ async function loggedUser(request: APIRequestContext) {
   return (await response.json()).message;
 }
 
-function mobilePull(request: APIRequestContext, token: string, installation: string) {
-  return request.post(sites().tenant + '/api/method/platform_core.api.mobile.v1_pull', {
-    headers: { ...bearer(token), 'X-Mobile-App-Version': '1.0.0', 'X-Mobile-Contract-Version': '1' },
-    data: { installation_id: installation }, maxRedirects: 0,
-  });
+function mobilePull(token: string, installation: string) {
+  return postMobile(sites().tenant + '/api/method/', 'pull', token, installation);
+}
+
+async function lifecycleMobile(browser: Browser, request: APIRequestContext, scenario: 'DELETE' | 'REVOKE') {
+  if (!fullPreview) {
+    return { access: required(`E2E_${scenario}_MOBILE_TOKEN`), installation: required(`E2E_${scenario}_INSTALLATION`),
+      refresh: scenario === 'REVOKE' ? required('E2E_REVOKE_MOBILE_REFRESH_TOKEN') : '' };
+  }
+  const tokens = await previewMobileToken(browser, request, required(`E2E_${scenario}_EMAIL`), required(`E2E_${scenario}_PASSWORD`));
+  const installation = randomUUID();
+  const registered = await postMobile(sites().tenant + '/api/method/', 'register', tokens.access, installation);
+  expect(registered.status, 'preview mobile installation').toBe(200);
+  return { ...tokens, installation };
 }
 
 function keycloakUser(request: APIRequestContext, subject: string, suffix = '') {
@@ -95,7 +109,7 @@ test.describe('Press account deletion', () => {
   test.skip(() => process.env.E2E_ACCOUNT_DELETION !== '1',
     'Requires the Press deletion page, identity-sync deletion workflow and dedicated synthetic fixtures.');
 
-  test('customer self-deletion closes Press, tenant and mobile access', async ({ page, request }) => {
+  test('customer self-deletion closes Press, tenant and mobile access', async ({ browser, page, request }) => {
     test.setTimeout(120_000);
     const { tenant, press } = sites();
     const email = fixtureEmail('E2E_DELETE_EMAIL', 'delete');
@@ -103,13 +117,12 @@ test.describe('Press account deletion', () => {
     const tenantReader = required('E2E_DELETE_TENANT_READER_COOKIE');
     const pressReader = required('E2E_DELETE_PRESS_READER_COOKIE');
     const pressKey = required('E2E_DELETE_PRESS_AUTHORIZATION');
-    const mobileToken = required('E2E_DELETE_MOBILE_TOKEN');
+    const { access: mobileToken, installation } = await lifecycleMobile(browser, request, 'DELETE');
     expect(tokenClaims(mobileToken).sub === subject).toBe(true);
-    const installation = required('E2E_DELETE_INSTALLATION');
     const readUser = (origin: string, cookie: string, name = email) =>
       resource(request, origin, cookie, 'User', name);
-    const pressAccess = () => request.get(press + LOGGED_USER, {
-      headers: { Authorization: pressKey }, maxRedirects: 0,
+    const pressAccess = () => request.get(press + PRESS_ACCOUNT, {
+      headers: { Authorization: pressKey, Cookie: 'sid=Guest' }, maxRedirects: 0,
     });
     const business = {
       doctype: required('E2E_DELETE_RECORD_DOCTYPE'),
@@ -128,8 +141,8 @@ test.describe('Press account deletion', () => {
     expect((await readUser(press, pressReader)).enabled).toBe(1);
     const pressSession = await pressAccess();
     expect(pressSession.status()).toBe(200);
-    expect((await pressSession.json()).message === email).toBe(true);
-    expect((await mobilePull(request, mobileToken, installation)).status()).toBe(200);
+    expect((await pressSession.json()).message?.user?.name === email).toBe(true);
+    expect((await mobilePull(mobileToken, installation)).status).toBe(200);
     const before = await readBusinessValue();
     const anonymous = JSON.parse(business.anonymous);
     expect(before).not.toEqual(anonymous);
@@ -174,19 +187,18 @@ test.describe('Press account deletion', () => {
       expect(previous.status()).toBe(404);
     }
     expect([401, 403]).toContain((await pressAccess()).status());
-    expect([401, 403]).toContain((await mobilePull(request, mobileToken, installation)).status());
+    expect([401, 403]).toContain((await mobilePull(mobileToken, installation)).status);
     expect(await readBusinessValue()).toEqual(anonymous);
   });
 });
 
-test('administrator revocation also terminates the Keycloak mobile session', async ({ request }) => {
+test('administrator revocation also terminates the Keycloak mobile session', async ({ browser, request }) => {
   test.skip(process.env.E2E_MOBILE_SESSION_REVOKE !== '1',
     'Requires mobile bearer authentication, the administrator approval tool and identity-sync session revocation.');
   test.setTimeout(90_000);
   const { identity, tenant } = sites();
-  const installation = required('E2E_REVOKE_INSTALLATION');
   const subject = required('E2E_REVOKE_SUBJECT');
-  const token = required('E2E_REVOKE_MOBILE_TOKEN');
+  const { access: token, installation, refresh: refreshToken } = await lifecycleMobile(browser, request, 'REVOKE');
   const { sid, sub, preferred_username } = tokenClaims(token);
   expect(typeof sid === 'string' && sid.length > 0 && sub === subject
     && /^e2e-revoke-[a-z0-9-]+@example\.test$/.test(preferred_username)).toBe(true);
@@ -202,8 +214,8 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
     maxRedirects: 0,
   });
   expect(await sessions()).toBe(true);
-  expect((await mobilePull(request, token, installation)).status()).toBe(200);
-  const rotated = await refresh(required('E2E_REVOKE_MOBILE_REFRESH_TOKEN'));
+  expect((await mobilePull(token, installation)).status).toBe(200);
+  const rotated = await refresh(refreshToken);
   expect(rotated.status()).toBe(200);
   const next = (await rotated.json()).refresh_token;
   expect(typeof next).toBe('string');
@@ -236,7 +248,7 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
   expect(approved.status()).toBe(200);
   expect((await approved.json()).message.executed).toBe(true);
   await expect.poll(sessions, { timeout: 30_000 }).toBe(false);
-  expect([401, 403]).toContain((await mobilePull(request, token, installation)).status());
+  expect([401, 403]).toContain((await mobilePull(token, installation)).status);
   const denied = await refresh(next);
   expect(denied.status()).toBe(400);
   expect((await denied.json()).error).toBe('invalid_grant');
@@ -244,19 +256,21 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
 
 async function keycloakStillSignedIn(page: Page) {
   const { identity, tenant } = sites();
+  const redirect = fullPreview ? new URL(required('E2E_MOBILE_REDIRECT_URI')) : new URL(tenant + CALLBACK);
+  const client = fullPreview ? required('E2E_SSO_PROBE_CLIENT') : 'site-tenant1';
   const state = randomUUID();
   const challenge = createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url');
   const url = new URL(identity + '/realms/platform/protocol/openid-connect/auth');
   url.search = new URLSearchParams({
-    client_id: 'site-tenant1', response_type: 'code', scope: 'openid', state, prompt: 'none',
-    redirect_uri: tenant + CALLBACK, code_challenge: challenge, code_challenge_method: 'S256',
+    client_id: client, response_type: 'code', scope: 'openid', state, prompt: 'none',
+    redirect_uri: redirect.href, code_challenge: challenge, code_challenge_method: 'S256',
   }).toString();
   const response = await page.request.get(url.href, { maxRedirects: 0 });
   const location = response.headers().location;
   if (!location) return false;
   const callback = new URL(location, identity);
   // Do not follow the callback. The Keycloak probe must not touch the tenant session.
-  return callback.origin === tenant && callback.pathname === CALLBACK
+  return callback.origin === redirect.origin && callback.pathname === redirect.pathname
     && callback.searchParams.get('state') === state && callback.searchParams.has('code');
 }
 
@@ -270,17 +284,16 @@ test.describe('Employee idle session', () => {
     const email = fixtureEmail('E2E_EMPLOYEE_EMAIL', 'employee');
     const password = required('E2E_EMPLOYEE_PASSWORD');
     await signIn(page, email, password);
-    expect(await loggedUser(page.request)).toBe(email);
+    await expect.poll(() => loggedUser(page.request)).toBe(email);
+    expect(await keycloakStillSignedIn(page)).toBe(true);
     const started = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 55 * 60 * 1000));
     expect(await keycloakStillSignedIn(page)).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, Math.max(0, started + IDLE_MS + 2000 - Date.now())));
     expect(await keycloakStillSignedIn(page)).toBe(true);
 
-    await page.goto(sites().tenant + '/panel');
-    await expect.poll(() => new URL(page.url()).origin).toBe(sites().identity);
-    await expect(page.locator('#password')).toBeVisible();
-    await enterCredentials(page, email, password);
+    await expect.poll(() => loggedUser(page.request)).toBe('Guest');
+    await signIn(page, email, password);
     await expect.poll(() => loggedUser(page.request)).toBe(email);
   });
 });
