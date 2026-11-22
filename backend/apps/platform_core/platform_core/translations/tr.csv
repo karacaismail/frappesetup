@@ -495,3 +495,210 @@ Report {0} refers to a report that cannot be found.,{0} raporu bulunamayan bir r
 Roles listed in roles_without_access can no longer read this document type once the rule is active.,Kural etkin olunca roles_without_access listesindeki roller bu kayıt türünü okuyamaz.,
 Change Access Rule {0} ({1}) on {2}: {3}.,{2} türündeki {0} ({1}) adlı Access Rule kaydını değiştir. Değişen alanlar: {3}.,
 Roles listed in roles_without_access can no longer read this document type once the change is saved.,Değişiklik kaydedilince roles_without_access listesindeki roller bu kayıt türünü okuyamaz.,
+"The phone sends pending operations and receives changes when connectivity returns.
+Request bodies may be at most 256 KiB. Larger requests return 413.
+The server accepts up to 60 requests per account per minute. Further requests return 429.
+This version starts with an empty allowlist. The server does not accept files.
+","Telefon, bağlantı gelince bekleyen işleri gönderir ve değişiklikleri alır.
+İstek gövdesi en çok 256 KiB olabilir. Aşımda 413 döner.
+Sunucu her hesaba dakikada en çok 60 istek işler. Aşımda 429 döner.
+Bu sürümde izin listesi boş başlar. Sunucu dosya kabul etmez.
+",OpenAPI mobile.info.description
+"Binds the installation to a verified Keycloak session.
+A revoked installation cannot be reactivated. A new session requires a new installation ID.
+","Telefon kurulumunu doğrulanmış Keycloak oturumuna bağlar.
+İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_register.post.description
+"Revokes one installation or all active installations for the account.
+The returned count reflects local revocations. The server then requests session closure.
+A single-installation revocation can be retried from another valid session.
+","Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+Başka bir geçerli oturumla tekli iptal yinelenebilir.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_revoke.post.description
+"Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+For an operation with the same ID and content, the server returns the original committed result.
+","En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
+Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_push.post.description
+Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.,İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.,OpenAPI mobile.paths./platform_core.api.mobile.v1_pull.post.description
+"Registers the mobile installation using a same-origin Frappe session.
+A revoked installation cannot be reactivated. A new session requires a new installation ID.
+","Telefon kurulumunu aynı kökendeki Frappe oturumuyla kaydeder.
+İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_register.post.description
+"Revokes one installation or all active installations for the account.
+The returned count reflects local revocations. The server then requests session closure.
+A single-installation revocation can be retried from another valid session.
+","Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+Başka bir geçerli oturumla tekli iptal yinelenebilir.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_revoke.post.description
+Stores the original operation result for retries.,İlk iş sonucunu yeniden gönderim için saklar.,Mobile Operation.description
+"The server derives the key from the site, account, and operation ID.","Sunucu anahtarı site, hesap ve işlem kimliğinden üretir.",Mobile Operation.fields.operation_key.description
+The server uses this digest to compare the contents of a repeated request.,Sunucu bu özeti kullanarak yinelenen isteğin içeriğini karşılaştırır.,Mobile Operation.fields.content_digest.description
+The server stores the original request result in this field.,Sunucu ilk isteğin sonucunu bu alanda saklar.,Mobile Operation.fields.result.description
+Tracks the sync sequence for the site.,Sitenin eşitleme sırasını tutar.,Mobile Sequence.description
+The site's only counter record uses this key.,Site için tek sayaç kaydı bu anahtarı taşır.,Mobile Sequence.fields.sequence_key.description
+The server assigns each new change a sequence number higher than this value.,Sunucu her yeni değişikliğe bu sayıdan büyük bir sıra numarası verir.,Mobile Sequence.fields.sequence.description
+The server rejects requests with a cursor below this sequence number.,Sunucu daha eski sıra numarası olan imleçle gelen isteği reddeder.,Mobile Sequence.fields.retention_floor.description
+Revokes one owned installation without signing out the current browser.,Hesabın bir kurulumunu iptal eder. Tarayıcı oturumu açık kalır.,Mobile sync API
+This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.yapay_zeka
+This action cannot run inside a transaction with pending writes.,"Bu işlem, bekleyen yazı taşıyan bir işlemin içinde çalışamaz.",platform_core.yapay_zeka
+"Send either a session cookie or an agent token, not both.",Oturum çerezini ya da aracı belirtecini gönderin. İkisini birlikte göndermeyin.,platform_core.yapay_zeka
+AI Action Log entries cannot be deleted.,Yapay zekâ işlem günlüğü kayıtları silinemez.,platform_core.yapay_zeka
+AI Action Log is append-only.,Yapay zekâ işlem günlüğüne yalnız yeni kayıt eklenir.,platform_core.yapay_zeka
+Unknown field: {0},Bilinmeyen alan: {0},platform_core.yapay_zeka
+Field {0} is secret.,{0} alanı gizlidir.,platform_core.yapay_zeka
+You may not read field {0}.,{0} alanını okuma izniniz yok.,platform_core.yapay_zeka
+DocType {0} does not exist.,{0} adlı kayıt türü yok.,platform_core.yapay_zeka
+Your roles do not allow tool {0}.,Rolleriniz {0} aracını kullanmaya izin vermiyor.,platform_core.yapay_zeka
+An earlier action on this target has an unknown result. A human must resolve it first.,Bu hedefteki önceki işlemin sonucu bilinmiyor. Önce bir insan o işlemi kapatmalı.,platform_core.yapay_zeka
+Proposal not found.,Öneri bulunamadı.,platform_core.yapay_zeka
+This proposal belongs to another user.,Bu öneri başka bir kullanıcıya ait.,platform_core.yapay_zeka
+Unknown status.,Bilinmeyen durum.,platform_core.yapay_zeka
+start must be between 0 and {0}.,start değeri 0 ile {0} arasında olmalı.,platform_core.yapay_zeka
+The target changed after the preview.,"Hedef, önizlemeden sonra değişti.",platform_core.yapay_zeka
+Only a pending proposal can be rejected.,Yalnız bekleyen öneri reddedilebilir.,platform_core.yapay_zeka
+outcome must be succeeded or failed.,outcome değeri succeeded ya da failed olmalı.,platform_core.yapay_zeka
+Only a proposal with an unknown result can be resolved.,Yalnız sonucu bilinmeyen öneri kapatılabilir.,platform_core.yapay_zeka
+The preview of tool {0} must be an object.,{0} aracının önizlemesi bir nesne olmalı.,platform_core.yapay_zeka
+The preview of tool {0} is not valid: {1},{0} aracının önizlemesi geçersiz: {1},platform_core.yapay_zeka
+The preview of versioned tool {0} must return {1}.,Sürüm denetimi isteyen {0} aracının önizlemesi şunları döndürmeli: {1}.,platform_core.yapay_zeka
+The retention period is between {0} and {1} days.,Saklama süresi {0} ile {1} gün arasında olmalı.,platform_core.yapay_zeka
+You may not create custom fields.,Özel alan oluşturma izniniz yok.,platform_core.yapay_zeka
+Select and Link fields need options.,Select ve Link türündeki alanlar seçenek ister.,platform_core.yapay_zeka
+insert_after names a field that does not exist.,insert_after değeri var olmayan bir alanı gösteriyor.,platform_core.yapay_zeka
+You may not change field properties.,Alan ayarlarını değiştirme izniniz yok.,platform_core.yapay_zeka
+options can change only on a Select field.,Seçenekler yalnız Select türündeki alanda değişebilir.,platform_core.yapay_zeka
+This role has more than one rule at this level. Change it in the permission manager.,Bu rolün bu seviyede birden çok kuralı var. Değişikliği izin yöneticisinde yapın.,platform_core.yapay_zeka
+permissions takes known permission types.,permissions yalnız bilinen izin türlerini alır.,platform_core.yapay_zeka
+The user already has this role.,Kullanıcı bu role zaten sahip.,platform_core.yapay_zeka
+The user does not have this role.,Kullanıcı bu role sahip değil.,platform_core.yapay_zeka
+DocType {0} is closed to AI tools.,{0} kayıt türü yapay zekâ araçlarına kapalıdır.,platform_core.yapay_zeka
+Field {0} already exists.,{0} alanı zaten var.,platform_core.yapay_zeka
+{0} takes text.,{0} metin alır.,platform_core.yapay_zeka
+Permissions of DocType {0} do not change through AI.,{0} kayıt türünün izinleri yapay zekâ yoluyla değişmez.,platform_core.yapay_zeka
+Permissions of role {0} do not change through AI.,{0} rolünün izinleri yapay zekâ yoluyla değişmez.,platform_core.yapay_zeka
+Unknown role: {0},Bilinmeyen rol: {0},platform_core.yapay_zeka
+Role {0} does not change through AI.,{0} rolü yapay zekâ yoluyla verilmez ve alınmaz.,platform_core.yapay_zeka
+Role {0} gives desk access. An end user cannot have it.,{0} rolü yönetim ekranını açar. Son kullanıcı bu rolü alamaz.,platform_core.yapay_zeka
+{0} takes true or false.,{0} doğru ya da yanlış alır.,platform_core.yapay_zeka
+{0} takes a number from 0 to 9.,{0} 0 ile 9 arasında bir sayı alır.,platform_core.yapay_zeka
+You have no permission on DocType {0}.,{0} kayıt türünde izniniz yok.,platform_core.yapay_zeka
+Read child rows through their parent document.,Alt tablo satırlarını ana kayıt üzerinden okuyun.,platform_core.yapay_zeka
+This report reads a DocType that is closed to AI tools.,"Bu rapor, yapay zekâ araçlarına kapalı bir kayıt türünü okuyor.",platform_core.yapay_zeka
+Reports are closed until the access engine's report gate is installed.,Erişim motorunun rapor kapısı kurulana kadar raporlar kapalıdır.,platform_core.yapay_zeka
+"A filter is a value or an [operator, value] pair.","Süzgeç bir değerdir ya da [işleç, değer] çiftidir.",platform_core.yapay_zeka
+order_by takes a field name and asc or desc.,order_by bir alan adı ile asc ya da desc alır.,platform_core.yapay_zeka
+You may not read DocType {0}.,{0} kayıt türünü okuma izniniz yok.,platform_core.yapay_zeka
+You may not run report {0}.,{0} raporunu çalıştırma izniniz yok.,platform_core.yapay_zeka
+Report {0} is prepared in the background.,{0} raporu arka planda hazırlanır.,platform_core.yapay_zeka
+Change child rows through their parent document.,Alt tablo satırlarını ana kayıt üzerinden değiştirin.,platform_core.yapay_zeka
+data must name at least one field.,data en az bir alan içermeli.,platform_core.yapay_zeka
+The document changed after the preview.,"Kayıt, önizlemeden sonra değişti.",platform_core.yapay_zeka
+Only a draft of a submittable DocType can be submitted.,Yalnız onaya gönderilebilen bir kayıt türünün taslağı onaya gönderilebilir.,platform_core.yapay_zeka
+Only a submitted document can be cancelled.,Yalnız onaylanmış kayıt iptal edilebilir.,platform_core.yapay_zeka
+Cancel a submitted document before deleting it.,Onaylanmış kaydı silmeden önce iptal edin.,platform_core.yapay_zeka
+DocType {0} is closed to AI write tools.,{0} kayıt türü yapay zekâ yazma araçlarına kapalıdır.,platform_core.yapay_zeka
+DocType {0} changes only through admin tools.,{0} kayıt türü yalnız yönetim araçlarıyla değişir.,platform_core.yapay_zeka
+Framework DocType {0} is closed to AI write tools.,Çatıya ait {0} kayıt türü yapay zekâ yazma araçlarına kapalıdır.,platform_core.yapay_zeka
+Field {0} takes a list of rows.,{0} alanı satır listesi alır.,platform_core.yapay_zeka
+Rows cannot carry their own tables.,Satırlar kendi alt tablolarını taşıyamaz.,platform_core.yapay_zeka
+You may not create {0}.,{0} oluşturma izniniz yok.,platform_core.yapay_zeka
+Field {0} cannot be set.,{0} alanına değer verilemez.,platform_core.yapay_zeka
+Field {0} is secret. A human enters it.,{0} alanı gizlidir. Bu değeri bir insan girer.,platform_core.yapay_zeka
+You may not write field {0}.,{0} alanına yazma izniniz yok.,platform_core.yapay_zeka
+A row name must be an existing row of this document. New rows carry no name.,Satır adı bu kaydın var olan bir satırı olmalı. Yeni satır ad taşımaz.,platform_core.yapay_zeka
+Row field {0} cannot be set.,Satırdaki {0} alanına değer verilemez.,platform_core.yapay_zeka
+You may not write row field {0}.,Satırdaki {0} alanına yazma izniniz yok.,platform_core.yapay_zeka
+AI Action Log,Yapay Zekâ İşlem Günlüğü,
+AI Action Proposal,Yapay Zekâ İşlem Önerisi,
+"Append-only log of every call an AI makes through the AI access layer, and of every denial. One row per step: call, preview, approval, rejection, execution. It stores a hash of the arguments, never the arguments themselves.","Yapay zekânın erişim katmanından yaptığı her çağrının ve her reddin günlüğüdür. Günlüğe yalnız kayıt eklenir. Her adım bir satırdır: çağrı, önizleme, onay, ret ve yürütme. Günlük girdinin kendisini değil, özetini tutar.",AI Action Log
+User,Kullanıcı,AI Action Log
+User on whose behalf the action ran.,İşlemin adına yapıldığı kullanıcı.,AI Action Log
+Principal,Kimlik türü,AI Action Log
+How the caller proved its identity: a human session or an agent token.,Çağıranın kimliğini nasıl kanıtladığı: insan oturumu ya da aracı belirteci.,AI Action Log
+Session ID,Konuşma kimliği,AI Action Log
+SHA-256 of the conversation id the client sent. The id itself is not stored. Rows of one conversation share this value.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz. Aynı konuşmanın satırları bu değeri paylaşır.,AI Action Log
+Client Info,İstemci bilgisi,AI Action Log
+"Fixed name of the MCP client if the layer knows it, otherwise ""other"". The client's own text is not stored.","Katman istemciyi tanıyorsa istemcinin sabit adı, tanımıyorsa ""other"". İstemcinin kendi metni saklanmaz.",AI Action Log
+Stage,Adım,AI Action Log
+Step of the flow this row records.,Bu satırın kaydettiği akış adımı.,AI Action Log
+Tool,Araç,AI Action Log
+Name of the tool that was called.,Çağrılan aracın adı.,AI Action Log
+Tool Class,Araç türü,AI Action Log
+Kind of the tool.,Aracın türü.,AI Action Log
+Target DocType,Hedef kayıt türü,AI Action Log
+DocType or report the call was aimed at.,Çağrının hedeflediği kayıt türü ya da rapor.,AI Action Log
+Target Name,Hedef kaydın adı,AI Action Log
+Name of the document the call was aimed at.,Çağrının hedeflediği kaydın adı.,AI Action Log
+Arguments Hash,Girdi özeti,AI Action Log
+SHA-256 of the call arguments. The arguments themselves are not stored.,Çağrı girdisinin SHA-256 özeti. Girdinin kendisi saklanmaz.,AI Action Log
+Decision,Karar,AI Action Log
+"Whether the layer allowed the step, denied it, or it failed unexpectedly.","Katmanın adıma izin verdiğini, adımı reddettiğini ya da adımın beklenmedik biçimde hata verdiğini gösterir.",AI Action Log
+Deny Reason,Ret nedeni,AI Action Log
+"Code that says why the step was denied, for example permission or expired.",Adımın neden reddedildiğini söyleyen kod. Örneğin permission ya da expired.,AI Action Log
+Proposal,Öneri,AI Action Log
+Write proposal this step belongs to.,Bu adımın bağlı olduğu yazma önerisi.,AI Action Log
+Approval State,Onay durumu,AI Action Log
+Status of the proposal when this row was written.,Bu satır yazıldığında önerinin durumu.,AI Action Log
+Result,Sonuç,AI Action Log
+Outcome of an executed write. Unknown means the outcome could not be confirmed.,"Yürütülen yazmanın sonucu. unknown, sonucun doğrulanamadığını gösterir.",AI Action Log
+Version,Sürüm kaydı,AI Action Log
+"Name of the Version document the write produced, if any.",Yazmanın ürettiği sürüm kaydının adı. Kayıt yoksa boş kalır.,AI Action Log
+IP Address,IP adresi,AI Action Log
+Network address the request came from.,İsteğin geldiği ağ adresi.,AI Action Log
+Duration (ms),Süre (ms),AI Action Log
+How long the step took in milliseconds.,Adımın milisaniye cinsinden süresi.,AI Action Log
+"A write that an AI asked for and that waits for a human. It holds the preview the human sees, the digest that binds the approval to that preview, and the outcome. Nothing is written to the target until the owner approves the proposal.","Yapay zekânın istediği ve insan kararını bekleyen yazma işidir. İnsanın gördüğü önizlemeyi, onayı o önizlemeye bağlayan özeti ve sonucu tutar. Sahibi öneriyi onaylayana kadar hedefe hiçbir şey yazılmaz.",AI Action Proposal
+User,Kullanıcı,AI Action Proposal
+User who asked for the write and who alone may approve it.,Yazmayı isteyen kullanıcı. Öneriyi yalnız bu kullanıcı onaylayabilir.,AI Action Proposal
+Principal,Kimlik türü,AI Action Proposal
+Identity type that opened the proposal.,Öneriyi açan kimlik türü.,AI Action Proposal
+Session ID,Konuşma kimliği,AI Action Proposal
+SHA-256 of the conversation id the client sent. The id itself is not stored.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz.,AI Action Proposal
+Tool,Araç,AI Action Proposal
+Name of the write tool that will run after approval.,Onaydan sonra çalışacak yazma aracının adı.,AI Action Proposal
+Tool Class,Araç türü,AI Action Proposal
+"Kind of the tool: write, admin or app.","Aracın türü: write, admin ya da app.",AI Action Proposal
+Target DocType,Hedef kayıt türü,AI Action Proposal
+DocType the write is aimed at.,Yazmanın hedeflediği kayıt türü.,AI Action Proposal
+Target Name,Hedef kaydın adı,AI Action Proposal
+Document the write is aimed at. Empty for a new document.,Yazmanın hedeflediği kayıt. Yeni kayıtta boş kalır.,AI Action Proposal
+Target Key,Hedef anahtarı,AI Action Proposal
+Hash of the target. Blocks a blind retry on the same target.,Hedefin özeti. Aynı hedefte kör tekrarı engeller.,AI Action Proposal
+Target Version,Hedef sürümü,AI Action Proposal
+Version marker of the target when the preview was made.,Önizleme üretildiğinde hedefin sürüm işareti.,AI Action Proposal
+Arguments,Girdi,AI Action Proposal
+Validated tool arguments as JSON. Never holds a secret field.,"Doğrulanmış araç girdisi, JSON biçiminde. Gizli alan taşımaz.",AI Action Proposal
+Preview,Önizleme,AI Action Proposal
+"What the human sees before approving, as JSON.","İnsanın onaydan önce gördüğü içerik, JSON biçiminde.",AI Action Proposal
+Digest,Özet,AI Action Proposal
+SHA-256 that binds an approval to this exact preview.,Onayı tam olarak bu önizlemeye bağlayan SHA-256 özeti.,AI Action Proposal
+Destructive,Yıkıcı,AI Action Proposal
+Set when the tool may destroy or overwrite data.,Araç veriyi silebiliyor ya da üstüne yazabiliyorsa işaretlenir.,AI Action Proposal
+Billable,Ücretli,AI Action Proposal
+Set when the tool may cost money.,Araç ücret doğurabiliyorsa işaretlenir.,AI Action Proposal
+Expires At,Son geçerlilik zamanı,AI Action Proposal
+Moment after which the proposal can no longer be approved.,Bu andan sonra öneri onaylanamaz.,AI Action Proposal
+Status,Durum,AI Action Proposal
+Where the proposal stands. Consumed means execution has started.,"Önerinin durumu. consumed, yürütmenin başladığını gösterir.",AI Action Proposal
+Result,Sonuç,AI Action Proposal
+Outcome of the execution. Unknown blocks new proposals on the same target.,"Yürütmenin sonucu. unknown, aynı hedefte yeni öneriyi engeller.",AI Action Proposal
+Result Document,Sonuç kaydı,AI Action Proposal
+Name of the document the execution touched.,Yürütmenin dokunduğu kaydın adı.,AI Action Proposal
+Error,Hata,AI Action Proposal
+Why the proposal was rejected or the execution failed.,Önerinin neden reddedildiği ya da yürütmenin neden hata verdiği.,AI Action Proposal
+Decided At,Karar zamanı,AI Action Proposal
+"When a human approved, rejected or resolved the proposal.","İnsanın öneriyi onayladığı, reddettiği ya da kapattığı zaman.",AI Action Proposal
+Preview Digest,Önizleme özeti,AI Action Proposal
+SHA-256 of the whole preview and its target. The server previews again at approval and compares.,Önizlemenin tamamının ve hedefinin SHA-256 özeti. Sunucu onayda önizlemeyi yeniden üretir ve karşılaştırır.,AI Action Proposal
+You do not have permission for this action.,Bu işlem için izniniz yok.,platform_core.yapay_zeka
+The record was not found.,Kayıt bulunamadı.,platform_core.yapay_zeka
+The tool refused the input.,Araç girdiyi kabul etmedi.,platform_core.yapay_zeka
+The digest is not valid.,Özet geçerli değil.,platform_core.yapay_zeka
+A proposal cannot change after it is opened or decided.,Öneri açıldıktan ya da karar verildikten sonra değişemez.,platform_core.yapay_zeka
+The tool failed. The error was recorded.,Araç hata verdi. Hata kaydedildi.,platform_core.yapay_zeka
+"Ask for a preview first, then send its confirmation token. Nothing was deleted.","Önce önizleme isteyin, sonra onay belirtecini gönderin. Hiçbir kayıt silinmedi.",platform_core.yapay_zeka
+The delete failed and was rolled back. Nothing was deleted.,Silme hata verdi ve geri alındı. Hiçbir kayıt silinmedi.,platform_core.yapay_zeka

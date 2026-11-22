@@ -7,13 +7,16 @@ app_license = "mit"
 
 # Mobile sync tables must exist before the sequence row is created.
 # The access rule engine switches off Auto Email Reports on governed data in the same two hooks.
+# The AI access layer turns off Frappe's built-in MCP endpoint.
 after_install = [
 	"platform_core.mobil.store.seed_sequence",
 	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
+	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
 ]
 after_migrate = [
 	"platform_core.mobil.store.seed_sequence",
 	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
+	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
 ]
 
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
@@ -156,7 +159,10 @@ before_request = ["platform_core.kabuk.native_metadata.guard_website_rpc_before_
 after_request = ["platform_core.kabuk.headers.add_security_headers"]
 
 # Keep a single list assignment. Credential hooks must precede the metadata guard when merged.
-auth_hooks = ["platform_core.kabuk.native_metadata.guard_native_metadata"]
+auth_hooks = [
+	"platform_core.yapay_zeka.agent_token.authenticate_request",
+	"platform_core.kabuk.native_metadata.guard_native_metadata",
+]
 
 website_user_allowed_methods = [
 	"platform_core.api.shell.get_bootstrap",
@@ -164,6 +170,15 @@ website_user_allowed_methods = [
 	"frappe.auth.get_logged_user",
 	"logout",
 	"frappe.desk.search.search_link",
+	# AI access layer: an end user talks to the layer and decides on their own proposals.
+	# `purge_logs` is for the System Manager role and stays off this list.
+	"platform_core.api.ai.mcp",
+	"platform_core.api.ai.issue_agent_token",
+	"platform_core.api.ai.list_proposals",
+	"platform_core.api.ai.get_proposal",
+	"platform_core.api.ai.approve_proposal",
+	"platform_core.api.ai.reject_proposal",
+	"platform_core.api.ai.resolve_proposal",
 	"platform_core.api.mobile.v1_activity",
 	"platform_core.api.mobile.v1_list_installations",
 	"platform_core.api.mobile.v1_pull",
