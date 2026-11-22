@@ -495,24 +495,6 @@
     "ignoreUntil": "2027-02-22"
   },
   {
-    "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/mobil/tests/test_identity_sync_client.py",
-    "code": "\"mobile_identity_sync_token_url\": \"https://id.example.test/realms/platform/protocol/openid-connect/token\",",
-    "statementSha256": "0d206c0cfe448791ff9d4951a5fea9c0ed79b8a3e22b2156a1e716444fa57573",
-    "reason": "The URL identifies a reserved test domain for a mocked identity service.",
-    "owner": "platform-core-mobil",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/mobil/tests/test_identity_sync_client.py",
-    "code": "\"mobile_identity_sync_client_secret\": \"fixture-secret\",",
-    "statementSha256": "0d206c0cfe448791ff9d4951a5fea9c0ed79b8a3e22b2156a1e716444fa57573",
-    "reason": "This fixed value belongs to a test fixture and is not a real credential.",
-    "owner": "platform-core-mobil",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
     "rule": "B106",
     "file": "backend/apps/platform_core/platform_core/mobil/tests/test_request.py",
     "code": "self.frappe.session.data = SimpleNamespace(csrf_token=\"csrf-token\", creation=\"2026-11-22 07:00:00\")",
@@ -974,27 +956,27 @@
   {
     "rule": "B603",
     "file": "backend/dev/naming/apply_renames.py",
-    "code": "result = subprocess.run([\"git\", \"-C\", str(root), *args], capture_output=True, check=False)",
-    "statementSha256": "17f83e9c10bcb30e8d1202381d211adf25d00fe8d3a2ea17395b2834d47b1758",
-    "reason": "The renamer uses separate arguments without shell parsing; executable lookup is tracked separately under B607.",
+    "code": "result = subprocess.run([GIT, \"-C\", str(root), *args], capture_output=True, check=False)",
+    "statementSha256": "b105599bcc453e7b24141284e6dd7215e59791d63ef82dc12471a555700c26b5",
+    "reason": "The naming tool invokes the resolved Git executable with separate arguments and no shell.",
     "owner": "naming-history-fix",
     "ignoreUntil": "2027-02-22"
   },
   {
     "rule": "B603",
     "file": "backend/dev/naming/check_names.py",
-    "code": "response = subprocess.run(",
-    "statementSha256": "70b0b0924574ef18b44d90ee2bee6f88cec19c727158f235b121c0258b0813d8",
-    "reason": "The naming check uses separate arguments without shell parsing; executable lookup is tracked separately under B607.",
+    "code": "response = subprocess.run([GIT, \"-C\", str(root), *args], text=True, capture_output=True, check=False)",
+    "statementSha256": "8e52982321cfe7353afc35006c15dcbbee2e0188c6a7879ced7d0376822b4a38",
+    "reason": "The naming tool invokes the resolved Git executable with separate arguments and no shell.",
     "owner": "naming-history-fix",
     "ignoreUntil": "2027-02-22"
   },
   {
     "rule": "B603",
     "file": "backend/dev/naming/check_names.py",
-    "code": "result = subprocess.run([\"git\", \"-C\", str(root), *arguments], text=True, capture_output=True, check=False)",
-    "statementSha256": "1c24c0782ca3ce6f45d4f20ef4149f828349cebffc724a4ae3914b9b9d6f1f2c",
-    "reason": "The naming helper uses separate arguments without shell parsing; executable lookup is tracked separately under B607.",
+    "code": "result = subprocess.run([GIT, \"-C\", str(root), *arguments], text=True, capture_output=True, check=False)",
+    "statementSha256": "30366afedd5da9329bf27c001c40188d9ef65fc90fd3697cb0c064abe9169175",
+    "reason": "The naming tool invokes the resolved Git executable with separate arguments and no shell.",
     "owner": "naming-history-fix",
     "ignoreUntil": "2027-02-22"
   },
@@ -1380,8 +1362,8 @@
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
     "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.kimlik.login_policy.reset_password\",",
-    "statementSha256": "36db1fd3a6ad84076c1a7fee39e1a577ed6b5ef8c26e6f8d4be1a30708e51332",
-    "reason": "This string is a Python route mapping for a Frappe sign-in wrapper.",
+    "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
+    "reason": "This Frappe hook maps dotted method names; it stores no credential.",
     "owner": "platform-core-kimlik",
     "ignoreUntil": "2027-02-22"
   },
@@ -1389,8 +1371,8 @@
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
     "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.kimlik.login_policy.update_password\",",
-    "statementSha256": "36db1fd3a6ad84076c1a7fee39e1a577ed6b5ef8c26e6f8d4be1a30708e51332",
-    "reason": "This string is a Python route mapping for a Frappe sign-in wrapper.",
+    "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
+    "reason": "This Frappe hook maps dotted method names; it stores no credential.",
     "owner": "platform-core-kimlik",
     "ignoreUntil": "2027-02-22"
   },
@@ -1398,8 +1380,8 @@
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
     "code": "\"frappe.www.login.login_via_token\": \"platform_core.kimlik.login_policy.login_via_token\",",
-    "statementSha256": "36db1fd3a6ad84076c1a7fee39e1a577ed6b5ef8c26e6f8d4be1a30708e51332",
-    "reason": "This string is a Python route mapping for a Frappe sign-in wrapper.",
+    "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
+    "reason": "This Frappe hook maps dotted method names; it stores no credential.",
     "owner": "platform-core-kimlik",
     "ignoreUntil": "2027-02-22"
   },
