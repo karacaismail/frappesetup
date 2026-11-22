@@ -214,7 +214,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
 - `remove_team_member` isteği `issuer` ve `subject` alanlarını taşır. İstek ayrıca şu iki alandan yalnız birini taşır:
   - `organization_id`: Press üyeyi yalnız bu kuruluşun takımından çıkarır.
-  - `all_organizations: true`: Press üyeyi `keycloak_org_id` alanı dolu olan bütün takımlardan çıkarır. Bu biçim silinen kullanıcı içindir. Silinen kullanıcının kuruluşları Keycloak'tan artık okunamaz.
+  - `all_organizations: true`: Press üyeyi `keycloak_org_id` alanı dolu olan bütün takımlardan çıkarır. Bu biçim Keycloak'ta kapatılan ve silinen kullanıcı içindir. Silinen kullanıcının kuruluşları Keycloak'tan artık okunamaz. Press bu istekte kullanıcıyı da kapatır ve API anahtarlarını geçersiz yapar.
 - İki alan birlikte gelirse ya da ikisi de gelmezse Press 400 döner. Boş `organization_id` değeri “bütün takımlar” anlamına gelmez, 400 döner.
 - `keycloak_org_id` alanı boş takımlara `remove_team_member` dokunmaz. Bu takımlar Keycloak dışında elle açılmıştır.
 - Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
