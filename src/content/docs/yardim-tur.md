@@ -45,7 +45,7 @@ Geri düşüşte ilk bulunan gösterilir: kiracı içeriği (standart alanda da 
 
 | Kayıt | Alanlar | Kural |
 | --- | --- | --- |
-| Tur ve hedef kitle | Anahtar (`cronhr.ilk-izin-talebi`), uygulama, rota kalıbı, sürüm; rol, plan ve özellik (`has_feature`, G-106), uygulama durumu (G-127), yetki (ör. `create`) | Tur kısadır, ilk anlamlı işi tamamlatır; koşullar sunucuda değerlendirilir |
+| Tur ve hedef kitle | Anahtar (`hrms_tr.ilk-izin-talebi`), uygulama, rota kalıbı, sürüm; rol, plan ve özellik (`has_feature`, G-106), uygulama durumu (G-127), yetki (ör. `create`) | Tur kısadır, ilk anlamlı işi tamamlatır; koşullar sunucuda değerlendirilir |
 | Tetik | İlk ziyaret, el ile, sürüm yeniliği, etkinleştirme sonrası ilk giriş (G-95) | Otomatik tetik yalnız davet kartı açar, odağı taşımaz |
 | Adım | Hedef: belge türü + alan adı (Custom Field dahil) veya `data-tour-id`; tür: açıklama veya anlamlı görev (ör. ilk Leave Type kaydı); `since_version` | Metin etiketi meta'dan alır; görev tamamlanmasını sunucu onaylar |
 | İlerleme | `platform_core` içinde kullanıcı + tur + sürüm; durum, son adım anahtarı, erteleme bitişi | Belge verisi saklanmaz |
