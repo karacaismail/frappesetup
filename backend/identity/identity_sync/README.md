@@ -421,6 +421,37 @@ docker --context colima-factory build -f identity/identity_sync/Dockerfile -t fs
 
 Bu imaj 22 Kasım 2026 Pazar günü `colima-factory` profilinde derlendi ve ağsız denendi. Deneme imajı ve container'ı sonra silindi.
 
+## Performans ölçümü
+
+Proje kaydının O-31 kararı iki sınır koyar. Okuma ucunda p95 en çok 500 milisaniyedir. Yazma ucunda p95 en çok 1 saniyedir. p95, çağrıların yüzde 95'inin altında kaldığı süredir.
+
+Ölçümü elle başlatın. Komutu bu klasörde çalıştırın:
+
+```bash
+python3 -m tests.measure
+```
+
+- Komut zamanlanmaz. Yalnız siz başlatınca çalışır.
+- Komut gerçek HTTP sunucusunu sahte Keycloak, Press ve kiracıyla açar. Ağa çıkmaz.
+- Örnek veri 200 uydurma kullanıcıdır.
+- Komut her ucu 50 kez sırayla, sonra 20 kez aynı anda çağırır.
+- Komut sonucu JSON olarak yazar. Bir sınır aşılırsa ya da bir istek hata verirse 1 koduyla çıkar.
+- Sayıları `--samples`, `--concurrency` ve `--users` seçenekleri değiştirir.
+
+Ölçülen uçlar şunlardır:
+
+| Uç | Tür | Sınır |
+| --- | --- | --- |
+| `POST /v1/sessions/revoke` | Yazma | 1.000 ms |
+| `POST /v1/account-deletions` | Yazma | 1.000 ms |
+| `POST /v1/reconcile`, önizleme | Okuma | 500 ms |
+
+Sonucu okurken şunları bilin:
+
+- Süre istemcide ölçülür. Yani sunucu süresine yerel ağ gidiş dönüşü eklenir.
+- Sahte hedefler hemen yanıt verir. Sayılar bu servisin maliyetini gösterir. Keycloak, Press ve kiracı sitesinin süresini göstermez.
+- Sunucu istekleri tek tek işler. 20 istek aynı anda gelirse sonuncusu öncekileri bekler. Rapor bu bekleme süresini `concurrent_wait_p95_ms` alanında verir. Bu alan sınırla karşılaştırılmaz.
+
 ## Bilinen eksikler
 
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
