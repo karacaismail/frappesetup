@@ -57,6 +57,12 @@ Her uçta HTTP yöntemlerini boş olmayan bir liste veya demetle yazın.
 Kod incelemesinde değişkene taşınan seçenekleri de denetleyin.
 Zorunlu bir istisnayı ilgili işin karar kaydında açıklayın.
 
+Press istisnalarının gerekçeleri `semgrep-exceptions.json` dosyasındadır.
+Kapı, Press uygulamasının ve ilgili Semgrep kural dosyasının özetini karşılaştırır.
+Özet taramadan önce veya sonra farklıysa kapı istisnayı uygulamaz.
+Dosya, satır ve kural kimliği de birebir eşleşmelidir.
+Dış doğrulayıcı güncellenirse Press istisnalarını yeniden inceleyin.
+
 Uç listesi `backend/apps/<uygulama>/<paket>/` altındaki Python kaynaklarını okur.
 Çalışırken eklenen uçlar için Frappe yapılandırmasını ayrıca inceleyin.
 Sınıf yöntemini listede sınıf ve yöntem adıyla bulabilirsiniz.
