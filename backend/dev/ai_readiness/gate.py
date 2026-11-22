@@ -845,9 +845,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--list-interfaces", action="store_true", help="List backend module interfaces as Markdown."
+    )
     parser.add_argument("--path-code", help="Locate a redacted path by its Git index slot.")
     parser.add_argument("--commit-base", help="Check commit messages after this revision through HEAD.")
     args = parser.parse_args()
+    if args.list_interfaces and (args.json or args.path_code or args.commit_base):
+        parser.error("--list-interfaces only accepts --root.")
     if not supports_python():
         print("ai-readiness requires Python 3.14 or newer.", file=sys.stderr)
         return 2
@@ -857,6 +862,14 @@ def main():
         print(str(error), file=sys.stderr)
         return 2
     root = args.root.resolve()
+    if args.list_interfaces:
+        from interfaces import list_interfaces
+
+        try:
+            print(list_interfaces(root, source_files, whitelist_checks))
+        except (OSError, TypeError, ValueError) as error:
+            parser.error(f"Could not list module interfaces: {error}.")
+        return 0
     if args.path_code:
         try:
             location = find_path_code(root, args.path_code)
