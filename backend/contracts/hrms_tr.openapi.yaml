@@ -333,10 +333,10 @@ paths:
         "403":
           $ref: "#/components/responses/PermissionDeniedV2"
 x-ai-tool:
-  name: hrms_tr_approve_leave
+  name: hrt_approve_leave
   kind: write
   destructive: true
-  roles: [HRMS TR Manager, HRMS TR Admin]
+  roles: [HRT Manager, HRT Admin]
   versioned: true
   arguments:
     type: object

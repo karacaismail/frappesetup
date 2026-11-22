@@ -7,7 +7,7 @@ from functools import partial
 import frappe
 from frappe.core.doctype.installed_applications.installed_applications import update_installed_apps_order
 from platform_core.api.mobile import _pull, _push
-from platform_core.mobil.protocol import (
+from platform_core.mobile.protocol import (
 	UUID_PATTERN,
 	Command,
 	content_digest,
@@ -15,7 +15,7 @@ from platform_core.mobil.protocol import (
 	unavailable_record,
 	uuid4_id,
 )
-from platform_core.mobil.request import endpoint_response
+from platform_core.mobile.request import endpoint_response
 
 from .load_accounts import LOAD_ACCOUNTS
 
@@ -177,7 +177,7 @@ def _authenticate():
 		if request.headers.get("X-Mobile-Test-Identity-Mismatch") == "site":
 			raise frappe.AuthenticationError
 		frappe.set_user("Administrator")
-		frappe.local.kimlik_service_claims = {
+		frappe.local.identity_service_claims = {
 			"iss": "fixture",
 			"azp": "identity-sync" if header == "Bearer fixture-service" else "different-service",
 		}

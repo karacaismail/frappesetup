@@ -1,7 +1,7 @@
 from frappe import _
 from frappe.sessions import get_csrf_token
 
-from press_tr.kimlik.deletion import fresh_reauthentication, human_identity
+from press_tr.press_identity.deletion import fresh_reauthentication, human_identity
 
 no_cache = 1
 

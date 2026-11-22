@@ -12,9 +12,9 @@ from uuid import uuid4
 import frappe
 from frappe.utils import now_datetime
 from frappe.utils.background_jobs import get_queues
-from platform_core.mobil.metadata import insert_metadata
-from platform_core.mobil.protocol import operation_key
-from platform_core.mobil.store import SEQUENCE_DOCTYPE, SEQUENCE_NAME, MobileStore
+from platform_core.mobile.metadata import insert_metadata
+from platform_core.mobile.protocol import operation_key
+from platform_core.mobile.store import SEQUENCE_DOCTYPE, SEQUENCE_NAME, MobileStore
 
 from . import fixture
 
@@ -98,8 +98,8 @@ def performance_fixture(site, samples):
             installations = [phone.installation for phone in phones]
             record_ids = [name for doctype, name in created if doctype == fixture.RECORD]
             for doctype, field, values in (
-                ("Mobile Delivery", "installation_id", installations),
-                ("Mobile Change", "record_id", record_ids),
+                ("PLT Mobile Delivery", "installation_id", installations),
+                ("PLT Mobile Change", "record_id", record_ids),
             ):
                 for name in frappe.get_all(doctype, filters={field: ["in", values]}, pluck="name"):
                     created.append((doctype, name))
@@ -107,9 +107,9 @@ def performance_fixture(site, samples):
                 principal = fixture.content_digest(["fixture", fixture._subject(phone.account)])
                 created.extend(
                     (
-                        ("Mobile Operation", operation_key(site, principal, phone.operation_id)),
-                        ("Mobile Installation", phone.installation),
-                        ("Mobile Account State", phone.account),
+                        ("PLT Mobile Operation", operation_key(site, principal, phone.operation_id)),
+                        ("PLT Mobile Installation", phone.installation),
+                        ("PLT Mobile Account State", phone.account),
                     )
                 )
             delete_records(reversed(created))
@@ -143,7 +143,7 @@ def seed_site(site, samples, created):
         installed = set(frappe.get_installed_apps())
         if not {"erpnext", "hrms", "platform_core", "mobile_test_app"} <= installed:
             raise SystemExit("Use a disposable test site with ERPNext, HRMS and mobile_test_app installed.")
-        for doctype in ("Employee", "Leave Application", "Mobile Installation", fixture.RECORD):
+        for doctype in ("Employee", "Leave Application", "PLT Mobile Installation", fixture.RECORD):
             if frappe.db.count(doctype):
                 raise SystemExit(f"The benchmark requires an empty {doctype} table.")
         timestamp = now_datetime()
@@ -277,9 +277,9 @@ def seed_backlog(phone, created):
 def verify_counts(site):
     with test_database(site):
         counts = tuple(
-            frappe.db.count(table) for table in ("Employee", "Leave Application", "Mobile Installation")
+            frappe.db.count(table) for table in ("Employee", "Leave Application", "PLT Mobile Installation")
         )
         expected = (EMPLOYEES, EMPLOYEES * LEAVE_PER_EMPLOYEE, EMPLOYEES)
-        accounts = frappe.get_all("Mobile Installation", limit=EMPLOYEES, pluck="account")
+        accounts = frappe.get_all("PLT Mobile Installation", limit=EMPLOYEES, pluck="account")
         if counts != expected or len(set(accounts)) != EMPLOYEES:
             raise RuntimeError(f"Unexpected benchmark data counts: {counts}. Expected: {expected}.")

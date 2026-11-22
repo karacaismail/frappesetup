@@ -1,0 +1,4 @@
+- term_tr: Mobil test uygulaması
+  code: mobile_test_app
+  scope: Frappe test app
+  definition_tr: Bu uygulama telefon eşitlemesi için örnek kayıtlar üretir.

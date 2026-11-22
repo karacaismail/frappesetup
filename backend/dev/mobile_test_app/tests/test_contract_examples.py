@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator
 
-CONTRACT = Path(__file__).resolve().parents[3] / "contracts" / "platform_core-mobil.openapi.yaml"
+CONTRACT = Path(__file__).resolve().parents[3] / "contracts" / "platform_core-mobile.openapi.yaml"
 
 
 class MobileContractExamplesTest(unittest.TestCase):

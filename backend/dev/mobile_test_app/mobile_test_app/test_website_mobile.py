@@ -10,9 +10,9 @@ from frappe.tests.test_api import make_request
 from frappe.utils import get_test_client
 from frappe.utils.password import update_password
 from platform_core.api import mobile
-from platform_core.mobil.store import MobileStore
-from platform_core.mobil.tests.http_diagnostics import http_diagnostic, safe_http_error_code
-from platform_core.mobil.tests.test_service import RECORD, SampleCommand
+from platform_core.mobile.store import MobileStore
+from platform_core.mobile.tests.http_diagnostics import http_diagnostic, safe_http_error_code
+from platform_core.mobile.tests.test_service import RECORD, SampleCommand
 
 from .fixture import SERVICE_TARGET, WEBSITE
 
@@ -39,7 +39,7 @@ class WebsiteMobileTest(IntegrationTestCase):
         hooks = frappe.get_hooks("auth_hooks")
         self.assertLess(
             hooks.index("mobile_test_app.fixture.authenticate"),
-            hooks.index("platform_core.kabuk.native_metadata.guard_native_metadata"),
+            hooks.index("platform_core.shell.native_metadata.guard_native_metadata"),
         )
         override = frappe.override_whitelisted_method
 

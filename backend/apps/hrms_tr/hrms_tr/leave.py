@@ -11,8 +11,8 @@ from pydantic import StringConstraints
 from hrms_tr.access import DOCTYPE
 from hrms_tr.users import HRMS_TR_ROLES
 
-HR_ROLE = "HRMS TR Admin"
-MANAGER_ROLE = "HRMS TR Manager"
+HR_ROLE = "HRT Admin"
+MANAGER_ROLE = "HRT Manager"
 APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 HRMS_APPROVER_METHOD = "hrms.hr.doctype.leave_application.leave_application.get_leave_approver"

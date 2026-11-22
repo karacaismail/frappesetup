@@ -12,7 +12,7 @@ from hrms_tr.leave import LeaveName, LeaveVersion
 
 
 # leave.approve locks the target and checks its read, write, and submit rights.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 @rate_limit(limit=60, seconds=60, methods=["POST"], ip_based=False, user_based=True)
 def approve_leave(name: LeaveName | None = None, version: LeaveVersion | None = None) -> dict[str, str]:
 	if name is None:
@@ -23,7 +23,7 @@ def approve_leave(name: LeaveName | None = None, version: LeaveVersion | None = 
 
 
 # leave.cancel locks the target and checks HR, read, and cancel permissions.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 @rate_limit(limit=60, seconds=60, methods=["POST"], ip_based=False, user_based=True)
 def cancel_leave(name: LeaveName | None = None, version: LeaveVersion | None = None) -> dict[str, str]:
 	if name is None:
@@ -34,7 +34,7 @@ def cancel_leave(name: LeaveName | None = None, version: LeaveVersion | None = N
 
 
 # The HRMS lookup checks the caller's access to this employee before returning the approver.
-@frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def get_leave_approver(
 	employee: Annotated[str, StringConstraints(min_length=1, max_length=140)] | None = None,
 ) -> dict[str, str | None]:

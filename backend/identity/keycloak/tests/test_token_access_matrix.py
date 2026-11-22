@@ -6,24 +6,24 @@ import unittest
 import urllib.parse
 
 from test_account_backlog import _login
-from test_eklentiler import _ac
+from test_extensions import _open
 from test_second_factor import TOTP_USER
-from yardimci import (
+from helpers import (
     admin,
-    canli_var_mi,
+    live_available,
     get_without_redirect,
-    istek,
-    istemci_belirteci,
-    jwt_govdesi,
-    ortam,
+    request,
+    client_token,
+    jwt_payload,
+    get_environment_value,
     pkce_pair,
     safe_detail,
     tenant_callback_url,
-    yonetici_belirteci,
+    admin_token,
 )
 
 TARGET_SCOPES = {
-    "aud-site-kiraci1": "site-kiraci1",
+    "aud-site-tenant1": "site-tenant1",
     "aud-press": "press",
     "aud-mobile-app": "mobile-app",
     "aud-identity-sync": "identity-sync",
@@ -45,10 +45,10 @@ def audiences(claims: dict) -> set[str]:
     return {value} if isinstance(value, str) else set(value)
 
 
-@unittest.skipUnless(canli_var_mi(), "Keycloak development environment is required")
+@unittest.skipUnless(live_available(), "Keycloak development environment is required")
 class TokenAccessMatrixTest(unittest.TestCase):
     def setUp(self):
-        self.keycloak_url = ortam("KC_PUBLIC_URL")
+        self.keycloak_url = get_environment_value("KC_PUBLIC_URL")
         self.issuer = f"{self.keycloak_url}/realms/platform"
         self.token_url = f"{self.issuer}/protocol/openid-connect/token"
         self.management_audiences = {"realm-management", f"{self.keycloak_url}/admin/realms/platform"}
@@ -63,15 +63,15 @@ class TokenAccessMatrixTest(unittest.TestCase):
 
     def test_service_grant_targets_scopes_and_roles(self):
         service_clients = {
-            "site-kiraci1-service": ("ATONOTA_SITE_KIRACI1_SERVICE_SECRET", {"aud-identity-sync"}),
-            "press-service": ("ATONOTA_PRESS_SERVICE_SECRET", {"aud-site-kiraci1", "aud-identity-sync"}),
-            "identity-sync": ("ATONOTA_IDENTITY_SYNC_SECRET", {"aud-site-kiraci1", "aud-press"}),
+            "site-tenant1-service": ("ATONOTA_SITE_TENANT1_SERVICE_SECRET", {"aud-identity-sync"}),
+            "press-service": ("ATONOTA_PRESS_SERVICE_SECRET", {"aud-site-tenant1", "aud-identity-sync"}),
+            "identity-sync": ("ATONOTA_IDENTITY_SYNC_SECRET", {"aud-site-tenant1", "aud-press"}),
         }
         for client_id, (secret_name, allowed) in service_clients.items():
-            secret = ortam(secret_name)
+            secret = get_environment_value(secret_name)
             for scope in (None, *TARGET_SCOPES, "admin-api kc-admin-api"):
                 with self.subTest(client=client_id, scope=scope):
-                    response = istemci_belirteci(client_id, secret, scope)
+                    response = client_token(client_id, secret, scope)
                     if scope is None:
                         expected = set()
                         scopes = set()
@@ -88,15 +88,15 @@ class TokenAccessMatrixTest(unittest.TestCase):
                     else:
                         self.assertEqual(safe_detail(response), "HTTP 400 invalid_scope")
                         continue
-                    self.assertEqual(response.durum, 200, safe_detail(response))
-                    claims = jwt_govdesi(response.json()["access_token"])
+                    self.assertEqual(response.status, 200, safe_detail(response))
+                    claims = jwt_payload(response.json()["access_token"])
                     self.assert_client_claims(claims, client_id, expected, scopes=scopes, roles=roles)
                     management_response = admin("/users?max=1", response.json()["access_token"])
                     expected_status = (200,) if roles else (401, 403)
-                    self.assertIn(management_response.durum, expected_status, safe_detail(management_response))
+                    self.assertIn(management_response.status, expected_status, safe_detail(management_response))
 
     def test_browser_only_clients_cannot_obtain_service_tokens(self):
-        for client_id in ("site-kiraci1", "press", "mobile-app"):
+        for client_id in ("site-tenant1", "press", "mobile-app"):
             _, secret = self.browser_clients()[client_id]
             for scope in (None, *TARGET_SCOPES):
                 with self.subTest(client=client_id, scope=scope):
@@ -105,17 +105,17 @@ class TokenAccessMatrixTest(unittest.TestCase):
                         form["client_secret"] = secret
                     if scope is not None:
                         form["scope"] = scope
-                    response = istek("POST", self.token_url, form=form)
-                    self.assertIn(response.durum, (400, 401), safe_detail(response))
+                    response = request("POST", self.token_url, form=form)
+                    self.assertIn(response.status, (400, 401), safe_detail(response))
 
     def browser_clients(self):
         return {
-            "site-kiraci1": (tenant_callback_url(), ortam("ATONOTA_SITE_KIRACI1_SECRET")),
+            "site-tenant1": (tenant_callback_url(), get_environment_value("ATONOTA_SITE_TENANT1_SECRET")),
             "press": (
-                f"{ortam('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback",
-                ortam("ATONOTA_PRESS_SECRET"),
+                f"{get_environment_value('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback",
+                get_environment_value("ATONOTA_PRESS_SECRET"),
             ),
-            "mobile-app": (ortam("ATONOTA_MOBILE_REDIRECT_URI"), None),
+            "mobile-app": (get_environment_value("ATONOTA_MOBILE_REDIRECT_URI"), None),
         }
 
     def authorize(self, client_id, callback, scope):
@@ -142,16 +142,16 @@ class TokenAccessMatrixTest(unittest.TestCase):
                 with self.subTest(client=client_id, target=target):
                     url, _ = self.authorize(client_id, callback, f"openid {scope}")
                     response = get_without_redirect(url)
-                    location = response.basliklar.get("Location", "")
+                    location = response.headers.get("Location", "")
                     error = urllib.parse.parse_qs(urllib.parse.urlsplit(location).query).get("error")
                     self.assertTrue(error == ["invalid_scope"], safe_detail(response))
 
     def open_tenant_session(self):
         clients = self.browser_clients()
-        token = yonetici_belirteci()
+        token = admin_token()
         user = admin(f"/users?email={TOTP_USER}&exact=true", token).json()[0]
-        admin(f"/attack-detection/brute-force/users/{user['id']}", token, yontem="DELETE")
-        tenant_url, _ = self.authorize("site-kiraci1", clients["site-kiraci1"][0], "openid")
+        admin(f"/attack-detection/brute-force/users/{user['id']}", token, method="DELETE")
+        tenant_url, _ = self.authorize("site-tenant1", clients["site-tenant1"][0], "openid")
         opener, status, _, _ = _login(tenant_url)
         self.assertEqual(status, 302)
         return opener
@@ -159,7 +159,7 @@ class TokenAccessMatrixTest(unittest.TestCase):
     def browser_token(self, opener, client_id, scope):
         callback, secret = self.browser_clients()[client_id]
         url, verifier = self.authorize(client_id, callback, scope)
-        status, headers, _ = _ac(opener, url)
+        status, headers, _ = _open(opener, url)
         self.assertEqual(status, 302)
         location = headers.get("Location", "")
         parameters = urllib.parse.parse_qs(urllib.parse.urlsplit(location).query)
@@ -176,10 +176,10 @@ class TokenAccessMatrixTest(unittest.TestCase):
         }
         if secret:
             form["client_secret"] = secret
-        response = istek("POST", self.token_url, form=form)
+        response = request("POST", self.token_url, form=form)
         if safe_detail(response) == "HTTP 400 invalid_scope":
             return None
-        self.assertEqual(response.durum, 200, safe_detail(response))
+        self.assertEqual(response.status, 200, safe_detail(response))
         return response.json()
 
     def test_browser_code_exchange_binds_id_token_to_the_requesting_client(self):
@@ -189,9 +189,9 @@ class TokenAccessMatrixTest(unittest.TestCase):
                 tokens = self.browser_token(opener, client_id, "openid")
                 self.assertIsNotNone(tokens)
                 self.assert_client_claims(
-                    jwt_govdesi(tokens["id_token"]),
+                    jwt_payload(tokens["id_token"]),
                     client_id,
                     {client_id},
                     scopes=set(),
                 )
-                self.assert_client_claims(jwt_govdesi(tokens["access_token"]), client_id, set(), scopes=set())
+                self.assert_client_claims(jwt_payload(tokens["access_token"]), client_id, set(), scopes=set())

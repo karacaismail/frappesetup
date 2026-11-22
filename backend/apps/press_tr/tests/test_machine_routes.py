@@ -18,8 +18,8 @@ from test_auth_http import PressHttpClient
 
 from press_tr import api
 from press_tr.api import auth
-from press_tr.kimlik import request_policy
-from press_tr.kimlik.machine_routes import machine_targets
+from press_tr.press_identity import request_policy
+from press_tr.press_identity.machine_routes import machine_targets
 
 CONTRACT = Path(__file__).with_name("press_tr.openapi.yaml")
 

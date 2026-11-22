@@ -6,8 +6,8 @@ if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); the
 	printf '%s\n' 'PANE_PORT must be an integer from 1000 to 65526.' >&2
 	exit 2
 fi
-export PRESS_WEB_PORT="$((PANE_PORT + 3))"
-export PRESS_SOCKET_PORT="$((PANE_PORT + 4))"
+export PTR_WEB_PORT="$((PANE_PORT + 3))"
+export PTR_SOCKET_PORT="$((PANE_PORT + 4))"
 
 case "${FS_COLIMA_PROFILE:-factory}" in
 	factory) press_context=colima-factory ;;

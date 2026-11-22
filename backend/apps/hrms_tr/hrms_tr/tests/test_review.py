@@ -26,26 +26,26 @@ class RoleFixtureTest(unittest.TestCase):
 
 	def test_manager_and_hr_profiles_keep_employee_role(self):
 		for profile in fixture("02_role_profile.json"):
-			self.assertIn("HRMS TR Employee", {row["role"] for row in profile["roles"]})
+			self.assertIn("HRT Employee", {row["role"] for row in profile["roles"]})
 
 	def test_hr_employee_permission_only_grants_read(self):
 		permissions = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Employee"]
 		self.assertEqual(len(permissions), 1)
 		permission = permissions[0]
-		self.assertEqual(permission["role"], "HRMS TR Admin")
+		self.assertEqual(permission["role"], "HRT Admin")
 		self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
 
 	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
 		self.assertEqual(
 			{row["role"] for row in perms if row.get("cancel")},
-			{"HRMS TR Admin", "System Manager", "HR Manager"},
+			{"HRT Admin", "System Manager", "HR Manager"},
 		)
-		self.assertEqual({row["role"] for row in perms if row.get("amend")}, {"HRMS TR Admin"})
+		self.assertEqual({row["role"] for row in perms if row.get("amend")}, {"HRT Admin"})
 		rules = fixture("03_access_rule.json")
 		self.assertEqual(
 			{row["role"] for row in rules if row.get("allow_cancel")},
-			{"HRMS TR Admin", "System Manager", "HR Manager"},
+			{"HRT Admin", "System Manager", "HR Manager"},
 		)
 
 
@@ -63,8 +63,8 @@ class AccessGateTest(unittest.TestCase):
 		fake = Mock()
 		fake.local = SimpleNamespace()
 		fake.get_hooks.side_effect = [
-			{"*": ["platform_core.erisim.hooks.query_conditions"]},
-			{"*": ["platform_core.erisim.hooks.has_permission"]},
+			{"*": ["platform_core.access.hooks.query_conditions"]},
+			{"*": ["platform_core.access.hooks.has_permission"]},
 		]
 		fake.db.exists.side_effect = [True, False]
 		with patch.object(access, "frappe", fake):
@@ -92,9 +92,9 @@ class ApprovalReviewTest(unittest.TestCase):
 class PortalUserTest(unittest.TestCase):
 	def test_leave_names_only_change_for_new_portal_requests(self):
 		for user, role, name, uses_uuid in (
-			("employee@example.test", "HRMS TR Employee", None, True),
-			("employee@example.test", "HRMS TR Employee", "HR-LAP-EXISTING", False),
-			("Administrator", "HRMS TR Employee", None, False),
+			("employee@example.test", "HRT Employee", None, True),
+			("employee@example.test", "HRT Employee", "HR-LAP-EXISTING", False),
+			("Administrator", "HRT Employee", None, False),
 			("operations@example.test", "HR Manager", None, False),
 		):
 			with self.subTest(user=user, name=name), patch.object(leave, "frappe") as framework:
@@ -112,13 +112,13 @@ class PortalUserTest(unittest.TestCase):
 
 		doc = SimpleNamespace(
 			name="manager@example.test",
-			roles=[SimpleNamespace(role="HRMS TR Manager"), SimpleNamespace(role="Leave Approver")],
+			roles=[SimpleNamespace(role="HRT Manager"), SimpleNamespace(role="Leave Approver")],
 			user_type="System User",
 			has_desk_access=lambda: False,
 		)
 		users.keep_portal_user(doc)
 		self.assertEqual(doc.user_type, "Website User")
-		self.assertEqual([row.role for row in doc.roles], ["HRMS TR Manager"])
+		self.assertEqual([row.role for row in doc.roles], ["HRT Manager"])
 
 
 class FixtureLifecycleTest(unittest.TestCase):
@@ -146,10 +146,10 @@ class FixtureLifecycleTest(unittest.TestCase):
 		with patch.object(setup, "frappe") as fake, patch.object(setup, "fixture_rows") as rows:
 			fake.get_installed_apps.return_value = []
 			fake.db.exists.side_effect = [True, True, True, False]
-			rows.side_effect = [[{"doctype": "Access Rule", "name": "HRMS TR Rule"}], [], []] * 2
+			rows.side_effect = [[{"doctype": "PLT Access Rule", "name": "HRMS TR Rule"}], [], []] * 2
 			setup.remove_policy_fixtures()
 			setup.remove_policy_fixtures()
-			fake.delete_doc.assert_called_once_with("Access Rule", "HRMS TR Rule")
+			fake.delete_doc.assert_called_once_with("PLT Access Rule", "HRMS TR Rule")
 			self.assertEqual(fake.db.commit.call_count, 2)
 
 	def test_migration_refreshes_manager_profile_without_waiting_for_a_queue(self):
@@ -295,7 +295,7 @@ class PortalMigrationBatchTest(unittest.TestCase):
 					SimpleNamespace(name="employee@example.test", user_type="Website User"),
 					SimpleNamespace(name="manager@example.test", user_type="Website User"),
 				],
-				[SimpleNamespace(parent="employee@example.test", role="HRMS TR Employee")],
+				[SimpleNamespace(parent="employee@example.test", role="HRT Employee")],
 				["manager@example.test"],
 				[],
 			]

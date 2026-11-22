@@ -13,7 +13,7 @@ from jsonschema.exceptions import ValidationError  # noqa: E402
 APP_PATH = Path(__file__).resolve().parents[2] / "apps" / "platform_core"
 sys.path.insert(0, str(APP_PATH))
 
-from platform_core.model_gecidi.tests.contract_validation import GatewayContract  # noqa: E402
+from platform_core.model_gateway.tests.contract_validation import GatewayContract  # noqa: E402
 
 
 class GatewayContractTests(unittest.TestCase):

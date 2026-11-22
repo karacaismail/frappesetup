@@ -9,7 +9,7 @@ Bu klasör Atonota kimlik servisinin geliştirme kurulumunu tutar. Atonota, Keyc
 | `../../dev/compose.keycloak.yaml` | Keycloak 26.8.2, PostgreSQL 17.12 ve Mailpit 1.34.0 servisleri |
 | `realm/platform-realm.json` | `platform` realm'inin tanımı. Keycloak açılışta içe alır. |
 | `realm/dev-users/platform-users-0.json` | Örnek kullanıcılar. Yalnız geliştirmede yüklenir. Alan adı `example.test`. |
-| `realm/password-blacklists/yaygin-parolalar.txt` | Parola politikasının yaygın parola listesi. Kaynağı `KAYNAK.md` dosyasındadır. |
+| `realm/password-blacklists/common-passwords.txt` | Parola politikasının yaygın parola listesi. Kaynağı `SOURCE.md` dosyasındadır. |
 | `.env.example` | Geliştirme ortamının değişkenleri ve sahte değerler |
 | `production.env.example` | Üretim değişkenlerinin örneği. Değerler sahtedir. Güvenlik ayarları gerçek değerdir. |
 | `conf/` | İmajın varsayılan Keycloak ayarı (`keycloak.conf`) ve geliştirmedeki düz HTTP adres listesi |
@@ -35,12 +35,12 @@ Komutların hepsi `PANE_PORT` değişkenini ister.
 | `bin/kc-dev.sh ps` | Servislerin durumunu gösterir. |
 | `bin/kc-dev.sh exec` | Bir serviste komut çalıştırır. |
 | `bin/kc-dev.sh test` | Bütün testleri çalıştırır. |
-| `bin/kc-dev.sh tunel` | Portları ssh tüneliyle bu Mac'e taşır. |
-| `bin/kc-dev.sh tunel-kapat` | Tüneli kapatır. |
+| `bin/kc-dev.sh tunnel` | Portları ssh tüneliyle bu Mac'e taşır. |
+| `bin/kc-dev.sh close-tunnel` | Tüneli kapatır. |
 | `bin/kc-dev.sh prod-check` | Üretim imajını Compose ayarı olmadan açar. Keycloak hazırsa testleri çalıştırır. Sonra geçici container'ları siler. |
 | `bin/kc-dev.sh realm-reload --yes` | Realm dosyasını imaj derlemeden yükler. Realm verisini siler. |
 | `bin/kc-dev.sh realm-delete-only --yes` | Yalnız realm'i siler. |
-| `bin/kc-dev.sh realm-sil --evet` | Realm'i siler ve imajdaki realm dosyasını yeniden içe alır. |
+| `bin/kc-dev.sh delete-realm --yes` | Realm'i siler ve imajdaki realm dosyasını yeniden içe alır. |
 
 ## Çalıştırma
 
@@ -53,7 +53,7 @@ bin/kc-dev.sh up
 
 Betik `.env` dosyası yoksa `.env.example` dosyasından üretir. Üretirken “degistir-” ile başlayan değerleri rastgele değerle doldurur. `.env` Git'e girmez.
 
-Keycloak adresi `http://kimlik.localhost:<PANE_PORT>` olur. Yönetim konsolu aynı adreste `/admin/` yolundadır. Giriş bilgisi `.env` dosyasındaki `KC_BOOTSTRAP_ADMIN_*` değerleridir.
+Keycloak adresi `http://identity.localhost:<PANE_PORT>` olur. Yönetim konsolu aynı adreste `/admin/` yolundadır. Giriş bilgisi `.env` dosyasındaki `KC_BOOTSTRAP_ADMIN_*` değerleridir.
 
 ## Testler
 
@@ -64,7 +64,7 @@ bin/kc-dev.sh test
 Betik `.env` değerlerini yükler. Sonra `tests/` klasöründeki testleri çalıştırır. Keycloak çalışmıyorsa canlı testler atlanır. Yalnız dosya testleri için şu komut yeter:
 
 ```bash
-cd tests && python3 -I -m unittest discover -s . -p 'test_realm_dosyalari.py'
+cd tests && python3 -I -m unittest discover -s . -p 'test_realm_files.py'
 ```
 
 Testlerin lint denetimi `uvx ruff check tests` komutudur. Ayar `ruff.toml` dosyasındadır.
@@ -74,17 +74,17 @@ Testlerin lint denetimi `uvx ruff check tests` komutudur. Ayar `ruff.toml` dosya
 Keycloak var olan realm'i yeniden içe almaz. Realm dosyası değişince şu komut realm'i siler ve Keycloak'ı yeniden başlatır:
 
 ```bash
-bin/kc-dev.sh realm-sil --evet
+bin/kc-dev.sh delete-realm --yes
 ```
 
-Bu komut geliştirme realm'indeki bütün veriyi siler. `--evet` bayrağı olmadan çalışmaz. Yalnız geliştirme ortamında kullanın.
+Bu komut geliştirme realm'indeki bütün veriyi siler. `--yes` bayrağı olmadan çalışmaz. Yalnız geliştirme ortamında kullanın.
 
 ## Ana makineden erişim
 
 Compose portu `127.0.0.1` adresine açar. Bu Mac'te Colima'nın factory profili yeni portları ana makineye taşımıyor. Bu durumda şu komut ayrı bir ssh tüneli açar:
 
 ```bash
-bin/kc-dev.sh tunel
+bin/kc-dev.sh tunnel
 ```
 
 Tünel Colima'nın kendi bağlantısına dokunmaz. `bin/kc-dev.sh down` tüneli de kapatır.
@@ -95,7 +95,7 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 
 ## Eklentiler
 
-Üç eklenti imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
+Üç eklenti imaja eklenir. Seçim gerekçesi `backend/docs/decisions/0003-keycloak-extensions.md` notundadır.
 
 - Olay dinleyiciyi `keycloak-webhook-listener` çatalı sağlar. Kaynak `event-listener/` klasöründedir. İmaj derlemesinde JUnit testleriyle derlenir. Olayları identity-sync servisine imzalı gönderir. Adres HTTPS olmalıdır. Düz HTTP yalnız `conf/webhook-plain-http-hosts.txt` listesindeki adrese izinlidir. Bu liste yalnız geliştirme imajına girer.
 

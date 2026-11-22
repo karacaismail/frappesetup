@@ -6,7 +6,7 @@ Contract: `backend/contracts/platform_core-erisim.openapi.yaml`.
 import frappe
 from frappe import _
 
-from platform_core.erisim import explain, field_level
+from platform_core.access import explain, field_level
 
 
 @frappe.whitelist(methods=["GET"])

@@ -597,7 +597,7 @@ paths:
         If the session is not in the list of the user, the service deletes nothing and returns 200.
 
         Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
-        This list carries the service clients of the `platform_core` sites. An example is `site-kiraci1-service`.
+        This list carries the service clients of the `platform_core` sites. An example is `site-tenant1-service`.
         A tenant has two clients. The `site-<tenant>` client is only for browser login and has no service account.
         The service refuses a token whose `azp` value is the browser client.
         The site requests the token with the `aud-identity-sync` scope (the shared contract, `docs/sozlesmeler.md`, section 2).

@@ -22,7 +22,7 @@ class TranslationContractTest(unittest.TestCase):
 
 	def test_missing_anonymization_key_error_is_translated(self):
 		message = "Configure a stable site key for Press anonymization."
-		tree = ast.parse((APP / "kimlik/identity.py").read_text())
+		tree = ast.parse((APP / "press_identity/identity.py").read_text())
 		key_error = next(
 			node.exc
 			for node in ast.walk(tree)
@@ -36,7 +36,7 @@ class TranslationContractTest(unittest.TestCase):
 
 	def test_doctype_descriptions_and_labels_have_form_context(self):
 		keys = {(row[0], row[2]) for row in self.rows if len(row) == 3}
-		for path in (APP / "kimlik/doctype").glob("*/*.json"):
+		for path in (APP / "press_identity/doctype").glob("*/*.json"):
 			doc = json.loads(path.read_text())
 			texts = [doc["description"]]
 			for field in doc["fields"]:

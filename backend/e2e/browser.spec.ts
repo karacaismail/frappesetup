@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { account, localUrl, required } from './local';
 
 async function login(page: Page, entry: 'button' | 'api') {
-  const site = localUrl('kiraci1.localhost', 1);
-  const identity = localUrl('kimlik.localhost', 0);
+  const site = localUrl('tenant1.localhost', 1);
+  const identity = localUrl('identity.localhost', 0);
   const blockedOrigins = new Set<string>();
   await page.route('**/*', async (route) => {
     const origin = new URL(route.request().url()).origin;
@@ -28,7 +28,7 @@ async function login(page: Page, entry: 'button' | 'api') {
   }
   await expect.poll(() => new URL(page.url()).origin).toBe(identity);
   const loginParameters = new URL(page.url()).searchParams;
-  expect(loginParameters.get('client_id')).toBe('site-kiraci1');
+  expect(loginParameters.get('client_id')).toBe('site-tenant1');
   expect((loginParameters.get('scope') ?? '').split(/\s+/)).not.toContain('aud-identity-sync');
   await page.locator('#username').fill(account);
   await page.locator('#password').fill(required('E2E_KEYCLOAK_PASSWORD'));

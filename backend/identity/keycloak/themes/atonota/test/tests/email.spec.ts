@@ -10,7 +10,7 @@ import { KC, MAILPIT, REALM, admin, createUser, screen } from './helpers';
 
 const emailDir = fileURLToPath(new URL('../../email/', import.meta.url));
 // Dolu ise her e-postanın 320 ve 600 piksel görüntüsü bu klasöre yazılır.
-const shotDir = process.env.EPOSTA_GORUNTU;
+const shotDir = process.env.KC_THEME_EMAIL_SCREENSHOTS;
 // Sihirli bağlantı eklentisi tema deneme ortamında kurulu değildir.
 // Eklentili ikinci bir Keycloak varsa adresi bu değişkenle verilir.
 const magicKc = process.env.MAGIC_LINK_KC_URL;

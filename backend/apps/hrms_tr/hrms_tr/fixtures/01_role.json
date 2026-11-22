@@ -1,22 +1,22 @@
 [
   {
     "doctype": "Role",
-    "name": "HRMS TR Employee",
-    "role_name": "HRMS TR Employee",
+    "name": "HRT Employee",
+    "role_name": "HRT Employee",
     "desk_access": 0,
     "is_custom": 1
   },
   {
     "doctype": "Role",
-    "name": "HRMS TR Manager",
-    "role_name": "HRMS TR Manager",
+    "name": "HRT Manager",
+    "role_name": "HRT Manager",
     "desk_access": 0,
     "is_custom": 1
   },
   {
     "doctype": "Role",
-    "name": "HRMS TR Admin",
-    "role_name": "HRMS TR Admin",
+    "name": "HRT Admin",
+    "role_name": "HRT Admin",
     "desk_access": 0,
     "is_custom": 1
   }

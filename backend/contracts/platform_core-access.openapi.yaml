@@ -1,0 +1,879 @@
+openapi: 3.1.0
+info:
+  title: platform_core access rule engine
+  version: 0.1.0
+  summary: Endpoints for the permission reason, the scope summary and field level management.
+  description: |
+    This contract describes the endpoints of the `platform_core.erisim` module.
+    The decision note is the file `docs/kararlar/0006-erisim-kurali.md`.
+
+    The engine narrows records. The role permission grants access. The permission level closes a field.
+
+    There is no separate endpoint to add, change or delete a rule.
+    These jobs use Frappe's built-in endpoint: `/api/v2/document/Access Rule`.
+    The fields of the “Access Rule” record are in the `AccessRule` schema below.
+
+    Identity: the Frappe session cookie. A POST request needs the `X-Frappe-CSRF-Token` header.
+    A guest cannot reach any endpoint.
+
+    The error response has Frappe's usual format. A permission error returns 403.
+    Invalid input returns 417. A record that is not found returns 404.
+servers:
+  - url: /api/method
+    description: Frappe endpoint root of the tenant site
+tags:
+  - name: explanation
+    description: Read-only endpoints. They do not change records.
+  - name: field-level
+    description: Field level management. It changes the site settings.
+  - name: search
+    description: Link search. Read-only. Replaces two Frappe endpoints at their own address.
+paths:
+  /platform_core.api.access.explain_permission:
+    get:
+      tags: [explanation]
+      operationId: explainPermission
+      summary: Explains the reason for the permission on a record.
+      description: |
+        The endpoint says whether a user can do an operation on a record.
+        The endpoint also gives the reason. The endpoint does not change records.
+
+        An ordinary user can ask only about their own permission.
+        An ordinary user gets a single denial reason: `not_permitted_or_missing`.
+        The same value returns when the record does not exist. This way the endpoint does not reveal that a record exists.
+        The `rules` list is empty in the response to an ordinary user.
+
+        A Website User cannot call this endpoint: it is not on the shell's allow-list
+        (`website_user_allowed_methods`), because the answer can carry rule detail. Such a
+        request returns 403.
+
+        The “System Manager” role can also ask about another user.
+        This role sees the rules one by one. It gets 404 when the record does not exist.
+
+        The endpoint first checks the caller's read permission on the document type. It returns 403 when there is no permission.
+        It also returns 403 when the document type does not exist.
+
+        In a denial response to an ordinary user, `layers.access_rule` and `layers.share`
+        return false. These two values return with their real state only to the “System Manager” role.
+
+        The `allowed` value is Frappe's final decision. The role permission, the user permission,
+        the access rule and the share all go into this decision together.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Name of the document type. For example `Employee`.
+          schema: {type: string, maxLength: 140}
+        - name: name
+          in: query
+          required: true
+          description: Name of the record.
+          schema: {type: string, maxLength: 140}
+        - name: ptype
+          in: query
+          required: false
+          description: Name of the operation. It counts as `read` when it is not given.
+          schema:
+            type: string
+            enum: [read, write, create, delete, submit, cancel]
+            default: read
+        - name: user
+          in: query
+          required: false
+          description: |
+            The user whose permission is asked. It counts as the session owner when it is not given.
+            Only the “System Manager” role can ask about another user.
+          schema: {type: string, maxLength: 140}
+      responses:
+        "200":
+          description: The decision and its reason.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Explanation"}
+              examples:
+                employeeDenied:
+                  summary: An employee asks about someone else's record.
+                  value:
+                    message:
+                      doctype: ER Test Talep
+                      name: a1b2c3d4e5
+                      ptype: read
+                      user: er.employee1@example.test
+                      allowed: false
+                      reason: not_permitted_or_missing
+                      governed: true
+                      layers: {role: true, access_rule: false, share: false}
+                      rules: []
+        "403":
+          description: |
+            A guest request. Or an ordinary user asked about another user.
+            Or the caller has no read permission on the document type.
+        "404":
+          description: The record does not exist. It returns only to the “System Manager” role.
+        "417":
+          description: |
+            The input is invalid. For example `ptype` is not one of the allowed values.
+            A child table, a single-record type and a virtual type also get this response.
+
+  /platform_core.api.access.get_access_summary:
+    get:
+      tags: [explanation]
+      operationId: getAccessSummary
+      summary: Returns the scopes of the session owner on a document type.
+      description: |
+        The endpoint returns a summary of the active rules that match the session owner.
+        A Website User can call it too: it is on the shell's allow-list
+        (`website_user_allowed_methods`). The user sees only their own scopes, never rule names,
+        rule fields or the scopes of other users.
+        The interface uses this summary to tell the user which records will be visible.
+        The endpoint does not change records.
+
+        The summary carries only access rules. It does not carry the role permission or the field permission.
+        The field permissions are in the `platform_core.api.meta.get_doctype` endpoint.
+
+        When the document type is not governed, `governed` returns false and the lists are empty.
+        In that case the role permission applies on its own.
+        When the document type is governed, an empty list shows that there is no access for that operation.
+
+        The endpoint returns 403 when the user has no read permission on the document type.
+        It also returns 403 when the document type does not exist. This way the endpoint does not reveal that a type exists.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Name of the document type.
+          schema: {type: string, maxLength: 140}
+      responses:
+        "200":
+          description: The scope summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AccessSummary"}
+              examples:
+                manager:
+                  summary: A user who has both the employee role and the manager role.
+                  value:
+                    message:
+                      doctype: ER Test Talep
+                      governed: true
+                      operations:
+                        read: [own, team]
+                        write: [own]
+                        create: [own]
+                        delete: []
+                        submit: []
+                        cancel: []
+        "403":
+          description: A guest request, no read permission on the document type, or the document type does not exist.
+
+  /platform_core.api.access.set_field_level:
+    post:
+      tags: [field-level]
+      operationId: setFieldLevel
+      summary: Changes the permission level of a field.
+      description: |
+        The endpoint changes the `permlevel` value of the field. The change is kept
+        in a “Property Setter” record. Frappe's document type definition does not change.
+
+        **This endpoint changes the site settings.** A field at level 1 or above closes
+        to all roles that have no permission at that level. The field does not return
+        in the list, in the record or in the export. The effect starts at once.
+
+        The operation can be undone. The same endpoint is called again with the old level.
+        `previous_permlevel` in the response gives the old level.
+
+        The endpoint is open only to the “System Manager” role.
+        The caller must also have permission to create a “Property Setter” record.
+        The endpoint does not touch standard fields. For example `name` and `owner` do not change.
+        The endpoint does not start a paid job.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doctype, fieldname, permlevel]
+              additionalProperties: false
+              properties:
+                doctype:
+                  type: string
+                  maxLength: 140
+                  description: Name of the document type.
+                fieldname:
+                  type: string
+                  maxLength: 140
+                  description: Name of the field. The field must be defined in the document type.
+                permlevel:
+                  type: integer
+                  minimum: 0
+                  maximum: 9
+                  description: The new permission level. 0 is the level open to everyone.
+            examples:
+              salary:
+                value: {doctype: ER Test Request, fieldname: salary_amount, permlevel: 1}
+      responses:
+        "200":
+          description: The new level and the old level of the field.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [doctype, fieldname, permlevel, previous_permlevel]
+                    properties:
+                      doctype: {type: string}
+                      fieldname: {type: string}
+                      permlevel: {type: integer, minimum: 0, maximum: 9}
+                      previous_permlevel: {type: integer, minimum: 0, maximum: 9}
+        "403":
+          description: The user is not “System Manager” or is a guest.
+        "404":
+          description: The document type does not exist.
+        "417":
+          description: |
+            The field does not exist, the field is standard, or the level is not between 0 and 9.
+            A document type that holds the permission system also gets this response. For example “Access Rule”.
+
+  /platform_core.api.access.set_level_access:
+    post:
+      tags: [field-level]
+      operationId: setLevelAccess
+      summary: Gives a role read and write permission at a permission level.
+      description: |
+        The endpoint sets the level permission of the role on a document type. The change
+        is kept in a “Custom DocPerm” record.
+
+        **This endpoint changes the site settings.** When `read` and `write` are both false,
+        the permission of the role at that level is deleted. The role can no longer see the fields at that level.
+        The effect starts at once.
+
+        The endpoint does not touch level 0. Level 0 is the base access.
+        The base access is managed from Frappe's role permission screen or endpoint.
+
+        The operation can be undone. The same endpoint is called again with the old values.
+        The endpoint is open only to the “System Manager” role.
+        The caller must also have write permission on the “Custom DocPerm” record.
+        The endpoint does not start a paid job.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doctype, role, permlevel, read, write]
+              additionalProperties: false
+              properties:
+                doctype:
+                  type: string
+                  maxLength: 140
+                  description: Name of the document type.
+                role:
+                  type: string
+                  maxLength: 140
+                  description: Name of the role. The role must be defined on the site.
+                permlevel:
+                  type: integer
+                  minimum: 1
+                  maximum: 9
+                  description: The permission level. Level 0 is not accepted.
+                read:
+                  type: boolean
+                  description: The role can read the fields at this level.
+                write:
+                  type: boolean
+                  description: |
+                    The role can change the fields at this level.
+                    Write permission cannot be given without read permission.
+            examples:
+              hr:
+                value: {doctype: ER Test Request, role: ER HR, permlevel: 1, read: true, write: true}
+      responses:
+        "200":
+          description: The final permission of the role at that level.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [doctype, role, permlevel, read, write]
+                    properties:
+                      doctype: {type: string}
+                      role: {type: string}
+                      permlevel: {type: integer, minimum: 1, maximum: 9}
+                      read: {type: boolean}
+                      write: {type: boolean}
+        "403":
+          description: The user is not “System Manager” or is a guest.
+        "404":
+          description: The document type or the role does not exist.
+        "417":
+          description: |
+            The level is not between 1 and 9, or write was requested without read.
+            A document type that holds the permission system also gets this response.
+
+  /platform_core.access.link_search.search_link:
+    get:
+      x-frappe-original: [frappe.desk.search.search_link]
+      tags: [search]
+      operationId: searchLink
+      summary: Link search behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.desk.search.search_link`.
+        Clients keep calling `/api/method/frappe.desk.search.search_link`. The address and the
+        inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        The endpoint does not change any record.
+
+        The standard search is unchanged. Its result passes the record rules and field levels.
+        On a governed document type every custom search function is refused with 403,
+        for every user, “Administrator” included. There is no allow list. A custom search function can come from the `query`
+        input or from the `standard_queries` hook. Both follow the same rule.
+        On a document type that is not governed a custom search runs as Frappe runs it.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type to search in.
+          schema: {type: string, maxLength: 140}
+        - name: txt
+          in: query
+          required: true
+          description: Search text. It may be empty.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: |
+            Dotted path of a custom search function. On a governed document type it is always refused.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters as JSON, passed on to the search.
+          schema: {type: string}
+        - name: page_length
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema: {type: integer, default: 10}
+        - name: searchfield
+          in: query
+          required: false
+          description: Field to search in. Defaults to the name.
+          schema: {type: string}
+        - name: reference_doctype
+          in: query
+          required: false
+          description: Document type of the form that holds the link field.
+          schema: {type: string}
+        - name: link_fieldname
+          in: query
+          required: false
+          description: Name of the link field in the reference document type.
+          schema: {type: string}
+        - name: ignore_user_permissions
+          in: query
+          required: false
+          description: Frappe honours it only when the link field itself allows it.
+          schema: {type: boolean, default: false}
+      responses:
+        "200":
+          description: Matching records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items:
+                      type: object
+                      required: [value]
+                      properties:
+                        value: {type: string, description: Name of the record.}
+                        label: {type: string, description: Title shown for the record.}
+                        description: {type: string, description: Extra text shown under the title.}
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function that is not allowed on a governed document type.
+        "417":
+          description: Invalid input.
+
+  /platform_core.access.link_search.search_widget:
+    get:
+      x-frappe-original: [frappe.desk.search.search_widget]
+      tags: [search]
+      operationId: searchWidget
+      summary: Raw link search behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.desk.search.search_widget`.
+        Clients keep calling `/api/method/frappe.desk.search.search_widget`. The address and the
+        inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        The endpoint does not change any record. It follows the same rule as `search_link`
+        and returns the rows of the search without formatting them for a link field.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type to search in.
+          schema: {type: string, maxLength: 140}
+        - name: txt
+          in: query
+          required: true
+          description: Search text. It may be empty.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: |
+            Dotted path of a custom search function. On a governed document type it is always refused.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters as JSON, passed on to the search.
+          schema: {type: string}
+        - name: page_length
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema: {type: integer, default: 10}
+        - name: searchfield
+          in: query
+          required: false
+          description: Field to search in. Defaults to the name.
+          schema: {type: string}
+        - name: reference_doctype
+          in: query
+          required: false
+          description: Document type of the form that holds the link field.
+          schema: {type: string}
+        - name: link_fieldname
+          in: query
+          required: false
+          description: Name of the link field in the reference document type.
+          schema: {type: string}
+        - name: ignore_user_permissions
+          in: query
+          required: false
+          description: Frappe honours it only when the link field itself allows it.
+          schema: {type: boolean, default: false}
+        - name: start
+          in: query
+          required: false
+          description: Number of results to skip.
+          schema: {type: integer, default: 0}
+        - name: filter_fields
+          in: query
+          required: false
+          description: Extra fields to return, as JSON.
+          schema: {type: string}
+        - name: as_dict
+          in: query
+          required: false
+          description: Return each row as an object instead of a list.
+          schema: {type: boolean, default: false}
+        - name: for_link_validation
+          in: query
+          required: false
+          description: Frappe's own input. The search matches the record name exactly.
+          schema: {type: boolean, default: false}
+        - name: query_filters_as_dict
+          in: query
+          required: false
+          description: Frappe's own input. It passes the filters to a custom search function as an object.
+          schema: {type: boolean, default: false}
+      responses:
+        "200":
+          description: Matching rows. Each row starts with the record name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: array
+                          items: {}
+                        - type: object
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function that is not allowed on a governed document type.
+        "417":
+          description: Invalid input.
+
+  /platform_core.access.link_search.validate_link_and_fetch:
+    get:
+      x-frappe-original: [frappe.client.validate_link_and_fetch]
+      tags: [search]
+      operationId: validateLinkAndFetch
+      summary: Link validation behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.client.validate_link_and_fetch`.
+        Clients keep calling `/api/method/frappe.client.validate_link_and_fetch`. The address and
+        the inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        Frappe's function passes the `query` input to its search from Python, past the two search
+        endpoints. A custom search function would then confirm that a record exists which the
+        user cannot see. The endpoint follows the same rule as `search_link`. It does not change
+        any record.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type of the linked record.
+          schema: {type: string}
+        - name: docname
+          in: query
+          required: true
+          description: Name of the linked record.
+          schema: {type: string}
+        - name: fields_to_fetch
+          in: query
+          required: false
+          description: Field names to return with the name, as JSON. Each field passes Frappe's read check.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: Custom search function. It is refused on a governed document type.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters of the link field, as JSON.
+          schema: {type: string}
+      responses:
+        "200":
+          description: |
+            The name of the record and the fetched fields. An empty object when the record does
+            not exist or the user may not select it.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function on a governed document type.
+        "417":
+          description: Invalid input.
+
+x-replaced-endpoints:
+  description: |
+    The engine puts its own function in place of three Frappe endpoints: the two search endpoints and link validation.
+    The addresses do not change. The client uses the same address and the same inputs.
+    The changed behaviour is below. This is a behaviour change of an existing endpoint.
+  endpoints:
+    - path: /api/method/frappe.desk.search.search_link
+      replaced_by: platform_core.access.link_search.search_link
+      methods: [GET, POST]
+    - path: /api/method/frappe.desk.search.search_widget
+      replaced_by: platform_core.access.link_search.search_widget
+      methods: [GET, POST]
+    - path: /api/method/frappe.client.validate_link_and_fetch
+      replaced_by: platform_core.access.link_search.validate_link_and_fetch
+      methods: [GET, POST]
+  behaviour:
+    - The caller must have `select` or `read` permission on the searched document type. Otherwise the endpoint returns 403.
+    - Frappe's standard search does not change. The result passes through the list rule and the field level.
+    - On a governed document type only Frappe's standard search runs. Every custom search function returns 403.
+    - A custom search function comes through the `query` input or through the `standard_queries` hook. Both follow the same rule.
+    - There is no allow list. Whether a search function reads with permissions cannot be verified from its code.
+    - This denial is for all users. There is no exception, not for the “System Manager” role and not for the “Administrator” user.
+    - On a document type that is not governed, a custom search runs with Frappe's usual behaviour.
+    - An unknown input name is rejected. The wrappers accept every input of the Frappe function they replace. A test compares the two.
+    - "`search_link` keeps the browser cache header of Frappe's endpoint: 60 seconds."
+    - "Not covered: `frappe.contacts.doctype.address.address.address_query` calls the search from Python for the “Address” type. It matters only if “Address” is governed and an app also sets a `standard_queries` function for it."
+
+x-hooks:
+  description: Hooks the engine writes in `hooks.py` for other modules.
+  hooks:
+    - name: ai_write_closed_doctypes
+      shape: '["PLT Access Rule"]'
+      description: |
+        The AI layer reads this hook. The engine lists the “Access Rule” document type in it (O-28).
+        The generic write tools cannot change this type. For example `create_document` and `update_document` are refused.
+        A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
+    - name: ai_tools
+      shape: '["platform_core.access.ai_tools.declare"]'
+      description: Declares the four AI tools listed in `x-ai-tools`.
+  removed:
+    - name: access_rule_report_scopes
+      description: |
+        Removed. It let an app declare what a script report reads, together with a static check of the
+        report code. Reviews found ways around the check, and such a check can never be complete.
+        Declaring this hook has no effect.
+    - name: access_rule_aware_reports
+      description: |
+        Removed. It let an app name a script report as reading with permissions, backed by the same
+        static check. Declaring this hook has no effect.
+    - name: access_rule_allowed_queries
+      description: |
+        Removed. It let an app allow a custom link search function on a governed document type,
+        with the same static check. Declaring this hook has no effect.
+
+x-report-rules:
+  description: |
+    The report endpoints are Frappe's own endpoints. The engine extends the Report record.
+    The rules below apply while the site has at least one governed document type.
+  rules:
+    - A list report (“Report Builder”) runs. Its data passes the record rules and the field levels.
+    - A query report (“Query Report”) runs only for the “System Manager” role. Everyone else gets 403.
+    - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
+    - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
+    - The gate decides on the report Frappe really runs. Frappe follows `reference_report` only for a report of type “Custom Report”, and so does the gate. A report of another type is judged by its own type, also when that field still holds an old value.
+    - "A custom report whose references form a loop: running it, exporting it and reading its script return 403 for every user. Frappe follows the references before it asks the gate. So the engine follows the chain itself as soon as Frappe loads the second report of a chain, keeps a list of the reports it has seen, and refuses at the first repeat. The length of the loop does not matter. Without this the request would end in a server error."
+    - "A custom report whose reference cannot be found: running it and exporting it return 404 for every user. This is Frappe's own answer for the missing report, given before any data is read."
+    - "A report with a loop or a missing reference can still be opened and saved, so that an administrator can repair it."
+    - "The gate function itself (`report_guard`, Prepared Report, Auto Email Report) refuses both cases with a permission error. On a site with a governed document type such a report also counts as touching governed data."
+    - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
+    - A prepared report queued before a rule existed is refused when its job starts, before any report code runs. This holds for list, query and script reports. The record ends in status Error and no file is written.
+    - A scheduled email report (“Auto Email Report”) that touches governed data is switched off for everyone, the “System Manager” role and the “Administrator” user included.
+    - Such a record cannot be created and an existing one cannot be enabled. Saving returns 403.
+    - Such a record cannot be downloaded or sent, by hand or by the scheduler. The scheduler works as “Administrator”; that session opens nothing here.
+    - An existing “Auto Email Report” record can still be saved while it stays switched off, and it can be deleted.
+    - After install and after migrate the engine switches off (`enabled = 0`) every enabled “Auto Email Report” that touches governed data.
+    - "The engine does not switch the session user. On data that is not governed Frappe's own behaviour applies: a list report is read with the user named on the record, a query report or script report runs as the session user. In a scheduled run that session user is “Administrator”."
+    - When the site has no governed document type, the gate checks only the field levels of the report's own document type.
+  exemptions:
+    - The “System Manager” role is exempt from the query report and script report rule by design. A site needs someone who can run these reports, and this role already manages the rules. The role is not exempt from the prepared report closure, from the “Auto Email Report” closure, from the link search rule or from record rules.
+    - The “Administrator” user is exempt from record rules and from the report gate. Frappe never asks permission hooks for this user. The user is not exempt from the prepared report closure, from the “Auto Email Report” closure or from the link search rule.
+
+x-ai-tools:
+  description: |
+    The engine declares four AI tools through the `ai_tools` hook.
+    The declaration format is in the `x-ai-tools-hook` section of the file `platform_core-yapay-zeka.openapi.yaml`.
+    The layer adds the app name to the start of the tool name. For example it becomes `platform_core_list_access_rules`.
+    The declaration function is `platform_core.erisim.ai_tools.declare`.
+
+    The tools take only structured fields. No tool takes SQL text or a raw condition.
+    The input models reject an unknown field. The filter rows pass the same validation as the rule record.
+    The writing tools do not change the record. The tool opens a proposal. A human approves the preview.
+  tools:
+    - name: list_access_rules
+      kind: read
+      roles: [System Manager]
+      description: |
+        It lists the access rules. The inputs are `document_type`, `role` and `include_inactive`.
+        The caller must have read permission on the “Access Rule” type. At most 200 rules return.
+    - name: explain_access
+      kind: read
+      description: |
+        It explains why a user can or cannot do an operation on a record.
+        Its behaviour is the same as the `explain_permission` endpoint. An ordinary user asks only about themselves
+        and sees a single denial reason. The rule detail returns only to the “System Manager” role.
+    - name: propose_access_rule
+      kind: write
+      destructive: true
+      roles: [System Manager]
+      description: |
+        It proposes a new rule. The inputs are the fields in the `AccessRule` schema. The `filters` field
+        is a list of `{field, operator, value}` rows.
+        The preview returns the summary, the field changes and the roles that will lose access.
+        When the first rule is written for a document type, the roles that have no rule lose access.
+        This is why the tool carries the `destructive` flag.
+        The `target_version` value of the preview is a digest of all the rules of that document type.
+        If another rule changes before the approval, the layer rejects the approval.
+    - name: propose_access_rule_change
+      kind: write
+      destructive: true
+      versioned: true
+      roles: [System Manager]
+      description: |
+        It proposes a change to a saved rule. Turning a rule off is also done with this tool.
+        The input is the `name` value of the rule and the fields to change. A field that is not given does not change.
+        The preview returns `target_name` and `target_version`. `target_version` is the `modified` value of the record.
+        The layer compares the version again just before it executes.
+        Narrowing a rule removes access. This is why the tool carries the `destructive` flag.
+
+components:
+  securitySchemes:
+    frappeSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: The Frappe session cookie. A POST request also needs the `X-Frappe-CSRF-Token` header.
+
+  schemas:
+    Scope:
+      type: string
+      enum: [own, team, department, company, all]
+      description: |
+        The set of records that the rule selects for the user.
+        `own` is the user's own records. `team` is the records of the user and of
+        the employees linked to the user through the `reports_to` chain. `department` is
+        the records in the user's department and its sub-departments. `company` is
+        the records in the user's company. `all` is all records.
+
+    Explanation:
+      type: object
+      required: [doctype, name, ptype, user, allowed, reason, governed, layers, rules]
+      properties:
+        doctype: {type: string}
+        name: {type: string}
+        ptype: {type: string, enum: [read, write, create, delete, submit, cancel]}
+        user: {type: string, description: The user whose permission is asked.}
+        allowed:
+          type: boolean
+          description: Frappe's final decision. All layers go into this decision.
+        reason:
+          type: string
+          enum:
+            - allowed
+            - allowed_by_share
+            - no_role_permission
+            - no_matching_rule
+            - user_permission
+            - not_permitted_or_missing
+          description: |
+            `allowed`: The role permission exists and a rule selects the record.
+            `allowed_by_share`: The record is shared with the user. The share overrides the rule.
+            `no_role_permission`: The role has no permission for this operation. Only “System Manager” sees it.
+            `no_matching_rule`: The document type is governed and no rule selects the record. Only “System Manager” sees it.
+            `user_permission`: Frappe's user permission record blocks it. Only “System Manager” sees it.
+            `not_permitted_or_missing`: The only denial reason that returns to an ordinary user.
+        governed:
+          type: boolean
+          description: The document type has at least one active rule.
+        layers:
+          type: object
+          required: [role, access_rule, share]
+          properties:
+            role:
+              type: boolean
+              description: The role permission opens this operation.
+            access_rule:
+              type: boolean
+              description: The engine's decision. It returns true when the document type is not governed.
+            share:
+              type: boolean
+              description: The record is shared with the user for this operation.
+        rules:
+          type: array
+          description: |
+            The active rules of the document type, in `priority` order.
+            It returns filled only to the “System Manager” role.
+          items:
+            type: object
+            required: [name, title, role, scope, applies, matches]
+            properties:
+              name: {type: string, description: Name of the rule record.}
+              title: {type: string}
+              role: {type: string}
+              scope: {$ref: "#/components/schemas/Scope"}
+              applies:
+                type: boolean
+                description: The user has the role and the rule covers this operation.
+              matches:
+                type: boolean
+                description: The rule selects this record. It returns false when `applies` is false.
+
+    AccessSummary:
+      type: object
+      required: [doctype, governed, operations]
+      properties:
+        doctype: {type: string}
+        governed:
+          type: boolean
+          description: The document type has at least one active rule.
+        operations:
+          type: object
+          description: For each operation, the scopes of the rules that match the session owner.
+          required: [read, write, create, delete, submit, cancel]
+          additionalProperties: false
+          properties:
+            read: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            write: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            create: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            delete: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            submit: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            cancel: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+
+    PLTAccessRule:
+      type: object
+      description: |
+        The “Access Rule” record. The record is managed from the `/api/v2/document/Access Rule` endpoint.
+        Only the “System Manager” role reads and writes the record.
+        When a rule is saved, its effect starts on the next request.
+
+        When the first rule is written for a document type, the roles that have no rule
+        lose access to that type. The response lists these roles in a warning message.
+      required: [title, document_type, role, scope]
+      properties:
+        name: {type: string, readOnly: true, description: Name of the record. The server generates it.}
+        title: {type: string, maxLength: 140, description: Short name of the rule.}
+        is_active: {type: integer, enum: [0, 1], default: 1, description: "Is the rule active?"}
+        document_type:
+          type: string
+          description: |
+            The document type that the rule narrows. A child table, a single-record type, a virtual type
+            and the types that hold the permission system are not accepted.
+        role: {type: string, description: The role that the rule applies to.}
+        scope: {$ref: "#/components/schemas/Scope"}
+        match_field:
+          type: [string, "null"]
+          description: |
+            The field that links the record to the user. It is required when the scope is not `all`.
+            `owner` points to the user. `name` points to the record itself.
+            A link field points to its target type. The target can be a user, an employee,
+            a department or a company. A target that does not fit the scope is rejected.
+        filters:
+          type: [string, "null"]
+          description: |
+            The JSON text of the extra conditions. Each row is `[field, operator, value]`.
+            The operators are `=`, `!=`, `in` and `not in`. All of the conditions must hold.
+            The value is a constant or one of these variables: `$user`,
+            `$user.employee`, `$user.department`, `$user.company`.
+          examples:
+            - '[["status", "=", "Open"], ["company", "=", "$user.company"]]'
+        allow_read: {type: integer, enum: [0, 1], default: 0}
+        allow_write: {type: integer, enum: [0, 1], default: 0}
+        allow_create: {type: integer, enum: [0, 1], default: 0}
+        allow_delete: {type: integer, enum: [0, 1], default: 0}
+        allow_submit: {type: integer, enum: [0, 1], default: 0}
+        allow_cancel: {type: integer, enum: [0, 1], default: 0}
+        priority:
+          type: integer
+          default: 0
+          description: The order in the explanation endpoint. A smaller number comes first. It does not change the result.
+        description: {type: [string, "null"], description: Why the rule exists.}

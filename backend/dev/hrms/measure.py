@@ -235,7 +235,7 @@ def main():
         parser.error("Use a dedicated perf-*.localhost site.")
     if not re.fullmatch(r"[0-9a-f]{7,40}", args.revision):
         parser.error("Pass the Git revision of the test image.")
-    password = os.environ["HRMS_TR_TEST_PASSWORD"]
+    password = os.environ["HRT_TEST_PASSWORD"]
     os.chdir("sites")
     # Frappe prints tracebacks for the expected 403 responses. Only the report goes to stdout.
     with redirect_stdout(sys.stderr):
