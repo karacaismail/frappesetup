@@ -299,8 +299,8 @@ Sunucu bu ayarları güvenli site yapılandırmasından okur.
 Canlı servis için kimlik ekibi servis hesabını ve kapsamı tanımlar.
 
 O-25 uyarınca erişim belirteci 5 dakika geçerlidir.
-Çalışanın Keycloak oturumu 1 saat boşta kalabilir. Toplam süre 24 saattir.
-Müşterinin oturumu 7 gün boşta kalabilir. Toplam süre 30 gündür.
+Kiracı ve telefon oturumları 1 saat boşta kalabilir. Toplam süre 24 saattir.
+Müşteri süreleri yalnız Press için geçerlidir.
 Yenileme belirteci her kullanımda değişir.
 Mobil sunucu boşta kalma süresini her kurulum için ayrı denetler.
 Süre dolarsa çekme ve gönderme uçları 401 döndürür.
@@ -416,6 +416,16 @@ Eski deneme PWA kurulumları yeni anahtarla yeniden kaydedilir.
 Eski anahtarla yazma komutu açılmış bir site varsa dağıtımdan önce geçiş planı gerekir.
 Üretim komut listesi bu turda boş kalır.
 
-Yeni doğrulanmış `sid`, kurulumun boşta kalma sayacını başlatır.
-Sunucu aynı `sid` ile yeniden kayıt olunca sayacı başlatmaz.
-Kimlik kancası bu sözleşmede ayrı bir `auth_time` sağlamaz.
+Kimlik kancası, doğrulanmış `auth_time` değerini mobil sunucuya verir.
+Sunucu, yeni kurulumun sayacını bu zamandan başlatır.
+Yeni belirteç ya da yeni kurulum kimliği tek başına süreyi uzatmaz.
+Aynı `sid` ile yeniden girişte yeni `auth_time`, sayaç başlangıcını ileri alır.
+Daha eski doğrulama zamanı taşıyan belirteç eşitlemeyi açamaz.
+
+Telefon başka bir kurulumu iptal etmeden önce sunucu çağıran kurulumun süresini denetler.
+Telefon kendi kurulumunu süre dolduktan sonra da iptal edebilir.
+PWA kurulumu iptal edilince tarayıcı oturumu açık kalır.
+`v1_revoke_installation` çağrısından sonra geçerli oturum yeni kurulum açabilir.
+`v1_revoke` ise yeni kurulum için daha yeni bir tarayıcı oturumu ister.
+
+Sunucu, her oturum için uzaktan kapatma denemeleri arasında en az 60 saniye bekler.

@@ -6,6 +6,11 @@ info:
     The phone sends pending operations and receives changes when connectivity returns.
     Request bodies may be at most 256 KiB. Larger requests return 413.
     The server accepts up to 60 requests per account per minute. Further requests return 429.
+    The server applies a one-hour idle limit per installation.
+    On 401 reauthentication_required, pause sync and ask the user to sign in again.
+    For mobile, use interactive Keycloak sign-in to obtain a newer auth_time, even when sid is unchanged.
+    For PWA, sign in again to obtain a new browser session.
+    Register the same installation again, then resume sync with its existing cursor and operation IDs.
     This version starts with an empty allowlist. The server does not accept files.
 servers:
   - url: /api/method
@@ -21,6 +26,9 @@ paths:
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
         Binds the installation to a verified Keycloak session.
+        The verified auth_time starts the idle clock. A newer auth_time resets it even when sid is unchanged.
+        Registering a new installation with an old auth_time does not restart the clock.
+        After reauthentication, older tokens for that session cannot resume sync.
         A revoked installation cannot be reactivated. An active installation can be rebound to a new verified Keycloak session.
       requestBody:
         required: true
@@ -44,7 +52,8 @@ paths:
       description: |
         Revokes one installation or all active installations for the account.
         The returned count reflects local revocations. The server then requests session closure.
-        A single-installation revocation can be retried from another valid session.
+        Revoking other installations requires a registered and recently active calling installation.
+        This also applies to revoking all installations. Self-revocation is available after the idle limit.
       requestBody:
         required: true
         content:
@@ -94,7 +103,7 @@ paths:
                     required: [last_user_activity_at]
                     properties:
                       last_user_activity_at: { type: integer }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -109,6 +118,7 @@ paths:
       description: |
         Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
         For an operation with the same ID and content, the server returns the original committed result.
+        After a change of sid, register the installation first. Until then, this endpoint responds with 403 installation_unavailable.
       requestBody:
         required: true
         content:
@@ -127,7 +137,8 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
         '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '403': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -139,7 +150,9 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.
+      description: |
+        Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.
+        After a change of sid, register the installation first. Until then, this endpoint responds with 403 installation_unavailable.
       requestBody:
         required: true
         content:
@@ -155,7 +168,8 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Page' }
         '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '403': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -263,6 +277,7 @@ paths:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
+        Revoking an installation does not end the Frappe browser session.
         Revokes one installation or all active installations for the account.
         The count reflects local revocations. The browser session stays open.
         Registering a new installation after revocation requires a new cookie session.
@@ -319,7 +334,7 @@ paths:
                     required: [last_user_activity_at]
                     properties:
                       last_user_activity_at: { type: integer }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -356,7 +371,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
         '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -388,7 +403,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Page' }
         '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -409,14 +424,15 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/InstallationListSuccess' }
         '401': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_revoke_installation:
     post:
       summary: Revoke one of your mobile installations
       operationId: mobileV1RevokeInstallation
-      description: Revokes one owned installation and requests closure of its Keycloak session when present.
+      description: |
+        Revokes one owned installation and requests closure of its Keycloak session when present.
+        Before revoking another installation, the server checks the calling installation's idle limit.
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
@@ -427,7 +443,8 @@ paths:
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
@@ -451,14 +468,15 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/InstallationListSuccess' }
         '401': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile_pwa.v1_revoke_installation:
     post:
       summary: Revoke one of your mobile installations
       operationId: mobilePwaV1RevokeInstallation
-      description: Revokes one owned installation without signing out the current browser.
+      description: |
+        Revokes one owned installation. The Frappe browser session stays open.
+        A browser with a valid session can register a replacement installation.
       security:
         - pwaSession: []
           pwaCsrf: []

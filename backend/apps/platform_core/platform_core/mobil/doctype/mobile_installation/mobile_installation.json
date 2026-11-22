@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "field:installation_id",
+ "creation": "2026-11-22 14:34:54.626327",
  "description": "Links a mobile installation to its account.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -64,19 +65,19 @@
    "label": "Last Audit At"
   },
   {
+   "description": "The verified Keycloak session that registered this installation.",
    "fieldname": "session_id",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Keycloak session ID",
-   "length": 140,
-   "description": "The verified Keycloak session that registered this installation.",
-   "hidden": 1
+   "length": 140
   },
   {
+   "description": "The private notification binding for this installation.",
    "fieldname": "notification_token",
    "fieldtype": "Small Text",
-   "label": "Notification token",
    "hidden": 1,
-   "description": "The private notification binding for this installation."
+   "label": "Notification token"
   },
   {
    "description": "Unix time of the last reported interactive action for this installation.",
@@ -96,9 +97,13 @@
   }
  ],
  "links": [],
+ "modified": "2026-11-22 14:34:54.626327",
+ "modified_by": "Administrator",
  "module": "Mobil",
  "name": "Mobile Installation",
+ "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []

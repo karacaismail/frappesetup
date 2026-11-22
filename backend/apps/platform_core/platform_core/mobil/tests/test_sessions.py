@@ -31,8 +31,11 @@ class MobileSessionTest(IntegrationTestCase):
 			principal="fixture",
 			issued_at=int(time.time()),
 			sid=self.sid,
+			installation=None,
+			auth_time=int(time.time()),
 		)
 		self.body = {"installation_id": str(uuid4())}
+		self.identity.installation = self.body["installation_id"]
 
 	def test_registration_rebinds_one_installation_across_twenty_one_sessions(self):
 		from platform_core.api.mobile import _register
@@ -92,6 +95,7 @@ class MobileSessionTest(IntegrationTestCase):
 	def test_manager_can_retry_remote_closure_of_an_already_revoked_installation(self):
 		from platform_core.api.mobile import _register, _revoke
 		from platform_core.mobil import ai_tools
+		from platform_core.mobil.sessions import _session_key
 
 		_register(self.identity, self.body)
 		with (
@@ -103,6 +107,12 @@ class MobileSessionTest(IntegrationTestCase):
 				call.args[0]()
 			send.assert_called_once_with((self.sid,))
 			after_commit.reset_mock()
+			plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
+			self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
+			after_commit.add.assert_not_called()
+			frappe.db.set_value(
+				"Mobile Revoked Session", _session_key(self.sid), "last_delivery_attempt_at", "1"
+			)
 			plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
 			self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
 			for call in list(after_commit.add.call_args_list):
@@ -131,8 +141,11 @@ class MobileSessionTest(IntegrationTestCase):
 		with patch("platform_core.api.mobile.time.time", return_value=initial):
 			_activity(self.identity, self.body)
 		body = {**self.body, "operations": []}
-		for user_type, seconds in (("System User", 3600), ("Website User", 604800)):
-			frappe.db.set_value("User", self.account, "user_type", user_type)
+		self.assertEqual(frappe.db.get_value("User", self.account, "user_type"), "Website User")
+		for user_type in ("Website User", "System User"):
+			if user_type != "Website User":
+				frappe.db.set_value("User", self.account, "user_type", user_type)
+			seconds = 3600
 			with (
 				patch("platform_core.api.mobile.time.time", return_value=initial + seconds - 1),
 				patch("platform_core.api.mobile.push", return_value={}),
@@ -146,6 +159,50 @@ class MobileSessionTest(IntegrationTestCase):
 					self.assertEqual(
 						(raised.exception.status, raised.exception.code), (401, "reauthentication_required")
 					)
+
+	def test_same_sid_requires_new_authentication_time_to_unlock(self):
+		from platform_core.api.mobile import _activity, _register
+		from platform_core.mobil.protocol import MobileError
+
+		started = self.identity.auth_time
+		old_identity = SimpleNamespace(**vars(self.identity))
+		_register(self.identity, self.body)
+		with patch("platform_core.api.mobile.time.time", return_value=started + 3600):
+			self.identity.issued_at = started + 3600
+			_register(self.identity, self.body)
+			with self.assertRaisesRegex(MobileError, "reauthentication_required"):
+				_activity(self.identity, self.body)
+
+			new_installation = {"installation_id": str(uuid4())}
+			_register(self.identity, new_installation)
+			with self.assertRaisesRegex(MobileError, "reauthentication_required"):
+				_activity(self.identity, new_installation)
+
+			self.identity.auth_time = started + 3600
+			_register(self.identity, self.body)
+			self.assertEqual(_activity(self.identity, self.body)["last_user_activity_at"], started + 3600)
+			with self.assertRaisesRegex(MobileError, "reauthentication_required"):
+				_activity(old_identity, self.body)
+
+	def test_expired_phone_cannot_revoke_other_installations(self):
+		from platform_core.api.mobile import _register, _revoke, _revoke_installation
+		from platform_core.mobil.protocol import MobileError
+		from platform_core.mobil.store import MobileStore
+
+		self.identity.installation = self.body["installation_id"]
+		_register(self.identity, self.body)
+		other = {"installation_id": str(uuid4())}
+		other_identity = SimpleNamespace(**{**vars(self.identity), "sid": str(uuid4())})
+		_register(other_identity, other)
+		with patch("platform_core.api.mobile.time.time", return_value=self.identity.auth_time + 3600):
+			for action, payload in (
+				(_revoke_installation, other),
+				(_revoke, other),
+				(_revoke, {"all": True}),
+			):
+				with self.assertRaisesRegex(MobileError, "reauthentication_required"):
+					action(self.identity, payload)
+		MobileStore().require_installation(other_identity, other["installation_id"])
 
 	def test_device_revocation_clears_only_its_notification_binding(self):
 		from platform_core.api.mobile import _register, _revoke

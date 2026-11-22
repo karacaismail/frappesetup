@@ -122,6 +122,10 @@ Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa ist
 
 - Kiracı sitesinde ve telefon paketinde bütün kullanıcılar çalışan süresini alır: 1 saat boşta kalma, 24 saat toplam süre. Realm bu istemcilerde `employee` düzeyini ister. Müşteri süreleri yalnız Press'e uygulanır.
 - Sunucu boşta kalma sayacını `auth_time` değeri sayaç başlangıcından yeni olunca sıfırlar. Böylece aynı `sid` ile yeniden giriş de telefonu açar.
+- Süre dolunca sunucu 401 durumunu ve `reauthentication_required` kodunu döndürür.
+- Uygulama bu yanıtı alınca eşitlemeyi durdurur. Kullanıcıdan Keycloak ile yeniden giriş ister.
+- Uygulama yeni belirteçle aynı kurulumu kaydeder. Ardından bekleyen işlemleri aynı kimliklerle yeniden gönderir.
+- Oturum kimliği değişirse uygulama önce kurulumu kaydeder. Kayıttan önce eşitleme 403 ve `installation_unavailable` döndürür.
 
 ### Kitaplığın arayüzü
 

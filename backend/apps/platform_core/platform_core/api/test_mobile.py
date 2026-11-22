@@ -118,7 +118,13 @@ class MobileHTTPTest(unittest.TestCase):
 		self.guest_denied("v1_revoke_installation", {"installation_id": str(uuid4())})
 
 	def test_v1_revoke_installation_foreign_data_denied(self):
-		status, payload, _ = self.post("v1_revoke_installation", self.register(), token=OTHER_TOKEN)
+		caller = self.register(token=OTHER_TOKEN)
+		status, payload, _ = self.post(
+			"v1_revoke_installation",
+			self.register(),
+			token=OTHER_TOKEN,
+			extra_headers={"X-Mobile-Test-Installation": caller["installation_id"]} if FIXTURE else {},
+		)
 		self.assertEqual(status, 404, payload)
 
 	def test_v1_cleanup_guest_denied(self):
@@ -147,8 +153,13 @@ class MobileHTTPTest(unittest.TestCase):
 	@unittest.skipUnless(FIXTURE, "Synthetic token issuance timestamps are required")
 	def test_revoke_all_rejects_stale_token_for_new_installation(self):
 		old = {"X-Mobile-Test-Iat": str(int(time()))}
-		self.register(token="fixture-revoke", extra_headers=old)
-		status, payload, _ = self.post("v1_revoke", {"all": True}, token="fixture-revoke", extra_headers=old)
+		caller = self.register(token="fixture-revoke", extra_headers=old)
+		status, payload, _ = self.post(
+			"v1_revoke",
+			{"all": True},
+			token="fixture-revoke",
+			extra_headers={**old, "X-Mobile-Test-Installation": caller["installation_id"]},
+		)
 		self.assertEqual(status, 200, payload)
 		fresh_installation = {"installation_id": str(uuid4())}
 		status, payload, _ = self.post(
@@ -170,6 +181,20 @@ class MobileHTTPTest(unittest.TestCase):
 			extra_headers=fresh,
 		)
 		self.assertEqual(status, 200, payload)
+
+	@unittest.skipUnless(FIXTURE, "Synthetic authentication timestamps are required")
+	def test_same_sid_reauthentication_restores_sync_without_changing_installation(self):
+		now = int(time())
+		sid = str(uuid4())
+		old = {"X-Mobile-Test-Auth-Time": str(now - 3600), "X-Mobile-Test-Sid": sid}
+		body = self.register(extra_headers=old)
+		status, payload, _ = self.post("v1_pull", body, extra_headers=old)
+		self.assertEqual((status, payload.get("code")), (401, "reauthentication_required"))
+		fresh = {**old, "X-Mobile-Test-Auth-Time": str(now)}
+		self.assertEqual(self.post("v1_register", body, extra_headers=fresh)[0], 200)
+		self.assertEqual(self.post("v1_pull", body, extra_headers=fresh)[0], 200)
+		status, payload, _ = self.post("v1_pull", body, extra_headers=old)
+		self.assertEqual((status, payload.get("code")), (401, "reauthentication_required"))
 
 	def test_body_above_contract_limit_returns_413(self):
 		status, payload, _ = self.post("v1_register", {"extra": "a" * (256 * 1024)})

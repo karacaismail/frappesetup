@@ -15,10 +15,11 @@ from frappe.utils.password import update_password
 class MobilePwaTest(IntegrationTestCase):
 	def setUp(self):
 		self.site = frappe.local.site
+		self.identity_links = {}
 		self.enterContext(
 			patch(
 				"platform_core.mobil.request._identity_link",
-				side_effect=lambda account: ("https://identity.example.test", account),
+				side_effect=self.identity_links.get,
 			)
 		)
 
@@ -40,6 +41,7 @@ class MobilePwaTest(IntegrationTestCase):
 		account = f"pwa-{uuid4().hex}@example.test"
 		password = uuid4().hex
 		frappe.get_doc(doctype="User", email=account, first_name="PWA", send_welcome_email=0).insert()
+		self.identity_links[account] = ("https://identity.example.test", str(uuid4()))
 		update_password(account, password)
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- WSGI uses a separate connection.
 		self.addCleanup(self.delete_account, account)
@@ -60,7 +62,8 @@ class MobilePwaTest(IntegrationTestCase):
 		return client, sid, headers
 
 	def delete_account(self, account):
-		frappe.delete_doc("User", account)
+		if frappe.db.exists("User", account):
+			frappe.delete_doc("User", account)
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- WSGI committed the test writes.
 
 	def test_website_user_can_call_only_declared_mobile_cookie_methods(self):
@@ -95,6 +98,45 @@ class MobilePwaTest(IntegrationTestCase):
 				site=self.site,
 			)
 			self.assertIn(response.status_code, (401, 403))
+
+	def test_user_rename_preserves_installation_and_operation_replay(self):
+		from platform_core.mobil.tests.test_service import RECORD, SampleCommand
+
+		client, sid, headers = self.login()
+		account = frappe.cache.hget("session", sid)["user"]
+		renamed = f"pwa-{uuid4().hex}@example.test"
+		self.addCleanup(self.delete_account, renamed)
+		body = {"installation_id": str(uuid4())}
+		self.assertEqual(self.post(client, "v1_register", body, headers).status_code, 200)
+		operation = {
+			"operation_id": str(uuid4()),
+			"command": "sample.update",
+			"record_id": RECORD,
+			"version": "1",
+			"fields": {"title": "Sample"},
+		}
+		payload = dict(body, operations=[operation])
+		command = SampleCommand()
+		with patch("platform_core.api.mobile.COMMANDS", {"sample.update": command}):
+			first = self.post(client, "v1_push", payload, headers)
+			self.assertEqual(first.status_code, 200, first.get_data(as_text=True))
+			frappe.rename_doc("User", account, renamed, force=True)
+			self.identity_links[renamed] = self.identity_links.pop(account)
+			password = uuid4().hex
+			update_password(renamed, password)
+			frappe.db.commit()  # nosemgrep: frappe-request-commit -- WSGI uses a separate connection.
+			client = get_test_client(use_cookies=True)
+			self.assertEqual(self.post(client, "login", {"usr": renamed, "pwd": password}).status_code, 200)
+			new_sid = client.get_cookie("sid").value
+			self.addCleanup(frappe.cache.hdel, "session", new_sid)
+			session = frappe.cache.hget("session", new_sid)
+			session["data"]["csrf_token"] = frappe.generate_hash()
+			frappe.cache.hset("session", new_sid, session)
+			headers["X-Frappe-CSRF-Token"] = session["data"]["csrf_token"]
+			replay = self.post(client, "v1_push", payload, headers)
+		self.assertEqual(replay.status_code, 200, replay.get_data(as_text=True))
+		self.assertEqual(replay.json["message"], first.json["message"])
+		self.assertEqual(command.effects, 1)
 
 	def test_background_sync_does_not_extend_the_cookie_session(self):
 		client, sid, headers = self.login()
@@ -160,6 +202,8 @@ class MobilePwaTest(IntegrationTestCase):
 		result = self.post(owner, "v1_revoke_installation", body, headers)
 		self.assertEqual(result.status_code, 200)
 		self.assertEqual(result.json["message"], {"revoked": 1})
+		replacement = {"installation_id": str(uuid4())}
+		self.assertEqual(self.post(owner, "v1_register", replacement, headers).status_code, 200)
 
 	def test_v1_register_guest_denied(self):
 		self.guest_denied("v1_register")

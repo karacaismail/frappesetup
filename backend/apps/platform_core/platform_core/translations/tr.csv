@@ -26,6 +26,7 @@ A digest of the revoked Keycloak session identifier.,İptal edilen Keycloak otur
 Keycloak session ID,Keycloak oturum kimliği,Mobile Installation
 The verified Keycloak session that registered this installation.,Kurulumu açan doğrulanmış Keycloak oturumu.,Mobile Installation
 Closure pending,Kapatma bekliyor,Mobile Revoked Session
+Last closure attempt time,Son kapatma denemesinin zamanı,Mobile Revoked Session
 Identity-sync has not confirmed closure of this Keycloak session.,Kimlik servisi bu Keycloak oturumunun kapandığını henüz doğrulamadı.,Mobile Revoked Session
 Notification token,Bildirim belirteci,Mobile Installation
 The private notification binding for this installation.,Bu kuruluma ait özel bildirim bağı.,Mobile Installation
@@ -182,6 +183,7 @@ List your mobile installations,Telefon kurulumlarınızı listeleyin,Mobile sync
 Revoke one of your mobile installations,Bir telefon kurulumunuzu iptal edin,Mobile sync API
 A page of installations for the authenticated account.,Oturum açan hesabın kurulum sayfası.,Mobile sync API
 Unix time of the last reported interactive action for this installation.,Bu kurulumda bildirilen son kullanıcı işleminin Unix zamanı.,Mobile Installation
+Unix time when the server last scheduled remote session closure.,Sunucunun son kapatma isteğini sıraya aldığı Unix zamanı.,Mobile Revoked Session
 Unix time used as the idle baseline for the current authenticated session.,Geçerli oturumun boşta kalma hesabında kullanılan Unix zamanı.,Mobile Installation
 "Lists installations for the verified account, ordered by installation ID.",Doğrulanmış hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API
 "Lists installations for the signed-in account, ordered by installation ID.",Oturum açan hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API

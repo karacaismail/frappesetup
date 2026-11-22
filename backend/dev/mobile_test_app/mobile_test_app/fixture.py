@@ -5,8 +5,8 @@ import time
 
 import frappe
 from platform_core.mobil.protocol import (
-	Command,
 	UUID_PATTERN,
+	Command,
 	content_digest,
 	scoped_record_key,
 	unavailable_record,
@@ -24,7 +24,16 @@ REVOKE_ONE = "mobile-revoke-one@example.test"
 RECORD = "Mobile Fixture Record"
 MOBILE_PATHS = frozenset(
 	f"/api/method/platform_core.api.mobile.v1_{action}"
-	for action in ("register", "revoke", "pull", "push", "cleanup", "activity", "list_installations", "revoke_installation")
+	for action in (
+		"register",
+		"revoke",
+		"pull",
+		"push",
+		"cleanup",
+		"activity",
+		"list_installations",
+		"revoke_installation",
+	)
 )
 PROBE_PATH = "/api/method/mobile_test_app.fixture.commit_probe"
 TOKENS = {
@@ -115,11 +124,13 @@ def authenticate():
 		frappe.set_user(FIRST)
 		return
 	if request.path == "/api/method/platform_core.api.mobile.revoke_user_installations" and header in (
-		"Bearer fixture-service", "Bearer fixture-service-other",
+		"Bearer fixture-service",
+		"Bearer fixture-service-other",
 	):
 		frappe.set_user("Administrator")
 		frappe.local.kimlik_service_claims = {
-			"iss": "fixture", "azp": "identity-sync" if header == "Bearer fixture-service" else "different-service",
+			"iss": "fixture",
+			"azp": "identity-sync" if header == "Bearer fixture-service" else "different-service",
 		}
 		return
 	if request.path not in MOBILE_PATHS:
@@ -132,10 +143,13 @@ def authenticate():
 		body = json.loads(request.get_data(cache=True))
 	except (ValueError, UnicodeError):
 		body = None
-	installation = body.get("installation_id") if isinstance(body, dict) else None
+	installation = request.headers.get("X-Mobile-Test-Installation")
+	if installation is None and isinstance(body, dict):
+		installation = body.get("installation_id")
 	if not isinstance(installation, str) or not UUID_PATTERN.fullmatch(installation):
 		installation = "12345678-1234-4234-8234-123456789abc"
 
+	issued_at = int(request.headers.get("X-Mobile-Test-Iat", time.time()))
 	frappe.set_user(account)
 	frappe.local.mobile_identity = {
 		"site": SITE,
@@ -144,7 +158,8 @@ def authenticate():
 		"installation": installation,
 		"issuer": "fixture",
 		"subject": account,
-		"iat": int(request.headers.get("X-Mobile-Test-Iat", time.time())),
+		"iat": issued_at,
+		"auth_time": int(request.headers.get("X-Mobile-Test-Auth-Time", issued_at)),
 		"sid": request.headers.get("X-Mobile-Test-Sid") or content_digest(["fixture-session", account]),
 	}
 	mismatch = request.headers.get("X-Mobile-Test-Identity-Mismatch")

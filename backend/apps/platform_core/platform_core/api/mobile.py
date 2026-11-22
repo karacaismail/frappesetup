@@ -26,6 +26,7 @@ from platform_core.mobil.store import MobileStore
 # Populate only when a record type and its server-defined projection are approved.
 PROJECTIONS = {}
 INVENTORIES = {}
+IDLE_LIMIT_SECONDS = 3600
 
 
 def _registry(name, approved):
@@ -61,20 +62,30 @@ def _revoke(identity, body):
 		installation = uuid4_id(body["installation_id"])
 
 	_lock_mobile_account(identity)
-	result = MobileStore().revoke(identity, installation)
+	store = MobileStore()
+	_require_recent_revoker(identity, installation, store)
+	result = store.revoke(identity, installation)
 	if revoke_all or result["revoked"]:
 		record_revocation(identity.account)
 	return result
 
 
 def _require_recent_activity(identity, row):
-	last_activity = max(int(row.last_user_activity_at or 0), int(row.session_bound_at or 0))
+	bound_at = int(row.session_bound_at or 0)
+	if identity.scope == "mobile" and identity.auth_time < bound_at:
+		raise MobileError("reauthentication_required", 401)
+	last_activity = max(int(row.last_user_activity_at or 0), bound_at)
 	if not last_activity:
 		last_activity = int(row.creation.replace(tzinfo=ZoneInfo(get_system_timezone())).timestamp())
-	employee = frappe.db.get_value("User", identity.account, "user_type") == "System User"
-	idle_limit = 3600 if employee else 7 * 86400
-	if int(time.time()) - last_activity >= idle_limit:
+	if int(time.time()) - last_activity >= IDLE_LIMIT_SECONDS:
 		raise MobileError("reauthentication_required", 401)
+
+
+def _require_recent_revoker(identity, target, store):
+	if identity.scope != "mobile" or target == identity.installation:
+		return
+	row = store.require_installation(identity, identity.installation, for_update=True)
+	_require_recent_activity(identity, row)
 
 
 def _list_installations(identity, body):
@@ -88,7 +99,9 @@ def _revoke_installation(identity, body):
 	_keys(body, {"installation_id"})
 	installation = uuid4_id(body["installation_id"])
 	_lock_mobile_account(identity)
-	return MobileStore().revoke_owned_installation(identity, installation)
+	store = MobileStore()
+	_require_recent_revoker(identity, installation, store)
+	return store.revoke_owned_installation(identity, installation)
 
 
 def _activity(identity, body):

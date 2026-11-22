@@ -16,6 +16,8 @@ class IdentitySyncClientTest(TestCase):
 			"mobile_identity_sync_client_secret": "fixture-secret",
 		}
 		patch.object(client.frappe, "conf", self.conf).start()
+		if hasattr(client, "_cached_bearer"):
+			patch.object(client, "_cached_bearer", None).start()
 		self.logger = patch.object(client.frappe, "logger").start().return_value
 		self.open = patch.object(client._OPENER, "open").start()
 
@@ -62,6 +64,22 @@ class IdentitySyncClientTest(TestCase):
 		self.logger.warning.assert_called_once()
 		for sensitive in ("private-session", "fixture-bearer", "fixture-secret"):
 			self.assertNotIn(sensitive, str(self.logger.warning.call_args))
+
+	def test_reuses_service_bearer_until_expiry(self):
+		self.open.side_effect = [
+			self.response(b'{"access_token":"fixture-bearer","expires_in":60}'),
+			self.response(),
+			self.response(),
+			self.response(b'{"access_token":"new-bearer","expires_in":60}'),
+			self.response(),
+		]
+		with patch.object(client, "monotonic", return_value=100) as clock:
+			self.assertEqual(client.send_session_revocations(["session-one"]), ())
+			clock.return_value = 120
+			self.assertEqual(client.send_session_revocations(["session-two"]), ())
+			clock.return_value = 161
+			self.assertEqual(client.send_session_revocations(["session-three"]), ())
+		self.assertEqual(self.open.call_count, 5)
 
 	def test_rejects_plaintext_and_credentials_in_configured_urls(self):
 		for address in (

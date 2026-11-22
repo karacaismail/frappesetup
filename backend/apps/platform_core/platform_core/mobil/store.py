@@ -77,6 +77,10 @@ class MobileStore:
 
 	def install(self, identity, installation_id, *, check_new=None):
 		sid = getattr(identity, "sid", None)
+		# Registration and token refresh cannot move the clock past actual authentication.
+		authenticated_at = (
+			getattr(identity, "auth_time", None) if sid else getattr(identity, "issued_at", None)
+		)
 		current = self._installation(installation_id, for_update=True)
 		if current is None:
 			if check_new is not None:
@@ -88,7 +92,7 @@ class MobileStore:
 				scope=identity.scope,
 				principal=identity.principal,
 				session_id=sid,
-				session_bound_at=str(int(time.time())),
+				session_bound_at=str(authenticated_at or 0),
 			)
 		elif not self._matches(current, identity) or (current.session_id and not sid):
 			raise MobileError("installation_unavailable", 403)
@@ -98,16 +102,12 @@ class MobileStore:
 			frappe.db.set_value(
 				"Mobile Installation",
 				installation_id,
-				{"session_id": sid, "session_bound_at": str(int(time.time()))},
+				{"session_id": sid, "session_bound_at": str(authenticated_at or 0)},
 			)
 			revoke_after_commit((current.session_id,))
-		elif (
-			identity.scope == "pwa"
-			and identity.issued_at
-			and identity.issued_at > int(current.session_bound_at or 0)
-		):
+		elif authenticated_at and authenticated_at > int(current.session_bound_at or 0):
 			frappe.db.set_value(
-				"Mobile Installation", installation_id, "session_bound_at", str(identity.issued_at)
+				"Mobile Installation", installation_id, "session_bound_at", str(authenticated_at)
 			)
 		return {"installation_id": installation_id}
 

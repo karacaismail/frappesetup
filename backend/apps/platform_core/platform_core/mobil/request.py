@@ -45,6 +45,7 @@ class Identity:
 	issued_at: int | None
 	sid: str | None
 	installation: str | None = None
+	auth_time: int | None = None
 
 
 def _unique_keys(pairs):
@@ -132,10 +133,12 @@ def mobile_request(endpoint):
 	installation = identity.get("installation")
 	if not isinstance(installation, str) or not UUID_PATTERN.fullmatch(installation):
 		raise MobileError("mobile_token_required", 401)
+	auth_time = identity.get("auth_time")
+	latest_timestamp = int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS
+	if type(auth_time) is not int or not 0 < auth_time <= latest_timestamp:
+		raise MobileError("mobile_token_required", 401)
 	issued_at = identity.get("iat")
-	if "iat" in identity and (
-		type(issued_at) is not int or not 0 < issued_at <= int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS
-	):
+	if "iat" in identity and (type(issued_at) is not int or not auth_time <= issued_at <= latest_timestamp):
 		raise MobileError("mobile_token_required", 401)
 	sid = identity.get("sid")
 	if not valid_session_id(sid):
@@ -150,7 +153,8 @@ def mobile_request(endpoint):
 		raise MobileError("mobile_token_required", 401)
 	principal = content_digest([issuer, subject])
 	mobile_identity, body = _sync_payload(
-		request, Identity(frappe.local.site, account, principal, scope, issued_at, sid, installation)
+		request,
+		Identity(frappe.local.site, account, principal, scope, issued_at, sid, installation, auth_time),
 	)
 	# Account owners may revoke a different installation from their current one.
 	if (

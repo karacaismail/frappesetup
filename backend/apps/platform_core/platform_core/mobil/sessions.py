@@ -1,6 +1,7 @@
 """Persist local Keycloak session denial and dispatch remote closure after commit."""
 
 import re
+import time
 
 import frappe
 
@@ -8,6 +9,7 @@ from .identity_sync_client import send_session_revocations
 from .protocol import MobileError, content_digest
 from .store import _insert
 
+DELIVERY_RETRY_SECONDS = 60
 REVOKED_SESSION = "Mobile Revoked Session"
 SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
@@ -37,21 +39,32 @@ def is_session_closure_pending(sid):
 
 def revoke_after_commit(session_ids, *, remote=True):
 	pending = []
+	now = int(time.time())
 	for sid in sorted({sid for sid in session_ids if valid_session_id(sid)}):
 		key = _session_key(sid)
 		row = frappe.db.get_value(
 			REVOKED_SESSION,
 			key,
-			["name", "delivery_pending"],
+			["delivery_pending", "last_delivery_attempt_at"],
 			as_dict=True,
 			for_update=True,
 		)
 		if row is None:
-			_insert(REVOKED_SESSION, session_key=key, delivery_pending=int(remote), ignore_duplicate=True)
-		if remote and (row is None or row.delivery_pending):
-			pending.append(sid)
-		elif not remote and row is not None and row.delivery_pending:
-			frappe.db.set_value(REVOKED_SESSION, key, "delivery_pending", 0)
+			_insert(
+				REVOKED_SESSION,
+				session_key=key,
+				delivery_pending=int(remote),
+				last_delivery_attempt_at=str(now) if remote else None,
+				ignore_duplicate=True,
+			)
+			if remote:
+				pending.append(sid)
+		elif row.delivery_pending:
+			if not remote:
+				frappe.db.set_value(REVOKED_SESSION, key, "delivery_pending", 0)
+			elif now - int(row.last_delivery_attempt_at or 0) >= DELIVERY_RETRY_SECONDS:
+				frappe.db.set_value(REVOKED_SESSION, key, "last_delivery_attempt_at", str(now))
+				pending.append(sid)
 
 	if pending:
 		# A failed transaction or its retry cannot send the remote request.

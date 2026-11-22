@@ -3,6 +3,7 @@
 import json
 import re
 from http.client import HTTPException
+from time import monotonic
 from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -21,6 +22,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 _OPENER = build_opener(_NoRedirect())
+_cached_bearer = None
 
 
 def _configured_url(key, *, origin_only=False):
@@ -41,11 +43,20 @@ def _configured_url(key, *, origin_only=False):
 
 
 def _service_bearer():
+	global _cached_bearer
 	url = _configured_url("mobile_identity_sync_token_url")
 	client_id = frappe.conf.get("mobile_identity_sync_client_id")
 	client_secret = frappe.conf.get("mobile_identity_sync_client_secret")
 	if not all(isinstance(value, str) and value for value in (client_id, client_secret)):
 		raise ValueError("Missing identity-sync service credentials")
+
+	cache_key = (url, client_id, client_secret)
+	cached = _cached_bearer
+	now = monotonic()
+	if cached is not None:
+		key, token, expires_at = cached
+		if key == cache_key and now < expires_at:
+			return token
 
 	form = {
 		"grant_type": "client_credentials",
@@ -69,6 +80,9 @@ def _service_bearer():
 	token = payload.get("access_token") if isinstance(payload, dict) else None
 	if not isinstance(token, str) or not _BEARER.fullmatch(token):
 		raise ValueError("Invalid identity-sync service token")
+	expires_in = payload.get("expires_in")
+	if type(expires_in) is int and expires_in > 5:
+		_cached_bearer = (cache_key, token, now + min(expires_in, 86400) - 5)
 	return token
 
 

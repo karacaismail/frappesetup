@@ -53,6 +53,7 @@ class MobileRequestTest(unittest.TestCase):
 					"issuer": "fixture",
 					"subject": "fixture-user",
 					"iat": self.issued_at,
+					"auth_time": self.issued_at - 10,
 					"sid": "session-01",
 				},
 				response={},
@@ -73,7 +74,7 @@ class MobileRequestTest(unittest.TestCase):
 			request.mobile_request("v1_register")
 		self.assertEqual((raised.exception.code, raised.exception.status), (code, status))
 
-	def test_contract_identity_accepts_five_fields_and_binds_the_installation(self):
+	def test_contract_identity_accepts_six_fields_and_binds_the_installation(self):
 		claims = self.frappe.local.mobile_identity
 		for key in ("issuer", "subject", "iat"):
 			del claims[key]
@@ -103,6 +104,14 @@ class MobileRequestTest(unittest.TestCase):
 		for invalid in ("has.dot", "has~tilde", "x" * 129):
 			with patch.dict(self.frappe.local.mobile_identity, {"sid": invalid}):
 				self.assert_rejected("mobile_token_required", 401)
+
+	def test_verified_auth_time_is_required_and_propagated(self):
+		identity, _ = request.mobile_request("v1_register")
+		self.assertEqual(identity.auth_time, self.issued_at - 10)
+		for invalid in (None, True, 0, "123", self.issued_at + 3600):
+			with patch.dict(self.frappe.local.mobile_identity, {"auth_time": invalid}):
+				with self.assertRaisesRegex(MobileError, "mobile_token_required"):
+					request.mobile_request("v1_register")
 
 	def test_mobile_identity_requires_sid_and_rejects_revoked_session(self):
 		identity, _ = request.mobile_request("v1_register")
