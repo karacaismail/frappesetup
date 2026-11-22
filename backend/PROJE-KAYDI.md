@@ -200,7 +200,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - `backend` dalı `main` dalına tek commit olarak girer. Yasaklı adı taşıyan hiçbir commit uzak depoya gönderilmez. Gönderim için proje sahibinin onayı gerekir.
   - Uygunluk kapısı commit mesajlarındaki yasaklı adı yakalamaya devam eder.
   - integration-e2e işinin geçici önizleme dalları uzak depoya gönderilmez. İş bitince silinir.
-
+- **O-35. Ölçüm komutları yalnız ayrı deneme sitesinde çalışır.** Performans ölçüm komutu var olan veriye ve kuyruğa dokunmaz. Kurallar şunlardır:
+  - Komut yalnız adı `perf-` ile başlayan ve `.localhost` ile biten sitede çalışır. Site ayarında `allow_performance_fixture` değeri 1 olmalıdır. Öteki sitede komut veri oluşturmadan durur.
+  - Komut başlamadan önce kuyruk boş olmalıdır. Kuyruk boş değilse komut veri oluşturmadan durur. Komut başka işin kuyruğunu çalıştırmaz.
+  - Komut yalnız kendi oluşturduğu kayıtları siler. Kayıtları tür ve ad çiftiyle seçer.
+  - Ölçüm bitince site silinebilir. Geri yükleme gerekmez.
+  - Bu kural bütün işlerin ölçüm komutlarına uygulanır.
 
 ## Karar sitesine işlenecek farklar
 

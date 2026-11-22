@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from itertools import batched
 
 import frappe
+from frappe.utils import now_datetime
 
 from .metadata import insert_metadata
 from .protocol import DELIVERY_AUDIT_SIZE, MobileError, content_digest
@@ -69,6 +70,24 @@ def _sequence_row(*, for_update=False):
 	if row is None:
 		raise MobileError("mobile_schema_unavailable", 503)
 	return row
+
+
+def _reserve_sequences(count):
+	"""Increment the commit-ordered counter against the current version of its row."""
+	# Other statements retain the connection's regular snapshot isolation.
+	frappe.db.sql(
+		"""
+		SET STATEMENT innodb_snapshot_isolation=OFF FOR
+		UPDATE `tabMobile Sequence`
+		SET sequence = LAST_INSERT_ID(sequence + %s)
+		WHERE name = %s AND sequence <= %s
+		""",
+		(count, SEQUENCE_NAME, 2_147_483_647 - count),
+	)
+	updated, end = frappe.db.sql("SELECT ROW_COUNT(), LAST_INSERT_ID()")[0]
+	if not updated:
+		raise MobileError("mobile_sequence_exhausted", 503)
+	return end
 
 
 class MobileStore:
@@ -284,27 +303,28 @@ class MobileStore:
 		insert_metadata("Mobile Operation", operation_key=key, content_digest=digest, result=result)
 
 	def append_change(self, record_type, record_id, kind, *, target_installation=None):
-		# Keep allocation and insertion under the same transaction lock.
-		current = _sequence_row(for_update=True).sequence
-		if current == 2_147_483_647:
-			raise MobileError("mobile_sequence_exhausted", 503)
-		sequence = current + 1
-		insert_metadata(
-			"Mobile Change",
-			sequence=sequence,
-			record_type=record_type,
-			record_id=record_id,
-			kind=kind,
-			target_installation=target_installation,
-		)
-		frappe.db.set_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "sequence", sequence)
-		# A locking read can see commits outside the caller's read snapshot.
-		# Keep the cursor below any events the snapshot cannot yet read.
-		if current == self.sequence:
-			self.sequence = sequence
+		return self.append_changes([(record_type, record_id, kind)], target_installation=target_installation)
+
+	def append_changes(self, changes, *, target_installation=None):
+		# Reserve at the end of the batch. Commit order must match sequence order,
+		# or a cursor could pass a lower event that another transaction still holds.
+		count = len(changes)
+		end = _reserve_sequences(count)
+		for sequence, (record_type, record_id, kind) in enumerate(changes, end - count + 1):
+			insert_metadata(
+				"Mobile Change",
+				sequence=sequence,
+				record_type=record_type,
+				record_id=record_id,
+				kind=kind,
+				target_installation=target_installation,
+			)
+		# The counter sees current commits. An earlier read snapshot may not.
+		if end - count == self.sequence:
+			self.sequence = end
 		else:
 			self.pending_events = True
-		return sequence
+		return end
 
 	def read_events(self, installation, after, ceiling, limit):
 		event = frappe.qb.DocType("Mobile Change")
@@ -334,14 +354,17 @@ class MobileStore:
 			order_by="name asc",
 			for_update=True,
 		)
+		changes = []
 		for row in rows[:DELIVERY_AUDIT_SIZE]:
 			projection = projections.get(row.record_type)
 			visible = projection is not None and projection(account, row.record_id) is not None
 			if visible != bool(row.visible):
 				kind = "upsert" if visible else "remove"
-				self.append_change(row.record_type, row.record_id, kind, target_installation=installation)
+				changes.append((row.record_type, row.record_id, kind))
 				frappe.db.set_value("Mobile Delivery", row.name, "visible", int(visible))
 
+		if changes:
+			self.append_changes(changes, target_installation=installation)
 		if len(rows) > DELIVERY_AUDIT_SIZE:
 			return rows[DELIVERY_AUDIT_SIZE - 1].name
 		return None
@@ -352,17 +375,21 @@ class MobileStore:
 
 	def record_delivery(self, installation, record_type, record_id):
 		key = content_digest([installation, record_type, record_id])
-		row = frappe.db.get_value("Mobile Delivery", key, ["name", "visible"], as_dict=True, for_update=True)
-		if row is not None:
-			if not row.visible:
-				frappe.db.set_value("Mobile Delivery", row.name, "visible", 1)
-			return
-		insert_metadata(
-			"Mobile Delivery",
-			delivery_key=key,
-			installation_id=installation,
-			record_type=record_type,
-			record_id=record_id,
+		# Insert directly so a missing key never acquires a range lock before insert.
+		user = frappe.session.user
+		timestamp = now_datetime()
+		frappe.db.sql(
+			"""
+			INSERT INTO `tabMobile Delivery`
+				(name, delivery_key, installation_id, record_type, record_id, visible,
+				 creation, modified, owner, modified_by)
+			VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
+			ON DUPLICATE KEY UPDATE
+				modified = IF(visible = 0, VALUES(modified), modified),
+				modified_by = IF(visible = 0, VALUES(modified_by), modified_by),
+				visible = 1
+			""",
+			(key, key, installation, record_type, record_id, timestamp, timestamp, user, user),
 		)
 
 	def audit_due(self, installation, now):

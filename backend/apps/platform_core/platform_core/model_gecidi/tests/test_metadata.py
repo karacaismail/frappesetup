@@ -1,6 +1,7 @@
 """Check the gateway's translation and AI write registration."""
 
 import csv
+import json
 import runpy
 import unittest
 from pathlib import Path
@@ -9,6 +10,18 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 
 
 class GatewayMetadataTests(unittest.TestCase):
+	def test_every_gateway_doctype_field_has_a_description(self):
+		definitions = sorted((APP_ROOT / "model_gecidi" / "doctype").glob("*/*.json"))
+		self.assertTrue(definitions)
+		for path in definitions:
+			definition = json.loads(path.read_text(encoding="utf-8"))
+			self.assertTrue(definition["fields"], definition["name"])
+			for field in definition["fields"]:
+				with self.subTest(doctype=definition["name"], fieldname=field["fieldname"]):
+					description = field.get("description")
+					self.assertIsInstance(description, str)
+					self.assertTrue(description.strip())
+
 	def test_turkish_translations_include_frappe_context_column(self):
 		with (APP_ROOT / "translations" / "tr.csv").open(encoding="utf-8", newline="") as source:
 			rows = list(csv.reader(source))
