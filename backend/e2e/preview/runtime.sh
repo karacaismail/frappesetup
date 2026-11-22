@@ -229,7 +229,7 @@ printf '%s\n' "Preparing a disposable stack. See $PREVIEW_DIR/runtime.log."
 
     {
         printf 'IDENTITY_SYNC_KEYCLOAK_PUBLIC_URL=%s\n' "$KC_PUBLIC_URL"
-        printf 'IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL=http://keycloak:%s\n' "$KC_PORT"
+        printf 'IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL=%s\n' "$KC_PUBLIC_URL"
         printf 'IDENTITY_SYNC_PRESS_URL=%s\n' "$ATONOTA_PRESS_URL"
         printf 'IDENTITY_SYNC_TENANTS=[{"name":"kiraci1","base_url":"%s","organization":"kiraci1"}]\n' "$ATONOTA_SITE_KIRACI1_URL"
         printf 'IDENTITY_SYNC_CLIENT_SECRET=%s\n' "$(setting ATONOTA_IDENTITY_SYNC_SECRET "$keycloak_env")"

@@ -56,7 +56,7 @@ def main():
     config = json.loads(config_file.read_text())
     config.update(
         keycloak_public_url=f"http://kimlik.localhost:{port}",
-        keycloak_internal_url=f"http://keycloak:{port}",
+        keycloak_internal_url=f"http://kimlik.localhost:{port}",
         platform_panel_url=f"http://kiraci1.localhost:{port + 1}/panel",
     )
     service_email = "e2e-service@example.test"
