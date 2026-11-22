@@ -84,7 +84,7 @@ Betik çalışamazsa kapı bulgu yazar.
 
 ## İnceleme sonrası dal taraması
 
-Ölçümde `6f2b47a` kaydındaki kapı ve Python 3.14.7 kullanıldı.
+Ölçümde `12b9d0f` kaydındaki kapı ve Python 3.14.7 kullanıldı.
 Tablo, taranan her dalın Git kaydını gösterir.
 Kapı 12 dalda bulgu vermedi.
 Kapı 10 dalda toplam 287 bulgu verdi.
@@ -94,13 +94,13 @@ Kapı 10 dalda toplam 287 bulgu verdi.
 | --- | --- | --- | ---: | --- |
 | `_reserve/43d361e2` | `308c37a` | `pass` | 0 | `not_run` |
 | `_reserve/7c7c61a6` | `8a814f4` | `not_applicable` | 0 | `not_applicable` |
-| `ai-readiness-gate` | `6f2b47a` | `pass` | 0 | `not_run` |
+| `ai-readiness-gate` | `12b9d0f` | `pass` | 0 | `not_run` |
 | `backend` | `481cd35` | `pass` | 0 | `not_run` |
 | `dev-ortam` | `5261c77` | `fail` | 56 | `not_run` |
 | `e2e-merge-preview-cvf3hstx` | `6f61dde` | `fail` | 29 | `not_run` |
 | `e2e-preview` | `f099504` | `fail` | 58 | `not_run` |
 | `e2e-preview-ordered-frozen` | `6796fd3` | `fail` | 64 | `not_run` |
-| `erisim-kurali` | `974dc1f` | `fail` | 2 | `not_run` |
+| `erisim-kurali` | `102002d` | `fail` | 2 | `not_run` |
 | `guvenlik-kapisi` | `bb41ac3` | `fail` | 47 | `not_run` |
 | `identity-sync` | `7338595` | `pass` | 0 | `not_run` |
 | `ilk-dikey-dilim` | `a9f9b82` | `fail` | 8 | `not_run` |
