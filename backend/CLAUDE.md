@@ -108,7 +108,7 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 ### Container kuralları
 
 - Container ortamı Colima'dır. Docker Desktop kullanmayın.
-- Komutlarda `docker --context colima-factory` kullanın. Bu Colima profili 64 GB bellek taşır.
+- Komutlarda `docker --context colima-factory` ya da `docker --context colima` kullanın. Hangisinin kullanılacağı “Disk dar” maddesindedir.
 - Başka projenin container'ına dokunmayın. Onları durdurmayın, silmeyin ve yeniden başlatmayın.
 - Compose proje adını `fs-<iş adı>` biçiminde verin. Örneğin `fs-kimlik-realm` yazın.
 - Ana bilgisayar portlarını yalnız `127.0.0.1` adresine bağlayın.
@@ -129,6 +129,12 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - Boş yer 5 GB'ın altına inerse raporlayın. Gerekirse `colima` profili kullanılır. O profilde 64 GB boş disk ama 8 GB bellek var.
    - 22 Kasım 2026 Pazar günü orkestratör ölü imaj ve birimleri sildi. Boş yer 5,7 GB oldu.
    - Aynı gün boş yer 2,3 GB'a düştü. Orkestratör geçici birimleri ve kullanılmayan önbelleği sildi. Boş yer 4,2 GB oldu. Geçici site için rastgele adlı birim açmayın. Bir deneme bitince kendi geçici birimini silin.
+   - Aynı gün saat 10:15'te boş yer 718 MB'a düştü. Disk öteki projelerle ortaktır. Dolarsa öteki projelerin container'ları da bozulur.
+   - Bu yüzden `colima-factory` profilinde yeni imaj derlemeyin ve yeni site açmayın. Var olan imajı ve sitenizi yeniden kullanın.
+   - Yeni ortamı `colima` (default) profilinde açın. Bu profilde 57 GB boş disk ve yaklaşık 5 GB boş bellek var. `frappe/erpnext:v16.55.0` imajı orada da var.
+   - Profili `FS_COLIMA_PROFILE=default` değişkeni seçer. `dev/bin/compose` ve `dev/bin/tunel` bu değişkeni okur. Kendi betiğinizde `docker --context colima` kullanın.
+   - `colima` profilinde başlatmadan önce `colima ssh -- free -g` ile en az 2 GB boş bellek ölçün. Bellek yoksa bekleyin ve başka bölümü yapın.
+   - Bir deneme bitince kendi geçici sitesini ve birimlerini silin. Bir işin en çok bir sitesi açık kalır.
    - Her `up` imajı yeniden derlemesin. İmaj varsa yeniden kullanın.
    - Press gereken ağır ortamı `colima` profilinde açın. Önce `colima ssh -- free -g` ile en az 3 GB boş bellek ölçün.
 5. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
