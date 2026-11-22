@@ -5,16 +5,16 @@ Bu iş model geçidini ve sağlayıcı kaydını kurar. Proje sahibinin kararı 
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJE-KAYDI.md`, özellikle D-9, D-11, O-13, O-14 ve O-15
-3. `backend/docs/sozlesmeler.md`, özellikle 10 ve 11. bölümler
+2. `backend/PROJECT-RECORD.md`, özellikle D-9, D-11, O-13, O-14 ve O-15
+3. `backend/docs/contracts.md`, özellikle 10 ve 11. bölümler
 4. Karar sitesinde `src/content/docs/rail-5-ai.md`. G-90 ve G-92 kurallarını bulun.
 
 ## Sahip olduğunuz yerler
 
-- `backend/apps/platform_core/platform_core/model_gecidi/`
+- `backend/apps/platform_core/platform_core/model_gateway/`
 - `backend/apps/platform_core/platform_core/api/model.py`
-- `backend/contracts/platform_core-model-gecidi.openapi.yaml`
-- `backend/docs/kararlar/0004-model-gecidi.md`
+- `backend/contracts/platform_core-model-gateway.openapi.yaml`
+- `backend/docs/decisions/0004-model-gateway.md`
 - `hooks.py` içinde yalnız bu işin satırları
 
 ## Kontrol noktası 1: bağdaştırıcılar ve yönlendirme

@@ -1,12 +1,12 @@
-x-kiraci: &kiraci
-  image: fs-kiraci-dev:${PANE_PORT:?Use dev/bin/compose}
+x-tenant: &tenant
+  image: fs-tenant-dev:${PANE_PORT:?Use dev/bin/compose}
   build:
     context: ..
-    dockerfile: dev/Dockerfile.kiraci
+    dockerfile: dev/Dockerfile.tenant
   working_dir: /home/frappe/frappe-bench
   volumes:
-    - kiraci-sites:/home/frappe/frappe-bench/sites
-    - kiraci-logs:/home/frappe/frappe-bench/logs
+    - tenant-sites:/home/frappe/frappe-bench/sites
+    - tenant-logs:/home/frappe/frappe-bench/logs
   environment:
     KIRACI_WEB_PORT: ${KIRACI_WEB_PORT:?Use dev/bin/compose}
     KIRACI_SOCKET_PORT: ${KIRACI_SOCKET_PORT:?Use dev/bin/compose}
@@ -14,39 +14,39 @@ x-kiraci: &kiraci
     ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Create .env}
 
 services:
-  kiraci-db:
+  tenant-db:
     image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Create .env}
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     volumes:
-      - kiraci-db:/var/lib/mysql
+      - tenant-db:/var/lib/mysql
 
-  kiraci-redis:
+  tenant-redis:
     image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     command: ["redis-server", "--save", "", "--appendonly", "no"]
 
-  kiraci-web:
-    <<: *kiraci
+  tenant-web:
+    <<: *tenant
     command: ["bench", "serve", "--port", "${KIRACI_WEB_PORT}", "--noreload"]
     ports:
       - "127.0.0.1:${KIRACI_WEB_PORT}:${KIRACI_WEB_PORT}"
     networks:
       default:
-        aliases: ["kiraci1.localhost"]
+        aliases: ["tenant1.localhost"]
     depends_on:
-      - kiraci-db
-      - kiraci-redis
+      - tenant-db
+      - tenant-redis
 
-  kiraci-socket:
-    <<: *kiraci
+  tenant-socket:
+    <<: *tenant
     command: ["node", "apps/frappe/socketio.js"]
     ports:
       - "127.0.0.1:${KIRACI_SOCKET_PORT}:${KIRACI_SOCKET_PORT}"
     depends_on:
-      - kiraci-web
+      - tenant-web
 
 volumes:
-  kiraci-db:
-  kiraci-sites:
-  kiraci-logs:
+  tenant-db:
+  tenant-sites:
+  tenant-logs:

@@ -1,4 +1,4 @@
-Kimlik
-Kabuk
-Yapay Zeka
-Model Gecidi
+Identity
+Shell
+AI
+Model Gateway

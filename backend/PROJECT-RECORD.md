@@ -23,24 +23,24 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 
 | Uygulama | Modül | Görevi |
 | --- | --- | --- |
-| `platform_core` | `kimlik` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
-| `platform_core` | `kabuk` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
-| `platform_core` | `yapay_zeka` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
-| `platform_core` | `mobil` | Telefon eşitlemesi: sürümlü mobil uçlar, işlem kimliği, imleç ve kaldırma işareti |
-| `platform_core` | `erisim` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
-| `platform_core` | `model_gecidi` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
-| `press_tr` | `kimlik` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
+| `platform_core` | `identity` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
+| `platform_core` | `shell` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
+| `platform_core` | `ai` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
+| `platform_core` | `mobile` | Telefon eşitlemesi: sürümlü mobil uçlar, işlem kimliği, imleç ve kaldırma işareti |
+| `platform_core` | `access` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
+| `platform_core` | `model_gateway` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
+| `press_tr` | `identity` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
 | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
 
 ## Bağımlılık yönü
 
-- `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
-- `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
-- `platform_core.mobil` yalnız `kimlik` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobil` modülünü çağırmaz.
-- `platform_core.erisim` öteki modülleri çağırmaz. Öteki modüller onu içe aktarmaz. Motor Frappe'nin izin kancalarıyla çalışır.
-- `platform_core.model_gecidi` öteki modülleri çağırmaz. `yapay_zeka` modülü `model_gecidi` modülünün açık işlevlerini çağırabilir.
-- `platform_core.yapay_zeka` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `yapay_zeka` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
+- `platform_core.identity` ve `press_tr.press_identity` yalnız `oidc_verify` kitaplığını kullanır.
+- `platform_core.shell` ile `platform_core.identity` birbirini çağırmaz.
+- `platform_core.mobile` yalnız `identity` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobile` modülünü çağırmaz.
+- `platform_core.access` öteki modülleri çağırmaz. Öteki modüller onu içe aktarmaz. Motor Frappe'nin izin kancalarıyla çalışır.
+- `platform_core.model_gateway` öteki modülleri çağırmaz. `ai` modülü `model_gateway` modülünün açık işlevlerini çağırabilir.
+- `platform_core.ai` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `ai` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
 - Döngü yasaktır. MVP'de bu yönler otomatik denetlenir (B-10).
 
@@ -75,6 +75,14 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
 - **D-9. Her şey yapay zekâyla yönetilebilir olur.** Bütün DocType'lar, alanlar ve backend işlemleri yapay zekâya açık bir katmandan geçer. Katman model sağlayıcısından bağımsızdır. Proje sahibi şöyle yazdı: “ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.” Ayrıntı sözleşmenin 10. bölümündedir.
 - **D-10. Kararlar ajana bırakıldı.** Proje sahibi şöyle yazdı: “Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma”. Ayrıntı aşağıdaki “Orkestratörün kararları” bölümündedir.
 - **D-11. Altyapı yapay zekâ tabanlıdır ve çok sağlayıcılıdır.** Sisteme n tane sağlayıcı eklenebilir. Her sağlayıcıdan n tane hesap eklenebilir. Her hesaptan n tane API eklenebilir. Proje sahibi şöyle yazdı: “birden fazla (n tane) ai provider eklenebilmeli, birden fazla (n tane) her hangi bir provider'dan, ai account eklenebilmeli, n tane api eklenebilmeli.” Ayrıntı sözleşmenin 11. bölümündedir.
+- **D-12. Kod tabanı İngilizcedir.** Proje sahibi şöyle yazdı: “yeni dosya oluşturursen, türkçe değil, codebase ingilizce olsun, dosya adları ingilizce olsun”. Bu kararın uygulanışı şudur:
+  - Dosya, klasör, modül, DocType, işlev ve değişken adları İngilizcedir.
+  - Koddaki yorumlar, açıklama satırları, hata iletileri ve günlük metinleri İngilizcedir.
+  - Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur (V-2).
+  - Belgelerin içeriği Türkçe kalabilir. Belge dosyalarının adı İngilizcedir.
+  - Yerel ad ve adres değerleri de İngilizcedir. Örneğin kiracı sitesi `tenant1.localhost`, Keycloak sunucusu `id.localhost` olur.
+  - `docs/standartlar/` klasöründeki standart belgeleri proje sahibinindir. Adları değişmez.
+  - Ad eşleşme tablosu aşağıdadır.
 
 ## Orkestratörün seçtiği varsayılanlar
 
@@ -82,7 +90,7 @@ Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçt
 
 - **V-1. Ad dili.** Koddaki adlar İngilizcedir. Frappe ekosistemi bu dili kullanır.
 - **V-2. Mesaj dili.** Kaynak metin İngilizce yazılır. Türkçesi çeviri dosyasında durur (G-73).
-- **V-3. Modül adları.** Modül adları Türkçedir. Örneğin `kimlik` ve `kabuk` modülleri vardır.
+- **V-3. Modül adları.** Bu varsayılan D-12 ile değişti. Modül adları artık İngilizcedir.
 - **V-4. Ortak kitaplık.** Belirteç doğrulama tek kitaplıkta durur. `platform_core` ve `press_tr` aynı kodu kullanır (H-8).
 - **V-5. Container profili.** Geliştirme `colima-factory` profilinde yürür. Bu profilde daha çok bellek var.
 
@@ -103,7 +111,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-11. Eşitleme olaylarının kaynağını identity-sync işi seçer.** İşçi T-2 notunda en yalın açık kaynak yolu seçer. Zamanlanmış yoklama yine yasaktır (D-6).
 - **O-12. `platform_core` MIT lisanslı kalır.** AGPL lisanslı bir bileşen `platform_core` içine alınmaz. Böyle bir bileşen gerekirse ayrı uygulama ya da ayrı servis olur.
 
-- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gecidi` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
+- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gateway` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
 - **O-14. Kayıt önce kiracı sitesindedir.** Her kiracı kendi sağlayıcılarını, hesaplarını ve API'lerini ekleyebilir. Platformun ortak hesapları sonraki turda Press'ten site ayarına gelir.
 - **O-15. Sağlık denetimi zamanlanmaz.** API'nin sağlığı gerçek çağrıların sonucundan çıkar. Elle başlatılan bağlantı denetimi de vardır (D-6).
 
@@ -115,7 +123,7 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 | --- | --- | --- |
 | K1: Press Frappe 15 üzerinde çalışır. | Press de Frappe 16 üzerinde çalışır. | D-7, O-9 |
 | K9: Claude Agent SDK ve adı yazılı Claude modelleri | Sağlayıcıdan bağımsız ajan servisi ve model geçidi | D-9, D-11, O-10 |
-| G-84: Kiracı MCP'si `frappe_mcp` ile kurulur. | `frappe/mcp` deposu arşivlendi. Katmanı `platform_core.yapay_zeka` kurar. | Karar notu 0002 |
+| G-84: Kiracı MCP'si `frappe_mcp` ile kurulur. | `frappe/mcp` deposu arşivlendi. Katmanı `platform_core.ai` kurar. | Karar notu 0002 |
 | Rail 5: Onay `confirm=true` alanıyla verilir. | Modelde onay alanı yoktur. Onay insan oturumundaki ayrı uçtan gelir. | Sözleşme 10. bölüm |
 | G-64: Günlük model, token ve maliyet tutar. | Bu alanlar “AI Usage Log” kaydındadır. | Karar notu 0002 |
 | G-57: Kiracıda kullanıcı “System User” olur. | Son kullanıcı “Website User” olur. | D-5, O-3 |
@@ -130,6 +138,43 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 - Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
 - Sunucu, DNS, yasal kutu ve ödeme hesabı işleri insanda kalır.
 - Push, pull request ve canlıya yükleme bu turda yapılmaz.
+
+
+## Ad eşleşme tablosu
+
+Türkçe adlar 22 Kasım 2026 Pazar günü İngilizceye çevrildi (D-12). Pane ve dal adları değişmedi.
+
+| Eski ad | Yeni ad |
+| --- | --- |
+| `PROJE-KAYDI.md` | `PROJECT-RECORD.md` |
+| `docs/sozlesmeler.md` | `docs/contracts.md` |
+| `docs/isler/` | `docs/tasks/` |
+| `docs/kararlar/` | `docs/decisions/` |
+| modül `kimlik` (Kimlik) | `identity` (Identity) |
+| modül `kabuk` (Kabuk) | `shell` (Shell) |
+| modül `yapay_zeka` (Yapay Zeka) | `ai` (AI) |
+| modül `model_gecidi` (Model Gecidi) | `model_gateway` (Model Gateway) |
+| modül `erisim` (Erisim) | `access` (Access) |
+| modül `mobil` (Mobil) | `mobile` (Mobile) |
+| `press_tr` modülü `kimlik` | `press_identity` (Press Identity) |
+| `dev/compose.kiraci.yaml` | `dev/compose.tenant.yaml` |
+| `dev/Dockerfile.kiraci` | `dev/Dockerfile.tenant` |
+| `dev/bin/tunel ac/kapat/durum` | `dev/bin/tunnel open/close/status` |
+| `dev/bin/guvenlik-denetimi` | `dev/bin/security-check` |
+| `dev/guvenlik/` | `dev/security/` |
+| `modul-sinirlari.json` | `module-boundaries.json` |
+| `kiraci1.localhost` | `tenant1.localhost` |
+| `site-kiraci1`, `aud-site-kiraci1` | `site-tenant1`, `aud-site-tenant1` |
+| `kimlik.localhost` | `id.localhost` |
+| `kiraci-*` compose servisleri | `tenant-*` |
+| `kimlik_marka_adi` ayarı | `identity_brand_name` |
+| `platform_core-kimlik.openapi.yaml` | `platform_core-identity.openapi.yaml` |
+| `platform_core-kabuk.openapi.yaml` | `platform_core-shell.openapi.yaml` |
+| `platform_core-yapay-zeka.openapi.yaml` | `platform_core-ai.openapi.yaml` |
+| `platform_core-model-gecidi.openapi.yaml` | `platform_core-model-gateway.openapi.yaml` |
+| `platform_core-erisim.openapi.yaml` | `platform_core-access.openapi.yaml` |
+| `platform_core-mobil.openapi.yaml` | `platform_core-mobile.openapi.yaml` |
+| karar notları `0002-yapay-zeka-katmani` ve benzerleri | `0002-ai-layer`, `0003-keycloak-extensions`, `0004-model-gateway`, `0005-security-gate`, `0006-access-rule`, `0007-mobile-sync`, `0008-first-vertical-slice` |
 
 ## Kişisel veri
 
