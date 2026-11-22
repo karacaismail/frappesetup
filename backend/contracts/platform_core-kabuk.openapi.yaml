@@ -15,6 +15,7 @@
       "get": {
         "operationId": "validateMobilePolicy",
         "summary": "Validate site metadata policy as a System Manager",
+        "description": "Checks the site's mobile metadata and field privacy settings. Returns whether the settings are valid and lists any configuration errors.",
         "responses": {
           "200": {
             "description": "Policy validation result.",
