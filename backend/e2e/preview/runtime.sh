@@ -16,7 +16,8 @@ if [[ "$worktree" != "$PREVIEW_DIR/worktree" || ! -d "$worktree" ]]; then
     printf '%s\n' 'The preview runtime requires its own disposable worktree.' >&2
     exit 2
 fi
-case "${FS_COLIMA_PROFILE:-default}" in
+export FS_COLIMA_PROFILE="${FS_COLIMA_PROFILE:-default}"
+case "$FS_COLIMA_PROFILE" in
     default) docker_context=colima ;;
     factory) docker_context=colima-factory ;;
     *) printf '%s\n' 'FS_COLIMA_PROFILE must be default or factory.' >&2; exit 2 ;;
@@ -232,9 +233,15 @@ PY
 "${compose[@]}" config --quiet
 printf '%s\n' "Preparing a disposable stack. See $PREVIEW_DIR/runtime.log."
 {
-    # Builds use the worker Dockerfiles and their cached base layers. The tenant base is reused.
-    docker_preview buildx create --name "$builder" --driver docker-container --driver-opt default-load=true "$docker_context"
-    "${compose[@]}" build --builder "$builder" web keycloak
+    # Factory's separate BuildKit container cannot resolve the image registries.
+    # Select the daemon builder only in the preview's private Docker configuration.
+    if [[ "$FS_COLIMA_PROFILE" == factory ]]; then
+        docker context use "$docker_context" >/dev/null
+        "${compose[@]}" build web keycloak
+    else
+        docker_preview buildx create --name "$builder" --driver docker-container --driver-opt default-load=true "$docker_context"
+        "${compose[@]}" build --builder "$builder" web keycloak
+    fi
     "${compose[@]}" up --no-build -d --wait --wait-timeout 120 mariadb redis
     "${compose[@]}" up --no-build -d web
     docker_preview exec -i -u root "$press" bash -s <<'BASH'
