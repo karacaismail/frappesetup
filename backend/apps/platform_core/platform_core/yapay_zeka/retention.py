@@ -136,42 +136,52 @@ def purge_from_web(
 		frappe.cache.set_value(_confirmation_key(token, "data"), kept, expires_in_sec=CONFIRMATION_SECONDS)
 		frappe.cache.set_value(_confirmation_key(token, "claim"), 1, expires_in_sec=CONFIRMATION_SECONDS)
 		return {**counted, "confirmation_token": token}
-	refusal = access.PreviewRequired(
-		_("Ask for a preview first, then send its confirmation token. Nothing was deleted.", context=CONTEXT)
-	)
 	if not isinstance(confirmation_token, str) or not 0 < len(confirmation_token) <= MAX_TOKEN_CHARS:
-		raise refusal
+		_stop(access.PreviewRequired)
 	kept = frappe.cache.get_value(_confirmation_key(confirmation_token, "data"))
 	# The claim is one atomic step, so a token works once even if two requests race.
 	claimed = frappe.cache.getdel(frappe.cache.make_key(_confirmation_key(confirmation_token, "claim")))
 	frappe.cache.delete_value(_confirmation_key(confirmation_token, "data"))
 	if kept is None or claimed is None or kept["user"] != frappe.session.user:
-		raise refusal
+		_stop(access.PreviewRequired)
 	# Every number of the preview must still hold: the chosen records and all that wait.
 	_counted, _chosen, digest = select(older_than_days)
 	if digest != kept["digest"]:
-		raise refusal
+		_stop(access.PreviewRequired)
 	try:
 		return purge(older_than_days, dry_run=False, selection=kept["selection"])
-	except frappe.PermissionError:
-		raise
-	except frappe.ValidationError as error:
-		# A chosen record of this layer or of the gateway is no longer eligible. The gateway
-		# deletes all or none, and this rollback undoes whatever else the request did.
-		frappe.db.rollback()
-		frappe.clear_messages()
-		log_tool_error("purge_logs", error)
-		raise refusal from None
 	except Exception as error:
-		# The gateway or a delete broke off for an unplanned reason, perhaps after it had deleted
-		# something. Everything is rolled back. The answer and the action log carry no text of
-		# the error. The server log gets the error type.
-		frappe.db.rollback()
-		frappe.clear_messages()
+		# Every error of the delete ends here. The gateway deletes all or none, and the rollback
+		# in `_stop` undoes whatever else the request did, also a delete that was half done.
 		log_tool_error("purge_logs", error)
-		raise access.DeleteFailed(
-			_("The delete failed and was rolled back. Nothing was deleted.", context=CONTEXT)
-		) from None
+		if isinstance(error, frappe.PermissionError):
+			_stop(frappe.PermissionError)
+		# A chosen record is no longer eligible: a new preview is needed. Anything else is unplanned.
+		_stop(access.PreviewRequired if isinstance(error, frappe.ValidationError) else access.DeleteFailed)
+
+
+def _stop(kind: type[Exception]) -> None:
+	"""Stop a web delete with the fixed answer of its kind. Nothing of the real error leaves the server.
+
+	The transaction is rolled back first. Then the messages Frappe collected are dropped: a hook
+	may have put a record value into one, and Frappe would send them with the response. Only the
+	fixed text is sent, as a message, so it also arrives when the site hides error details.
+	The new error does not carry the real one as its cause, so a shown traceback has no foreign text.
+	"""
+	frappe.db.rollback()
+	frappe.clear_messages()
+	texts = {
+		frappe.PermissionError: _("You do not have permission for this action.", context=CONTEXT),
+		access.PreviewRequired: _(
+			"Ask for a preview first, then send its confirmation token. Nothing was deleted.", context=CONTEXT
+		),
+		access.DeleteFailed: _(
+			"The delete failed and was rolled back. Nothing was deleted.", context=CONTEXT
+		),
+	}
+	error = kind(texts[kind])
+	frappe.msgprint(texts[kind], indicator="red")
+	raise error from None
 
 
 def _confirmation_key(token: str, part: str) -> str:

@@ -42,7 +42,9 @@ def installed(gateway):
 	return patch.object(api, "purge_usage_logs", gateway, create=True)
 
 
-class TestUsageSelection(YzTestCase):
+class PurgeRequests:
+	"""Helpers shared by the test classes of this file."""
+
 	def old_proposal(self, client) -> str:
 		name = self.make_record(MANAGER)
 		arguments = {"doctype": DOCTYPE, "name": name, "data": {"title": "New"}}
@@ -59,6 +61,8 @@ class TestUsageSelection(YzTestCase):
 	def post(self, client, **body):
 		return self.human(client, "POST", "purge_logs", body=body)
 
+
+class TestUsageSelection(PurgeRequests, YzTestCase):
 	def test_web_delete_hands_the_previewed_names_to_the_gateway(self):
 		manager = self.login(MANAGER)
 		gateway = Gateway(["u-1", "u-2"], waiting=3)
@@ -217,3 +221,82 @@ class TestUsageSelection(YzTestCase):
 
 		self.assertEqual(done.status_code, 403)
 		self.assertTrue(self.exists(old))
+
+
+# The one text a caller gets for each way a delete can stop (contract, `purge_logs`).
+TEXTS = {
+	403: "You do not have permission for this action.",
+	"purge_failed": "The delete failed and was rolled back. Nothing was deleted.",
+	"preview_required": "Ask for a preview first, then send its confirmation token. Nothing was deleted.",
+}
+
+
+class TestDeleteErrorAnswers(PurgeRequests, YzTestCase):
+	"""Every error during a delete ends in one fixed answer, with error details shown or hidden.
+
+	Frappe puts the traceback and the collected messages into the response for a system user
+	when the site shows error details. The text of a foreign error must not be in either.
+	"""
+
+	MARKER = "leak-marker-from-a-delete-hook"
+
+	def failing(self, error: Exception):
+		marker = self.MARKER
+
+		class Failing(Gateway):
+			def __call__(self, *, dry_run=False, names=None):
+				if dry_run:
+					return super().__call__(dry_run=dry_run, names=names)
+				# A hook collects a message with a record value, then raises with it too.
+				frappe.msgprint(f"value {marker}")
+				raise error
+
+		return Failing(["u-1"])
+
+	def delete_with(self, error: Exception, *, details: bool):
+		manager = self.login(MANAGER)
+		old = self.old_proposal(manager)
+		with (
+			installed(self.failing(error)),
+			patch("frappe.utils.response.is_traceback_allowed", lambda: details),
+		):
+			token = self.post(manager).json["message"]["confirmation_token"]
+			response = self.post(manager, dry_run=False, confirmation_token=token)
+		self.assertTrue(self.exists(old))
+		return response
+
+	def assert_fixed(self, response, status: int, text: str) -> None:
+		body = response.get_data(as_text=True)
+		self.assertEqual(response.status_code, status, body)
+		self.assertNotIn(self.MARKER, body)
+		self.assertIn(text, body)
+		frappe.db.rollback()
+		stored = frappe.get_all("AI Action Log", fields=["*"]) + frappe.get_all("Error Log", fields=["*"])
+		self.assertNotIn(self.MARKER, str(stored))
+
+	def test_permission_error_of_a_hook_becomes_the_fixed_403(self):
+		for details in (True, False):
+			response = self.delete_with(
+				frappe.PermissionError(f"no access to {self.MARKER}"), details=details
+			)
+			self.assert_fixed(response, 403, TEXTS[403])
+
+	def test_unexpected_error_becomes_the_fixed_417(self):
+		for details in (True, False):
+			response = self.delete_with(RuntimeError(self.MARKER), details=details)
+			self.assert_fixed(response, 417, TEXTS["purge_failed"])
+			self.assertEqual(self.last_log(tool="purge_logs", decision="denied").deny_reason, "purge_failed")
+
+	def test_validation_error_becomes_the_fixed_preview_answer(self):
+		for details in (True, False):
+			response = self.delete_with(frappe.ValidationError(self.MARKER), details=details)
+			self.assert_fixed(response, 417, TEXTS["preview_required"])
+
+	def test_missing_token_gets_the_fixed_text_when_details_are_hidden(self):
+		manager = self.login(MANAGER)
+
+		with patch("frappe.utils.response.is_traceback_allowed", lambda: False):
+			response = self.post(manager, dry_run=False)
+
+		self.assertEqual(response.status_code, 417)
+		self.assertIn(TEXTS["preview_required"], response.get_data(as_text=True))

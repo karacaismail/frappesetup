@@ -372,8 +372,8 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/PurgeResult"}
-        "403": {description: The request did not come from a human session or the user is not an administrator.}
-        "417": {description: "Nothing was deleted. Either the retention period is out of range, or the delete came without a valid confirmation token (`preview_required`), or the delete broke off for an unexpected reason and was rolled back (`purge_failed`). The answer carries a fixed text, never the text of the error. The deny reason is in the AI Action Log."}
+        "403": {description: "The request did not come from a human session, the user is not an administrator, or a permission error stopped the delete. In the last case nothing was deleted and the message is the fixed text `You do not have permission for this action.`"}
+        "417": {description: "Nothing was deleted. The response carries one fixed message in `_server_messages`, also when the site hides error details: `Ask for a preview first, then send its confirmation token. Nothing was deleted.` or `The delete failed and was rolled back. Nothing was deleted.` The text of the real error and messages collected during the delete are never sent. Either the retention period is out of range, or the delete came without a valid confirmation token (`preview_required`), or the delete broke off for an unexpected reason and was rolled back (`purge_failed`). The answer carries a fixed text, never the text of the error. The deny reason is in the AI Action Log."}
 
 components:
   securitySchemes:
