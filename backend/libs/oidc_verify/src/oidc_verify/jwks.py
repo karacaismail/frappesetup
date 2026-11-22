@@ -15,15 +15,20 @@ serialises network fetches so at most one runs at a time. A reader whose `kid` i
 for an in-flight fetch; readers with an unknown `kid` wait for the running fetch and then look again.
 
 Bounds: the HTTP fetcher gives up once the whole download has taken `total_timeout` seconds, however
-slowly the server trickles bytes (the per-operation socket `timeout` alone does not bound that). A caller
-that must wait for an in-flight refresh waits at most `wait_timeout` seconds; on timeout it serves a
-cached key inside the stale window or raises `JwksUnavailable`. The refresh lock is always released.
+slowly the server trickles bytes. A timer shuts the socket down at the deadline, so the status line, the
+headers and the body are all covered (the per-operation socket `timeout` alone does not bound that).
+A caller whose `kid` is cached and still inside the stale window never waits for the refresh lock: it
+tries the refresh without blocking and serves the cached key when another thread holds the lock. A
+caller without a usable key waits at most `wait_timeout` seconds and then raises `JwksUnavailable`.
+The refresh lock is always released.
 """
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import json
+import socket
 import threading
 import time
 import urllib.parse
@@ -52,7 +57,62 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         raise OSError(f"JWKS redirect refused ({code})")
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect())
+class _Deadline:
+    """Cuts the open connection when the total download time is over.
+
+    A timer calls `cut`. Shutting the socket down wakes a read that is blocked in any stage: connect has
+    its own socket timeout, the status line and headers and the body all read from this socket.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._conn: http.client.HTTPConnection | None = None
+        self.expired = False
+
+    def attach(self, conn: http.client.HTTPConnection) -> None:
+        with self._lock:
+            if self.expired:
+                raise TimeoutError("JWKS download exceeded total_timeout")
+            self._conn = conn
+
+    def cut(self) -> None:
+        with self._lock:
+            self.expired = True
+            conn = self._conn
+        sock = getattr(conn, "sock", None)
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+
+class _DeadlineHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, deadline: _Deadline) -> None:
+        super().__init__()
+        self._deadline = deadline
+
+    def http_open(self, req):
+        def connection(host, **kwargs):
+            conn = http.client.HTTPConnection(host, **kwargs)
+            self._deadline.attach(conn)
+            return conn
+
+        return self.do_open(connection, req)
+
+
+class _DeadlineHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, deadline: _Deadline) -> None:
+        super().__init__()
+        self._deadline = deadline
+
+    def https_open(self, req):
+        def connection(host, **kwargs):
+            conn = http.client.HTTPSConnection(host, **kwargs)
+            self._deadline.attach(conn)
+            return conn
+
+        return self.do_open(connection, req, context=self._context)
 
 
 def _is_development_host(host: str | None) -> bool:
@@ -95,7 +155,24 @@ def _http_fetcher(
         # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
         istek = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
         deadline = time.monotonic() + total_timeout
-        with _OPENER.open(istek, timeout=timeout) as yanit:
+        cutter = _Deadline()
+        opener = urllib.request.build_opener(
+            _NoRedirect(), _DeadlineHTTPHandler(cutter), _DeadlineHTTPSHandler(cutter)
+        )
+        timer = threading.Timer(total_timeout, cutter.cut)
+        timer.daemon = True
+        timer.start()
+        try:
+            return _read(opener, istek, deadline, cutter)
+        except OSError as hata:
+            if cutter.expired:
+                raise TimeoutError("JWKS download exceeded total_timeout") from hata
+            raise
+        finally:
+            timer.cancel()
+
+    def _read(opener, istek, deadline: float, cutter: _Deadline) -> dict:
+        with opener.open(istek, timeout=timeout) as yanit:
             if yanit.status != 200:
                 raise OSError(f"JWKS yanıtı {yanit.status}")
             parcalar: list[bytes] = []
@@ -114,6 +191,9 @@ def _http_fetcher(
                 uzunluk += len(parca)
                 if uzunluk > max_bytes:
                     raise ValueError("JWKS response exceeds the size limit")
+            if cutter.expired:
+                # A cut socket can end the body read with an empty chunk instead of an error.
+                raise TimeoutError("JWKS download exceeded total_timeout")
             govde = b"".join(parcalar)
         return json.loads(govde.decode("utf-8"))
 
@@ -213,7 +293,7 @@ class JwksCache:
 
     # --- refresh ---
 
-    def _attempt_refresh(self, seen_generation: int, *, forced: bool) -> bool | None:
+    def _attempt_refresh(self, seen_generation: int, *, forced: bool, wait: bool = True) -> bool | None:
         """Runs at most one fetch. Returns True when a fetch was attempted since `seen_generation`.
 
         Returns False when the failure throttle skipped the fetch, and None when the refresh lock could
@@ -223,7 +303,11 @@ class JwksCache:
         The network call happens outside `_state_lock`, so readers with a cached `kid` are never blocked.
         Throttling (`min_refresh_seconds`) is applied inside `_refresh_lock` so it is race free.
         """
-        if not self._refresh_lock.acquire(timeout=self.wait_timeout):
+        if wait:
+            acquired = self._refresh_lock.acquire(timeout=self.wait_timeout)
+        else:
+            acquired = self._refresh_lock.acquire(blocking=False)
+        if not acquired:
             return None
         try:
             with self._state_lock:
@@ -266,10 +350,14 @@ class JwksCache:
             return anahtar
         attempted: bool | None = False
         if expired:
-            if anahtar is not None and self._refresh_lock.locked() and self._usable():
-                # A refresh is already running in another thread. Serve the cached key without waiting.
-                return anahtar
-            attempted = self._attempt_refresh(generation, forced=False)
+            if anahtar is not None and self._usable():
+                # A valid cached key never waits for the refresh lock. Try the refresh without blocking:
+                # when another thread already runs it, serve the cached key at once (merge review O4).
+                attempted = self._attempt_refresh(generation, forced=False, wait=False)
+                if attempted is None:
+                    return anahtar
+            else:
+                attempted = self._attempt_refresh(generation, forced=False)
             if not self._usable():
                 raise JwksUnavailable("Anahtar listesi alınamadı")
             anahtar, _, generation = self._lookup(kid)
