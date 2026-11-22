@@ -3,7 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
-from platform_core.model_gecidi.doctype.validation import encode_identifiers
+from platform_core.model_gateway.doctype.validation import encode_identifiers
 
 
 class AIAPI(Document):

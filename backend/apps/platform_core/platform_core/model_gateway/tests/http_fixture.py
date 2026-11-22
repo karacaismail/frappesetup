@@ -151,7 +151,7 @@ def _session(base, user=None, password=None):
 
 def _agent_session(base, manager, user, cleanup):
 	token = "fsat_" + secrets.token_urlsafe(32)
-	key = "yz_agent_token:" + hashlib.sha256(token.encode()).hexdigest()
+	key = "ai_agent_token:" + hashlib.sha256(token.encode()).hexdigest()
 	counter_key = frappe.cache.make_key(key + ":calls")
 	frappe.cache.set_value(
 		key,

@@ -804,7 +804,7 @@ Proje sahibi şunu istedi:
 
 Sonuç şudur:
 
-- `platform_core` içinde ikinci bir yapay zekâ modülü kurulur. Modülün adı `model_gecidi` olur.
+- `platform_core` içinde ikinci bir yapay zekâ modülü kurulur. Modülün adı `model_gateway` olur.
 - Modül sağlayıcıları, hesapları, API'leri ve modelleri kayıtta tutar. Her birinden n tane eklenebilir.
 - Model çağrısı tek bir geçitten geçer. Geçit sağlayıcıya düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz.
 - Geçit sırayla dener. Bir API sınıra takılırsa sıradaki API ya da hesap kullanılır.

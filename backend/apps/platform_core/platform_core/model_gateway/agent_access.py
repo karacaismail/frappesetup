@@ -7,7 +7,7 @@ from frappe.sessions import get_expired_threshold
 
 COMPLETE_PATH = "/api/method/platform_core.api.model.complete"
 PREFIX = "fsat_"
-CACHE_PREFIX = "yz_agent_token:"
+CACHE_PREFIX = "ai_agent_token:"
 DEFAULT_AUDIENCE = "agent-service"
 
 

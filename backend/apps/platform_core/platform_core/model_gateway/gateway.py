@@ -8,8 +8,8 @@ from time import monotonic, time
 import frappe
 from redis.exceptions import LockError, RedisError
 
-from platform_core.model_gecidi import adapters, agent_access, ledger, policy, routing
-from platform_core.model_gecidi.policy import Denied
+from platform_core.model_gateway import adapters, agent_access, ledger, policy, routing
+from platform_core.model_gateway.policy import Denied
 
 COOLDOWN = 60
 MAX_ROUTE_SECONDS = 120

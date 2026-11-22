@@ -4,7 +4,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from platform_core.model_gecidi.doctype.validation import encode_identifiers, parse_records
+from platform_core.model_gateway.doctype.validation import encode_identifiers, parse_records
 
 
 class AIRoute(Document):

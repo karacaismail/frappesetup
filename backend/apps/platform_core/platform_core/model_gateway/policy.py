@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 import frappe
 
-from platform_core.model_gecidi import agent_access
+from platform_core.model_gateway import agent_access
 
 MAX_BYTES = 256 * 1024
 MAX_OUTPUT = 16_384
