@@ -1061,6 +1061,21 @@ test.describe('requirements explorer', () => {
     await noHorizontalOverflow(page);
   });
 
+  test('resizing the focused requirements wrapper preserves focus until blur', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const results = page.locator('.req-results');
+    await expect(results).toHaveAttribute('tabindex', '0');
+    await results.focus();
+    await expect(results).toBeFocused();
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect(results).not.toHaveAttribute('role');
+    await expect(results).toBeFocused();
+    await page.getByRole('textbox', { name: 'Ara' }).focus();
+    await expect(results).not.toHaveAttribute('tabindex');
+  });
+
   test('overflowing requirements use a single keyboard focus edge', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('gereksinimler/');

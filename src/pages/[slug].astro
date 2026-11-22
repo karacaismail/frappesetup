@@ -277,7 +277,7 @@ const embeds = EMBEDS[entry.id] ?? [];
       results.setAttribute('role', 'region');
       results.setAttribute('aria-label', 'Gereksinim tablosu (yatay kaydırılabilir)');
     } else {
-      results.removeAttribute('tabindex');
+      if (document.activeElement !== results) results.removeAttribute('tabindex');
       results.removeAttribute('role');
       results.removeAttribute('aria-label');
     }
@@ -293,7 +293,7 @@ const embeds = EMBEDS[entry.id] ?? [];
     document.addEventListener('pointerdown', clearKeyboardFocus);
     document.addEventListener('touchstart', clearKeyboardFocus, { passive: true });
     results.addEventListener('keydown', (event) => {
-      if (event.target !== results || results.tabIndex !== 0) return;
+      if (event.target !== results || !results.hasAttribute('role')) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
       event.preventDefault();
@@ -308,6 +308,7 @@ const embeds = EMBEDS[entry.id] ?? [];
       measureResults();
     });
   };
+  results?.addEventListener('blur', schedule);
   // Ölçüm başlayınca satır içi kodda break-word ağı kapanır (global.css); betik yoksa ağ yerinde kalır.
   document.documentElement.setAttribute('data-code-measured', '');
   markScrollingCode();
