@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "autoname": "field:installation_id",
+ "creation": "2026-11-22 14:34:54.626327",
+ "description": "Links a mobile installation to its account.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "installation_id",
+  "account",
+  "principal",
+  "scope",
+  "revoked",
+  "last_audit_at",
+  "session_id",
+  "session_subject",
+  "notification_token",
+  "last_user_activity_at",
+  "session_bound_at"
+ ],
+ "fields": [
+  {
+   "description": "Identifies the mobile installation.",
+   "fieldname": "installation_id",
+   "fieldtype": "Data",
+   "label": "Installation ID",
+   "length": 36,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "The account that owns the installation.",
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Account",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The server derives this value from the stable identity link.",
+   "fieldname": "principal",
+   "fieldtype": "Data",
+   "label": "Stable account key",
+   "length": 64,
+   "reqd": 1
+  },
+  {
+   "description": "Identifies the sync scope for this installation.",
+   "fieldname": "scope",
+   "fieldtype": "Data",
+   "label": "Scope",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "The server rejects sync for a revoked installation.",
+   "fieldname": "revoked",
+   "fieldtype": "Check",
+   "label": "Revoked"
+  },
+  {
+   "description": "The UTC time when the installation last completed its delivery audit.",
+   "fieldname": "last_audit_at",
+   "fieldtype": "Datetime",
+   "label": "Last Audit At"
+  },
+  {
+   "description": "The verified Keycloak session that registered this installation.",
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Keycloak session ID",
+   "length": 140
+  },
+  {
+   "description": "The Keycloak user identifier bound to this session.",
+   "fieldname": "session_subject",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Keycloak user ID",
+   "length": 128
+  },
+  {
+   "description": "The private notification binding for this installation.",
+   "fieldname": "notification_token",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Notification token"
+  },
+  {
+   "description": "Unix time of the last reported interactive action for this installation.",
+   "fieldname": "last_user_activity_at",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Last user activity time",
+   "length": 16
+  },
+  {
+   "description": "Unix time used as the idle baseline for the current authenticated session.",
+   "fieldname": "session_bound_at",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Session binding time",
+   "length": 16
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-22 14:34:54.626328",
+ "modified_by": "Administrator",
+ "module": "Mobil",
+ "name": "Mobile Installation",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

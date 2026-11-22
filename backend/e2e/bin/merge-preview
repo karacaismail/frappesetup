@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Merge frozen backend inputs in a disposable worktree and run the preview."""
+
+import argparse
+import fcntl
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+SUITE = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SUITE / "preview"))
+
+from merging import HOOKS, MergeError, duplicate_hook_assignments, git, hook_values, resolve, verify_hook_lists
+
+IDENTITY = "karacaismail <35493655+karacaismail@users.noreply.github.com>"
+GIT_ROUTING = (
+    "GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_CONFIG", "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
+)
+
+
+def snapshot(repo, order):
+    refs = [f"refs/heads/{name}" for name in ("backend", *order)]
+    result = git(repo, "for-each-ref", "--format=%(refname) %(objectname)", *refs)
+    heads = dict(line.split() for line in result.stdout.splitlines())
+    absent = [ref for ref in refs if ref not in heads]
+    if absent:
+        raise MergeError("Missing branches: " + ", ".join(absent))
+    commits = [heads[ref] for ref in refs]
+    authors = git(repo, "log", "--format=%an <%ae>", *commits[1:], "--not", commits[0]).stdout.splitlines()
+    if any(author != IDENTITY for author in authors):
+        raise MergeError("An input introduces commits by another author. Existing history was preserved.")
+    return commits[0], list(zip(order, commits[1:]))
+
+
+def merge_inputs(worktree, inputs, branch, report, base):
+    report.write("\n## Çakışmalar\n\n| Dosya | Alan dal | Gelen dal | Sonuç |\n| --- | --- | --- | --- |\n")
+    sources = [base]
+    for name, sha in inputs:
+        if git(worktree, "merge-base", "--is-ancestor", sha, "HEAD", check=False).returncode == 0:
+            sources.append(sha)
+            continue
+        result = git(worktree, "merge", "--no-commit", "--no-ff", sha, check=False)
+        conflicts = git(worktree, "diff", "--name-only", "--diff-filter=U", "-z").stdout.rstrip("\0")
+        if result.returncode and not conflicts:
+            (Path(report.name).parent / "git-merge.log").write_text(result.stdout + result.stderr)
+            raise MergeError(f"Merge failed before conflict resolution: {name}")
+        problems = []
+        for filename in filter(None, conflicts.split("\0")):
+            try:
+                resolve(worktree, filename)
+                outcome = "Birleştirildi"
+            except (MergeError, ValueError, SyntaxError) as error:
+                outcome = str(error)
+                problems.append(filename)
+            cells = [filename, branch, name, outcome]
+            report.write("| " + " | ".join(cell.replace("|", "&#124;").replace("\n", " ") for cell in cells) + " |\n")
+            report.flush()
+        if problems:
+            raise MergeError(f"Manual resolution required for {name}. See the conflict table.")
+        if conflicts:
+            files = conflicts.split("\0")
+            quality = git(worktree, "diff", "--cached", "--check", "--", *files, check=False)
+            if quality.returncode:
+                (Path(report.name).parent / "git-merge.log").write_text(quality.stdout + quality.stderr)
+                raise MergeError(f"A conflict resolution has whitespace errors: {name}")
+        git(worktree, "commit", "-m", f"{name} dalını önizlemeye al")
+        sources.append(sha)
+
+    merged = git(worktree, "show", f"HEAD:{HOOKS}", check=False).stdout
+    duplicates = duplicate_hook_assignments(merged)
+    if duplicates:
+        report.write("\n## Yinelenen kanca atamaları\n\n| Dosya | Ad | Satırlar |\n| --- | --- | --- |\n")
+        for name, lines in duplicates.items():
+            report.write(f"| `{HOOKS}` | `{name}` | {', '.join(map(str, lines))} |\n")
+        raise MergeError("Duplicate top-level hook assignments. See the report.")
+    merged_values = hook_values(merged)
+    for sha in sources:
+        source = git(worktree, "show", f"{sha}:{HOOKS}", check=False).stdout
+        if source:
+            verify_hook_lists(hook_values(source), merged_values)
+    report.write("\nKanca listeleri korundu.\n")
+
+
+def run_live(worktree, environment):
+    workspace = worktree / "backend" / "e2e"
+    workspace.mkdir(parents=True, exist_ok=True)
+    for filename in (*SUITE.glob("*.ts"), SUITE / "fake-provider.mjs"):
+        shutil.copy2(filename, workspace / filename.name)
+    dependencies = SUITE.parents[1] / "node_modules"
+    if not (dependencies / ".bin" / "playwright").is_file():
+        raise MergeError("Install the checkout's Playwright dependencies first.")
+    (worktree / "node_modules").symlink_to(dependencies, target_is_directory=True)
+    runtime = SUITE / "preview" / "runtime.sh"
+    with subprocess.Popen(["bash", str(runtime), str(worktree)], env=environment, start_new_session=True) as child:
+        try:
+            return child.wait()
+        except KeyboardInterrupt:
+            if child.poll() is None:
+                os.killpg(child.pid, signal.SIGTERM)
+                child.wait()
+            raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--merge-only", action="store_true", help="Check the frozen merges without starting Colima.")
+    args = parser.parse_args()
+    overrides = [name for name in GIT_ROUTING if os.getenv(name)]
+    if overrides:
+        parser.error("Git routing overrides are set: " + ", ".join(overrides))
+    repo = Path(git(".", "rev-parse", "--show-toplevel").stdout.strip())
+    order = (SUITE / "preview" / "branches.txt").read_text().split()
+    scratch = Path(os.environ.get("PANE_SCRATCH_DIR", repo / ".pane" / "scratch")).resolve()
+    scratch.mkdir(parents=True, exist_ok=True)
+    artifacts = Path(tempfile.mkdtemp(prefix="merge-preview-", dir=scratch))
+    worktree = artifacts / "worktree"
+    branch = "e2e-" + artifacts.name
+    port = os.getenv("PANE_PORT", "")
+    result = 1
+    print(f"Preview report: {artifacts / 'report.md'}", flush=True)
+    with (artifacts / "report.md").open("w", buffering=1) as report:
+        report.write("# Birleştirme önizlemesi\n")
+        created = False
+        try:
+            for variable in ("GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+                os.environ.pop(variable, None)
+            if not args.merge_only and (
+                not re.fullmatch(r"[1-9][0-9]{3,4}", port) or int(port) > 65526
+            ):
+                raise MergeError("A valid PANE_PORT is required.")
+            for identity in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
+                if not git(repo, "var", identity).stdout.startswith(IDENTITY + " "):
+                    raise MergeError("The preview requires the repository's authorized Git identity.")
+            base, inputs = snapshot(repo, order)
+            report.write(f"\nBackend tabanı `{base}`.\n\n| Dal | Commit |\n| --- | --- |\n")
+            for name, sha in inputs:
+                report.write(f"| {name} | `{sha}` |\n")
+            if git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0:
+                raise MergeError("The temporary branch already exists.")
+            created = True
+            git(repo, "worktree", "add", "-b", branch, str(worktree), base)
+            merge_inputs(worktree, inputs, branch, report, base)
+            report.write(f"\nÖnizleme commit'i `{git(worktree, 'rev-parse', 'HEAD').stdout.strip()}`.\n")
+            if args.merge_only:
+                report.write("\nCanlı senaryolar `not_run`.\n")
+                result = 0
+            else:
+                environment = {
+                    **os.environ,
+                    "FS_COLIMA_PROFILE": "default",
+                    "PREVIEW_DIR": str(artifacts),
+                    "PREVIEW_PROJECT": f"fs-e2e-preview-{port}-{artifacts.name.rsplit('-', 1)[-1].replace('_', '-')}",
+                }
+                git_dir = Path(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip())
+                with (git_dir / f"merge-preview-{port}.lock").open("a") as lock:
+                    try:
+                        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError as error:
+                        raise MergeError("A live merge preview already uses this Pane port.") from error
+                    result = run_live(worktree, environment)
+                report.write(f"\nCanlı koşu çıkış kodu `{result}`.\n")
+        except (MergeError, subprocess.CalledProcessError, OSError, KeyboardInterrupt) as error:
+            if isinstance(error, subprocess.CalledProcessError):
+                (artifacts / "git-error.log").write_text((error.stdout or "") + (error.stderr or ""))
+            report.write(f"\nÖnizleme durdu. {error}\n")
+            print(f"Preview stopped: {error}", file=sys.stderr)
+        finally:
+            if created:
+                listed = git(repo, "worktree", "list", "--porcelain", "-z", check=False)
+                cleanup_ok = listed.returncode == 0
+                if cleanup_ok and f"worktree {worktree}" in listed.stdout.split("\0"):
+                    cleanup_ok = git(repo, "worktree", "remove", "--force", str(worktree), check=False).returncode == 0
+                elif cleanup_ok and worktree.exists():
+                    shutil.rmtree(worktree)
+                if cleanup_ok and git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0:
+                    cleanup_ok = git(repo, "branch", "-D", branch, check=False).returncode == 0
+                if not cleanup_ok:
+                    report.write("\nGeçici Git alanı temizlenemedi.\n")
+                    result = 1
+                else:
+                    report.write("\nGeçici worktree ve dal kaldırıldı.\n")
+    return result
+
+
+def interrupted(_signum, _frame):
+    raise KeyboardInterrupt
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, interrupted)
+    sys.exit(main())
