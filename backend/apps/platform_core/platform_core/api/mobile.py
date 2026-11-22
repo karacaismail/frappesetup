@@ -29,12 +29,6 @@ INVENTORIES = {}
 IDLE_LIMIT_SECONDS = 3600
 
 
-def _registry(name, approved):
-	if frappe.conf.get("allow_tests"):
-		return getattr(frappe.local, name, approved)
-	return approved
-
-
 def _keys(body, required, optional=()):
 	if not required <= body.keys() or body.keys() - required - set(optional):
 		raise MobileError("invalid_request")
@@ -115,7 +109,7 @@ def _activity(identity, body):
 	return {"last_user_activity_at": activity_at}
 
 
-def _push(identity, body):
+def _push(identity, body, *, commands=None):
 	_keys(body, {"installation_id", "operations"})
 	_lock_mobile_account(identity)
 	store = MobileStore()
@@ -126,7 +120,7 @@ def _push(identity, body):
 		raise MobileError("invalid_mobile_settings", 503)
 	return push(
 		store,
-		_registry("mobile_commands", COMMANDS),
+		COMMANDS if commands is None else commands,
 		identity.site,
 		identity.account,
 		body["operations"],
@@ -135,7 +129,7 @@ def _push(identity, body):
 	)
 
 
-def _pull(identity, body):
+def _pull(identity, body, *, projections=None, inventories=None):
 	_require_enabled_user(identity.account)
 	_keys(body, {"installation_id"}, {"limit", "cursor"})
 	installation = uuid4_id(body["installation_id"])
@@ -150,14 +144,14 @@ def _pull(identity, body):
 		raise MobileError("invalid_cursor", 410)
 	return pull(
 		store,
-		_registry("mobile_projections", PROJECTIONS),
+		PROJECTIONS if projections is None else projections,
 		secret,
 		(identity.site, identity.principal, installation, identity.scope),
 		body.get("cursor"),
 		body.get("limit", PAGE_SIZE),
 		account=identity.account,
 		now=int(time.time()),
-		inventories=_registry("mobile_inventories", INVENTORIES),
+		inventories=INVENTORIES if inventories is None else inventories,
 	)
 
 
@@ -179,7 +173,7 @@ def _revoke_user_installations(body):
 	if not account:
 		raise MobileError("IdentityNotFound", 404)
 	try:
-		_, cutoff, _ = lock_revocation_scope(account)
+		_unused, cutoff, _unused = lock_revocation_scope(account)
 	except MobileError as error:
 		if error.code == "account_unavailable":
 			raise MobileError("IdentityNotFound", 404) from error

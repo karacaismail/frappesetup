@@ -6,9 +6,10 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from time import monotonic, sleep, time
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from uuid import uuid4
+
+from platform_core.mobil.tests.loopback_http import open_loopback, validate_loopback_url
 
 FIXTURE = os.environ.get("MOBILE_TEST_FIXTURE") == "1"
 BASE = os.environ.get("MOBILE_TEST_URL")
@@ -22,9 +23,7 @@ OTHER_TOKEN = os.environ.get("MOBILE_TEST_OTHER_BEARER")
 class MobileHTTPTest(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
-		host = urlsplit(BASE).hostname
-		if host not in {"localhost", "127.0.0.1", "::1"}:
-			raise ValueError("HTTP tests are restricted to loopback")
+		validate_loopback_url(BASE)
 
 	def post(self, endpoint, data, token=TOKEN, *, suffix="", extra_headers=None):
 		return self.post_method(
@@ -47,28 +46,29 @@ class MobileHTTPTest(unittest.TestCase):
 			method="POST",
 		)
 		try:
-			with urlopen(request, timeout=15) as response:
+			with open_loopback(request, timeout=15) as response:
 				return response.status, json.load(response), response.headers
 		except HTTPError as error:
 			with error:
-				return error.code, json.load(error), error.headers
+				result = {"code": "redirect_rejected"} if 300 <= error.code < 400 else json.load(error)
+				return error.code, result, error.headers
 
 	def register(self, *, token=TOKEN, extra_headers=None):
 		body = {"installation_id": str(uuid4())}
-		status, payload, _ = self.post("v1_register", body, token=token, extra_headers=extra_headers)
+		status, payload, _unused = self.post("v1_register", body, token=token, extra_headers=extra_headers)
 		self.assertEqual(status, 200, payload)
 		self.assertEqual(payload["message"], body)
 		return body
 
 	def guest_denied(self, endpoint, body):
-		status, payload, _ = self.post(endpoint, body, token=None)
+		status, payload, _unused = self.post(endpoint, body, token=None)
 		self.assertIn(status, {401, 403}, payload)
 
 	def test_v1_register_guest_denied(self):
 		self.guest_denied("v1_register", {"installation_id": str(uuid4())})
 
 	def test_v1_register_foreign_data_denied(self):
-		status, payload, _ = self.post("v1_register", self.register(), token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_register", self.register(), token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
 	def test_v1_revoke_guest_denied(self):
@@ -76,7 +76,7 @@ class MobileHTTPTest(unittest.TestCase):
 
 	def test_v1_revoke_foreign_data_denied(self):
 		body = self.register()
-		status, payload, _ = self.post("v1_revoke", body, token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_revoke", body, token=OTHER_TOKEN)
 		self.assertEqual(status, 200, payload)
 		self.assertEqual(payload["message"], {"revoked": 0})
 		self.assertEqual(self.post("v1_pull", body)[0], 200)
@@ -86,21 +86,21 @@ class MobileHTTPTest(unittest.TestCase):
 
 	def test_v1_push_foreign_data_denied(self):
 		body = dict(self.register(), operations=[])
-		status, payload, _ = self.post("v1_push", body, token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_push", body, token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
 	def test_v1_pull_guest_denied(self):
 		self.guest_denied("v1_pull", {"installation_id": str(uuid4())})
 
 	def test_v1_pull_foreign_data_denied(self):
-		status, payload, _ = self.post("v1_pull", self.register(), token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_pull", self.register(), token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
 	def test_v1_activity_guest_denied(self):
 		self.guest_denied("v1_activity", {"installation_id": str(uuid4())})
 
 	def test_v1_activity_foreign_data_denied(self):
-		status, payload, _ = self.post("v1_activity", self.register(), token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_activity", self.register(), token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
 	def test_v1_list_installations_guest_denied(self):
@@ -108,7 +108,7 @@ class MobileHTTPTest(unittest.TestCase):
 
 	def test_v1_list_installations_foreign_data_denied(self):
 		body = self.register()
-		status, payload, _ = self.post("v1_list_installations", {}, token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_list_installations", {}, token=OTHER_TOKEN)
 		self.assertEqual(status, 200, payload)
 		self.assertNotIn(
 			body["installation_id"], [row["installation_id"] for row in payload["message"]["installations"]]
@@ -119,7 +119,7 @@ class MobileHTTPTest(unittest.TestCase):
 
 	def test_v1_revoke_installation_foreign_data_denied(self):
 		caller = self.register(token=OTHER_TOKEN)
-		status, payload, _ = self.post(
+		status, payload, _unused = self.post(
 			"v1_revoke_installation",
 			self.register(),
 			token=OTHER_TOKEN,
@@ -131,7 +131,7 @@ class MobileHTTPTest(unittest.TestCase):
 		self.guest_denied("v1_cleanup", {})
 
 	def test_v1_cleanup_foreign_data_denied(self):
-		status, payload, _ = self.post("v1_cleanup", {}, token=OTHER_TOKEN)
+		status, payload, _unused = self.post("v1_cleanup", {}, token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
 	def test_revoke_prevents_reads_and_reactivation(self):
@@ -139,10 +139,10 @@ class MobileHTTPTest(unittest.TestCase):
 		body = self.register(token=token)
 		self.assertEqual(self.post("v1_revoke", body, token=token)[0], 200)
 		for endpoint in ("v1_pull", "v1_register"):
-			status, result, _ = self.post(endpoint, body, token=token)
+			status, result, _unused = self.post(endpoint, body, token=token)
 			self.assertEqual((status, result.get("code")), (401, "mobile_session_revoked"), result)
 		if FIXTURE:
-			status, payload, _ = self.post(
+			status, payload, _unused = self.post(
 				"v1_register",
 				{"installation_id": str(uuid4())},
 				token=token,
@@ -154,7 +154,7 @@ class MobileHTTPTest(unittest.TestCase):
 	def test_revoke_all_rejects_stale_token_for_new_installation(self):
 		old = {"X-Mobile-Test-Iat": str(int(time()))}
 		caller = self.register(token="fixture-revoke", extra_headers=old)
-		status, payload, _ = self.post(
+		status, payload, _unused = self.post(
 			"v1_revoke",
 			{"all": True},
 			token="fixture-revoke",
@@ -162,7 +162,7 @@ class MobileHTTPTest(unittest.TestCase):
 		)
 		self.assertEqual(status, 200, payload)
 		fresh_installation = {"installation_id": str(uuid4())}
-		status, payload, _ = self.post(
+		status, payload, _unused = self.post(
 			"v1_register",
 			fresh_installation,
 			token="fixture-revoke",
@@ -174,7 +174,7 @@ class MobileHTTPTest(unittest.TestCase):
 		while int(time()) + 30 < issued_after:
 			sleep(0.02)
 		fresh = {"X-Mobile-Test-Iat": str(issued_after), "X-Mobile-Test-Sid": str(uuid4())}
-		status, payload, _ = self.post(
+		status, payload, _unused = self.post(
 			"v1_register",
 			fresh_installation,
 			token="fixture-revoke",
@@ -188,43 +188,43 @@ class MobileHTTPTest(unittest.TestCase):
 		sid = str(uuid4())
 		old = {"X-Mobile-Test-Auth-Time": str(now - 3600), "X-Mobile-Test-Sid": sid}
 		body = self.register(extra_headers=old)
-		status, payload, _ = self.post("v1_pull", body, extra_headers=old)
+		status, payload, _unused = self.post("v1_pull", body, extra_headers=old)
 		self.assertEqual((status, payload.get("code")), (401, "reauthentication_required"))
 		fresh = {**old, "X-Mobile-Test-Auth-Time": str(now)}
 		self.assertEqual(self.post("v1_register", body, extra_headers=fresh)[0], 200)
 		self.assertEqual(self.post("v1_pull", body, extra_headers=fresh)[0], 200)
-		status, payload, _ = self.post("v1_pull", body, extra_headers=old)
+		status, payload, _unused = self.post("v1_pull", body, extra_headers=old)
 		self.assertEqual((status, payload.get("code")), (401, "reauthentication_required"))
 
 	def test_body_above_contract_limit_returns_413(self):
-		status, payload, _ = self.post("v1_register", {"extra": "a" * (256 * 1024)})
+		status, payload, _unused = self.post("v1_register", {"extra": "a" * (256 * 1024)})
 		self.assertEqual(status, 413, payload)
 
 	def test_v1_remains_available_for_the_original_client_version(self):
 		body = self.register()
-		status, response, _ = self.post("v1_pull", body)
+		status, response, _unused = self.post("v1_pull", body)
 		self.assertEqual(status, 200, response)
 		continuation = dict(body, cursor=response["message"]["cursor"])
-		status, response, _ = self.post(
+		status, response, _unused = self.post(
 			"v1_pull",
 			continuation,
 			extra_headers={"X-Mobile-Contract-Version": "2"},
 		)
 		self.assertEqual((status, response.get("code")), (400, "unsupported_contract_version"))
-		status, response, _ = self.post("v1_pull", continuation)
+		status, response, _unused = self.post("v1_pull", continuation)
 		self.assertEqual(status, 200, response)
 		self.assertIn("changes", response["message"])
 
 	@unittest.skipUnless(FIXTURE, "The fixture lets an empty cmd reach the mobile endpoint")
 	def test_mobile_identity_rejects_cmd_query_even_with_json_body(self):
-		status, payload, _ = self.post("v1_register", {"installation_id": str(uuid4())}, suffix="?cmd=")
+		status, payload, _unused = self.post("v1_register", {"installation_id": str(uuid4())}, suffix="?cmd=")
 		self.assertEqual((status, payload.get("code")), (400, "invalid_mobile_route"), payload)
 
 	@unittest.skipUnless(FIXTURE, "Synthetic identity marker is required")
 	def test_request_gate_rejects_untrusted_identity_and_invalid_body(self):
 		for marker in ("site", "scope", "account"):
 			with self.subTest(marker=marker):
-				status, payload, _ = self.post(
+				status, payload, _unused = self.post(
 					"v1_register",
 					{"installation_id": str(uuid4())},
 					extra_headers={"X-Mobile-Test-Identity-Mismatch": marker},
@@ -236,14 +236,14 @@ class MobileHTTPTest(unittest.TestCase):
 			(b"not JSON", {"Content-Type": "text/plain"}, 415, "json_required"),
 		):
 			with self.subTest(code=code):
-				status, payload, _ = self.post("v1_register", content, extra_headers=headers)
+				status, payload, _unused = self.post("v1_register", content, extra_headers=headers)
 				self.assertEqual((status, payload.get("code")), (status_expected, code))
 
 	def pull_all(self, body, cursor=None, *, token=TOKEN):
 		changes = []
 		while True:
 			request = dict(body, cursor=cursor) if cursor is not None else body
-			status, payload, _ = self.post("v1_pull", request, token=token)
+			status, payload, _unused = self.post("v1_pull", request, token=token)
 			self.assertEqual(status, 200, payload)
 			message = payload["message"]
 			changes.extend(message["changes"])
@@ -254,7 +254,7 @@ class MobileHTTPTest(unittest.TestCase):
 			cursor = next_cursor
 
 	def commit_probe(self, record_id, release=False):
-		status, payload, _ = self.post_method(
+		status, payload, _unused = self.post_method(
 			"mobile_test_app.fixture.commit_probe",
 			{"record_id": record_id, "release": release},
 			"fixture-control",
@@ -287,11 +287,14 @@ class MobileHTTPTest(unittest.TestCase):
 		ids = [str(uuid4()), str(uuid4())]
 		for record_id in ids:
 			operation = self.fixture_operation(body, "create", record_id, fields={"title": "Example"})
-			status, result, _ = self.post("v1_push", operation)
+			status, result, _unused = self.post("v1_push", operation)
 			self.assertEqual(status, 200, result)
-			self.assertEqual(self.post("v1_push", operation)[:2], (status, result))
+			retry_status, retry_result, _unused = self.post("v1_push", operation)
+			self.assertEqual(retry_status, status, retry_result)
+			self.assertEqual(retry_result["message"], result["message"])
+			self.assertIsInstance(retry_result["server_time"], int)
 			operation["operations"][0]["fields"]["title"] = "Different"
-			status, result, _ = self.post("v1_push", operation)
+			status, result, _unused = self.post("v1_push", operation)
 			self.assertEqual((status, result.get("code")), (409, "operation_conflict"), result)
 
 		initial_changes, cursor = self.pull_all(body)
@@ -301,24 +304,24 @@ class MobileHTTPTest(unittest.TestCase):
 			if change["record_id"] in ids and change["kind"] == "upsert"
 		}
 		stale = self.fixture_operation(body, "update", ids[0], version="old", fields={"title": "Updated"})
-		status, result, _ = self.post("v1_push", stale)
+		status, result, _unused = self.post("v1_push", stale)
 		self.assertEqual((status, result.get("code")), (409, "version_conflict"), result)
 		self.assertEqual(result["current"]["version"], versions[ids[0]])
 
 		for action, record_id in zip(("delete", "transfer"), ids, strict=True):
-			status, result, _ = self.post(
+			status, result, _unused = self.post(
 				"v1_push",
 				self.fixture_operation(body, action, record_id, version=versions[record_id]),
 			)
 			self.assertEqual(status, 200, result)
 
-		changes, _ = self.pull_all(body, cursor)
+		changes, _unused = self.pull_all(body, cursor)
 		changes = [change for change in changes if change["record_id"] in ids]
 		self.assertEqual({change["record_id"] for change in changes}, set(ids))
 		for change in changes:
 			self.assertEqual(change.keys(), {"record_id", "record_type", "kind"})
 			self.assertEqual(change["kind"], "remove")
-		replayed, _ = self.pull_all(body, cursor)
+		replayed, _unused = self.pull_all(body, cursor)
 		self.assertEqual([change for change in replayed if change["record_id"] in ids], changes)
 
 	@unittest.skipUnless(
@@ -327,11 +330,11 @@ class MobileHTTPTest(unittest.TestCase):
 	def test_concurrent_writes_are_both_delivered(self):
 		body = self.register()
 		fast_body = self.register(token=OTHER_TOKEN)
-		_, cursor = self.pull_all(body)
-		_, fast_cursor = self.pull_all(fast_body, token=OTHER_TOKEN)
+		_unused, cursor = self.pull_all(body)
+		_unused, fast_cursor = self.pull_all(fast_body, token=OTHER_TOKEN)
 		# Complete initial audits before probing a read-only delta page during the held write.
-		_, cursor = self.pull_all(body, cursor)
-		_, fast_cursor = self.pull_all(fast_body, fast_cursor, token=OTHER_TOKEN)
+		_unused, cursor = self.pull_all(body, cursor)
+		_unused, fast_cursor = self.pull_all(fast_body, fast_cursor, token=OTHER_TOKEN)
 		delayed_id, fast_id = str(uuid4()), str(uuid4())
 		delayed_request = self.fixture_operation(
 			body, "create", delayed_id, fields={"title": "Delayed fixture"}
@@ -365,11 +368,11 @@ class MobileHTTPTest(unittest.TestCase):
 			finally:
 				self.commit_probe(delayed_id, release=True)
 			for future in (delayed, fast):
-				status, result, _ = future.result()
+				status, result, _unused = future.result()
 				self.assertEqual(status, 200, result)
 
-		last, _ = self.pull_all(body, cursor)
-		fast_changes, _ = self.pull_all(fast_body, fast_cursor, token=OTHER_TOKEN)
+		last, _unused = self.pull_all(body, cursor)
+		fast_changes, _unused = self.pull_all(fast_body, fast_cursor, token=OTHER_TOKEN)
 		self.assertIn(delayed_id, {change["record_id"] for change in last})
 		self.assertIn(fast_id, {change["record_id"] for change in fast_changes})
 
@@ -386,7 +389,7 @@ class MobileHTTPTest(unittest.TestCase):
 			self.fixture_operation(foreign, "update", str(uuid4()), version="old"),
 		)
 		for attempt in attempts:
-			status, payload, _ = self.post("v1_push", attempt, token=OTHER_TOKEN)
+			status, payload, _unused = self.post("v1_push", attempt, token=OTHER_TOKEN)
 			self.assertEqual((status, payload.get("code")), (404, "record_not_found"), payload)
 
 	@unittest.skipUnless(FIXTURE, "Synthetic business commands are required")
@@ -396,13 +399,13 @@ class MobileHTTPTest(unittest.TestCase):
 		operation = self.fixture_operation(
 			body, "create_bad_scope", record_id, fields={"title": "Wrong scope"}
 		)
-		status, payload, _ = self.post("v1_push", operation)
+		status, payload, _unused = self.post("v1_push", operation)
 		self.assertEqual(status, 200, payload)
 
-		changes, _ = self.pull_all(body)
+		changes, _unused = self.pull_all(body)
 		self.assertNotIn(record_id, {change["record_id"] for change in changes})
 		attempt = self.fixture_operation(body, "update", record_id, version="old")
-		status, payload, _ = self.post("v1_push", attempt)
+		status, payload, _unused = self.post("v1_push", attempt)
 		self.assertEqual((status, payload.get("code")), (404, "record_not_found"), payload)
 
 	@unittest.skipUnless(
@@ -414,7 +417,7 @@ class MobileHTTPTest(unittest.TestCase):
 		valid = self.fixture_operation(body, "create", record_id, fields={"title": "Example"})
 		invalid = self.fixture_operation(body, "unsupported", str(uuid4()))
 		batch = dict(body, operations=valid["operations"] + invalid["operations"])
-		status, result, _ = self.post("v1_push", batch)
+		status, result, _unused = self.post("v1_push", batch)
 		self.assertEqual((status, result.get("code")), (400, "unknown_command"), result)
 		self.assertEqual(self.post("v1_push", valid)[0], 200)
 
@@ -423,7 +426,7 @@ class MobileHTTPTest(unittest.TestCase):
 	)
 	def test_rate_limit_returns_429_with_retry_after(self):
 		body = {"installation_id": str(uuid4())}
-		for _ in range(121):
+		for _unused in range(121):
 			status, result, headers = self.post("v1_register", body, token="fixture-rate")
 			if status == 429:
 				self.assertEqual(result.get("code"), "rate_limit")
@@ -434,12 +437,12 @@ class MobileHTTPTest(unittest.TestCase):
 
 	@unittest.skipUnless(FIXTURE, "Synthetic service markers are required")
 	def test_revoke_user_installations_guest_denied(self):
-		status, _, _ = self.post("revoke_user_installations", {}, token=None)
+		status, _unused, _unused = self.post("revoke_user_installations", {}, token=None)
 		self.assertIn(status, {401, 403})
 
 	@unittest.skipUnless(FIXTURE, "Synthetic service markers are required")
 	def test_revoke_user_installations_foreign_data_denied(self):
-		status, _, _ = self.post(
+		status, _unused, _unused = self.post(
 			"revoke_user_installations",
 			{"issuer": "fixture", "subject": "missing"},
 			token="fixture-service-other",

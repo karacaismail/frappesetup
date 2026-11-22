@@ -4,6 +4,7 @@ import json
 import re
 from http.client import HTTPException
 from time import monotonic
+from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -87,7 +88,7 @@ def _service_bearer():
 
 
 def send_session_revocations(sessions):
-	"""Send each distinct session and subject pair and return failed pairs."""
+	"""Send each pair and return only pairs that still need a delivery attempt."""
 	sessions = tuple(dict.fromkeys(sessions))
 	if not sessions:
 		return ()
@@ -108,9 +109,18 @@ def send_session_revocations(sessions):
 			)
 			try:
 				with _OPENER.open(req, timeout=_TIMEOUT_SECONDS) as response:
-					if response.status != 200:
-						failed.append((sid, subject))
+					status = response.status
+			except HTTPError as error:
+				with error:
+					status = error.code
 			except _DELIVERY_ERRORS:
+				status = None
+
+			if status == 403:
+				frappe.logger("mobile_sessions").error(
+					"Identity-sync refused mobile session closure (HTTP 403). Local revocation remains in effect."
+				)
+			elif status != 200:
 				failed.append((sid, subject))
 
 	if failed:

@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from secrets import token_urlsafe
 
 import frappe
 
@@ -17,17 +18,47 @@ def ensure_website_user(email):
         insert("User", email=email, first_name="Preview", user_type="Website User", send_welcome_email=0)
 
 
-def seed_tenant(provider_urls):
-    from platform_core.erisim.tests.base import (
-        DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, PASSWORD, RULE_DOCTYPE, ErisimTestCase, ensure_fixtures,
-    )
+def seed_access_fixture():
+    """Create the minimal two-record access scenario on the disposable tenant."""
+    doctype = "Preview Access Request"
+    role = "Preview Access Reader"
+    reader = "e2e-access-reader@example.test"
+    password = "Aa9!" + token_urlsafe(24)
 
+    insert("Role", role_name=role, desk_access=1)
+    insert(
+        "DocType",
+        name=doctype,
+        module="Custom",
+        custom=1,
+        autoname="hash",
+        fields=[
+            {"fieldname": "title", "fieldtype": "Data", "label": "Title"},
+            {"fieldname": "request_user", "fieldtype": "Link", "options": "User", "label": "Request User"},
+        ],
+        permissions=[{"role": role, "read": 1}, {"role": "System Manager", "read": 1, "write": 1}],
+    )
+    insert(
+        "User", email=reader, first_name="Preview Reader", send_welcome_email=0,
+        roles=[{"role": role}], new_password=password,
+    )
+    insert(
+        "Access Rule", title="Preview reader sees own request", document_type=doctype,
+        role=role, scope="own", match_field="request_user", allow_read=1, is_active=1, priority=10,
+    )
+    return {
+        "E2E_DOCTYPE": doctype,
+        "E2E_VISIBLE_RECORD": insert(doctype, title="Visible request", request_user=reader),
+        "E2E_HIDDEN_RECORD": insert(doctype, title="Hidden request", request_user="Administrator"),
+        "E2E_UPDATE_FIELD": "title",
+        "E2E_PREVIEW_READER_EMAIL": reader,
+        "E2E_PREVIEW_READER_PASSWORD": password,
+    }
+
+
+def seed_tenant(provider_urls):
     ensure_website_user(os.environ["E2E_PREVIEW_LOGIN_EMAIL"])
-    ensure_fixtures()
-    for rule in ErisimTestCase.RULES:
-        insert(RULE_DOCTYPE, document_type=DOCTYPE, is_active=1, **rule)
-    visible = ErisimTestCase.insert_record(EMPLOYEE_1)
-    hidden = ErisimTestCase.insert_record(EMPLOYEE_2)
+    access_fixture = seed_access_fixture()
     provider = insert("AI Provider", provider_name="Preview Local", adapter="ollama")
     account = insert("AI Account", provider=provider, account_name="Preview Local", currency="USD")
     model = insert(
@@ -42,9 +73,7 @@ def seed_tenant(provider_urls):
         targets=[{"api": name, "model": model} for name in api_names],
     )
     return {
-        "E2E_DOCTYPE": DOCTYPE, "E2E_VISIBLE_RECORD": visible, "E2E_HIDDEN_RECORD": hidden,
-        "E2E_MODEL_ROUTE": route, "E2E_FALLBACK_API": api_names[1], "E2E_UPDATE_FIELD": "title",
-        "E2E_PREVIEW_READER_EMAIL": EMPLOYEE_1, "E2E_PREVIEW_READER_PASSWORD": PASSWORD,
+        **access_fixture, "E2E_MODEL_ROUTE": route, "E2E_FALLBACK_API": api_names[1],
     }
 
 

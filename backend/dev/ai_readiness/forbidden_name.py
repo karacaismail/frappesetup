@@ -94,7 +94,12 @@ def commit_findings(root, commit_base):
         git_output(root, "rev-parse", "--verify", "HEAD")
     except subprocess.CalledProcessError:
         if commit_base is None:
-            return
+            status = git_output(root, "--no-optional-locks", "status", "--porcelain=v2", "--branch", "-uno")
+            headers = status.splitlines()
+            if b"# branch.oid (initial)" in headers and any(
+                line.startswith(b"# branch.head ") and line != b"# branch.head (unknown)" for line in headers
+            ):
+                return
         raise
     revision = "HEAD"
     if commit_base is not None:

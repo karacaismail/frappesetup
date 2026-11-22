@@ -28,7 +28,7 @@ class HookValidationTests(unittest.TestCase):
         )
         (tools, overrides), findings = check(source)
         self.assertEqual(list(tools), ["sample.tools.declare"])
-        self.assertEqual(overrides["sample.api.old"][0], "sample.api.new")
+        self.assertEqual(overrides["sample.api.old"][0][0], "sample.api.new")
         self.assertEqual(findings, [])
 
     def test_ai_tools_requires_one_direct_top_level_assignment(self):
