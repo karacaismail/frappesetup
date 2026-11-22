@@ -63,7 +63,3 @@ repos:
                 platform_core/public/js/lib/.*
             )$
 
-ci:
-    autoupdate_schedule: weekly
-    skip: []
-    submodules: false
