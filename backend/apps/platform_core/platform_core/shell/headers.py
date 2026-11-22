@@ -5,8 +5,7 @@ from werkzeug.wrappers import Request, Response
 
 CSP_RESTRICTIONS = "object-src 'none'; base-uri 'self'; form-action 'self'"
 BASE_CSP = f"frame-ancestors 'self'; {CSP_RESTRICTIONS}"
-UNFRAMED_CSP = f"frame-ancestors 'none'; {CSP_RESTRICTIONS}"
-PANEL_CSP = f"default-src 'self'; script-src 'self'; {UNFRAMED_CSP}"
+STRICT_CSP = f"default-src 'self'; script-src 'self'; frame-ancestors 'none'; {CSP_RESTRICTIONS}"
 SECURITY_HEADERS = {
 	"X-Content-Type-Options": "nosniff",
 	"Referrer-Policy": "strict-origin-when-cross-origin",
@@ -20,9 +19,14 @@ def add_security_headers(response: Response | None, request: Request | None = No
 
 	# Frappe applies pending endpoint headers after the after_request hooks.
 	pending = frappe.local.response_headers
-	# The native login template contains inline JavaScript. Tighten framing only.
-	policy = UNFRAMED_CSP if request is not None and request.path.rstrip("/") == "/login" else BASE_CSP
-	headers = {**SECURITY_HEADERS, "Content-Security-Policy": policy}
+	# The tenant login override loads its script and styles from the same origin.
+	is_login = request is not None and request.path.rstrip("/") == "/login"
+	headers = {
+		**SECURITY_HEADERS,
+		"Content-Security-Policy": STRICT_CSP if is_login else BASE_CSP,
+	}
+	if is_login:
+		headers["X-Frame-Options"] = "DENY"
 	for name, header_value in headers.items():
 		if name not in pending:
 			response.headers.setdefault(name, header_value)

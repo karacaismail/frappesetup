@@ -238,6 +238,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Kiracı servis istemcisi yürütme yetkisini korur. Yetki yalnız kendi kuruluşu içindir. Örneğin kendi kuruluşuna kullanıcı davet eder.
   - Mutabakat, kuyruk yeniden oynatma ve platform listeleri yeni `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemcinindir.
   - Operatör, önizleme ve silme listelerinde `site-` ile başlayan istemci olmaz. Ayrıntı sözleşmenin 7. bölümündedir.
+- **O-40. Kiracı yanıtları içerik güvenliği politikası taşır.** Desk satır içi betik kullanır. Taban politika bu betiklere izin verir.
+  - Taban yanıt `frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'` politikasını taşır.
+  - Giriş ve Panel `default-src 'self'; script-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'` politikasını taşır.
+  - Giriş ve Panel yanıtları `X-Frame-Options: DENY` taşır. Yönlendirme yanıtları da aynı başlıkları taşır.
+  - Başlığı `platform_core` kancası ekler. Kanca, varsa yanıtın kendi başlığını korur. Frappe kodu değişmez.
+  - Üretimde ters vekil başlığı ekleyebilir. Uygulamanın taban politikası da yürürlükte kalır.
 
 ## Karar sitesine işlenecek farklar
 

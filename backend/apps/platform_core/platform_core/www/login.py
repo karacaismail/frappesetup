@@ -31,7 +31,7 @@ def get_context(context):
 
 	if frappe.session.user != "Guest":
 		frappe.local.flags.redirect_location = redirect_to or (settings.panel_url if settings else "/")
-		raise frappe.Redirect
+		raise frappe.Redirect(302)
 
 	context.no_cache = 1
 	context.lang = frappe.local.lang or "en"
