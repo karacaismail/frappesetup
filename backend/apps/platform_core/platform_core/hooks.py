@@ -68,6 +68,68 @@ doc_events = {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
 		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
 	},
+	"DocShare": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Custom Role": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Workspace": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Custom Workspace": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Sidebar": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Custom Sidebar": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Page": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Report": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Dashboard": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Dashboard Chart": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Number Card": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Module Onboarding": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Module Def": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"System Settings": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Domain Settings": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Translation": {
+		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
 }
 
 before_request = ["platform_core.kabuk.native_metadata.guard_website_rpc_before_request"]

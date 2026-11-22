@@ -19,3 +19,6 @@ class TestPerformanceBudget(TestCase):
 	def test_budget_rejects_fewer_than_fifty_samples(self):
 		with self.assertRaises(ValueError):
 			summarize([10.0] * (SAMPLES - 1))
+
+	def test_warm_bootstrap_budget_rejects_above_two_hundred(self):
+		self.assertEqual(summarize([200.01] * SAMPLES, limit_ms=200), (200.01, False))

@@ -21,9 +21,13 @@ EMPLOYEES = 200
 LEAVE_PER_EMPLOYEE = 10
 SAMPLES = 50
 LIMIT_MS = 500
+WARM_BOOTSTRAP_LIMIT_MS = 200
 TIMING_HEADER = "X-Shell-Test-Server-Ns"
+BOOTSTRAP_LABEL = "Aç\u0131l\u0131ş verisi"
+WARM_MODE = "Önbellekli"
+COLD_MODE = "Önbelleksiz"
 ENDPOINTS = (
-	("Aç\u0131l\u0131ş verisi", "/api/method/platform_core.api.shell.get_bootstrap", "user", ACCOUNT),
+	(BOOTSTRAP_LABEL, "/api/method/platform_core.api.shell.get_bootstrap", "user", ACCOUNT),
 	(
 		"DocType tan\u0131m\u0131",
 		"/api/method/platform_core.api.meta.get_doctype?" + urlencode({"doctype": "Leave Application"}),
@@ -33,11 +37,11 @@ ENDPOINTS = (
 )
 
 
-def summarize(samples):
+def summarize(samples, *, limit_ms=LIMIT_MS):
 	if len(samples) < SAMPLES:
 		raise ValueError(f"At least {SAMPLES} samples are required.")
 	p95 = sorted(samples)[ceil(len(samples) * 0.95) - 1]
-	return p95, p95 <= LIMIT_MS
+	return p95, p95 <= limit_ms
 
 
 @contextmanager
@@ -199,10 +203,10 @@ def measure(port, password):
 	rows = []
 	for endpoint, path, identity_key, identity_name in ENDPOINTS:
 		request(port, path, sid=sid)
-		for mode in ("Önbellekli", "Önbelleksiz"):
+		for mode in (WARM_MODE, COLD_MODE):
 			samples = []
 			for sample_index in range(SAMPLES):
-				if mode == "Önbelleksiz":
+				if mode == COLD_MODE:
 					clear_caches()
 				headers, payload = request(port, path, sid=sid)
 				message = payload["message"]
@@ -235,11 +239,12 @@ def report(rows):
 	]
 	passed = True
 	for endpoint, mode, samples in rows:
-		p95, within_budget = summarize(samples)
+		limit_ms = WARM_BOOTSTRAP_LIMIT_MS if endpoint == BOOTSTRAP_LABEL and mode == WARM_MODE else LIMIT_MS
+		p95, within_budget = summarize(samples, limit_ms=limit_ms)
 		passed &= within_budget
 		outcome = "pass" if within_budget else "fail"
 		summary.append(
-			f"| {endpoint} | {mode} | {len(samples)} | {median(samples):.3f} | {p95:.3f} | {LIMIT_MS} | {outcome} |"
+			f"| {endpoint} | {mode} | {len(samples)} | {median(samples):.3f} | {p95:.3f} | {limit_ms} | {outcome} |"
 		)
 	return "\n".join(summary), passed
 

@@ -23,4 +23,6 @@ Tüm ölçümler tam HTTP 200 yanıtı kullanır.
 Sunucu süresi, isteğin alınmasından yanıt başlıklarının hazır olmasına kadar ölçülür.
 p95, sıralı ölçümlerin yüzde 95 konumundaki süredir.
 Komut sonuç tablosunu durum dosyasına ekler.
-Bir koşu 500 ms sınırını aşarsa komut 1 döndürür.
+Önbellekli açılış için p95 sınırı 200 ms'dir.
+Diğer koşularda p95 sınırı 500 ms'dir.
+Bir koşu kendi sınırını aşarsa komut 1 döndürür.
