@@ -58,6 +58,24 @@ class ReviewTests(unittest.TestCase):
             self.assertEqual(scans.scan_bandit().status, "fail")
             git.assert_not_called()
 
+    def test_bandit_scans_a_tracked_backend_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / scans.SECURITY / "bandit-exceptions.json"
+            config.parent.mkdir(parents=True)
+            config.write_text("[]")
+            target = "backend/known.py"
+            (root / target).write_text("assert False\n")
+            (root / "backend/untracked.py").write_text("assert False\n")
+            fixture = [{"test_id": "B101", "line_number": 1}]
+            finding = {**fixture[0], "filename": target}
+            with patch.object(scans, "ROOT", root), patch.object(scans, "git", return_value=target + "\0"), \
+                    patch.object(scans, "bandit_findings", side_effect=[fixture, [finding]]) as scan:
+                result = scans.scan_bandit()
+            self.assertEqual(scan.call_args.args[1], [target])
+            self.assertEqual(result.status, "fail")
+            self.assertEqual(result.findings, (f"B101 · {target}:1",))
+
     def test_unused_bandit_exception_fails(self):
         entry = '{"rule":"B603","file":"backend/a.py","code":"run()","statementSha256":"1111111111111111111111111111111111111111111111111111111111111111","owner":"dev","reason":"Fixed argv","ignoreUntil":"2100-01-01"}'
         with tempfile.TemporaryDirectory() as directory:
@@ -120,6 +138,7 @@ class ReviewTests(unittest.TestCase):
             for destination, body in {
                 tools / "git": 'case "$1" in merge-base) [ -n "$BASE" ] && printf "%s\\n" "$BASE";; esac',
                 tools / "uvx": "exit 0",
+                tools / "uv": 'printf "%s\\n" "$*" >> "$CALLS"; exit "$BANDIT_STATUS"',
                 tools / "python3": "exit 0",
                 tools / "docker": "cat >/dev/null",
                 security / "history-scan": "exit 0",
@@ -129,13 +148,18 @@ class ReviewTests(unittest.TestCase):
                 destination.chmod(0o755)
             calls = root / "calls"
             env = {**os.environ, "PATH": f"{tools}:{os.environ['PATH']}", "CALLS": str(calls)}
-            for base, code, expected in (("abc", 0, ["--self-test", "--commit-base abc"]), ("", 1, ["--self-test"])):
-                with self.subTest(base=base):
+            bandit_call = "run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py bandit"
+            for base, bandit_status, gate_status, remaining in (
+                ("abc", 0, 0, ["--self-test", "--commit-base abc"]),
+                ("", 0, 1, ["--self-test"]),
+                ("abc", 1, 1, ["--self-test", "--commit-base abc"]),
+            ):
+                with self.subTest(base=base, bandit_status=bandit_status):
                     calls.write_text("")
-                    result = subprocess.run([bin_dir / "security-audit"], env={**env, "BASE": base},
-                                            capture_output=True, text=True)
-                    self.assertEqual(result.returncode, code, result.stderr)
-                    self.assertEqual(calls.read_text().splitlines(), expected)
+                    result = subprocess.run([bin_dir / "security-audit"], env={**env, "BASE": base,
+                                            "BANDIT_STATUS": str(bandit_status)}, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, gate_status, result.stderr)
+                    self.assertEqual(calls.read_text().splitlines(), [bandit_call, *remaining])
 
     def test_handoff_describes_database_timestamp_limit(self):
         handoff = (scans.ROOT / "backend/docs/handoff/ci-security.md").read_text()

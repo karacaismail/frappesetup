@@ -1,22 +1,26 @@
 # Backend güvenlik denetimi
 
 Depo kökünde `backend/dev/bin/security-audit` komutunu çalıştırın.
-Komut için Python 3.9 veya üstü, `uvx` ve çalışan Colima gerekir.
+Komut için Python 3.9 veya üstü, `uv`, `uvx` ve çalışan Colima gerekir.
+Bandit adımı sabitlenmiş Python 3.12 ortamında çalışır.
 İlk çalıştırmada araç paketlerinin ve Gitleaks imajının indirilmesi gerekebilir.
 
 Komut aşağıdaki işleri yapar.
 
-1. Semgrep kurallarını doğru ve hatalı örneklerle sınar.
-2. Backend kaynak kodunu Semgrep ile denetler.
-3. Gitleaks ile koda yazılmış gizli bilgileri arar.
-4. Uç listesi betiğinin birim testlerini çalıştırır.
-5. Tüm uçları ve misafire açık uçları ayrı ayrı listeler.
-6. Her uç için iki yetki testi adı arar.
+1. Bandit ile Git’in izlediği backend Python dosyalarını tarar.
+2. Semgrep kurallarını doğru ve hatalı örneklerle sınar.
+3. Backend kaynak kodunu Semgrep ile denetler.
+4. Gitleaks ile koda yazılmış gizli bilgileri arar.
+5. Uç listesi betiğinin birim testlerini çalıştırır.
+6. Tüm uçları ve misafire açık uçları ayrı ayrı listeler.
+7. Her uç için iki yetki testi adı arar.
 
 Bir adım başarısız olursa komut hata koduyla çıkar.
 Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
 Tarama, Git geçmişini kapsamaz.
 Gitleaks sonucu gösterirken gizli değerleri örter.
+Bandit önce bilinen hatalı örneği sınar. Ardından örnek klasörlerini kapsam dışında tutar.
+Kullanılmayan Bandit istisnası ya da açık bulgu kapıyı durdurur.
 
 ## Her uç için iki test
 

@@ -744,6 +744,7 @@ def main():
     local.add_argument("target")
     for scan in (full, local):
         scan.add_argument("--ci", action="store_true", default=os.environ.get("CI", "").lower() in ("1", "true"))
+    subcommands.add_parser("bandit")
     subcommands.add_parser("report")
     subcommands.add_parser("compile-lock")
     card = subcommands.add_parser("scorecard")
@@ -762,6 +763,8 @@ def main():
             return scan_local(args.target, ci=args.ci)
         except ValueError as error:
             parser.error(str(error))
+    if args.mode == "bandit":
+        return int(scan_bandit().status != "pass")
     if args.mode == "compile-lock":
         compile_lock()
         return 0
