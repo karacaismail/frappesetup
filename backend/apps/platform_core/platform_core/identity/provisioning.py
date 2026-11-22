@@ -29,6 +29,10 @@ MAX_ISSUER = 255
 
 
 def provision(data: dict) -> dict:
+	return _retry_write(_provision, data)
+
+
+def _provision(data: dict) -> dict:
 	issuer = _issuer(data)
 	subject = _text(data, "subject", MAX_SUBJECT)
 	email = _email(data.get("email"))
@@ -89,6 +93,10 @@ def provision(data: dict) -> dict:
 
 
 def set_enabled(data: dict) -> dict:
+	return _retry_write(_set_enabled, data)
+
+
+def _set_enabled(data: dict) -> dict:
 	issuer = _issuer(data)
 	subject = _text(data, "subject", MAX_SUBJECT)
 	enabled = _bool(data, "enabled")
@@ -100,6 +108,10 @@ def set_enabled(data: dict) -> dict:
 
 
 def change_email(data: dict) -> dict:
+	return _retry_write(_change_email, data)
+
+
+def _change_email(data: dict) -> dict:
 	issuer = _issuer(data)
 	subject = _text(data, "subject", MAX_SUBJECT)
 	new_email = _email(data.get("new_email"))
@@ -112,6 +124,12 @@ def change_email(data: dict) -> dict:
 		)
 	rename_doc("User", user, new_email, show_alert=False)
 	return {"user": new_email}
+
+
+def _retry_write(step, data: dict) -> dict:
+	from platform_core.identity import anonymization
+
+	return anonymization._with_retry(step, data)
 
 
 def _locked_user(issuer: str, subject: str, *, candidate_user: str | None = None) -> str | None:

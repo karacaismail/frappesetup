@@ -360,7 +360,6 @@ class TenantClient:
             "platform_core.api.identity.anonymize_user",
             self._body(action),
             _is_anonymized,
-            missing_identity_is_success=True,
             retry_statuses=ANONYMIZE_RETRY_STATUSES,
         )
 
