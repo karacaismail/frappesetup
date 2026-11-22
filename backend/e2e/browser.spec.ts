@@ -27,6 +27,9 @@ async function login(page: Page, entry: 'button' | 'api') {
     await page.goto(login_url);
   }
   await expect.poll(() => new URL(page.url()).origin).toBe(identity);
+  const loginParameters = new URL(page.url()).searchParams;
+  expect(loginParameters.get('client_id')).toBe('site-kiraci1');
+  expect((loginParameters.get('scope') ?? '').split(/\s+/)).not.toContain('aud-identity-sync');
   await page.locator('#username').fill(account);
   await page.locator('#password').fill(required('E2E_KEYCLOAK_PASSWORD'));
   await page.locator('#kc-login').click();

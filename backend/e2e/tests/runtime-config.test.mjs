@@ -41,6 +41,12 @@ test('preview webhook uses the Keycloak development hostname and its network ali
           "compose --project-name")
             if [[ "$*" == *" config --quiet" ]]; then printf '%s\\n' "$IDENTITY_SYNC_EVENTS_URL" > "$PREVIEW_DIR/webhook"; fi ;;
           "create --label")
+            for ((index = 1; index < $#; index++)); do
+              if [[ "\${!index}" == --env-file ]]; then
+                next=$((index + 1))
+                grep -E '^IDENTITY_SYNC_(EXECUTE|SESSION)_AZP=' "\${!next}" > "$PREVIEW_DIR/tenant-service-clients"
+              fi
+            done
             while [[ "$1" != --network-alias && $# -gt 1 ]]; do shift; done
             printf '%s\\n' "$2" > "$PREVIEW_DIR/alias"
             exit 42 ;;
@@ -69,6 +75,10 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.equal(webhook.hostname, 'event-sink.localhost');
     assert.equal(webhook.pathname, '/v1/events');
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);
+    assert.deepEqual(readFileSync(join(root, 'tenant-service-clients'), 'utf8').trim().split('\n'), [
+      'IDENTITY_SYNC_SESSION_AZP=site-kiraci1-service',
+      'IDENTITY_SYNC_EXECUTE_AZP=site-kiraci1-service',
+    ]);
   } finally {
     rmSync(root, { recursive: true });
   }

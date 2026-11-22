@@ -36,6 +36,9 @@ node --experimental-strip-types --test backend/e2e/tests/*.test.*
 Hata kalırsa API denemesi, geçidin hata kodunu ve sahte sağlayıcı yanıtlarını gösterir.
 Önizleme, kimlik eşitleme kuyruğundan işlem adını ve HTTP kodunu saklar.
 
+Tarayıcı girişi `site-kiraci1` istemcisini kullanır. Canlı önizleme bu istemcinin servis belirteci isteğini reddettiğini doğrular.
+`site-kiraci1-service` ayrı bir sır kullanır. Önizleme, bu istemcinin yalnız `identity-sync` hedefli belirteç aldığını doğrular.
+
 ## Sonuçlar
 
 Canlı Factory önizlemesi 22 Kasım 2026 Pazar günü çalıştı.

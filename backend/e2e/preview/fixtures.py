@@ -1,5 +1,6 @@
 """Create synthetic fixture data in a merge preview's fresh, isolated sites."""
 
+import base64
 import http.client
 import ipaddress
 import json
@@ -16,7 +17,7 @@ BENCH = "/home/frappe/frappe-bench"
 PRESS_BENCH = "/home/frappe/benches/frappe-bench"
 
 
-def keycloak_request(port, path, *, token=None, data=None, form=False):
+def keycloak_request(port, path, *, token=None, data=None, form=False, expect_denial=False):
     headers = {"Host": f"kimlik.localhost:{port}"}
     body = None
     if token:
@@ -29,12 +30,47 @@ def keycloak_request(port, path, *, token=None, data=None, form=False):
         connection.request("POST" if data is not None else "GET", path, body=body, headers=headers)
         response = connection.getresponse()
         raw = response.read()
+        if expect_denial and response.status in (400, 401):
+            return json.loads(raw)
         if not 200 <= response.status < 300:
             # Do not print HTTP headers or bodies. They can contain tokens.
             raise RuntimeError(f"Keycloak fixture request returned HTTP {response.status} on {path}")
         return json.loads(raw) if raw else response.getheader("Location")
     finally:
         connection.close()
+
+
+def check_tenant_clients(port):
+    """Exercise the disposable realm without retaining or logging its tokens."""
+    path = "/realms/platform/protocol/openid-connect/token"
+    browser_secret = os.environ["E2E_KEYCLOAK_CLIENT_SECRET"]
+    service_secret = os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"]
+    if not browser_secret or not service_secret or browser_secret == service_secret:
+        raise RuntimeError("The preview requires two distinct tenant client secrets.")
+
+    browser = {
+        "grant_type": "client_credentials", "client_id": "site-kiraci1",
+        "client_secret": browser_secret,
+    }
+    for scope in ({}, {"scope": "aud-identity-sync"}):
+        response = keycloak_request(port, path, data={**browser, **scope}, form=True, expect_denial=True)
+        if not isinstance(response, dict) or response.get("error") not in {"unauthorized_client", "invalid_scope"}:
+            raise RuntimeError("The tenant browser client did not refuse the service token request as expected.")
+
+    service_client = "site-kiraci1-service"
+    response = keycloak_request(port, path, form=True, data={
+        "grant_type": "client_credentials", "client_id": service_client,
+        "client_secret": service_secret, "scope": "aud-identity-sync",
+    })
+    try:
+        _, payload, _ = response["access_token"].split(".")
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise RuntimeError("Keycloak returned an invalid preview service token.") from None
+    if not isinstance(claims, dict) or claims.get("azp") != service_client or claims.get("aud") not in (
+        "identity-sync", ["identity-sync"],
+    ):
+        raise RuntimeError("The preview service token has an unexpected client or audience.")
 
 
 def created_identifier(location, fixture_kind):
@@ -126,6 +162,8 @@ def main():
     ):
         raise SystemExit("The fake provider must use a private address on the preview network.")
 
+    check_tenant_clients(port)
+    print("Tenant browser and service client checks passed.", flush=True)
     password = "Aa9!" + secrets.token_urlsafe(24)
     subject, lifecycle = seed_keycloak(port, password)
     common = {
@@ -151,6 +189,7 @@ def main():
         **common,
         "E2E_PROVIDER_IP": str(address),
         "E2E_KEYCLOAK_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
+        "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
     })
     fixture.update(press_fixture)
     fixture.update(

@@ -124,6 +124,8 @@ def main():
         config.update(
             keycloak_client_id="site-kiraci1",
             keycloak_client_secret=os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
+            keycloak_service_client_id="site-kiraci1-service",
+            keycloak_service_client_secret=os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
             kimlik_marka_adi="Atonota",
             kimlik_mobil_azp=["mobile-app"],
             kimlik_deletion_hmac_key=token_urlsafe(32),

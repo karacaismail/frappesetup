@@ -174,11 +174,12 @@ E2E_ADMIN_PASSWORD="$(setting ADMIN_PASSWORD "$DEV_ENV_FILE")"
 E2E_KEYCLOAK_ADMIN_USER="$(setting KC_BOOTSTRAP_ADMIN_USERNAME "$keycloak_env")"
 E2E_KEYCLOAK_ADMIN_PASSWORD="$(setting KC_BOOTSTRAP_ADMIN_PASSWORD "$keycloak_env")"
 E2E_KEYCLOAK_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SECRET "$keycloak_env")"
+E2E_KEYCLOAK_SERVICE_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SERVICE_SECRET "$keycloak_env")"
 E2E_PRESS_CLIENT_SECRET="$(setting ATONOTA_PRESS_SECRET "$keycloak_env")"
 E2E_PRESS_ADMIN_PASSWORD="$(setting PRESS_ADMIN_PASSWORD "$press_env")"
 E2E_IDENTITY_SYNC_WEBHOOK_SECRET="$(setting IDENTITY_SYNC_WEBHOOK_SECRET "$keycloak_env")"
 export E2E_ADMIN_PASSWORD E2E_KEYCLOAK_ADMIN_USER E2E_KEYCLOAK_ADMIN_PASSWORD E2E_KEYCLOAK_CLIENT_SECRET
-export E2E_PRESS_CLIENT_SECRET E2E_PRESS_ADMIN_PASSWORD E2E_IDENTITY_SYNC_WEBHOOK_SECRET
+export E2E_KEYCLOAK_SERVICE_CLIENT_SECRET E2E_PRESS_CLIENT_SECRET E2E_PRESS_ADMIN_PASSWORD E2E_IDENTITY_SYNC_WEBHOOK_SECRET
 export E2E_PROVIDER_HOST=e2e-provider
 
 # Include each source fragment with an isolated override. The source fragments keep their own
@@ -257,7 +258,7 @@ BASH
         printf 'IDENTITY_SYNC_DIGEST_KEY=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
         printf 'IDENTITY_SYNC_PORT=%s\n' "$sync_port"
         printf '%s\n' 'IDENTITY_SYNC_HOST=0.0.0.0' 'IDENTITY_SYNC_REALM=platform' 'IDENTITY_SYNC_CLIENT_ID=identity-sync' \
-            'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-kiraci1'
+            'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-kiraci1-service' 'IDENTITY_SYNC_EXECUTE_AZP=site-kiraci1-service'
     } > "$sync_env"
     docker_default create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias "$sync_host" --memory 128m \
         --env-file "$sync_env" -e PYTHONPATH=/tmp --publish "127.0.0.1:$sync_port:$sync_port" \

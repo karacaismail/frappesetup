@@ -1,5 +1,7 @@
 """Check fixture failures without starting Keycloak, Docker, or Frappe."""
 
+import base64
+import json
 import os
 import unittest
 from unittest.mock import patch
@@ -8,6 +10,43 @@ from backend.e2e.preview import fixtures
 
 
 class PreviewFixturesTest(unittest.TestCase):
+    def test_live_credentials_are_split_between_tenant_clients(self):
+        claims = base64.urlsafe_b64encode(json.dumps({
+            "aud": "identity-sync", "azp": "site-kiraci1-service",
+        }).encode()).decode().rstrip("=")
+        settings = {
+            "E2E_KEYCLOAK_CLIENT_SECRET": "browser-secret",
+            "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": "service-secret",
+        }
+        with patch.dict(os.environ, settings), patch.object(
+            fixtures, "keycloak_request", side_effect=[
+                {"error": "unauthorized_client"},
+                {"error": "unauthorized_client"},
+                {"access_token": f"header.{claims}.signature"},
+            ],
+        ) as request:
+            fixtures.check_tenant_clients(43820)
+        forms = [call.kwargs["data"] for call in request.call_args_list]
+        self.assertEqual([form["client_id"] for form in forms], [
+            "site-kiraci1", "site-kiraci1", "site-kiraci1-service",
+        ])
+        self.assertEqual([form.get("scope") for form in forms], [None, "aud-identity-sync", "aud-identity-sync"])
+        self.assertEqual([form["client_secret"] for form in forms], [
+            "browser-secret", "browser-secret", "service-secret",
+        ])
+
+    def test_browser_service_grant_success_stops_the_preview(self):
+        settings = {
+            "E2E_KEYCLOAK_CLIENT_SECRET": "browser-secret",
+            "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": "service-secret",
+        }
+        with patch.dict(os.environ, settings), patch.object(
+            fixtures, "keycloak_request", return_value={"access_token": "unexpected"},
+        ) as request:
+            with self.assertRaisesRegex(RuntimeError, "browser client did not refuse"):
+                fixtures.check_tenant_clients(43820)
+            request.assert_called_once()
+
     def test_sync_user_creation_requires_a_location(self):
         settings = {
             "E2E_KEYCLOAK_ADMIN_USER": "preview-admin",
