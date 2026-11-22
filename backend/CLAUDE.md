@@ -43,7 +43,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
 | `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
-| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
+| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi`, `dev/security/`, `dev/bin/security-full`, `dev/bin/dast-scan`, `dev/bin/release-report` | Güvenlik kapısı ve elle başlatılan taramalar | security-tooling |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/hrms_tr/`, `dev/hrms/` | HRMS TR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
@@ -87,12 +87,11 @@ Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle baş
 
 ### Ad dili
 
-Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içindir.
+Bütün kod adları İngilizce ve yalnız ASCII olur (D-12, proje sahibinin Karar 40'ı). Ayrıntı `docs/standartlar/` içindeki M-8, H-10, F-4, TS-9 ve IC-1 kurallarıdır.
 
-- Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
-- Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
-- Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
-- Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
+- Yeni dosya, klasör, modül, DocType, alan, Select seçeneği, işlev ve değişken adını İngilizce verin.
+- Görünen metni İngilizce yazın. Python'da `frappe._`, JavaScript'te `__()` kullanın. DocType JSON etiketleri de İngilizce olur. Türkçesi çeviri dosyasına girer.
+- Var olan adları elle değiştirmeyin. Eski adları naming-history-fix işinin ortak betiği değiştirir. Orkestratör betiği kendi dalınızda çalıştırmanızı isteyecek.
 - Proje sahibi bir ürün adını bu depoda yasakladı (D-13). Ad bu projeyle ilgili değildir. Adı hiçbir dosyaya, commit mesajına, imaj ya da container adına yazmayın.
 - İK uygulamasının teknik adı `hrms_tr` olur. Görünen adı “HRMS TR” olur. Yapay zekâ uygunluk kapısı yasaklı adı yakalar.
 
@@ -129,6 +128,7 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - Kendi eski `fs-*` imajlarınızı ve derleme önbelleğinizi silin. Başka projenin imajına dokunmayın.
    - Boş yer 5 GB'ın altına inerse raporlayın. Gerekirse `colima` profili kullanılır. O profilde 64 GB boş disk ama 8 GB bellek var.
    - 22 Kasım 2026 Pazar günü orkestratör ölü imaj ve birimleri sildi. Boş yer 5,7 GB oldu.
+   - Aynı gün boş yer 2,3 GB'a düştü. Orkestratör geçici birimleri ve kullanılmayan önbelleği sildi. Boş yer 4,2 GB oldu. Geçici site için rastgele adlı birim açmayın. Bir deneme bitince kendi geçici birimini silin.
    - Her `up` imajı yeniden derlemesin. İmaj varsa yeniden kullanın.
    - Press gereken ağır ortamı `colima` profilinde açın. Önce `colima ssh -- free -g` ile en az 3 GB boş bellek ölçün.
 5. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.

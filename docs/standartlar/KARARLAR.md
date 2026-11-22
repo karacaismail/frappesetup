@@ -857,7 +857,7 @@ Sonuç şudur:
 - Ad kuralları `naming_rules_report.md` dosyasındadır. Raporda 73 kural var. Kural kodları `AV` ile başlar.
 - Raporun açıklamaları Türkçedir. Kod örnekleri İngilizcedir.
 - frappesetup deposunun eski adlarını “Frappe setup” oturumu düzeltir. İş Pane'de `naming-history-fix` adıyla yürür.
-- Kural dosyaları bu karara göre güncellenir. Python dosyasında M-8, Python dışı dosyada H-10 ve F-4, ayrı arayüz dosyasında TS-9 değişir.
+- Kural dosyaları bu karara göre güncellenir. Python dosyasında M-8 değişir. Python dışı dosyada H-10 ve F-4 değişir. Ayrı arayüz dosyasında TS-9 ve IC-1 değişir. Codex ve Gemini değişikliği iki turda inceledi.
 
 ### Karar 41. Kural dosyasının sınırı 36.000 ile 39.000 bayt arasında olacak
 
