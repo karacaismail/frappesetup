@@ -149,3 +149,9 @@ Tablo `pass`, `fail` ve `not_run` durumlarını kullanır. Test satırları, den
 | 320 px genişlikte %300 yazı | İnceleme, ana sayfanın yatay taştığını gördü. Bu ölçek mevcut kabul aralığı dışında. | Ana sayfa taşmadan okunur. | Depo sahibi |
 | Görsel referans kapsamı | Referanslar yedi görünüm içindir; mobil gezinme çekmecesi ve Teslim grubu gezinmesi görüntüde yok (davranış testleri var) | Gerekirse ek referans, bağımsız onayla | Depo sahibi |
 | Action güncellemeleri | Action sürümleri commit koduna sabittir. Otomatik güncelleme işi kurulmadı. Zamanlama kararı kullanıcıya aittir. | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | DevOps sorumlusu |
+
+## Kapanan kararlar
+
+| Kimlik | Karar | Kanıt |
+| --- | --- | --- |
+| K-36 | 8 Ekim 2026 Perşembe günü karar kapandı. JS bütçesi ilk görünümde indirilen tüm kabuk parçalarını kapsar. Önceki 85 KB ölçümü yalnız giriş parçalarını saydı. O derlemede gerçek toplam 125,2 KB idi. | Kabuk hafifletilince toplam 96,9 KB oldu. Giriş parçaları 77,9 KB idi. CI, her koşuda toplamın en çok 100 KB olduğunu denetler. Güncel ölçüm doğrulama tablosundadır. |

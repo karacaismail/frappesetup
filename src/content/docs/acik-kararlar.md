@@ -4,7 +4,7 @@ nav: "Açık kararlar"
 order: 18
 ---
 
-Bu bölüm açık kararları ve dış bağımlılıkları gösterir. Kararlar üç türdür ve **Tür** sütununda yazılıdır. sabit kullanıcı kararları [Kararlar](/frappesetup/kararlar/) sayfasındadır (K1 ile K10). Bu tabloda **ürün sahibi**, **mali müşavir/finans**, **hukuk** kararı isteyenler ile **teknik varsayımlar** (onaya kadar geçici kuraldır) ayrılır. Onaya kadar gereksinimler bu varsayımla yazılır. Etkilenen kimlikler aynı satırdadır. "Öneri" sütunundaki sayılar ölçülmüş kapasite veya kabul edilmiş taahhüt değildir. Ekip kapanan kararları karar notuna yazar (X-19). GoDaddy kaydını DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı uygular. DevOps sorumlusu sonucu doğrular.
+Bu bölüm açık kararları ve dış bağımlılıkları gösterir. Kararlar üç türdür ve **Tür** sütununda yazılıdır. Sabit kullanıcı kararları [Kararlar](/frappesetup/kararlar/) sayfasındadır (K1 ile K10). Bu tabloda **ürün sahibi**, **mali müşavir/finans**, **hukuk** kararı isteyenler ayrı gösterilir. **Teknik varsayımlar** onaya kadar geçici kuraldır. Onaya kadar gereksinimler bu varsayımla yazılır. Etkilenen kimlikler aynı satırdadır. "Öneri" sütunundaki sayılar ölçülmüş kapasite veya kabul edilmiş taahhüt değildir. Ekip kapanan kararları karar notuna yazar (X-19). GoDaddy kaydını DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı uygular. DevOps sorumlusu sonucu doğrular.
 
 ## Açık kararlar
 
@@ -15,7 +15,6 @@ Bu bölüm açık kararları ve dış bağımlılıkları gösterir. Kararlar ü
 | K-3 | Güvenlik ajanları ve nöbet (G-36, G-115, X-08) | Ürün sahibi | Wazuh, YARA ve Malware Scan kapsamı ile yedek nöbetçi | Wazuh ve auditd P0 kapsamındadır. İlk nöbet DevOps sorumlusundadır. Ürün sahibi yedek kişiyi atar. | P0 |
 | K-4 | Yinelenen tahsilat modeli (G-19, G-20) | Ürün sahibi | Press Usage Record + iyzico saklı karttan tahsilat / iyzico Subscription ürünü | Press defteri + saklı kart: ay içi plan değişimi, kredi ve Havale/EFT tek defterde kalır | P1 |
 | K-5 | App Release onay kapısı (G-14) | Ürün sahibi | `bypass_automated_audit` + otomatik Approved / App Release Approval Request | alpha ve beta'da otomatik, rc ve prod Release Group'ta Approval Request zorunlu | P1 |
-| K-6 | Keycloak teması (G-80) | Teknik varsayım | Keycloakify / FTL | MVP'de kapandı: tema Keycloak'ın kendi tema yapısıyla (FTL) kurulur (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Tema Java kodu içermez (G-152). Giriş sayfası ve panelin tokenları bugün iki ayrı dosyadadır. Tek kaynağa geçiş backend borcudur | P1 |
 | K-7 | SMTP relay (G-47) | Ürün sahibi | Hetzner'de Postfix / AB bölgeli sağlayıcı | AB bölgeli sağlayıcı teslimat itibarı için seçilir. Ekip sağlayıcıyı KVKK envanterine ekler. DevOps sorumlusu kurulumu yapar. Alan adı sorumlusu DNS değerlerini uygular. | P1 |
 | K-8 | Ürün parametreleri | Ürün sahibi | `rounding_method` (G-41), `track_views` (G-64), `apply_strict_user_permissions` (G-52). Oturum ayarı G-43 kapsamında ayrı ele alındı. | Banker's Rounding, track\_views yalnızca hassas doctype'larda, strict açık | P1 |
 | K-9 | GİB özel entegratörü ve e-belge kodu (G-22, G-65) | Mali müşavir + ürün sahibi | Hazır Frappe e-belge uygulaması / `tr_edocs` geliştirme; Sovos, Logo, Uyumsoft, eLogo | Entegratör mali müşavirle seçilir; UBL-TR katmanı tek kez yazılır, operasyon sitesi (`press_tr_finance`) ve kiracılar paylaşır | P2 |
@@ -49,13 +48,11 @@ Bu bölüm açık kararları ve dış bağımlılıkları gösterir. Kararlar ü
 
 | # | Karar | Tür | Durum | Öneri |
 | --- | --- | --- | --- | --- |
-| K-31 | Görev sahiplerinin bu public sitede adlandırılması | Ürün sahibi | Kapandı (22 Kasım 2026 Pazar): yayın provasında en güvenli seçenek uygulandı. Kişi adları rol adlarıyla değiştirildi. Rol adları "DevOps sorumlusu" ve "alan adı sorumlusu" olarak yazılır. Ürün sahibi başka karar verirse satır yeniden açılır. | Yeni metinde kişi adı yazılmaz, rol adı kullanılır |
 | K-32 | Bu deponun lisans onay kaydı (kod MIT, içerik CC BY 4.0) | Ürün sahibi | Lisans dosyaları değiştirilmedi; onayın kaydı depoda yok | Ürün sahibi onayı ADR olarak yazılır; onay yoksa lisans kararı yeniden açılır |
-| K-36 | Docs sitesi kabuk JS bütçesinin kapsamı | Ürün sahibi | Kapandı (8 Ekim 2026): kapsam ilk görünümün toplam JS'idir, giriş parçalarıyla daraltılmaz. Önceki "85 KB" bildirimi yalnız giriş parçalarını sayıyordu; aynı derlemenin toplamı 125,2 KB idi | Kabuk hafifletildi: toplam 96,9 KB, giriş parçaları 77,9 KB (ayrı raporlanır; güncel ölçüm İzlenebilirlik QA tablosunda); ağ testi her CI koşusunda toplamı ≤ 100 KB ile denetler |
 
 ## Karar notlarından gelen kararlar ve çelişkiler
 
-Kararların metni [Karar kataloğu](/frappesetup/karar-katalogu/) sayfasındadır. K-37 ile K-44 arasındaki kararlar açıktır. K-45 ile K-61 arasındaki satırlar notlardaki çelişkileri gösterir. Notlardaki fazlar yol haritası fazlarıyla eşlenmedi.
+Kararların metni [Karar kataloğu](/frappesetup/karar-katalogu/) sayfasındadır. K-37 ile K-44 arasındaki kararlar açıktır. K-45 ile K-60 arasındaki satırlar notlardaki çelişkileri gösterir. Notlardaki fazlar yol haritası fazlarıyla eşlenmedi.
 
 | # | Karar | Tür | Seçenekler | Öneri | Faz |
 | --- | --- | --- | --- | --- | --- |
@@ -83,7 +80,6 @@ Kararların metni [Karar kataloğu](/frappesetup/karar-katalogu/) sayfasındadı
 | K-58 | Notun küçük ölçüleri (AU-05) | Ürün sahibi | 15 px clamp, 32 px hedef / kalıcı kural: ≥ 1rem, 44/48 px | Kalıcı kural geçerlidir. Notun değerleri uygulanmadı. | Faz yok |
 | K-59 | Doğrulanamayan AI olguları (AI-15) | Ürün sahibi | Not: üç depo var, OpenAEC MIT / 8 Ekim klon denemesi: 404, LGPL v3 metni | Depoya dayanan öneriler doğrulanana kadar uygulanmaz | Faz yok |
 | K-60 | Mimari adı (AU-01) | Ürün sahibi | Üç not, üç ad | Resmi ad kaydı yok | Faz yok |
-| K-62 | Keycloak fark denetimi (KM-22) | Platform ekibi | Gecelik rapor veya elle denetim | Operatör fark denetimini elle başlatır. Bu kural D-6, O-11 ve SUS-03’te açıklanır. | Faz yok |
 
 ## Başlıca riskler ve azaltımlar
 

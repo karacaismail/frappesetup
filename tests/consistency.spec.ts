@@ -28,8 +28,7 @@ type TaskBoard = {
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
   items: Record<string, TaskItem>;
 };
-const openDecisions = docs.find((doc) => doc.slug === 'acik-kararlar')!.text;
-const decisionIds = [...openDecisions.matchAll(/^[ \t]*\|[ \t]*(K-\d+)[ \t]*\|/gm)].map((match) => match[1]);
+const decisionRows = docs.flatMap(({ text }) => [...text.matchAll(/^\| (K-\d+) \|.*$/gm)]);
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
 
 // Git yardımcıları: kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer.
@@ -283,9 +282,9 @@ test.describe('content consistency', () => {
     const k9 = text('kararlar').split('\n').find((line) => line.startsWith('| K9 |'));
     const homeCard = read('src/pages/index.astro').split('\n').find((line) => line.includes("id: 'K9'"));
     for (const decision of [k9, homeCard]) {
-      expect(decision).toContain('AI eylemleri aynı sunucu izinlerinden geçer');
-      expect(decision).toContain('yazma eylemleri önizleme + onay ister');
-      expect(decision).toContain("her eylem audit'e düşer");
+      expect(decision).toContain('AI eylemleri aynı sunucu izinlerinden geçer.');
+      expect(decision).toContain('Yazma eylemleri önizleme ve onay gerektirir.');
+      expect(decision).toContain('Sistem her eylemi denetim kaydına yazar.');
       expect(decision).toContain('KVKK uyumu zorunlu');
     }
 
@@ -319,7 +318,7 @@ test.describe('content consistency', () => {
     });
     expect(missing).toEqual([]);
 
-    const decisions = new Map([...openDecisions.matchAll(/^\| (K-\d+) \|.*$/gm)].map((row) => [row[1], row[0]]));
+    const decisions = new Map(decisionRows.map((row) => [row[1], row[0]]));
     for (const [id, links] of Object.entries({ 'K-6': ['G-80', 'G-152'], 'K-8': ['G-43'], 'K-41': ['G-78', 'K-8'] })) {
       for (const link of links) expect(decisions.get(id), `${id} → ${link}`).toContain(link);
     }
@@ -380,18 +379,18 @@ test.describe('content consistency', () => {
     expect(missing).toEqual([]);
   });
 
-  test('open decision ids are unique', () => {
+  test('decision ids are unique', () => {
     const seen = new Set<string>();
     const duplicates = new Set<string>();
-    for (const id of decisionIds) {
+    for (const [, id] of decisionRows) {
       if (seen.has(id)) duplicates.add(id);
       seen.add(id);
     }
     expect([...duplicates]).toEqual([]);
   });
 
-  test('every K decision reference exists in the open decisions page', () => {
-    const defined = new Set(decisionIds);
+  test('every K decision reference has a documented decision', () => {
+    const defined = new Set(decisionRows.map((row) => row[1]));
     const missing: string[] = [];
     const scan = (where: string, text: string) => {
       for (const m of text.matchAll(/\bK-(\d+)\b/g)) if (!defined.has(`K-${m[1]}`)) missing.push(`${where}: K-${m[1]}`);
@@ -404,6 +403,7 @@ test.describe('content consistency', () => {
   test('all document embeds render once without placeholders', () => {
     for (const doc of docs) {
       const names = [...doc.text.matchAll(/<div data-embed="([a-z0-9-]+)"><\/div>/g)].map((match) => match[1]);
+      expect(new Set(names).size, doc.slug).toBe(names.length);
       if (names.length === 0) continue;
       const html = read(`dist/${doc.slug}/index.html`);
       expect(html, doc.slug).not.toMatch(/<[^>]*\sdata-embed=/);

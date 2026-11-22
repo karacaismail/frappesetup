@@ -44,8 +44,8 @@
   "after": [
    "P1"
   ],
-  "goal": "App çerçevesinin (backend iskelet, frontend modül, yetki/AI/abonelik sözleşmeleri, uygulama durum modeli, yardım ve tur içeriği) HRMS TR ile ilk kez uygulanması; Marketplace App, App Plan, Product Trial, aktivasyon UX, paylaşım bağlantıları ve güvenli bağlantı önizlemesi.",
-  "exit": "Yeni müşteri Keycloak ile kayıt → 14 günlük deneme sitesi → 'Etkinleştir' → Agent Job → sidebar'da HRMS TR başlığı akışı E2E testte ve ilk ödeyen müşteride çalışıyor; HRMS TR bordro kabul senaryoları geçiyor; subscription info ile özellik kapıları ve uygulama durumları doğrulanmış; paylaşılan kayıt bağlantısının oturumsuz önizlemesi kayıt verisi içermiyor; ilk ziyaret turu girdi kaybı olmadan çalışıyor.",
+  "goal": "Ekip uygulama çerçevesini ilk kez HRMS TR ile uygular. Çerçeve arka uç iskeletini ve ön yüz modülünü içerir. Yetki, AI ve abonelik sözleşmelerini kapsar. Uygulama durum modelini, yardım metnini ve ilk ziyaret turunu da kapsar. Kapsamda Marketplace App, App Plan ve Product Trial var. Etkinleştirme, paylaşım bağlantıları ve güvenli bağlantı önizlemesi de kapsama girer.",
+  "exit": "Müşteri Keycloak ile kaydolur. Sistem 14 günlük deneme sitesini açar. Müşteri Etkinleştir düğmesine basınca Agent Job başlar. HRMS TR başlığı yan menüde görünür. Bu akış uçtan uca testte ve ilk ödeyen müşteride çalışır. HRMS TR bordro kabul senaryoları geçer. Ekip, subscription info ile özellik erişimini ve uygulama durumlarını doğrular. Oturumsuz bağlantı önizlemesi paylaşılan kaydın verisini göstermez. İlk ziyaret turu kullanıcının girdisini korur.",
   "owner": "Platform ekibi + App ekibi + Frontend ekibi; ürün sahibi (plan/fiyat, K-29, K-35); mali müşavir (bordro parametreleri)"
  },
  {

@@ -186,7 +186,7 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 
 ## 9. Oturum süreleri
 
-İlk sürümde kiracı sitesi ve telefon paketi herkese çalışan oturum sürelerini uygular. Keycloak bu istemcilerde çalışan süre profili olan `employee` düzeyini ister. Müşteri oturum süresi yalnız Press için geçerlidir.
+Keycloak, çalışan oturum sürelerini `employee` adlı profilde tutar. İlk sürümde kiracı sitesi ve telefon uygulaması bu profili tüm kullanıcılar için zorunlu tutar. Müşteri oturum süresi yalnız Press için geçerlidir.
 
 | Ayar | Kiracı sitesi ve telefon | Press |
 | --- | --- | --- |
@@ -219,3 +219,10 @@ Kullanıcı takımın tek üyesiyse sistem takımı kapatır. Sistem siteleri as
 Bir adım başarısız olursa istek hata kuyruğuna girer. Operatör isteği elle yeniden dener. Sistem tamamlanan adımları tekrarlamaz.
 
 Hesap silme sırasını proje kaydı O-27 ve sözleşmenin 7. bölümü belirler.
+
+## Kapanan kararlar
+
+| Kimlik | Karar | Kaynak |
+| --- | --- | --- |
+| K-6 | MVP'de ekip giriş temasını Keycloak'ın kendi tema yapısıyla (FTL) kurar. Tema Java kodu içermez. Giriş sayfası ve panelin tasarım değerleri bugün iki ayrı dosyadadır. Tek kaynağa geçiş backend borcudur. Panel tasarım değerleri hazır olunca ekip Keycloakify seçeneğini yeniden değerlendirir. | Backend O-4, G-80 ve G-152. Faz P1. |
+| K-62 | Operatör ayar farkı denetimini elle başlatır. Gecelik rapor seçeneği kapandı. | KM-22, D-6, O-11 ve SUS-03. |

@@ -146,7 +146,7 @@ function CollapsibleGroup({
         <span className="nav-link-label">{label}</span>
         <IconChevronDown size={18} aria-hidden className="nav-wrapper-chevron" />
       </button>
-      <div id={panelId} hidden={!opened} className="nav-wrapper-panel">
+      <div id={panelId} hidden={!opened} role="group" aria-label={label} className="nav-wrapper-panel">
         <Stack gap={2}>{children}</Stack>
       </div>
     </>

@@ -567,7 +567,9 @@ test.describe('documents without JavaScript', () => {
   test('desktop AI links remain usable without JavaScript', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
-    const links = page.locator('#site-nav a[href*="/ai-"]');
+    const group = page.getByRole('group', { name: 'AI', exact: true });
+    await expect(group).toBeVisible();
+    const links = group.locator('a[href*="/ai-"]');
     await expect(links).toHaveCount(DOC_SLUGS.filter((slug) => slug.startsWith('ai-')).length);
     await expect(links.first()).toBeVisible();
     await links.first().click();
@@ -580,6 +582,7 @@ test.describe('documents without JavaScript', () => {
     for (const [name, heading] of [['phase-table', 'Faz tablosu'], ['timeline', 'Faz sırası']]) {
       const block = page.locator(`.prose [data-embed-source="${name}"]`);
       await expect(block).toBeVisible();
+      await expect(block).not.toHaveClass(/\bprose\b/);
       await expect(block.locator('xpath=preceding-sibling::h2[1]')).toHaveText(heading);
     }
     await expect(page.getByRole('button', { name: 'Menüyü aç' })).toBeDisabled();

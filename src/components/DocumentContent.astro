@@ -10,12 +10,15 @@ if (malformedPlaceholder.test(content.replace(placeholderPattern, ''))) {
 }
 
 const chunks: string[] = [];
+const seen = new Set<string>();
 let offset = 0;
 
 for (const match of content.matchAll(placeholderPattern)) {
   const [placeholder, name] = match;
   const start = match.index!;
   if (!Astro.slots.has(name)) throw new Error(`Bilinmeyen belge bileşeni: ${name}`);
+  if (seen.has(name)) throw new Error(`Belge bileşeni yinelendi: ${name}`);
+  seen.add(name);
   chunks.push(content.slice(offset, start), await Astro.slots.render(name));
   offset = start + placeholder.length;
 }

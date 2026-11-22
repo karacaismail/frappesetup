@@ -1512,7 +1512,7 @@
  {
   "id": "G-152",
   "title": "Realm-as-code ve SPI istisna politikası",
-  "detail": "Realm, client, rol ve akış tanımları Git'te sürümlenir ve uygulanır; operatör değişiklik farkını elle denetler (proje kaydı D-6). Özel Keycloak SPI'ı varsayılan olarak yazılmaz; tek istisna identity-sync olay köprüsüdür: küçük, sürümlü ve her Keycloak minor sürümüne karşı sözleşme testli bir Event Listener olay bağlantısı (proje kaydı O-11). Tema `keycloak.v2` üzerinden kurulur (proje kaydı O-4). Kabul: sapma raporu sıfır; SPI sözleşme testi yükseltme kapısında. Tema özel Java kodu içermez.",
+  "detail": "Realm, client, rol ve akış tanımları Git'te sürümlenir ve uygulanır. Operatör farkı elle denetler (proje kaydı D-6). Varsayılan olarak özel Keycloak SPI yazılmaz. Tek istisna küçük ve sürümlü identity-sync olay köprüsüdür (Event Listener, proje kaydı O-11). Ekip her Keycloak alt sürümünde sözleşme testi yapar. Tema `keycloak.v2` üzerinden kurulur (proje kaydı O-4). Sapma raporu sıfır olmalıdır. SPI sözleşme testi geçmeden sürüm yükseltilmez. Tema özel Java kodu içermez.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
