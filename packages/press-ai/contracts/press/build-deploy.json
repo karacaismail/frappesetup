@@ -975,7 +975,7 @@
           {
             "signal": "Uzun Preparing/Pending",
             "meaning": "Worker/scheduler kuyruğu",
-            "next": "Kanıtla Hüseyin Cengiz'e aktar; yeni build açma"
+            "next": "Kanıtla DevOps sorumlusuna aktar; yeni build açma"
           }
         ],
         "timeout": "Zaman aşımında sonuç unknown; build.get ile oku, yeni build açma.",

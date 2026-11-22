@@ -168,10 +168,10 @@ Kurulumdan sonra adres çubuğunun sonunda bir sayı görünür. Bu sayı kurulu
 2. "Key pairs" sekmesini açın.
 3. "New key" düğmesine basın.
 4. Chrome bir `.pem` dosyası indirir.
-5. Dosyanın iznini daraltın.
+5. Dosyanın iznini daraltın. Dosya tarayıcının indirme klasörüne iner. Komuttaki `<indirilen-pem-dosyası>` yazısının yerine bu dosyanın yolunu yazın.
 
 ```bash
-chmod 600 ~/Downloads/frappesetup-propr-gate.*.private-key.pem
+chmod 600 <indirilen-pem-dosyası>
 ```
 
 ProPR bu dosyanın iznine bakar. İzin `600` değilse ProPR dosyayı kabul etmez.

@@ -1,0 +1,106 @@
+@font-face {
+  font-family: Outfit;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/platform_core/panel/fonts/outfit-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Outfit;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/platform_core/panel/fonts/outfit-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+html:where(.platform-shell-panel):root {
+  --panel-font: Outfit, system-ui, sans-serif;
+  --panel-body-size: 1rem;
+  --panel-title-size: 2rem;
+  --panel-leading: 1.5;
+  --panel-ink: #14282b;
+  --panel-surface: #fff;
+  --panel-link: #0b5b52;
+  --panel-focus: #0b5b52;
+  --panel-gutter: clamp(1rem, 5vw, 3rem);
+  --panel-top: 3rem;
+  --panel-gap: 0.75rem;
+  --panel-content-width: 40rem;
+  --panel-target-height: 2.75rem;
+  --panel-link-underline-width: 1px;
+  --panel-focus-width: 3px;
+  --panel-underline-offset: 0.2em;
+}
+
+html:where(.platform-shell-panel) body {
+  margin: 0;
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+  font: var(--panel-body-size)/var(--panel-leading) var(--panel-font);
+}
+
+html:where(.platform-shell-panel) main {
+  box-sizing: border-box;
+  max-inline-size: var(--panel-content-width);
+  margin-inline: auto;
+  padding: var(--panel-top) var(--panel-gutter);
+}
+
+html:where(.platform-shell-panel) h1,
+html:where(.platform-shell-panel) p {
+  margin: 0 0 var(--panel-gap);
+}
+
+html:where(.platform-shell-panel) h1 {
+  font-size: var(--panel-title-size);
+}
+
+html:where(.platform-shell-panel) a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--panel-target-height);
+  color: var(--panel-link);
+  text-decoration-thickness: var(--panel-link-underline-width);
+  text-underline-offset: var(--panel-underline-offset);
+}
+
+html:where(.platform-shell-panel) .skip-link {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: var(--panel-gutter);
+  background: var(--panel-surface);
+  clip-path: inset(50%);
+}
+
+html:where(.platform-shell-panel) .skip-link:focus-visible {
+  clip-path: none;
+}
+
+/* The underline marks the focused link without surrounding it. */
+html:where(.platform-shell-panel) :where(a, main):focus-visible {
+  outline: none;
+}
+
+html:where(.platform-shell-panel)[data-keyboard-focus] a:focus-visible,
+html:where(.platform-shell-panel)[data-keyboard-focus] main:focus-visible h1 {
+  text-decoration: underline var(--panel-focus) var(--panel-focus-width);
+  text-underline-offset: var(--panel-underline-offset);
+}
+
+@media (forced-colors: active) {
+  html:where(.platform-shell-panel)[data-keyboard-focus] :where(a, main):focus-visible {
+    outline: 2px solid CanvasText;
+  }
+
+  html:where(.platform-shell-panel)[data-keyboard-focus] a:focus-visible {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: var(--panel-link-underline-width);
+  }
+
+  html:where(.platform-shell-panel)[data-keyboard-focus] main:focus-visible h1 {
+    text-decoration: none;
+  }
+}

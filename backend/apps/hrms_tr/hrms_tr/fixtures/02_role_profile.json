@@ -1,0 +1,38 @@
+[
+  {
+    "doctype": "Role Profile",
+    "name": "HRT Employee",
+    "role_profile": "HRT Employee",
+    "roles": [
+      {
+        "role": "HRT Employee"
+      }
+    ]
+  },
+  {
+    "doctype": "Role Profile",
+    "name": "HRT Manager",
+    "role_profile": "HRT Manager",
+    "roles": [
+      {
+        "role": "HRT Manager"
+      },
+      {
+        "role": "HRT Employee"
+      }
+    ]
+  },
+  {
+    "doctype": "Role Profile",
+    "name": "HRT Admin",
+    "role_profile": "HRT Admin",
+    "roles": [
+      {
+        "role": "HRT Admin"
+      },
+      {
+        "role": "HRT Employee"
+      }
+    ]
+  }
+]

@@ -1,0 +1,35 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<section class="account-deletion-content">
+<h1>{{ _("Delete your account", context="press_tr") | e }}</h1>
+<p>{{ _("Deleting your account cannot be undone. Your access will end. Invoices and other business records will be kept.", context="press_tr") | e }}</p>
+{% if deletion_status | default(none) %}
+<p>{{ _("Last status known to Press.", context="press_tr") | e }}</p>
+{% endif %}
+{% if deletion_status | default(none) == "submitted" %}
+<p role="status">{{ _("Your deletion request was submitted.", context="press_tr") | e }}</p>
+{% elif deletion_csrf_token | default(false) %}
+{% set is_reauthenticated = reauthenticated | default(false) %}
+<form id="account-deletion" method="post" action="/api/method/press_tr.api.account.request_deletion"
+    data-confirm="{{ 'true' if is_reauthenticated else 'false' }}"
+    data-success="{{ _("Your deletion request was submitted.", context="press_tr") | e }}"
+    data-pending="{{ _("Account deletion is in progress.", context="press_tr") | e }}"
+    data-refresh="{{ _("Reload this page to check the status.", context="press_tr") | e }}"
+    data-error="{{ _("The request could not be submitted.", context="press_tr") | e }}">
+    <input type="hidden" name="csrf_token" value="{{ deletion_csrf_token | e }}">
+    {% if is_reauthenticated %}
+    <button type="submit" class="btn btn-danger">{{ _("Confirm account deletion", context="press_tr") | e }}</button>
+    {% else %}
+    <p>{{ _("Verify your identity to continue.", context="press_tr") | e }}</p>
+    <button type="submit" class="btn btn-primary">{{ _("Verify your identity", context="press_tr") | e }}</button>
+    {% endif %}
+    <p role="status" id="account-deletion-status">{% if deletion_status | default(none) == "pending" %}{{ _("Account deletion is in progress.", context="press_tr") | e }}{% endif %}</p>
+    <a id="restart-account-deletion" href="/account-deletion" hidden>{{ _("Reload this page to try again.", context="press_tr") | e }}</a>
+</form>
+{% else %}
+<p role="status">{{ _("The request could not be submitted.", context="press_tr") | e }}</p>
+<a href="/account-deletion">{{ _("Reload this page to try again.", context="press_tr") | e }}</a>
+{% endif %}
+</section>
+{% endblock %}

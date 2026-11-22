@@ -1,0 +1,126 @@
+rules:
+  - id: frappe-missing-permission
+    languages: [python]
+    severity: ERROR
+    message: "Check document permissions in the endpoint."
+    patterns:
+      - pattern: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+              $DOC.check_permission(...)
+              ...
+      - pattern-not: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+              if not frappe.has_permission(...):
+                  frappe.throw(...)
+              ...
+  - id: frappe-ignore-permissions
+    languages: [python]
+    severity: ERROR
+    message: "Remove the option that bypasses permission checks."
+    pattern-either:
+      - pattern: $CALL(..., ignore_permissions=True, ...)
+      - pattern: $DOC.flags.ignore_permissions = True
+      - pattern: frappe.flags.ignore_permissions = True
+  - id: frappe-built-sql
+    languages: [python]
+    severity: ERROR
+    message: "Pass query values as separate parameters."
+    pattern-either:
+      - pattern: frappe.db.sql(f"...", ...)
+      - pattern: frappe.db.sql($FORMAT.format(...), ...)
+      - pattern: frappe.db.sql($LEFT + $RIGHT, ...)
+  - id: frappe-guest-without-limit
+    languages: [python]
+    severity: ERROR
+    message: "Apply a rate limit to guest requests."
+    patterns:
+      - pattern-either:
+          - pattern: |
+              @frappe.whitelist(..., allow_guest=True, ...)
+              def $FUNC(...):
+                  ...
+          - pattern: |
+              @frappe.whitelist(True, ...)
+              def $FUNC(...):
+                  ...
+      - pattern-not: |
+          @frappe.whitelist(...)
+          @rate_limit(...)
+          def $FUNC(...):
+              ...
+  - id: frappe-missing-methods
+    languages: [python]
+    severity: ERROR
+    message: "Declare the endpoint's HTTP methods in the methods option."
+    pattern-either:
+      - patterns:
+          - pattern: |
+              @frappe.whitelist(...)
+              def $FUNC(...):
+                  ...
+          - pattern-not: |
+              @frappe.whitelist(..., methods=$METHODS, ...)
+              def $FUNC(...):
+                  ...
+      - pattern: |
+          @frappe.whitelist(..., methods=None, ...)
+          def $FUNC(...):
+              ...
+  - id: frappe-request-commit
+    languages: [python]
+    severity: ERROR
+    message: "Avoid committing database writes early during a request."
+    patterns:
+      - pattern-inside: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+      - pattern-either:
+          - pattern: frappe.db.commit()
+          - pattern: $DOC.db_set(..., commit=True, ...)
+  - id: python-dynamic-execution
+    languages: [python]
+    severity: ERROR
+    message: "Remove dynamic code and shell execution."
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+      - pattern: $CALL(..., shell=True, ...)
+  - id: http-missing-timeout
+    languages: [python]
+    severity: ERROR
+    message: "Set an explicit timeout for the outbound request."
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: requests.$METHOD(...)
+              - pattern: httpx.$METHOD(...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: ^(request|get|post|put|patch|delete|head|options|stream)$
+          - pattern-either:
+              - pattern: requests.$METHOD(..., timeout=None, ...)
+              - pattern: httpx.$METHOD(..., timeout=None, ...)
+              - patterns:
+                  - pattern-either:
+                      - pattern: requests.$METHOD(...)
+                      - pattern: httpx.$METHOD(...)
+                  - pattern-not: requests.$METHOD(..., timeout=$TIMEOUT, ...)
+                  - pattern-not: httpx.$METHOD(..., timeout=$TIMEOUT, ...)
+      - pattern: urllib.request.urlopen(..., timeout=None, ...)
+      - patterns:
+          - pattern: urllib.request.urlopen(...)
+          - pattern-not: urllib.request.urlopen(..., timeout=$TIMEOUT, ...)
+  - id: ai-provider-sdk
+    languages: [python]
+    severity: ERROR
+    message: "Connect to the model provider through the shared gateway."
+    pattern-regex: '^\s*(?:from|import)\s+(?:openai|anthropic|google\.generativeai|google\.genai|mistralai|cohere|groq|ollama|litellm)\b'

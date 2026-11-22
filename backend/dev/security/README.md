@@ -1,0 +1,92 @@
+# Backend güvenlik denetimi
+
+Depo kökünde `backend/dev/bin/security-audit` komutunu çalıştırın.
+Komut için Python 3.9 veya üstü, `uvx` ve çalışan Colima gerekir.
+İlk çalıştırmada araç paketlerinin ve Gitleaks imajının indirilmesi gerekebilir.
+
+Komut aşağıdaki işleri yapar.
+
+1. Semgrep kurallarını doğru ve hatalı örneklerle sınar.
+2. Backend kaynak kodunu Semgrep ile denetler.
+3. Gitleaks ile koda yazılmış gizli bilgileri arar.
+4. Uç listesi betiğinin birim testlerini çalıştırır.
+5. Tüm uçları ve misafire açık uçları ayrı ayrı listeler.
+6. Her uç için iki yetki testi adı arar.
+
+Bir adım başarısız olursa komut hata koduyla çıkar.
+Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
+Tarama, Git geçmişini kapsamaz.
+Gitleaks sonucu gösterirken gizli değerleri örter.
+
+## Her uç için iki test
+
+Uç, sunucunun istek kabul eden bir işlemidir.
+`@frappe.whitelist` işareti Frappe'ye işlemi dışarıdan çağırma izni verir.
+`notlar.py` içindeki `oku` ucu için aynı klasöre `test_notlar.py` ekleyin.
+
+- `test_oku_guest_denied` girişsiz isteğin korunan işlemi yapamadığını doğrular.
+- `test_oku_foreign_data_denied` kullanıcının başkasına ait korunan kayda erişemediğini doğrular.
+
+İşlev bir sınıftaysa test adında sınıfı da yazın.
+Örneğin `Not.oku` için `test_Not_oku_guest_denied` adını kullanın.
+Uç `__init__.py` içindeyse test dosyası `test___init__.py` olur.
+Testleri dosya düzeyinde veya test sınıfında tanımlayabilirsiniz.
+
+Testleri gerçek istek yolundan çalıştırın. Uydurma kişi ve kayıt kullanın.
+Misafire açık uçta, girişsiz kişinin korunan veriyi alamadığını sınayın.
+Eksik test adı kapıyı durdurur. Betik testin içeriğini veya sonucunu ölçmez.
+İlgili uygulamanın test komutu bu davranışı ayrıca sınar.
+
+## Kuralların kapsamı
+
+Semgrep kodda tanımlı kalıpları arar.
+Yeni kurallar aynı işlev içinde verinin kaynaktan kullanıldığı yere akışını izler.
+Kurallar, yardımcı işlevler ve dosyalar arasındaki akışı kapsamaz.
+
+- Ham istek adresi ve yanıt gövdesi günlükte görünmemeli.
+- Testin hata iletisi ham yanıt içermemeli. Durum kodu yeterliyse onu kullanın.
+- İşletim sistemine verilen komut argümanında gizli değer bulunmamalı.
+  Aracın desteklediği korumalı giriş yolunu kullanın.
+
+Olumlu ve olumsuz denemeler `backend/dev/security/fixtures/` altındadır.
+Misafir uçta Frappe'nin `rate_limit` işaretini kullanın.
+`rate_limit` satırını `whitelist` satırının altına yazın.
+Uç listesi bu sırayı ve işaretin içe aktarıldığı yeri denetler.
+Her uçta HTTP yöntemlerini boş olmayan bir liste veya demetle yazın.
+Çağrının içine doğrudan yazılan sorgu ve süre seçenekleri denetlenir.
+Kod incelemesinde değişkene taşınan seçenekleri de denetleyin.
+Zorunlu bir istisnayı ilgili işin karar kaydında açıklayın.
+
+Press istisnalarının gerekçeleri `semgrep-exceptions.json` dosyasındadır.
+Kapı, Press uygulamasının ve ilgili Semgrep kural dosyasının özetini karşılaştırır.
+Özet taramadan önce veya sonra farklıysa kapı istisnayı uygulamaz.
+Dosya, satır ve kural kimliği de birebir eşleşmelidir.
+Press kodu veya kural değişirse istisnaları yeniden inceleyin.
+İnceleme bitince depo kökünde şu komutu çalıştırın.
+
+```sh
+python3 -B backend/dev/security/semgrep_exceptions.py --snapshot
+```
+
+Komut her kapsam için bir özet yazdırır.
+Özet `null` ise kapsama ait onayları yenilemeyin.
+Onayları inceleyince yeni özeti aynı kapsamın `sha256` alanına yazın.
+Ardından `backend/dev/bin/security-audit` komutunu çalıştırın.
+
+Erişim onayları yalnız listelenen dosyalara bağlıdır.
+Aşağıdaki yollar `backend/apps/platform_core/platform_core/` klasörüne göredir.
+
+- `access/link_search.py` ve `api/access.py`, incelenen beş ucu tanımlar.
+- `access/explain.py`, yetki açıklamasını ve kapsam özetini üretir.
+- `access/rules.py`, belge türünün erişim kurallarını okur.
+- `access/engine.py` ve `access/subject.py`, yetki kararını ve kullanıcı kapsamını hesaplar.
+- `hooks.py` ve `access/hooks.py`, Frappe izin ve arama kancalarını bağlar.
+- `access/reports.py`, izin kancasındaki rapor ve rapor dosyası koşullarını sağlar.
+
+Kapsam dışındaki dosya değişikliği bu özeti değiştirmez.
+İki onay kapsamı çakışırsa kapı hata verir.
+
+Uç listesi `backend/apps/<uygulama>/<paket>/` altındaki Python kaynaklarını okur.
+Çalışırken eklenen uçlar için Frappe yapılandırmasını ayrıca inceleyin.
+Sınıf yöntemini listede sınıf ve yöntem adıyla bulabilirsiniz.
+Uygulama klasörü yoksa kapı hata verir.

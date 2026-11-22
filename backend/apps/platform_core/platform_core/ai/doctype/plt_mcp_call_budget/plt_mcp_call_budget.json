@@ -1,0 +1,38 @@
+{
+ "actions": [],
+ "creation": "2026-11-22 19:02:41.000000",
+ "description": "Internal durable limit on tool calls made with an external MCP token. The row name is a digest of the client ID and token.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "calls",
+  "expires_at"
+ ],
+ "fields": [
+  {
+   "description": "Number of tool calls charged to the token.",
+   "fieldname": "calls",
+   "fieldtype": "Int",
+   "label": "Calls",
+   "read_only": 1
+  },
+  {
+   "description": "Token expiry in Unix seconds.",
+   "fieldname": "expires_at",
+   "fieldtype": "Long Int",
+   "label": "Expires At",
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-22 19:53:09.000000",
+ "modified_by": "Administrator",
+ "module": "AI",
+ "name": "PLT MCP Call Budget",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
