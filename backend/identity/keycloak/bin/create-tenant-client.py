@@ -35,17 +35,17 @@ def https_origin(value):
 
 def tenant_client(slug, site_url):
     realm = json.loads(REALM_FILE.read_text(encoding="utf-8"))
-    client = next(client for client in realm["clients"] if client.get("clientId") == "site-kiraci1")
+    client = next(client for client in realm["clients"] if client.get("clientId") == "site-tenant1")
     client.pop("secret")
     client["clientId"] = f"site-{slug}"
     client["name"] = f"Tenant site {slug}"
     # The template lists the login, panel and logout URLs alongside the rest of the tenant policy.
-    return json.loads(json.dumps(client).replace("${ATONOTA_SITE_KIRACI1_URL}", site_url))
+    return json.loads(json.dumps(client).replace("${ATONOTA_SITE_TENANT1_URL}", site_url))
 
 
 def tenant_service_client(slug):
     realm = json.loads(REALM_FILE.read_text(encoding="utf-8"))
-    client = next(client for client in realm["clients"] if client["clientId"] == "site-kiraci1-service")
+    client = next(client for client in realm["clients"] if client["clientId"] == "site-tenant1-service")
     client.pop("secret")
     client["clientId"] = f"site-{slug}-service"
     client["name"] = f"Tenant service {slug}"
@@ -63,8 +63,8 @@ class ProvisioningError(Exception):
 
 def tenant_scope(client_id):
     realm = json.loads(REALM_FILE.read_text(encoding="utf-8"))
-    scope = next(scope for scope in realm["clientScopes"] if scope["name"] == "aud-site-kiraci1")
-    return json.loads(json.dumps(scope).replace("site-kiraci1", client_id))
+    scope = next(scope for scope in realm["clientScopes"] if scope["name"] == "aud-site-tenant1")
+    return json.loads(json.dumps(scope).replace("site-tenant1", client_id))
 
 
 def make_admin_request(keycloak_url, token):

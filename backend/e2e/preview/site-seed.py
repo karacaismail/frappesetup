@@ -44,7 +44,7 @@ def seed_access_fixture():
         roles=[{"role": role}], new_password=password,
     )
     insert(
-        "Access Rule", title="Preview reader sees own request", document_type=doctype,
+        "PLT Access Rule", title="Preview reader sees own request", document_type=doctype,
         role=role, scope="own", match_field="request_user", allow_read=1, is_active=1, priority=10,
     )
     return {
@@ -60,17 +60,17 @@ def seed_access_fixture():
 def seed_tenant(provider_urls):
     ensure_website_user(os.environ["E2E_PREVIEW_LOGIN_EMAIL"])
     access_fixture = seed_access_fixture()
-    provider = insert("AI Provider", provider_name="Preview Local", adapter="ollama")
-    account = insert("AI Account", provider=provider, account_name="Preview Local", currency="USD")
+    provider = insert("PLT AI Provider", provider_name="Preview Local", adapter="ollama")
+    account = insert("PLT AI Account", provider=provider, account_name="Preview Local", currency="USD")
     model = insert(
-        "AI Model", provider=provider, model_id="e2e-local", context_size=4096, output_tokens_per_second=100,
+        "PLT AI Model", provider=provider, model_id="e2e-local", context_size=4096, output_tokens_per_second=100,
     )
     api_names = [
-        insert("AI API", account=account, api_name=part, base_url=provider_urls[part], priority=priority)
+        insert("PLT AI API", account=account, api_name=part, base_url=provider_urls[part], priority=priority)
         for priority, part in enumerate(("limited", "fallback"))
     ]
     route = insert(
-        "AI Route", route_name="e2e-local-only",
+        "PLT AI Route", route_name="e2e-local-only",
         targets=[{"api": name, "model": model} for name in api_names],
     )
     return {
@@ -80,7 +80,7 @@ def seed_tenant(provider_urls):
 
 def seed_lifecycle_identities(identities, issuer, tenant):
     if tenant:
-        from platform_core.kimlik.provisioning import provision
+        from platform_core.identity.provisioning import provision
 
         for account in identities.values():
             provision({
@@ -90,7 +90,7 @@ def seed_lifecycle_identities(identities, issuer, tenant):
         return {}
 
     from frappe.core.doctype.user.user import generate_keys
-    from press_tr.kimlik.identity import bind_identity
+    from press_tr.press_identity.identity import bind_identity
 
     account = identities["delete"]
     link = bind_identity({
@@ -105,9 +105,9 @@ def seed_lifecycle_identities(identities, issuer, tenant):
 
 def main():
     port = int(os.environ["PANE_PORT"])
-    tenant = sys.argv[1] == "kiraci-web"
+    tenant = sys.argv[1] == "tenant-web"
     lifecycle = json.loads(os.environ["E2E_LIFECYCLE_IDENTITIES"])
-    site = "kiraci1.localhost" if tenant else "press.localhost"
+    site = "tenant1.localhost" if tenant else "press.localhost"
     config_file = Path("sites") / site / "site_config.json"
     config = json.loads(config_file.read_text())
     config.update(
@@ -123,11 +123,11 @@ def main():
             part: f"http://e2e-provider:{port + 7}/{part}" for part in ("limited", "fallback")
         }
         config.update(
-            keycloak_client_id="site-kiraci1",
+            keycloak_client_id="site-tenant1",
             keycloak_client_secret=os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
-            keycloak_service_client_id="site-kiraci1-service",
+            keycloak_service_client_id="site-tenant1-service",
             extra_config="preview_site_config.tenant_service_config",
-            kimlik_marka_adi="Atonota",
+            identity_brand_name="Atonota",
             kimlik_mobil_azp=["mobile-app"],
             kimlik_deletion_hmac_key=token_urlsafe(32),
             mobile_cursor_key=token_urlsafe(32),
@@ -157,7 +157,7 @@ def main():
     issuer = f"http://kimlik.localhost:{port}/realms/platform"
     fixture = seed_lifecycle_identities(lifecycle, issuer, tenant)
     if tenant:
-        from platform_core.kimlik.anonymization import identity_hash
+        from platform_core.identity.anonymization import identity_hash
 
         fixture.update(seed_tenant(provider_urls))
         delete_account = lifecycle["delete"]

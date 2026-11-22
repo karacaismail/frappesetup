@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "autoname": "field:sequence_key",
+ "creation": "2026-11-22 10:42:15.000000",
+ "description": "Tracks the sync sequence for the site.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sequence_key",
+  "sequence",
+  "retention_floor"
+ ],
+ "fields": [
+  {
+   "description": "The site's only counter record uses this key.",
+   "fieldname": "sequence_key",
+   "fieldtype": "Data",
+   "label": "Counter key",
+   "length": 16,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "description": "The server assigns each new change a sequence number higher than this value.",
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Latest sequence number",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "The server rejects requests with a cursor below this sequence number.",
+   "fieldname": "retention_floor",
+   "fieldtype": "Int",
+   "label": "Oldest valid sequence",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-22 10:42:15.000000",
+ "modified_by": "Administrator",
+ "module": "Mobile",
+ "name": "PLT Mobile Sequence",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

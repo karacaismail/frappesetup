@@ -14,9 +14,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from yardimci import KLASOR
+from helpers import DIRECTORY
 
-SCRIPT = KLASOR / "bin" / "kc-dev.sh"
+SCRIPT = DIRECTORY / "bin" / "kc-dev.sh"
 FAKE_SECRET = "fake-webhook-secret-for-the-argv-test-7f3a"  # gitleaks:allow (synthetic test value)
 
 STAND_IN = """#!/bin/sh
@@ -59,7 +59,7 @@ class ProdCheckSecretTest(unittest.TestCase):
         (root / "bin").mkdir(parents=True)
         (root / "tests").mkdir()
         shutil.copy2(SCRIPT, root / "bin" / "kc-dev.sh")
-        shutil.copy2(KLASOR / ".env.example", root / ".env.example")
+        shutil.copy2(DIRECTORY / ".env.example", root / ".env.example")
         self.script = root / "bin" / "kc-dev.sh"
         self.root = root
         bin_dir = self.dir / "stand-ins"
@@ -71,7 +71,7 @@ class ProdCheckSecretTest(unittest.TestCase):
         self.log = self.dir / "argv.log"
         env_file = self.dir / "test.env"
         lines = []
-        for line in (KLASOR / ".env.example").read_text(encoding="utf-8").splitlines():
+        for line in (DIRECTORY / ".env.example").read_text(encoding="utf-8").splitlines():
             if line.startswith("IDENTITY_SYNC_WEBHOOK_SECRET="):
                 line = f"IDENTITY_SYNC_WEBHOOK_SECRET={FAKE_SECRET}"
             elif "=degistir-" in line:

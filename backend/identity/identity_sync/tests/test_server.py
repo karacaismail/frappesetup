@@ -37,9 +37,9 @@ ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 def fake_verifier(token: str) -> dict[str, object]:
     azp = {
         PREVIEW_TOKEN: "ai-agent",
-        EXECUTE_TOKEN: "site-kiraci1-service",
-        SESSION_TOKEN: "site-kiraci1-service",
-        OTHER_SITE_TOKEN: "site-kiraci2-service",
+        EXECUTE_TOKEN: "site-tenant1-service",
+        SESSION_TOKEN: "site-tenant1-service",
+        OTHER_SITE_TOKEN: "site-tenant2-service",
         PRESS_TOKEN: "press-service",
         "stranger-token": "baska-istemci",
     }.get(token)
@@ -63,7 +63,7 @@ class ServerCase(unittest.TestCase):
         self.now = float(NOW)
         self.start_server(fake_verifier)
         # The organization of tenant kiraci1. An execute client may only invite into its own organization.
-        organization = self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+        organization = self.stack.keycloak.add_organization(ORG_ID, "tenant1")
         self.stack.keycloak.add_user(keycloak_user(), [organization])
         self._next_timestamp = NOW - 100
 
@@ -560,7 +560,7 @@ class ApprovalLayerTest(ServerCase):
         # İşlem günlüğü çağıranı, onay kimliğini, önizleme özetini ve sonucu taşır.
         audit = "\n".join(logs.output)
         self.assertIn("replay_dead_letters", audit)
-        self.assertIn("site-kiraci1-service", audit)
+        self.assertIn("site-tenant1-service", audit)
         self.assertIn("onay-1", audit)
         self.assertIn(digest, audit)
         self.assertIn("outcome=executed", audit)
@@ -619,7 +619,7 @@ class ApprovalLayerTest(ServerCase):
         self.fail_once()
         preview = self.preview_replay()
         self.stack.keycloak.add_user(
-            keycloak_user(email="yeni@example.test"), [{"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}]
+            keycloak_user(email="yeni@example.test"), [{"id": ORG_ID, "name": "tenant1", "alias": "tenant1"}]
         )
         writes = len(self.downstream_writes())
 
@@ -725,7 +725,7 @@ class ApprovalLayerTest(ServerCase):
         # whatever the digest says, and Keycloak is not written.
         kc = self.stack.keycloak
         kc.on("GET", f"{kc.admin}/users", (200, []))
-        kc.add_organization("baska-kurulus", "kiraci2")
+        kc.add_organization("baska-kurulus", "tenant2")
         invitation = {"email": "davetli@example.test", "organization_id": ORG_ID}
         _status, preview = self.post_json("/v1/invitations", {**invitation, "dry_run": True})
         other = {**invitation, "organization_id": "baska-kurulus", "dry_run": False}
@@ -764,7 +764,7 @@ class SessionRevokeTest(ServerCase):
         super().setUp()
         keycloak = self.stack.keycloak
         # SUBJECT is a member of kiraci1 (base setup). OTHER_USER is a member of kiraci2 only.
-        other_org = {"id": "o-kiraci2", "name": "kiraci2", "alias": "kiraci2"}
+        other_org = {"id": "o-kiraci2", "name": "tenant2", "alias": "tenant2"}
         keycloak.add_user(keycloak_user(subject=self.OTHER_USER, email="ikinci@example.test"), [other_org])
         keycloak.add_session(SUBJECT, self.SID)
         keycloak.add_session(self.OTHER_USER, self.OTHER_SID)
@@ -782,7 +782,7 @@ class SessionRevokeTest(ServerCase):
         self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
         audit = "\n".join(logs.output)
         self.assertIn("operation=revoke_session", audit)
-        self.assertIn("site-kiraci1-service", audit)
+        self.assertIn("site-tenant1-service", audit)
 
     def test_closed_session_also_gets_200(self) -> None:
         # Repeatable: the same request twice gives the same answer.
@@ -1178,7 +1178,7 @@ class OperationJournalTest(ServerCase):
 class BatchRefusalTest(ServerCase):
     def test_one_changed_event_gets_409_and_nothing_is_written(self) -> None:
         other = "99999999-9999-4999-8999-999999999999"
-        org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
+        org = {"id": ORG_ID, "name": "tenant1", "alias": "tenant1"}
         self.stack.keycloak.add_user(keycloak_user(subject=other, email="ikinci@example.test"), [org])
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
         self.post_event()
@@ -1204,7 +1204,7 @@ class DeadLetterEndpointTest(ServerCase):
         self.assertEqual(status, 200)
         (letter,) = body["dead_letters"]
         self.assertEqual(letter["event"]["id"], "e-1")
-        self.assertEqual(letter["error"], "tenant.provision kiraci1: HTTP 503")
+        self.assertEqual(letter["error"], "tenant.provision tenant1: HTTP 503")
         self.assertEqual((letter["attempts"], letter["state"]), (1, "failed"))
 
 
@@ -1218,7 +1218,7 @@ class ReconcileEndpointTest(ServerCase):
         super().setUp()
         # Drift: CLOSED is disabled in Keycloak but still enabled on Press and on the tenant.
         keycloak, issuer = self.stack.keycloak, self.stack.issuer
-        org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
+        org = {"id": ORG_ID, "name": "tenant1", "alias": "tenant1"}
         keycloak.add_user(keycloak_user(subject=self.CLOSED, email="closed@example.test", enabled=False), [org])
         keycloak.serve_directory()
         self.stack.press.seed_member(issuer, self.CLOSED, "closed@example.test", ORG_ID, api_keys=1)
@@ -1243,7 +1243,7 @@ class ReconcileEndpointTest(ServerCase):
             body["differences"],
             [
                 {"target": "press", "subject": self.CLOSED, "kind": "closed_in_keycloak"},
-                {"target": "kiraci1", "subject": self.CLOSED, "kind": "closed_in_keycloak"},
+                {"target": "tenant1", "subject": self.CLOSED, "kind": "closed_in_keycloak"},
             ],
         )
         self.assertEqual(
@@ -1279,8 +1279,8 @@ class ReconcileEndpointTest(ServerCase):
             [(r["operation"], r["target"], r["status"]) for r in body["results"]],
             [
                 ("press.remove_team_member", "press", "done"),
-                ("tenant.set_enabled", "kiraci1", "done"),
-                ("tenant.revoke_user_installations", "kiraci1", "done"),
+                ("tenant.set_enabled", "tenant1", "done"),
+                ("tenant.revoke_user_installations", "tenant1", "done"),
             ],
         )
         closed_on_press = self.stack.press.user_of(issuer, self.CLOSED)
@@ -1317,7 +1317,7 @@ class ReconcileEndpointTest(ServerCase):
 
         self.assertEqual(status, 200)
         failed = [r for r in body["results"] if r["status"] == "failed"]
-        self.assertEqual([(r["operation"], r["error"]) for r in failed], [("tenant.set_enabled", "tenant.set_enabled kiraci1: HTTP 403")])
+        self.assertEqual([(r["operation"], r["error"]) for r in failed], [("tenant.set_enabled", "tenant.set_enabled tenant1: HTTP 403")])
 
     def test_unreachable_keycloak_is_an_upstream_failure(self) -> None:
         kc = self.stack.keycloak
@@ -1337,7 +1337,7 @@ class ListLimitTest(ServerCase):
         store = self.stack.app.store
         for number in range(count):
             failed = Event(id=f"e-{number:03d}", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
-            store.add_dead_letter(failed, "tenant.provision kiraci1: HTTP 503")
+            store.add_dead_letter(failed, "tenant.provision tenant1: HTTP 503")
 
     def ids(self, query: str = "") -> tuple[list[str], object]:
         status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(PREVIEW_TOKEN))
@@ -1576,7 +1576,7 @@ class TargetErrorValueTest(ServerCase):
         self.assertEqual((status, reply["status"]), (202, "dead_lettered"))
         self.assertNotIn(self.MARKER, text)
         (letter,) = self.stack.app.store.dead_letters()
-        self.assertIn("tenant.provision kiraci1: HTTP 409", letter.error)
+        self.assertIn("tenant.provision tenant1: HTTP 409", letter.error)
 
     def test_known_error_name_is_kept_for_the_operator(self) -> None:
         # A name from the target contracts tells the operator what to fix. It is from a fixed list.

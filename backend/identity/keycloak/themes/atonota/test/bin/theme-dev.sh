@@ -72,7 +72,7 @@ write_env() {
     content="KC_PORT=$base
 KC_PUBLIC_URL=http://localhost:$base
 MAILPIT_UI_PORT=$((base + 1))
-KC_BOOTSTRAP_ADMIN_USERNAME=tema-admin
+KC_BOOTSTRAP_ADMIN_USERNAME=theme-admin
 KC_BOOTSTRAP_ADMIN_PASSWORD=$admin_password
 IDENTITY_BRAND_NAME=Sample Brand
 IDENTITY_ACCOUNT_DELETION_URL=http://press.localhost:$((base + 3))/account/delete"

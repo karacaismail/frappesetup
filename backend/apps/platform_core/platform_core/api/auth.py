@@ -4,9 +4,9 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
-from platform_core.kimlik import provider_setup, sign_in, sign_out
-from platform_core.kimlik.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
-from platform_core.kimlik.safe_errors import safe_errors
+from platform_core.identity import provider_setup, sign_in, sign_out
+from platform_core.identity.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
+from platform_core.identity.safe_errors import safe_errors
 
 
 # The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
@@ -27,7 +27,7 @@ def start_login(redirect_to: str | None = None) -> None:
 		result = sign_in.build_login_url(redirect_to)
 	except (InvalidRedirect, KeycloakLoginNotConfigured) as error:
 		frappe.respond_as_web_page(
-			_("Sign-in failed", context="platform_core.kimlik"),
+			_("Sign-in failed", context="platform_core.identity"),
 			str(error),
 			http_status_code=error.http_status_code,
 			indicator_color="red",
@@ -55,7 +55,7 @@ def keycloak_callback(
 		# Releases the identity lock at once (merge review E1). Nothing of a refused sign-in is kept.
 		frappe.db.rollback()
 		frappe.respond_as_web_page(
-			_("Sign-in failed", context="platform_core.kimlik"),
+			_("Sign-in failed", context="platform_core.identity"),
 			refusal.message,
 			http_status_code=refusal.status,
 			indicator_color="red",

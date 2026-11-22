@@ -20,7 +20,7 @@ function totp(secret: string) {
 }
 
 function identityOrigin() {
-  return localUrl('kimlik.localhost', 0);
+  return localUrl('identity.localhost', 0);
 }
 
 function mailpitUrl(path: string) {
@@ -35,7 +35,7 @@ async function mailbox(request: APIRequestContext, email: string) {
 }
 
 async function observe(page: Page, state: string) {
-  const callback = localUrl('kiraci1.localhost', 1) + '/api/method/platform_core.api.auth.keycloak_callback';
+  const callback = localUrl('tenant1.localhost', 1) + '/api/method/platform_core.api.auth.keycloak_callback';
   let authorized = false;
   let issuedCode = false;
   page.on('request', (request) => {
@@ -66,8 +66,8 @@ async function requestLink(page: Page, request: APIRequestContext, email: string
   const entry = new URL(identityOrigin() + '/realms/platform/protocol/openid-connect/auth');
   const challenge = createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url');
   entry.search = new URLSearchParams({
-    client_id: 'site-kiraci1', response_type: 'code', scope: 'openid', state,
-    redirect_uri: localUrl('kiraci1.localhost', 1) + '/api/method/platform_core.api.auth.keycloak_callback',
+    client_id: 'site-tenant1', response_type: 'code', scope: 'openid', state,
+    redirect_uri: localUrl('tenant1.localhost', 1) + '/api/method/platform_core.api.auth.keycloak_callback',
     code_challenge: challenge, code_challenge_method: 'S256',
   }).toString();
   await page.goto(entry.toString());

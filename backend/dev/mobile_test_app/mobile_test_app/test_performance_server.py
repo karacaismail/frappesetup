@@ -8,7 +8,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request
 
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.mobile.tests.loopback_http import open_loopback
 
 from . import measure_performance
 

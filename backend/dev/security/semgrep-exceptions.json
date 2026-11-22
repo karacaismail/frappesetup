@@ -1,0 +1,120 @@
+{
+  "scope": "backend/apps/press_tr",
+  "sha256": "9512e29277577579b5998e496f565b6f7b15b0eda9f7f6bed3fb2c0ca0d800a1",
+  "findings": [
+    {
+      "rule": "frappe-guest-without-limit",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 34,
+      "reason": "The contract exempts signature-verified logout notifications from endpoint rate limiting. Rejected notifications are limited to 120 per minute."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 34,
+      "reason": "Verifies the signed logout notification and restricts revocation to matched sessions."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/account.py",
+      "line": 17,
+      "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/auth.py",
+      "line": 41,
+      "reason": "Starts browser-bound login without reading or modifying an application record."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/auth.py",
+      "line": 152,
+      "reason": "Consumes browser-bound state once and verifies ID token claims before binding identity."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 46,
+      "reason": "Validates the Identity Sync service identity and issuer before provisioning."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 107,
+      "reason": "Validates the Identity Sync service identity and issuer before membership removal."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 184,
+      "reason": "Validates the Identity Sync service identity and issuer before anonymization."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 210,
+      "reason": "Validates the Identity Sync service identity and issuer before identity inventory."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/maintenance.py",
+      "line": 6,
+      "reason": "Requires the System Manager role before touching internal session mappings."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 93,
+      "reason": "Deletes only session mappings selected by the verified logout notification."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/api/maintenance.py",
+      "line": 27,
+      "reason": "System Manager maintenance deletes expired internal session mappings."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/accounts.py",
+      "line": 16,
+      "reason": "Internal callers save only the linked account or the site selected during authorized anonymization."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/anonymization.py",
+      "line": 184,
+      "reason": "Authorized anonymization selects files owned by or attached to its linked account."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/anonymization.py",
+      "line": 328,
+      "reason": "Authorized anonymization selects SSH keys belonging to its linked account."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/identity.py",
+      "line": 51,
+      "reason": "Checks that the current non-guest user owns the identity link before writing the session mapping."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/identity.py",
+      "line": 95,
+      "reason": "Only the verified login callback and authorized service provisioning create identity links."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/identity.py",
+      "line": 148,
+      "reason": "Verified login and service provisioning create a team under its validated local owner."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/sessions.py",
+      "line": 37,
+      "reason": "Matches the current account and exact logout session ID before deleting the internal mapping."
+    }
+  ]
+}

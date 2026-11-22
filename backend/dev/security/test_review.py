@@ -112,7 +112,7 @@ class ReviewTests(unittest.TestCase):
             bin_dir.mkdir(parents=True)
             tools = root / "tools"
             tools.mkdir()
-            shutil.copy(scans.ROOT / "backend/dev/bin/guvenlik-denetimi", bin_dir)
+            shutil.copy(scans.ROOT / "backend/dev/bin/security-audit", bin_dir)
             security = root / scans.SECURITY
             security.mkdir()
             for name in ("container-settings", "tool-versions.env"):
@@ -132,7 +132,7 @@ class ReviewTests(unittest.TestCase):
             for base, code, expected in (("abc", 0, ["--self-test", "--commit-base abc"]), ("", 1, ["--self-test"])):
                 with self.subTest(base=base):
                     calls.write_text("")
-                    result = subprocess.run([bin_dir / "guvenlik-denetimi"], env={**env, "BASE": base},
+                    result = subprocess.run([bin_dir / "security-audit"], env={**env, "BASE": base},
                                             capture_output=True, text=True)
                     self.assertEqual(result.returncode, code, result.stderr)
                     self.assertEqual(calls.read_text().splitlines(), expected)
@@ -142,12 +142,12 @@ class ReviewTests(unittest.TestCase):
         self.assertIn("dosyanın değişiklik zamanı", handoff)
 
     def test_decision_lists_exceptions_and_lock_scope(self):
-        decision = (scans.ROOT / "backend/docs/kararlar/0011-security-tooling.md").read_text()
+        decision = (scans.ROOT / "backend/docs/decisions/0011-security-tooling.md").read_text()
         for text in ("bandit-exceptions.json", ".gitleaksignore", "isteğe bağlı paketleri"):
             self.assertIn(text, decision)
 
     def test_expiry_is_recorded(self):
-        record = (scans.ROOT / "backend/PROJE-KAYDI.md").read_text()
+        record = (scans.ROOT / "backend/PROJECT-RECORD.md").read_text()
         self.assertIn("Bandit istisnaları 22 Şubat 2027 Pazartesi günü", record)
 
     def test_cli_reports_in_english(self):

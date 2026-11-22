@@ -63,7 +63,7 @@ class PerformanceSafetyTest(unittest.TestCase):
             ):
                 data.seed_site("perf-mobile.localhost", 0, created)
             self.assertEqual(seed.call_count, int(not already_exists))
-            self.assertEqual(("Mobile Sequence", "site") in created, not already_exists)
+            self.assertEqual(("PLT Mobile Sequence", "site") in created, not already_exists)
 
     def test_seed_does_not_claim_a_counter_when_insert_fails(self):
         frappe = Mock()
@@ -81,7 +81,7 @@ class PerformanceSafetyTest(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "Duplicate counter"),
         ):
             data.seed_site("perf-mobile.localhost", 0, created)
-        self.assertNotIn(("Mobile Sequence", "site"), created)
+        self.assertNotIn(("PLT Mobile Sequence", "site"), created)
 
     def test_cleanup_selects_the_doctype_and_name_together(self):
         frappe = Mock()

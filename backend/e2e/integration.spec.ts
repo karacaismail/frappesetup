@@ -8,7 +8,7 @@ function sessionHeaders(role: 'operator' | 'reader') {
 }
 
 const aiMethod = (method: string) =>
-  `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.ai.${method}`;
+  `${localUrl('tenant1.localhost', 1)}/api/method/platform_core.api.ai.${method}`;
 
 async function issueAgentToken(request: APIRequestContext, role: 'operator' | 'reader') {
   const response = await request.post(aiMethod('issue_agent_token'), {
@@ -64,7 +64,7 @@ function fixtures() {
 
 async function resource(request: APIRequestContext, doctype: string, name?: string, role: 'operator' | 'reader' = 'reader', params?: Record<string, string | number>) {
   const path = [doctype, ...(name ? [name] : [])].map(encodeURIComponent).join('/');
-  return request.get(`${localUrl('kiraci1.localhost', 1)}/api/resource/${path}`, {
+  return request.get(`${localUrl('tenant1.localhost', 1)}/api/resource/${path}`, {
     headers: sessionHeaders(role),
     params,
     maxRedirects: 0,
@@ -188,7 +188,7 @@ test('model gateway falls back after the first provider returns 429', async ({ r
   const reset = await request.delete(attemptsUrl, { maxRedirects: 0 });
   expect(reset.status()).toBe(204);
   const response = await request.post(
-    `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.model.complete`,
+    `${localUrl('tenant1.localhost', 1)}/api/method/platform_core.api.model.complete`,
     { headers: sessionHeaders('operator'), maxRedirects: 0,
       data: { route: required('E2E_MODEL_ROUTE'), messages: [{ role: 'user', content: 'Integration test' }] } },
   );
@@ -210,7 +210,7 @@ test('model gateway falls back after the first provider returns 429', async ({ r
 test('access rule applies equally to list and detail', async ({ request }) => {
   const { doctype, visible, hidden } = fixtures();
   const summary = await request.get(
-    `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.access.get_access_summary`,
+    `${localUrl('tenant1.localhost', 1)}/api/method/platform_core.api.access.get_access_summary`,
     { headers: sessionHeaders('reader'), params: { doctype }, maxRedirects: 0 },
   );
   expect(summary.status()).toBe(200);

@@ -3,10 +3,10 @@
 import frappe
 from frappe.rate_limiter import rate_limit
 
-from platform_core.kabuk.bootstrap import compact_bootstrap
-from platform_core.kabuk.bootstrap import get_bootstrap as read_bootstrap
-from platform_core.kabuk.http import conditional_response, require_session
-from platform_core.kabuk.request_policy import BootstrapQuery, validate_query
+from platform_core.shell.bootstrap import compact_bootstrap
+from platform_core.shell.bootstrap import get_bootstrap as read_bootstrap
+from platform_core.shell.http import conditional_response, require_session
+from platform_core.shell.request_policy import BootstrapQuery, validate_query
 
 
 # No record selector is accepted. Identity comes from the session cookie, and

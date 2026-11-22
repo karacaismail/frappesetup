@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.kimlik.tests import helpers as h
+from platform_core.identity.tests import helpers as h
 
 ENDPOINT = "/api/method/platform_core.api.identity.list_identities"
 DISABLED_USER = "reconciliation.disabled@example.test"
@@ -65,7 +65,7 @@ class TestListIdentities(FrappeAPITestCase):
 		check = frappe.has_permission
 
 		def deny_identity_links(doctype, *args, **kwargs):
-			return False if doctype == "Platform Identity Link" else check(doctype, *args, **kwargs)
+			return False if doctype == "PLT Identity Link" else check(doctype, *args, **kwargs)
 
 		with patch.object(frappe, "has_permission", side_effect=deny_identity_links):
 			response = self.call()
@@ -80,7 +80,7 @@ class TestListIdentities(FrappeAPITestCase):
 	def test_list_identities_foreign_data_denied(self):
 		admin = h.new_client()
 		admin.set_cookie("sid", self.sid)
-		with h.SiteSettings({"kimlik_servis_azp": ["identity-sync", "another-service"]}):
+		with h.SiteSettings({"identity_service_azp": ["identity-sync", "another-service"]}):
 			for response, status in (
 				(self.call(with_token=False, client=admin), 403),
 				(self.call(claims={"azp": "mobile"}), 401),

@@ -5,13 +5,13 @@ import frappe
 from frappe import _
 
 from press_tr.api.auth import start_login
-from press_tr.kimlik.deletion import (
+from press_tr.press_identity.deletion import (
 	clear_reauthentication,
 	fresh_reauthentication,
 	human_identity,
 	send_deletion_request,
 )
-from press_tr.kimlik.oidc import reject
+from press_tr.press_identity.oidc import reject
 
 
 @frappe.whitelist(methods=["POST"])

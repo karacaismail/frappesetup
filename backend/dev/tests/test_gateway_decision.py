@@ -9,8 +9,8 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "apps/platform_core"
-MODULE = APP / "platform_core/model_gecidi"
-DECISION = BACKEND / "docs/kararlar/0004-model-gecidi.md"
+MODULE = APP / "platform_core/model_gateway"
+DECISION = BACKEND / "docs/decisions/0004-model-gateway.md"
 PERMISSION_APPROVAL = "Orkestratör, D-10, 22 Kasım 2026 Pazar"
 
 
@@ -52,7 +52,7 @@ class GatewayDecisionTests(unittest.TestCase):
 
     def test_module_interface_lists_the_public_methods_and_events(self):
         interface = section(self.decision, "Modül arayüzü")
-        self.assertIn("`platform_core.model_gecidi.api.complete`", interface)
+        self.assertIn("`platform_core.model_gateway.api.complete`", interface)
         http_module = ast.parse((APP / "platform_core/api/model.py").read_text(encoding="utf-8"))
         for node in http_module.body:
             if isinstance(node, ast.FunctionDef) and any(
@@ -81,7 +81,7 @@ class GatewayDecisionTests(unittest.TestCase):
             "ai_write_closed_doctypes",
             "validate",
             "on_doctype_update",
-            "platform_core.model_gecidi.maintenance.reconcile_stale_pending",
+            "platform_core.model_gateway.maintenance.reconcile_stale_pending",
         ):
             with self.subTest(item=item):
                 self.assertIn(f"`{item}`", interface)

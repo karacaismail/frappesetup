@@ -22,16 +22,16 @@ class BoundaryTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.policy = {
             "modules": {
-                "platform_core.kimlik": [],
-                "platform_core.kabuk": [],
-                "platform_core.yapay_zeka": ["platform_core.kimlik", "platform_core.model_gecidi"],
-                "platform_core.model_gecidi": [],
+                "platform_core.identity": [],
+                "platform_core.shell": [],
+                "platform_core.ai": ["platform_core.identity", "platform_core.model_gateway"],
+                "platform_core.model_gateway": [],
             },
             "public_paths": {
-                "platform_core.kimlik": ["platform_core.kimlik", "platform_core.kimlik.api"],
-                "platform_core.model_gecidi": ["platform_core.model_gecidi.api"],
+                "platform_core.identity": ["platform_core.identity", "platform_core.identity.api"],
+                "platform_core.model_gateway": ["platform_core.model_gateway.api"],
             },
-            "path_owners": {"platform_core.api.auth": "platform_core.kimlik"},
+            "path_owners": {"platform_core.api.auth": "platform_core.identity"},
             "forbidden_imports": [
                 "openai",
                 "anthropic",
@@ -43,7 +43,7 @@ class BoundaryTests(unittest.TestCase):
             ],
         }
         self.write(
-            "kimlik/doctype/identity/identity.json", json.dumps({"name": "Identity", "module": "Kimlik"})
+            "identity/doctype/identity/identity.json", json.dumps({"name": "Identity", "module": "Identity"})
         )
 
     def write(self, name, text):
@@ -57,56 +57,56 @@ class BoundaryTests(unittest.TestCase):
 
     def test_rejects_import_and_relative_alias(self):
         for code in [
-            "import platform_core.kimlik.api",
-            "from ..kimlik.api import resolve",
-            "from platform_core import kimlik",
-            "from .. import kimlik",
+            "import platform_core.identity.api",
+            "from ..identity.api import resolve",
+            "from platform_core import identity",
+            "from .. import identity",
         ]:
             with self.subTest(code=code):
-                self.write("kabuk/api.py", code)
+                self.write("shell/api.py", code)
                 self.assertTrue(any("IMPORT" in e for e in self.errors()))
 
     def test_ai_calls_public_function(self):
-        self.write("yapay_zeka/tools.py", "from platform_core.kimlik.api import resolve")
+        self.write("ai/tools.py", "from platform_core.identity.api import resolve")
         self.assertEqual(self.errors(), [])
 
     def test_ai_calls_public_model_gateway_completion(self):
-        self.write("yapay_zeka/tools.py", "from platform_core.model_gecidi.api import complete")
+        self.write("ai/tools.py", "from platform_core.model_gateway.api import complete")
         self.assertEqual(self.errors(), [])
         self.assertTrue(
-            (DEV.parent / "apps/platform_core/platform_core/model_gecidi/api.py").is_file()
+            (DEV.parent / "apps/platform_core/platform_core/model_gateway/api.py").is_file()
         )
 
     def test_ai_cannot_import_the_internal_model_gateway(self):
-        self.write("yapay_zeka/tools.py", "from platform_core.model_gecidi.gateway import complete")
+        self.write("ai/tools.py", "from platform_core.model_gateway.gateway import complete")
         self.assertTrue(any("PUBLIC" in error for error in self.errors()))
 
     def test_ai_cannot_call_private_function_or_internal_module(self):
         for code in [
-            "from platform_core.kimlik.api import _resolve",
-            "from platform_core.kimlik.api import *",
-            "import platform_core.kimlik.internal",
+            "from platform_core.identity.api import _resolve",
+            "from platform_core.identity.api import *",
+            "import platform_core.identity.internal",
         ]:
             with self.subTest(code=code):
-                self.write("yapay_zeka/tools.py", code)
+                self.write("ai/tools.py", code)
                 self.assertTrue(any("PUBLIC" in e for e in self.errors()))
 
     def test_gateway_cannot_call_other_modules(self):
-        self.write("model_gecidi/route.py", "from platform_core.kimlik.api import resolve")
+        self.write("model_gateway/route.py", "from platform_core.identity.api import resolve")
         self.assertTrue(any("IMPORT" in e for e in self.errors()))
 
     def test_other_modules_cannot_call_ai_or_gateway(self):
-        for target in ["yapay_zeka", "model_gecidi"]:
+        for target in ["ai", "model_gateway"]:
             with self.subTest(target=target):
-                self.write("kimlik/api.py", f"import platform_core.{target}.api")
+                self.write("identity/api.py", f"import platform_core.{target}.api")
                 self.assertTrue(any("IMPORT" in e for e in self.errors()))
 
     def test_cycles_are_reported(self):
-        self.policy["modules"]["platform_core.kimlik"] = ["platform_core.kabuk"]
-        self.policy["modules"]["platform_core.kabuk"] = ["platform_core.kimlik"]
-        self.policy["public_paths"]["platform_core.kabuk"] = ["platform_core.kabuk.api"]
-        self.write("kimlik/api.py", "import platform_core.kabuk.api")
-        self.write("kabuk/api.py", "import platform_core.kimlik.api")
+        self.policy["modules"]["platform_core.identity"] = ["platform_core.shell"]
+        self.policy["modules"]["platform_core.shell"] = ["platform_core.identity"]
+        self.policy["public_paths"]["platform_core.shell"] = ["platform_core.shell.api"]
+        self.write("identity/api.py", "import platform_core.shell.api")
+        self.write("shell/api.py", "import platform_core.identity.api")
         self.assertTrue(any("CYCLE" in e for e in self.errors()))
 
     def test_provider_imports_are_rejected_everywhere(self):
@@ -120,18 +120,18 @@ class BoundaryTests(unittest.TestCase):
             "import ollama",
         ]:
             with self.subTest(code=code):
-                self.write("model_gecidi/route.py", code)
+                self.write("model_gateway/route.py", code)
                 self.assertTrue(any("PROVIDER" in e for e in self.errors()))
 
     def test_dynamic_literal_imports_are_checked(self):
         self.write(
-            "kabuk/api.py",
+            "shell/api.py",
             """from importlib import import_module as load
-load("platform_core.kimlik.api")""",
+load("platform_core.identity.api")""",
         )
         self.assertTrue(any("IMPORT" in e for e in self.errors()))
         self.write(
-            "kabuk/api.py",
+            "shell/api.py",
             """import importlib
 importlib.import_module("openai")""",
         )
@@ -162,17 +162,17 @@ doc.db_set("enabled", 1)""",
 frappe.get_doc(doctype="Identity", name="demo").save()""",
         ]:
             with self.subTest(code=code):
-                self.write("kabuk/api.py", code)
+                self.write("shell/api.py", code)
                 self.assertTrue(any("WRITE" in e for e in self.errors()))
 
     def test_owned_writes_and_foreign_reads_are_allowed(self):
         self.write(
-            "kimlik/api.py",
+            "identity/api.py",
             """import frappe
 frappe.db.set_value("Identity", "demo", "enabled", 1)""",
         )
         self.write(
-            "kabuk/api.py",
+            "shell/api.py",
             """import frappe
 doc = frappe.get_doc("Identity", "demo")
 print(doc.name)""",
@@ -180,11 +180,11 @@ print(doc.name)""",
         self.assertEqual(self.errors(), [])
 
     def test_api_paths_have_module_owner(self):
-        self.write("api/auth.py", "import platform_core.kabuk.api")
+        self.write("api/auth.py", "import platform_core.shell.api")
         self.assertTrue(any("IMPORT" in e for e in self.errors()))
 
     def test_invalid_python_fails_closed(self):
-        self.write("kabuk/api.py", "def invalid(")
+        self.write("shell/api.py", "def invalid(")
         self.assertTrue(any("SYNTAX" in e for e in self.errors()))
 
 

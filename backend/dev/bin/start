@@ -1,0 +1,12 @@
+#!/bin/bash
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+python3 "$DEV_DIR/init_env.py"
+"$DEV_DIR/bin/compose" config --quiet
+"$DEV_DIR/bin/compose" build tenant-web
+"$DEV_DIR/bin/compose" up -d --wait --wait-timeout 90 tenant-db tenant-redis
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web \
+    env/bin/python /workspace/dev/bootstrap.py tenant1.localhost --app erpnext --app platform_core
+"$DEV_DIR/bin/compose" up -d tenant-web tenant-socket
+"$DEV_DIR/bin/tunnel" open
+printf 'Tenant URL: http://tenant1.localhost:%s\n' "$((PANE_PORT + 1))"

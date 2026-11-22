@@ -10,8 +10,8 @@ from urllib.error import HTTPError
 from urllib.request import Request
 from uuid import uuid4
 
-from platform_core.mobil.tests.http_diagnostics import http_diagnostic, safe_http_error_code
-from platform_core.mobil.tests.loopback_http import open_loopback, validate_loopback_url
+from platform_core.mobile.tests.http_diagnostics import http_diagnostic, safe_http_error_code
+from platform_core.mobile.tests.loopback_http import open_loopback, validate_loopback_url
 
 FIXTURE = os.environ.get("MOBILE_TEST_FIXTURE") == "1"
 BASE = os.environ.get("MOBILE_TEST_URL")

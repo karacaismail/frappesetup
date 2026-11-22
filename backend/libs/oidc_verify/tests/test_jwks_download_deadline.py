@@ -15,7 +15,7 @@ import threading
 import time
 import unittest
 
-from anahtarlar import ISSUER, Anahtar, SahteJwks, erisim_govdesi
+from keys import ISSUER, Anahtar, FakeJwks, access_payload
 
 from oidc_verify import JwksCache, JwksUnavailable, TokenError, verify_access_token
 
@@ -80,7 +80,7 @@ class _ServerMixin:
             token,
             cache=cache,
             issuer=ISSUER,
-            audience="site-kiraci1",
+            audience="site-tenant1",
             allowed_azp={"identity-sync"},
             leeway=30,
         )
@@ -90,23 +90,23 @@ class DownloadDeadlineTest(_ServerMixin, unittest.TestCase):
     """The HTTP fetcher stops reading at `total_timeout` even when bytes keep trickling in."""
 
     def test_defaults(self):
-        cache = JwksCache("https://kimlik.example/certs")
+        cache = JwksCache("https://identity.example/certs")
         self.assertEqual(cache.total_timeout, 10.0)
         self.assertEqual(cache.wait_timeout, 11.0)
-        self.assertEqual(JwksCache("https://kimlik.example/certs", total_timeout=3).wait_timeout, 4.0)
-        self.assertEqual(JwksCache("https://kimlik.example/certs", wait_timeout=2).wait_timeout, 2.0)
+        self.assertEqual(JwksCache("https://identity.example/certs", total_timeout=3).wait_timeout, 4.0)
+        self.assertEqual(JwksCache("https://identity.example/certs", wait_timeout=2).wait_timeout, 2.0)
 
     def test_non_positive_timeouts_are_rejected(self):
         with self.assertRaises(ValueError):
-            JwksCache("https://kimlik.example/certs", total_timeout=0)
+            JwksCache("https://identity.example/certs", total_timeout=0)
         with self.assertRaises(ValueError):
-            JwksCache("https://kimlik.example/certs", wait_timeout=-1)
+            JwksCache("https://identity.example/certs", wait_timeout=-1)
 
     def test_cold_cache_gives_up_at_total_timeout_and_releases_lock(self):
         key = Anahtar("kid-1")
         handler, url = self.serve(key)
         cache = JwksCache(url, ttl_seconds=600, timeout=0.3, total_timeout=0.6, min_refresh_seconds=0)
-        token = key.imzala(erisim_govdesi())
+        token = key.sign(access_payload())
         begin = time.monotonic()
         with self.assertRaises(JwksUnavailable):
             self.access(token, cache)
@@ -130,7 +130,7 @@ class DownloadDeadlineTest(_ServerMixin, unittest.TestCase):
             clock=lambda: now[0],
             min_refresh_seconds=0,
         )
-        token = key.imzala(erisim_govdesi())
+        token = key.sign(access_payload())
         self.assertEqual(self.access(token, cache)["azp"], "identity-sync")
         handler.trickle = True
         now[0] += 601
@@ -177,7 +177,7 @@ class DownloadDeadlineTest(_ServerMixin, unittest.TestCase):
             max_stale_seconds=60,
             min_refresh_seconds=0,
         )
-        token = key.imzala(erisim_govdesi())
+        token = key.sign(access_payload())
         self.assertEqual(self.access(token, cache)["azp"], "identity-sync")
         handler.trickle = True
         now[0] += 600 + 61
@@ -194,7 +194,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
 
     def test_simultaneous_refresh_starts_fetch_once(self):
         key = Anahtar("kid-1")
-        inner = SahteJwks(key)
+        inner = FakeJwks(key)
         in_fetch = threading.Event()
         proceed = threading.Event()
 
@@ -205,7 +205,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
             return data
 
         cache = JwksCache(JWKS_URL, ttl_seconds=600, fetcher=fetcher)
-        token = key.imzala(erisim_govdesi())
+        token = key.sign(access_payload())
         gate = threading.Barrier(2)
         results: list[object] = []
         lock = threading.Lock()
@@ -235,7 +235,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
     def test_unknown_kid_caller_gives_up_at_wait_timeout(self):
         key = Anahtar("kid-1")
         new_key = Anahtar("kid-2")
-        inner = SahteJwks(key)
+        inner = FakeJwks(key)
         in_fetch = threading.Event()
         release = threading.Event()
 
@@ -247,9 +247,9 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
             return data
 
         cache = JwksCache(JWKS_URL, ttl_seconds=600, fetcher=fetcher, wait_timeout=0.5)
-        self.assertEqual(self.access(key.imzala(erisim_govdesi()), cache)["azp"], "identity-sync")
-        inner.anahtarlar.append(new_key)
-        token = new_key.imzala(erisim_govdesi())
+        self.assertEqual(self.access(key.sign(access_payload()), cache)["azp"], "identity-sync")
+        inner.keys.append(new_key)
+        token = new_key.sign(access_payload())
         first: list[object] = []
 
         def first_caller():
@@ -279,7 +279,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
 
     def test_expired_cached_kid_waiter_falls_back_to_stale_key_on_wait_timeout(self):
         key = Anahtar("kid-1")
-        inner = SahteJwks(key)
+        inner = FakeJwks(key)
         in_fetch = threading.Event()
         release = threading.Event()
         now = [1000.0]
@@ -292,7 +292,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
             return data
 
         cache = JwksCache(JWKS_URL, ttl_seconds=600, fetcher=fetcher, clock=lambda: now[0], wait_timeout=0.3)
-        token = key.imzala(erisim_govdesi())
+        token = key.sign(access_payload())
         self.assertEqual(self.access(token, cache)["azp"], "identity-sync")
         now[0] += 601
         thread = threading.Thread(target=self.access, args=(token, cache), daemon=True)
@@ -313,13 +313,13 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
         self.assertFalse(cache._refresh_lock.locked())
 
     def test_fetcher_exception_releases_lock(self):
-        inner = SahteJwks(Anahtar("kid-1"))
-        inner.hata = RuntimeError("boom")
+        inner = FakeJwks(Anahtar("kid-1"))
+        inner.error = RuntimeError("boom")
         cache = JwksCache(JWKS_URL, ttl_seconds=600, fetcher=inner, min_refresh_seconds=0)
         with self.assertRaises(JwksUnavailable):
             cache.get_signing_key("kid-1")
         self.assertFalse(cache._refresh_lock.locked())
-        inner.hata = None
+        inner.error = None
         self.assertIsNotNone(cache.get_signing_key("kid-1"))
         with self.assertRaises(TokenError) as caught:
             cache.get_signing_key("kid-9")

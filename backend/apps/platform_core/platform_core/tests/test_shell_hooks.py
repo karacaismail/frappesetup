@@ -12,11 +12,11 @@ from platform_core.hooks import doc_events
 
 class TestShellPermissionHooks(IntegrationTestCase):
 	def test_security_header_hook_is_installed_once(self):
-		hook = "platform_core.kabuk.headers.add_security_headers"
+		hook = "platform_core.shell.headers.add_security_headers"
 		self.assertEqual(frappe.get_hooks("after_request").count(hook), 1)
 
 	def test_security_header_hook_preserves_existing_values(self):
-		from platform_core.kabuk.headers import add_security_headers
+		from platform_core.shell.headers import add_security_headers
 
 		response = Response(headers={"X-Frame-Options": "DENY"})
 		pending = Headers({"Referrer-Policy": "no-referrer"})
@@ -29,11 +29,11 @@ class TestShellPermissionHooks(IntegrationTestCase):
 
 	def test_installed_auth_guard_follows_credentials_hooks(self):
 		hooks = frappe.get_hooks("auth_hooks")
-		guard = "platform_core.kabuk.native_metadata.guard_native_metadata"
+		guard = "platform_core.shell.native_metadata.guard_native_metadata"
 		self.assertEqual(hooks.count(guard), 1)
 		for name in (
-			"platform_core.kimlik.service_token.validate",
-			"platform_core.yapay_zeka.agent_token.authenticate_request",
+			"platform_core.identity.service_token.validate",
+			"platform_core.ai.agent_token.authenticate_request",
 		):
 			parts = name.split(".")
 			module = Path(frappe.get_app_path(parts[0], *parts[1:-2], parts[-2] + ".py"))
@@ -45,7 +45,7 @@ class TestShellPermissionHooks(IntegrationTestCase):
 	def test_website_request_guard_is_installed(self):
 		self.assertEqual(
 			frappe.get_hooks("before_request").count(
-				"platform_core.kabuk.native_metadata.guard_website_rpc_before_request"
+				"platform_core.shell.native_metadata.guard_website_rpc_before_request"
 			),
 			1,
 		)
@@ -94,11 +94,11 @@ class TestShellPermissionHooks(IntegrationTestCase):
 			"DocType",
 			"Custom Field",
 			"Property Setter",
-			"Access Rule",
+			"PLT Access Rule",
 		):
 			for event in ("on_update", "on_trash"):
 				self.assertIn(
-					"platform_core.kabuk.cache.invalidate_permissions",
+					"platform_core.shell.cache.invalidate_permissions",
 					installed[doctype][event],
 					(doctype, event),
 				)
@@ -106,10 +106,10 @@ class TestShellPermissionHooks(IntegrationTestCase):
 	def test_permission_hook_doctypes_exist_on_the_site(self):
 		for doctype, events in doc_events.items():
 			if not any(
-				"platform_core.kabuk.cache.invalidate_permissions" in handlers for handlers in events.values()
+				"platform_core.shell.cache.invalidate_permissions" in handlers for handlers in events.values()
 			):
 				continue
-			if doctype == "Access Rule" and not frappe.db.exists("Module Def", "Erisim"):
+			if doctype == "PLT Access Rule" and not frappe.db.exists("Module Def", "Access"):
 				continue
 			with self.subTest(doctype=doctype):
 				self.assertEqual(frappe.db.exists("DocType", doctype), doctype)

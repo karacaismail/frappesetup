@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / ".pane/prompts/security-results"
 SECURITY = Path("backend/dev/security")
 FIXTURES = SECURITY / "fixtures"
+CONTRACT_FIXTURE = SECURITY / "contract-fixtures" / "contract.yaml"
 OSV_CONFIG = SECURITY / "osv-exceptions.toml"
 VERSIONS = dict(line.split("=", 1) for line in (ROOT / SECURITY / "tool-versions.env").read_text().splitlines())
 BANDIT = VERSIONS["BANDIT_VERSION"]
@@ -201,7 +202,7 @@ def scan_bandit():
             raise ValueError("Invalid or duplicate Bandit exception signature.")
         files = [path for path in git("ls-files", "-z", "--", "backend").split("\0")
                  if path.endswith(".py") and not path.startswith(
-                     ("backend/dev/guvenlik/fixtures/", f"{FIXTURES}/"))
+                     ("backend/dev/security/fixtures/", f"{FIXTURES}/"))
                  and (ROOT / path).is_file() and not (ROOT / path).is_symlink()]
         if not files:
             raise ValueError("No tracked Python files to scan.")
@@ -515,7 +516,7 @@ def contract_fixture_found():
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
         try:
-            findings, _tested = run_contract(str(FIXTURES / "contract.yaml"), "fixture.localhost",
+            findings, _tested = run_contract(str(CONTRACT_FIXTURE), "fixture.localhost",
                                              server.server_port)
         finally:
             server.shutdown()
@@ -587,7 +588,7 @@ def scan_full(requirements, *, ci=False, runtime_image=None, api_target=None, al
         run("Security tool tests", "Python", [sys.executable, "-B", "-m", "unittest", "discover",
                                                "-s", str(SECURITY)]),
         run("Backend gate", f"Semgrep {VERSIONS['SEMGREP_VERSION']} / Gitleaks {VERSIONS['GITLEAKS_VERSION']}",
-            ["backend/dev/bin/guvenlik-denetimi"]),
+            ["backend/dev/bin/security-audit"]),
         scan_bandit(),
         run("Gitleaks", VERSIONS["GITLEAKS_VERSION"], [str(SECURITY / "history-scan")]),
         scan_dependencies(requirements, reproduce=ci),

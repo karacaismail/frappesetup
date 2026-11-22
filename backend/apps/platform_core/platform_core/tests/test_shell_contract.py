@@ -5,9 +5,9 @@ import os
 import unittest
 from pathlib import Path
 
-from platform_core.kabuk.bootstrap import project_sidebar
-from platform_core.kabuk.contract_tests.contract_json import parse_json
-from platform_core.kabuk.serialization import project_meta
+from platform_core.shell.bootstrap import project_sidebar
+from platform_core.shell.contract_tests.contract_json import parse_json
+from platform_core.shell.serialization import project_meta
 
 SCHEMA_FILE = Path(__file__).with_name("shell_contract_components.json")
 JSON_TYPES = {

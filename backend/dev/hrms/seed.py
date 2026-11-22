@@ -66,7 +66,7 @@ def seed(password, *, performance=False):
             send_welcome_email=0,
             new_password=password,
             user_type="Website User",
-            role_profiles=[{"role_profile": "HRMS TR Admin"}],
+            role_profiles=[{"role_profile": "HRT Admin"}],
         )
         return
     allocated_type = insert("Leave Type", leave_type_name=ALLOCATED_LEAVE_TYPE, include_holiday=1)
@@ -88,7 +88,7 @@ def seed(password, *, performance=False):
             send_welcome_email=0,
             new_password=password,
             user_type="Website User",
-            role_profiles=[{"role_profile": f"HRMS TR {ROLES[actor]}"}],
+            role_profiles=[{"role_profile": f"HRT {ROLES[actor]}"}],
         )
         employees[actor] = insert(
             "Employee",
@@ -233,7 +233,7 @@ def seed_permission_matrix(password, data):
         user_type="Website User",
         new_password=password,
         send_welcome_email=0,
-        role_profiles=[{"role_profile": "HRMS TR Admin"}],
+        role_profiles=[{"role_profile": "HRT Admin"}],
     )
     company = insert(
         "Company",
@@ -304,7 +304,7 @@ def seed_concurrency(password, data):
         email="hrms-tr-race-reviewer@example.test",
         first_name="Synthetic Second Reviewer",
         user_type="Website User",
-        role_profiles=[{"role_profile": "HRMS TR Admin"}],
+        role_profiles=[{"role_profile": "HRT Admin"}],
         new_password=password,
         send_welcome_email=0,
     )
@@ -329,7 +329,7 @@ def seed_concurrency(password, data):
             email=f"hrms-tr-{actor}@example.test",
             first_name=f"Synthetic Requester {number}",
             user_type="Website User",
-            role_profiles=[{"role_profile": "HRMS TR Employee"}],
+            role_profiles=[{"role_profile": "HRT Employee"}],
             new_password=password,
             send_welcome_email=0,
         )
@@ -361,7 +361,7 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"test-[a-z0-9-]+\.localhost", args.site):
         parser.error("Use a dedicated test-*.localhost site.")
-    password = os.environ["HRMS_TR_TEST_PASSWORD"]
+    password = os.environ["HRT_TEST_PASSWORD"]
     manifest = args.manifest.resolve()
     os.chdir("sites")
     frappe.init(site=args.site, sites_path=".")

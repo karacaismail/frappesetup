@@ -22,7 +22,7 @@ class PipelineCase(unittest.TestCase):
     def setUp(self) -> None:
         self.stack = Stack()
         self.addCleanup(self.stack.close)
-        self.org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
+        self.org = {"id": ORG_ID, "name": "tenant1", "alias": "tenant1"}
 
     def add_member(self, **overrides: object) -> None:
         self.stack.keycloak.add_user(keycloak_user(**overrides), [self.org])
@@ -45,7 +45,7 @@ class ProvisionTest(PipelineCase):
                 "email": "ayse@example.test",
                 "email_verified": True,
                 "organization_id": ORG_ID,
-                "organization_name": "kiraci1",
+                "organization_name": "tenant1",
             },
         )
         (provision,) = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
@@ -72,7 +72,7 @@ class ProvisionTest(PipelineCase):
         (team,) = self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)
         (provision,) = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
         self.assertEqual(team.headers["authorization"], "Bearer token-for:aud-press")
-        self.assertEqual(provision.headers["authorization"], "Bearer token-for:aud-site-kiraci1")
+        self.assertEqual(provision.headers["authorization"], "Bearer token-for:aud-site-tenant1")
         admin_reads = self.stack.keycloak.calls("GET", f"{self.stack.keycloak.admin}/users/{SUBJECT}")
         self.assertEqual(admin_reads[0].headers["authorization"], f"Bearer token-for:{fakes.ADMIN_SCOPE}")
 
@@ -83,7 +83,7 @@ class ProvisionTest(PipelineCase):
 
         token_calls = self.stack.keycloak.calls("POST", "/realms/platform/protocol/openid-connect/token")
         scopes = sorted(call.form()["scope"][0] for call in token_calls)
-        self.assertEqual(scopes, [fakes.ADMIN_SCOPE, "aud-press", "aud-site-kiraci1"])
+        self.assertEqual(scopes, [fakes.ADMIN_SCOPE, "aud-press", "aud-site-tenant1"])
         form = token_calls[0].form()
         self.assertEqual(form["grant_type"], ["client_credentials"])
         self.assertEqual(form["client_id"], ["identity-sync"])
@@ -173,11 +173,11 @@ class ProvisionTest(PipelineCase):
         result = self.stack.app.processor.handle(event())
 
         self.assertEqual(result.status, "dead_lettered")
-        self.assertIn("tenant.change_email kiraci1: HTTP 404", self.stack.app.store.dead_letters()[0].error)
+        self.assertIn("tenant.change_email tenant1: HTTP 404", self.stack.app.store.dead_letters()[0].error)
 
     def test_membership_delete_resolves_organization(self) -> None:
         self.stack.keycloak.add_user(keycloak_user(), [])
-        self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+        self.stack.keycloak.add_organization(ORG_ID, "tenant1")
 
         result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
 
@@ -203,7 +203,7 @@ class ProvisionTest(PipelineCase):
         # The user is still enabled and only left one organization. This request never
         # carries all_organizations, so Press does not disable the user.
         self.stack.keycloak.add_user(keycloak_user(), [])
-        self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+        self.stack.keycloak.add_organization(ORG_ID, "tenant1")
 
         self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
 
@@ -282,7 +282,7 @@ class AmbiguousReadTest(PipelineCase):
     def test_failed_membership_read_does_not_deprovision(self) -> None:
         kc = self.stack.keycloak
         kc.add_user(keycloak_user(), [self.org])
-        kc.add_organization(ORG_ID, "kiraci1")
+        kc.add_organization(ORG_ID, "tenant1")
         kc.on("GET", f"{kc.admin}/organizations/members/{SUBJECT}/organizations", (404, None))
 
         result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
@@ -324,7 +324,7 @@ class FanOutTest(unittest.TestCase):
         self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
 
         (letter,) = self.stack.app.store.dead_letters()
-        self.assertIn("press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404", letter.error)
+        self.assertIn("press.remove_team_member press: HTTP 403; tenant.set_enabled tenant1: HTTP 404", letter.error)
         self.assertEqual(len(self.stack.tenant2.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
 
 
@@ -391,7 +391,7 @@ class TargetContractTest(PipelineCase):
     def test_leaving_one_organization_keeps_the_press_user_and_keys(self) -> None:
         self.seed_everywhere()
         self.stack.keycloak.add_user(keycloak_user(), [])
-        self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+        self.stack.keycloak.add_organization(ORG_ID, "tenant1")
 
         result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
 
@@ -743,7 +743,7 @@ class AccountDeletionTest(PipelineCase):
         self.stack.app.processor.handle(self.job())
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
         old = Event(id="e-old", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
-        self.stack.app.store.add_dead_letter(old, "tenant.provision kiraci1: HTTP 503")
+        self.stack.app.store.add_dead_letter(old, "tenant.provision tenant1: HTTP 503")
         self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))
         self.stack.app.processor._account_deleted = lambda _subject: False
         for approved in (True, False):
@@ -1038,7 +1038,7 @@ class IdempotencyTest(PipelineCase):
 
         self.assertEqual(result.status, "processed")
         token_calls = self.stack.keycloak.calls("POST", "/realms/platform/protocol/openid-connect/token")
-        self.assertEqual(sorted(c.form()["scope"][0] for c in token_calls).count("aud-site-kiraci1"), 2)
+        self.assertEqual(sorted(c.form()["scope"][0] for c in token_calls).count("aud-site-tenant1"), 2)
 
 
 class FailureTest(PipelineCase):
@@ -1055,7 +1055,7 @@ class FailureTest(PipelineCase):
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_CHANGE_EMAIL)), 1)
         (letter,) = self.stack.app.store.dead_letters()
         self.assertEqual(letter.event, event())
-        self.assertEqual(letter.error, "tenant.provision kiraci1: HTTP 503")
+        self.assertEqual(letter.error, "tenant.provision tenant1: HTTP 503")
         self.assertEqual(letter.attempts, 1)
 
     def test_rejected_request_is_not_retried(self) -> None:
@@ -1134,7 +1134,7 @@ class UnknownOutcomeTest(PipelineCase):
                 self.assertEqual(result.status, "unknown")
                 (letter,) = stack.app.store.dead_letters()
                 self.assertEqual(letter.state, "unknown")
-                self.assertEqual(letter.error, "tenant.provision kiraci1: unknown outcome")
+                self.assertEqual(letter.error, "tenant.provision tenant1: unknown outcome")
                 # Belirsiz sonuçta kör tekrar yapılmaz.
                 self.assertEqual(len(stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 1)
 
@@ -1193,7 +1193,7 @@ class UnknownOutcomeTest(PipelineCase):
         closed.close()
         self.add_member()
         settings = dataclasses.replace(
-            self.stack.settings, tenants=(Tenant(name="kiraci1", base_url=url, organization="kiraci1"),)
+            self.stack.settings, tenants=(Tenant(name="tenant1", base_url=url, organization="tenant1"),)
         )
         app = build_app(settings, sleep=lambda _s: None)
         self.addCleanup(app.close)
@@ -1230,7 +1230,7 @@ class UnknownOutcomeTest(PipelineCase):
 
         self.assertEqual(result.status, "unknown")
         (letter,) = self.stack.app.store.dead_letters()
-        self.assertEqual(letter.error, "press.ensure_team press: HTTP 403; tenant.provision kiraci1: unknown outcome")
+        self.assertEqual(letter.error, "press.ensure_team press: HTTP 403; tenant.provision tenant1: unknown outcome")
 
 
 class ApprovedPlanTest(PipelineCase):
@@ -1568,7 +1568,7 @@ class CrossProcessTest(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
         self.server_side = Stack(os.path.join(self.dir.name, "db.sqlite3"))
         self.addCleanup(self.server_side.close)
-        self.server_side.keycloak.add_user(keycloak_user(), [{"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}])
+        self.server_side.keycloak.add_user(keycloak_user(), [{"id": ORG_ID, "name": "tenant1", "alias": "tenant1"}])
         # İkinci süreç: aynı ayar, ayrı bağlantı.
         from identity_sync.app import build_app
 

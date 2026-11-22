@@ -121,14 +121,14 @@ python3 -m identity_sync resolve-operation <kimlik> --resolution completed
 Servis dört istemci listesi tutar:
 
 - `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1-service`.
+- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-tenant1-service`.
 - `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
 - `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 
 İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
 
 - Yürütme listesi ile oturum listesi aynı istemcileri taşımalıdır. Listeler farklıysa servis açılmaz.
-- Bu iki listedeki her istemci, `IDENTITY_SYNC_TENANTS` ayarındaki bir kiracının servis istemcisi olmalıdır. Örneğin `kiraci1` kiracısının istemcisi `site-kiraci1-service` adını taşır. Kayıtsız bir kiracının istemcisi listeye yazılırsa servis açılmaz.
+- Bu iki listedeki her istemci, `IDENTITY_SYNC_TENANTS` ayarındaki bir kiracının servis istemcisi olmalıdır. Örneğin `kiraci1` kiracısının istemcisi `site-tenant1-service` adını taşır. Kayıtsız bir kiracının istemcisi listeye yazılırsa servis açılmaz.
 - Servis çalışırken de aynı kuralı uygular. Kiracıya bağlı olmayan istemci yürütme isterse 403 alır.
 - Önizleme ya da silme listesindeki istemci başka bir listede olamaz.
 - Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
@@ -308,8 +308,8 @@ Keycloak olayları kimlik-realm işinin kurduğu eklentiden gelir. Eklenti olay�
 
 Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/sessions/revoke` ucunu çağırır. Gövde `sid` ve `subject` alanlarını taşır.
 
-- Servis kiracıyı belirtecin `azp` değerinden bulur. Örneğin `site-kiraci1-service` istemcisi `kiraci1` kiracısıdır.
-- Her kiracının iki istemcisi vardır. `site-kiraci1` yalnız tarayıcı girişi içindir ve servis hesabı yoktur. `site-kiraci1-service` yalnız servis hesabıdır.
+- Servis kiracıyı belirtecin `azp` değerinden bulur. Örneğin `site-tenant1-service` istemcisi `kiraci1` kiracısıdır.
+- Her kiracının iki istemcisi vardır. `site-kiraci1` yalnız tarayıcı girişi içindir ve servis hesabı yoktur. `site-tenant1-service` yalnız servis hesabıdır.
 - Tarayıcı istemcisi hiçbir listeye yazılamaz. Yazılırsa servis açılmaz ve nedeni söyler.
 - Tarayıcı istemcisinin `azp` değeriyle gelen belirteç her uçta 401 alır.
 - Kullanıcı o kiracının kuruluşuna üye değilse servis 403 döner.
