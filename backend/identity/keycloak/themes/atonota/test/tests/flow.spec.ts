@@ -74,9 +74,10 @@ test('TOTP: kurulum tamamlanır ve sonraki girişte kod sorulur', async ({ page,
   await page.getByLabel('Tek kullanımlık kod').fill(totp(base32Decode(key)));
   await page.getByLabel('Cihaz adı').fill('Telefon');
   await page.getByRole('button', { name: 'Gönderin', exact: true }).click();
-  await expect(page).toHaveURL(accountUrl);
+  await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
 
-  await page.waitForLoadState('networkidle');
+  // The account console has loaded when its form is on screen. Only then is the session complete.
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 30_000 });
   await context.clearCookies();
   await openLogin(page);
   await submitPassword(page, email);
@@ -87,7 +88,7 @@ test('TOTP: kurulum tamamlanır ve sonraki girişte kod sorulur', async ({ page,
   // Keycloak aynı kodu iki kez kabul etmez. Bu yüzden bir sonraki 30 saniyenin kodu yazılır.
   await page.getByLabel('Doğrulama uygulamasındaki kod').fill(totp(base32Decode(key), Date.now() + 30_000));
   await page.getByRole('button', { name: 'Oturum açın', exact: true }).click();
-  await expect(page).toHaveURL(accountUrl);
+  await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
 });
 
 test('passkey: anahtar kaydedilir ve anahtarla oturum açılır', async ({ page, context, browserName }) => {
@@ -109,17 +110,26 @@ test('passkey: anahtar kaydedilir ve anahtarla oturum açılır', async ({ page,
   const email = await createUser({ requiredActions: ['webauthn-register-passwordless'] });
   await openLogin(page);
   await submitPassword(page, email);
-  await page.getByRole('button', { name: 'Geçiş anahtarı ekleyin', exact: true }).click();
-  await expect(page).toHaveURL(accountUrl);
+  // The page script binds the button while the page loads. A click before the "load" event does nothing,
+  // so the test waits for that event. A second click would start a second registration, so there is only one.
+  const addPasskey = page.getByRole('button', { name: 'Geçiş anahtarı ekleyin', exact: true });
+  await expect(addPasskey).toBeVisible({ timeout: 20_000 });
+  await page.waitForLoadState('load');
+  await addPasskey.click();
+  await expect(page).toHaveURL(accountUrl, { timeout: 30_000 });
 
-  await page.waitForLoadState('networkidle');
+  // The account console has loaded when its form is on screen. Only then is the session complete.
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 30_000 });
   await context.clearCookies();
   // Sanal anahtar soruyu kendiliğinden yanıtlar. Düğmeyi sınamak için yanıt önce durdurulur.
   await cdp.send('WebAuthn.setAutomaticPresenceSimulation', { authenticatorId, enabled: false });
   await openLogin(page);
   await cdp.send('WebAuthn.setAutomaticPresenceSimulation', { authenticatorId, enabled: true });
-  await page.getByRole('link', { name: 'Geçiş anahtarıyla oturum açın', exact: true }).click();
-  await expect(page).toHaveURL(accountUrl);
+  const usePasskey = page.getByRole('link', { name: 'Geçiş anahtarıyla oturum açın', exact: true });
+  await expect(usePasskey).toBeVisible({ timeout: 20_000 });
+  await page.waitForLoadState('load');
+  await usePasskey.click();
+  await expect(page).toHaveURL(accountUrl, { timeout: 30_000 });
 });
 
 test('passkey hatası: yalın bir ileti ve yeniden deneme düğmesi görünür', async ({ page }) => {

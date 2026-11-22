@@ -183,8 +183,19 @@ export async function openLogin(page: Page, locale?: string): Promise<void> {
 }
 
 export async function submitPassword(page: Page, email: string, password = PASSWORD): Promise<void> {
-  await page.locator('#username').fill(email);
-  await page.locator('#password').fill(password);
+  const username = page.locator('#username');
+  const secret = page.locator('#password');
+  // While the page loads, it moves focus to the first field. Text typed in that moment can land in the
+  // wrong field. So the test waits for the "load" event and submits only when both fields hold the
+  // right text. The check never prints the values.
+  await expect(username).toBeVisible({ timeout: 20_000 });
+  await page.waitForLoadState('load');
+  await expect(async () => {
+    await username.fill(email);
+    await secret.fill(password);
+    expect((await username.inputValue()) === email, 'the email field holds the email').toBe(true);
+    expect((await secret.inputValue()) === password, 'the password field holds the password').toBe(true);
+  }).toPass({ timeout: 20_000 });
   await page.locator('#kc-login').click();
 }
 
