@@ -1,10 +1,11 @@
 """The platform_core mobile client against this service, over real HTTP.
 
 The client lives in another job's folder (`apps/platform_core/.../mobil/identity_sync_client.py`).
-This test loads it read-only and lets it call the real server of this service. Only two things
-are replaced: the `frappe` module (the client reads three settings and a logger from it) and the
-client's "https only" address check, because the test server speaks plain HTTP on 127.0.0.1.
-The token request, the request body and the headers are the client's own.
+It gets its service token from `kimlik/service_client.py`. This test loads both files read-only
+and lets them call the real server of this service. Only two things are replaced: the `frappe`
+module (the client reads settings and a logger from it) and the two "https only" address checks,
+because the test servers speak plain HTTP on 127.0.0.1. The token request, the client id check,
+the request body and the headers are the client's own.
 """
 
 from __future__ import annotations
@@ -28,12 +29,15 @@ CLIENT = (
     / "mobil"
     / "identity_sync_client.py"
 )
+SERVICE_CLIENT = CLIENT.parents[1] / "kimlik" / "service_client.py"
 SID = "55555555-5555-4555-8555-555555555555"
 OTHER_USER = "99999999-9999-4999-8999-999999999999"
 OTHER_SID = "66666666-6666-4666-8666-666666666666"
 
 
-@unittest.skipUnless(CLIENT.is_file(), "the platform_core mobile client is not in this checkout")
+@unittest.skipUnless(
+    CLIENT.is_file() and SERVICE_CLIENT.is_file(), "the platform_core mobile client is not in this checkout"
+)
 class MobileClientTest(ServerCase):
     two_tenants = True
 
@@ -60,34 +64,52 @@ class MobileClientTest(ServerCase):
         self.client = self.load_client(
             {
                 "mobile_identity_sync_url": f"http://127.0.0.1:{self.httpd.server_address[1]}",
-                "mobile_identity_sync_token_url": keycloak.url + token_path,
-                "mobile_identity_sync_client_id": "site-kiraci1-service",
-                "mobile_identity_sync_client_secret": "made-up-site-secret",
+                "test_token_url": keycloak.url + token_path,
+                # docs/sozlesmeler.md, section 8: the site's browser client and its service client.
+                "keycloak_client_id": "site-kiraci1",
+                "keycloak_service_client_id": "site-kiraci1-service",
+                "keycloak_service_client_secret": "made-up-site-value",
             }
         )
 
     def load_client(self, conf: dict[str, str]) -> types.ModuleType:
+        """Load the client and the token module it imports, without Frappe.
+
+        The two files are loaded by path under their real module names. `frappe` and the two
+        parent packages are stand-ins, removed again after loading.
+        """
         frappe = types.ModuleType("frappe")
         frappe.conf = conf
         frappe.logger = lambda _name: types.SimpleNamespace(warning=self.warnings.append, error=self.errors.append)
-        previous = sys.modules.get("frappe")
+        names = ("frappe", "platform_core", "platform_core.kimlik", "platform_core.kimlik.service_client")
+        previous = {name: sys.modules.get(name) for name in names}
         sys.modules["frappe"] = frappe
+        sys.modules["platform_core"] = types.ModuleType("platform_core")
+        sys.modules["platform_core.kimlik"] = types.ModuleType("platform_core.kimlik")
         try:
-            spec = importlib.util.spec_from_file_location("mobile_identity_sync_client_under_test", CLIENT)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            tokens = self.load_file("platform_core.kimlik.service_client", SERVICE_CLIENT)
+            sys.modules["platform_core.kimlik.service_client"] = tokens
+            module = self.load_file("mobile_identity_sync_client_under_test", CLIENT)
         finally:
-            if previous is None:
-                del sys.modules["frappe"]
-            else:
-                sys.modules["frappe"] = previous
+            for name, value in previous.items():
+                if value is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = value
+        # The two "https only" address checks are replaced: the test servers speak plain HTTP
+        # on 127.0.0.1. Everything else is the client's own code, the client id check included.
+        token_url = conf["test_token_url"]
+        service_url = conf["mobile_identity_sync_url"]
+        assert urlsplit(token_url).hostname == urlsplit(service_url).hostname == "127.0.0.1"
+        tokens._token_url = lambda: token_url
+        module._identity_sync_origin = lambda: service_url.rstrip("/")
+        return module
 
-        def plain_http_url(key: str, *, origin_only: bool = False) -> str:
-            value = conf[key]
-            assert urlsplit(value).hostname == "127.0.0.1"
-            return value.rstrip("/") if origin_only else value
-
-        module._configured_url = plain_http_url
+    @staticmethod
+    def load_file(name: str, path: pathlib.Path) -> types.ModuleType:
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
         return module
 
     def test_client_request_ends_the_session(self) -> None:
