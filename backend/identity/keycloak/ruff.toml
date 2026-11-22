@@ -1,0 +1,7 @@
+# Lint settings for the Keycloak tests (standard R-10). Run: uvx ruff check tests
+# Pyflakes errors only. Formatting is not applied yet: the shared renaming job will rewrite these older
+# files, and a format pass now would only create merge conflicts with it.
+line-length = 120
+
+[lint]
+select = ["F", "E9"]
