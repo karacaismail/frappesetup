@@ -3,10 +3,12 @@ from unittest.mock import patch
 from urllib.parse import quote, urlencode
 
 import frappe
-from frappe.core.doctype.user.user import generate_keys
+from frappe.sessions import delete_session
+from frappe.utils.password import remove_encrypted_password
 
 from platform_core.kabuk.bootstrap import get_bootstrap, safe_url
-from platform_core.tests.shell_http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
+from platform_core.kabuk.test_panel import PanelMetadata
+from platform_core.tests.shell_http_fixture import DESK, DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
 
 
 class TestBootstrapHTTP(ShellHTTPFixture):
@@ -40,13 +42,41 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 		self.assertIn("Kabuk Reader Private", targets)
 		self.assertNotIn("Kabuk Other Private", targets)
 
-	def test_api_key_does_not_create_browser_session(self):
-		keys = generate_keys(READER)
-		frappe.db.commit()
-		headers = {"Authorization": f"token {keys['api_key']}:{keys['api_secret']}"}
+	def issue_reader_api_keys(self):
+		"""Use the HTTP worker that caches the site's encryption settings."""
+		sid = None
 		try:
-			status, _, _ = self.request("/api/method/frappe.auth.get_logged_user", headers=headers)
+			frappe.get_doc("User", DESK).add_roles("System Manager")
+			frappe.db.commit()
+			sid = self.login(DESK)
+			status, _, body = self.request("/panel", sid)
 			self.assertEqual(status, 200)
+			token = PanelMetadata(body).token
+			self.assertTrue(token)
+			status, _, body = self.request(
+				"/api/method/frappe.core.doctype.user.user.generate_keys",
+				sid,
+				method="POST",
+				data={"user": READER},
+				headers={"X-Frappe-CSRF-Token": token},
+			)
+			self.assertEqual(status, 200)
+			return json.loads(body)["message"]
+		finally:
+			try:
+				if sid:
+					delete_session(sid=sid, user=DESK)
+			finally:
+				frappe.get_doc("User", DESK).remove_roles("System Manager")
+				frappe.db.commit()
+
+	def test_api_key_does_not_create_browser_session(self):
+		try:
+			keys = self.issue_reader_api_keys()
+			headers = {"Authorization": f"token {keys['api_key']}:{keys['api_secret']}"}
+			status, _, body = self.request("/api/method/frappe.auth.get_logged_user", headers=headers)
+			self.assertEqual(status, 200)
+			self.assertEqual(json.loads(body)["message"], READER)
 			status, _, _ = self.request("/api/method/platform_core.api.shell.get_bootstrap", headers=headers)
 			self.assertEqual(status, 403)
 			status, _, _ = self.request(f"/api/v2/doctype/{quote(DOCTYPE)}/meta", headers=headers)
@@ -56,6 +86,7 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 		finally:
 			frappe.db.rollback()
 			frappe.db.set_value("User", READER, "api_key", None, update_modified=False)
+			remove_encrypted_password("User", READER, "api_secret")
 			frappe.db.commit()
 
 	def test_direct_bootstrap_cannot_switch_users(self):
