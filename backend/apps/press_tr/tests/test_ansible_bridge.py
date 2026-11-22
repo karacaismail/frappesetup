@@ -44,7 +44,7 @@ class AnsibleBridgeTest(unittest.TestCase):
 			patch.dict(os.environ, {"ANSIBLE_CALLBACK_PLUGINS": "/opt/other"}, clear=False),
 			patch.object(ansible_bridge.wrapt, "register_post_import_hook") as register,
 		):
-			for _ in range(2):
+			for _attempt in range(2):
 				ansible_bridge.activate(method="press.x", kwargs={}, transaction_type="job")
 			self.assertEqual(os.environ["ANSIBLE_STDOUT_CALLBACK"], "press_tr_bridge")
 			self.assertEqual(

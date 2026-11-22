@@ -1,7 +1,7 @@
 # Press sunucu kurulumu devir notu
 
 Bu not DevOps sorumlusu içindir. Not hazırlık sunucusunda yapılacak işi anlatır.
-Yazılım tarafı 22 Kasım 2026 Pazar günü tamamlandı. Gerçek sunucu denemesi yapılmadı.
+Gerçek sunucu denemesi yapılmadı.
 
 ## Ne hazır
 
@@ -12,12 +12,49 @@ Yazılım tarafı 22 Kasım 2026 Pazar günü tamamlandı. Gerçek sunucu deneme
 
 Ayrıntı [karar notundadır](../../docs/decisions/0018-press-ansible-python314.md).
 
+## Yerel kurulum denemesi
+
+Press, kurulumu iş kuyruğuna ekler. Kuyruk, arka planda çalışacak işleri tutar.
+Yerel deneme, Press'in kurulum görevini çalıştırıp sonucunu yazdığını doğruladı.
+
+1. `fs-pd-press-provision` projesinde `press.localhost` sitesini hazırlayın.
+2. Aynı ağa `fs-pd-press-provision-target` adlı tek kullanımlık Ubuntu 22.04 container’ı ekleyin.
+3. Hedefte Python 3, SSH sunucusu, `sudo` ve `iproute2` hazır olsun.
+   Hedef, kendi ağ yolunu değiştirebilmeli.
+4. Press container’ında tek kullanımlık SSH anahtarı üretin.
+5. Hedefte yalnız açık anahtara izin verin. Press container’ında hedefin SSH kimliğini doğrulayın.
+6. Depo kökünde aşağıdaki komutu çalıştırın.
+
+```sh
+PANE_PORT=47330 backend/dev/press/provisioning_smoke.sh
+```
+
+Betik hedefin dış ağ yolunu kapatır. Paket indirme isteğini hedefin kendi içine yönlendirir.
+Press, `self_hosted.yml` dosyasını SSH üzerinden çalıştırır.
+Test, paket listesini yenileme hatasının görev kaydına yazılmasını bekler.
+Test bittiğinde hedefi ve tek kullanımlık anahtarı silin.
+
+### Yerel sonuç
+
+Press, SSH üzerinden Ubuntu bilgilerini topladı.
+Press, “Update APT Cache” görevini “Failure” olarak kaydetti. Görev sonucu doluydu.
+Bu hata bekleniyordu. Hedefin dış ağa erişimi kapalıydı.
+“Ansible Play” durumu “Failure”, “Server” durumu “Broken” oldu.
+Kalan 101 görev “Pending” durumunda kaldı.
+
+### Gerçek sunucuda sınanacak işler
+
+- Paket kurulumu ve kalan 101 görev gerçek sunucuda sınanacak.
+- Ağ yönlendirme, disk bağlama ve güvenlik duvarı `server.yml` ile sınanacak.
+- SSH ve sistem güvenliği adımları da `server.yml` ile sınanacak.
+- Press Agent sağlık yanıtı ve ikinci kurulum gerçek sunucuda doğrulanacak.
+
 ## Sizden istenenler
 
 1. Tek kullanımlık bir hazırlık sunucusu açın. Sunucu silinebilir olmalı.
    Press'in kurulum dosyaları Ubuntu içindir. Sunucuya yalnız bu iş bağlansın.
-2. Sunucuya `root` kullanıcısı için SSH anahtarı koyun. Parola ile giriş kapalı olsun.
-   Press anahtarı "Press Settings" kaydından okur.
+2. Sunucuda `root` kullanıcısı için tek kullanımlık SSH anahtarına izin verin.
+   Parola ile girişi kapatın. Press çalışanında SSH bağlantısını doğrulayın.
 3. Press sitesinde dört kayıt açın: "Cluster", "Proxy Server", "Database Server", "Server".
    "Server" kaydına sunucunun genel ve özel IP adresini yazın.
 4. "Server" kaydında "Setup Server" düğmesine basın. Press `server.yml` dosyasını çalıştırır.
