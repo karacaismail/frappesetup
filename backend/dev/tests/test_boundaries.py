@@ -71,7 +71,11 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(self.errors(), [])
 
     def test_ai_cannot_call_private_function_or_internal_module(self):
-        for code in ["from platform_core.kimlik.api import _resolve", "import platform_core.kimlik.internal"]:
+        for code in [
+            "from platform_core.kimlik.api import _resolve",
+            "from platform_core.kimlik.api import *",
+            "import platform_core.kimlik.internal",
+        ]:
             with self.subTest(code=code):
                 self.write("yapay_zeka/tools.py", code)
                 self.assertTrue(any("PUBLIC" in e for e in self.errors()))
@@ -134,6 +138,9 @@ f.delete_doc("Identity", "demo")""",
 frappe.db.delete("Identity", {"name": "demo"})""",
             """import frappe
 doc = frappe.get_doc("Identity", "demo")
+doc.save()""",
+            """import frappe
+doc: object = frappe.get_doc("Identity", "demo")
 doc.save()""",
             """import frappe
 frappe.get_doc({"doctype": "Identity"}).insert()""",

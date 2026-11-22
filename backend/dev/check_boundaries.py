@@ -96,6 +96,7 @@ class SourceCheck(ast.NodeVisitor):
             or (
                 not isinstance(node, ast.Import)
                 and name.rpartition(".")[0] == p
+                and not name.endswith(".*")
                 and not name.rsplit(".", 1)[-1].startswith("_")
             )
             for p in public
@@ -132,10 +133,10 @@ class SourceCheck(ast.NodeVisitor):
             return doctype_arg(node)
         return None
 
-    def visit_Assign(self, node: ast.Assign) -> None:
-        doctype = self.document_type(node.value)
-        resolved = self.resolve(node.value)
-        for target in node.targets:
+    def assign(self, targets: list[ast.expr], value: ast.expr) -> None:
+        doctype = self.document_type(value)
+        resolved = self.resolve(value)
+        for target in targets:
             if isinstance(target, ast.Name):
                 self.documents.pop(target.id, None)
                 self.aliases.pop(target.id, None)
@@ -143,6 +144,14 @@ class SourceCheck(ast.NodeVisitor):
                     self.documents[target.id] = doctype
                 if resolved:
                     self.aliases[target.id] = resolved
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        self.assign(node.targets, node.value)
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if node.value is not None:
+            self.assign([node.target], node.value)
         self.generic_visit(node)
 
     def foreign_write(self, node: ast.Call, doctype: str | None) -> None:
