@@ -38,7 +38,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 | İstemci | Tür | Akış | Dönüş adresi | Çıkış bildirimi |
 | --- | --- | --- | --- | --- |
-| `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu | `<kiracı adresi>/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
+| `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `press` | Gizli sırlı | Yetkilendirme kodu | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
@@ -147,6 +147,7 @@ Adres biçimi `/api/method/<yol>` olur.
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
 | `platform_core.api.auth.get_login_url` | POST | Misafir, istek sınırlı | Keycloak giriş adresini üretir. `state` sunucuda üretilir. `redirect_to` yalnız aynı kökende göreli yol olabilir. |
+| `platform_core.api.auth.keycloak_callback` | GET | Misafir, `state`, kod ve tarayıcı çerezi | Kodu belirteçle değiştirir. Kullanıcıyı `(iss, sub)` ile bulur. Oturum açar ve `sid` değerini oturuma yazar. |
 | `platform_core.api.auth.logout` | POST | Oturum | Frappe oturumunu kapatır. Keycloak çıkış adresini döner. |
 | `platform_core.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Frappe oturumlarını kapatır. |
 | `platform_core.api.identity.provision` | POST | Servis belirteci, `azp=identity-sync` | Kullanıcıyı açar ya da günceller. Aynı istek iki kez gelirse aynı sonucu döner. |
@@ -155,6 +156,13 @@ Adres biçimi `/api/method/<yol>` olur.
 | `platform_core.api.shell.get_bootstrap` | GET | Oturum | Kullanıcıyı, rolleri, kurulu uygulamaları ve kenar çubuğunu döner. |
 | `platform_core.api.meta.get_doctype` | GET | Oturum | Kullanıcının görebildiği DocType tanımını döner. `ETag` başlığı taşır. |
 
+- Kiracı girişi kendi dönüş ucunu kullanır. Frappe'nin hazır `login_via_keycloak` ucu kullanılmaz. Nedeni şudur: hazır uç `state` değerini tarayıcıya bağlamaz. Ayrıca kimlik belirtecini saklamaz, bu yüzden `sid` bulunmaz.
+- `get_login_url` rastgele bir tarayıcı değeri üretir. Değer `HttpOnly`, `Secure` ve `SameSite=Lax` çerezinde durur. Üretimde çerez adı `__Host-` önekini taşır.
+- Sunucu `state` kaydında bu değerin özetini, PKCE doğrulayıcısını, `nonce` değerini ve dönüş yolunu saklar. Kayıt 600 saniye yaşar.
+- Dönüş ucu kaydı tek bölünmez işlemle okur ve siler. Örneğin Redis `GETDEL` kullanılır. Çerezdeki değer kayıttaki özetle eşleşmezse giriş reddedilir.
+- Dönüş ucu kimlik belirtecindeki `nonce` değerini denetler. Belirteç `oidc_verify.verify_id_token` ile doğrulanır.
+- `kimlik_yalniz_keycloak` ayarı açıkken Frappe'nin yerel giriş işlevleri kapanır. Kapatma adrese değil, çağrılan işleve uygulanır. `override_whitelisted_methods` kancası kullanılır. Kapsam şudur: parola girişi, parola sıfırlama ve güncelleme, e-posta bağlantısıyla giriş ve hazır sosyal giriş uçları. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi 403 alır.
+- Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
 - `api/__init__.py`, `api/auth.py` ve `api/identity.py` dosyaları platform-core-kimlik işinindir.
 - `api/shell.py` ve `api/meta.py` dosyaları platform-core-kabuk işinindir.
