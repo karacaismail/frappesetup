@@ -265,3 +265,5 @@ required_apps = ["press"]
 # ignore_translatable_strings_from = []
 
 before_request = ["press_tr.kimlik.request_policy.before_request"]
+
+auth_hooks = ["press_tr.kimlik.service.authorize_identity_sync"]

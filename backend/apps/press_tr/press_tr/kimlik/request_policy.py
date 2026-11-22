@@ -2,6 +2,8 @@ import frappe
 from werkzeug.exceptions import Forbidden, HTTPException
 from werkzeug.utils import redirect
 
+from press_tr.kimlik.service import SERVICE_PARAMETERS
+
 CLOSED_METHODS = frozenset(
 	{
 		"press.api.account.signup",
@@ -42,7 +44,7 @@ def before_request():
 
 	# Press denies non-Press API paths by default. Extend its runtime allowlist
 	# with the exact methods exposed here, without editing its source.
-	if path.removeprefix("/api/method/") in APP_METHODS:
+	if path.removeprefix("/api/method/") in APP_METHODS | SERVICE_PARAMETERS.keys():
 		allow_press_route(path)
 
 

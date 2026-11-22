@@ -72,3 +72,76 @@ paths:
           description: Logout processed, including a repeated logout.
         "403":
           description: Logout token was rejected.
+  /api/method/press_tr.api.identity.ensure_team:
+    post:
+      operationId: ensureTeam
+      summary: Ensure a Press team and membership.
+      description: Identity Sync provisions a verified user and their personal team, or adds the user to an existing team. Repeating the request returns the same team and user. This operation does not start billing.
+      security:
+        - identitySync: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject]
+              properties:
+                issuer:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                  description: Required for the first identity binding.
+                email_verified:
+                  type: boolean
+                  description: Must be true for the first identity binding.
+                team:
+                  type: string
+                  description: Existing team name. Omit to ensure the user's personal team.
+      responses:
+        "200":
+          description: Team and user names in the message object.
+        "403":
+          description: Service identity or user binding was rejected.
+        "404":
+          description: The named team does not exist.
+  /api/method/press_tr.api.identity.remove_team_member:
+    post:
+      operationId: removeTeamMember
+      summary: Revoke a Press team membership.
+      description: Removes the member and their team role assignments. This destructive operation preserves the user and the team. Team owner removal requires a separate ownership change.
+      security:
+        - identitySync: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject, team]
+              properties:
+                issuer:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                team:
+                  type: string
+      responses:
+        "200":
+          description: The user has no team membership, including a repeated request.
+        "403":
+          description: Service identity or owner removal was rejected.
+components:
+  securitySchemes:
+    identitySync:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A Keycloak access token with only press as audience and identity-sync as authorized party.

@@ -40,8 +40,11 @@ def bind_identity(claims):
 	if len(email) > 140 or address.addr_spec != email:
 		reject()
 
-	user = frappe.db.get_value("User", {"email": email}, "name", for_update=True)
+	user = frappe.db.get_value("User", {"email": email}, "name")
 	if user:
+		# Lock existing users by their primary key, without gap-locking new emails.
+		if not frappe.db.get_value("User", user, "name", for_update=True):
+			reject()
 		validate_local_user(user)
 		if frappe.db.exists(IDENTITY_LINK, {"user": user}):
 			reject()
