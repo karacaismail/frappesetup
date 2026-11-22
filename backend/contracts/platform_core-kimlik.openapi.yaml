@@ -366,9 +366,16 @@ paths:
            Bilinmeyen e-posta 403 alır. Kayıt açılmaz. Kullanıcıyı eşitleme servisi açar.
            Bağ başka kullanıcıya aitse 403 döner. Aynı e-posta başka `sub` değerine bağlıysa 403 döner.
            Kapalı kullanıcı 403 alır.
-        7. Sunucu Frappe oturumu açar. Keycloak oturum kimliği (`sid`) oturum verisine yazılır.
+        7. Kullanıcı çalışansa sunucu kimlik belirtecinin `auth_time` değerine bakar (O-25).
+           Çalışan, masaüstü rolü olan “System User” kullanıcısıdır.
+           Değer yoksa ya da 3600 saniyeden eskiyse oturum açılmaz.
+           Sunucu yeni bir `state` üretir ve tarayıcıyı `prompt=login` ile Keycloak'a geri yollar. Yanıt 302 olur.
+           Böylece açık Keycloak çerezi yeniden kimlik doğrulamayı atlatmaz.
+           Bu ikinci denemede de değer eskiyse 403 döner. Müşteri bu adımdan geçmez.
+        8. Sunucu Frappe oturumu açar. Keycloak oturum kimliği (`sid`) oturum verisine yazılır.
            Arka kanal çıkışı bu değerle eşleşir.
-        8. Sunucu tarayıcıyı `redirect_to` yoluna yönlendirir. Yol kayıtta yoksa `platform_panel_url` adresine yönlendirir.
+           Oturum 1 saat işlem olmazsa kapanır. Süre oturum verisinde `session_expiry` olarak durur.
+        9. Sunucu tarayıcıyı `redirect_to` yoluna yönlendirir. Yol kayıtta yoksa `platform_panel_url` adresine yönlendirir.
 
         Keycloak'a ulaşılamazsa ya da anahtar listesi alınamazsa 503 döner.
         Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
@@ -477,7 +484,7 @@ paths:
         Bilinen sınır: Adreste `id_token_hint` yoktur. Sunucu kimlik belirtecini saklamaz.
         Bu yüzden Keycloak bir onay ekranı gösterebilir.
 
-        İstek gövdesizdir. Misafir isteği 403 alır.
+        İstek gövdesizdir. Misafir isteği 403 alır. Süresi biten oturum 401 alır.
       x-yikici: true
       security:
         - frappeSession: []
@@ -499,11 +506,17 @@ paths:
                       logout_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/logout?client_id=site-kiraci1&post_logout_redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fpanel"
         "403":
           description: |
-            Misafir isteği. `exc_type` değeri `PermissionError` olur.
-            CSRF başlığı yoksa ya da yanlışsa Frappe yine 403 ve `CSRFTokenError` döner.
+            Misafir isteği. Çerez hiç yoktur. `exc_type` değeri `PermissionError` olur.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
+        "400":
+          description: CSRF başlığı yok ya da yanlış. `exc_type` değeri `CSRFTokenError` olur.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
 
   /platform_core.api.auth.setup_keycloak_login:
     post:
@@ -564,6 +577,8 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
 
   /platform_core.api.keycloak_backchannel_logout:
     post:
@@ -957,6 +972,20 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
+    OturumBitti:
+      description: |
+        Oturumun süresi bitti. Kullanıcı 1 saat işlem yapmadı ya da oturum kapatıldı (O-25).
+        `exc_type` değeri Frappe'nin `SessionExpired` değeridir. Frappe `sid` çerezini siler.
+        Bu yanıt yetki reddi değildir. İstemci kullanıcıyı giriş sayfasına yollar (SZ-8).
+        Çerez hiç yoksa bu yanıt dönmez. O durumda 403 ve `PermissionError` döner.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
+          examples:
+            boslukta:
+              value:
+                exc_type: SessionExpired
+                exception: "frappe.exceptions.SessionExpired"
     GovdeBozuk:
       description: |
         Gövde JSON olarak ayrıştırılamadı. Frappe isteği uca iletmeden reddetti.

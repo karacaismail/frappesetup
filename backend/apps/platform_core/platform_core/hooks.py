@@ -28,3 +28,9 @@ override_whitelisted_methods = {
 	"frappe.integrations.oauth2_logins.login_via_keycloak": "platform_core.kimlik.login_policy.login_via_keycloak",
 	"frappe.integrations.oauth2_logins.custom": "platform_core.kimlik.login_policy.custom",
 }
+
+# platform-core-kimlik: Frappe idle timeout of 1 hour (O-25, kimlik/session_policy.py).
+after_install = ["platform_core.kimlik.session_policy.apply"]
+after_migrate = ["platform_core.kimlik.session_policy.apply"]
+# O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
+ai_write_closed_doctypes = ["Platform Identity Link"]

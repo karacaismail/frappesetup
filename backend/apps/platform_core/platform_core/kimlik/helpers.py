@@ -115,6 +115,7 @@ def authorize_url(
 	state: str,
 	nonce: str,
 	challenge: str,
+	prompt: str | None = None,
 ) -> str:
 	params = {
 		"client_id": client_id,
@@ -126,6 +127,8 @@ def authorize_url(
 		"code_challenge": challenge,
 		"code_challenge_method": "S256",
 	}
+	if prompt:
+		params["prompt"] = prompt
 	return realm_url(public_url, realm) + "/protocol/openid-connect/auth?" + urlencode(params)
 
 

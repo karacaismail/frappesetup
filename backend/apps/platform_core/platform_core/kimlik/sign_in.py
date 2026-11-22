@@ -20,7 +20,7 @@ import frappe.sessions
 from frappe import _
 from frappe.utils import get_url
 
-from platform_core.kimlik import helpers, jwks, site_settings
+from platform_core.kimlik import helpers, jwks, session_policy, site_settings
 from platform_core.kimlik.exceptions import (
 	InvalidRedirect,
 	KeycloakLoginNotConfigured,
@@ -58,8 +58,11 @@ def guard_guest_request(max_bytes: int = helpers.MAX_GUEST_BODY_BYTES) -> None:
 		frappe.throw(_("Request body is too large."), PayloadTooLarge)
 
 
-def build_login_url(redirect_to: str | None = None) -> dict:
-	"""Builds the Keycloak authorize address and binds the attempt to this browser."""
+def build_login_url(redirect_to: str | None = None, force_login: bool = False) -> dict:
+	"""Builds the Keycloak authorize address and binds the attempt to this browser.
+
+	`force_login` adds `prompt=login`: Keycloak asks for the credentials even with an open session (O-25).
+	"""
 	guard_guest_request()
 	if redirect_to and not helpers.is_safe_redirect(redirect_to):
 		frappe.throw(_("Redirect target must be a relative path on this site."), InvalidRedirect)
@@ -79,6 +82,7 @@ def build_login_url(redirect_to: str | None = None) -> dict:
 			"verifier": code_verifier,
 			"nonce": nonce,
 			"redirect_to": redirect_to or "",
+			"force_login": bool(force_login),
 		},
 	)
 	frappe.local.cookie_manager.set_cookie(
@@ -93,6 +97,7 @@ def build_login_url(redirect_to: str | None = None) -> dict:
 			state,
 			nonce,
 			helpers.code_challenge(code_verifier),
+			prompt="login" if force_login else None,
 		),
 		"brand_name": settings.brand_name,
 		"label": _("Sign in with {0}").format(settings.brand_name),
@@ -152,8 +157,14 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 		raise SignInRefused(503, _("The identity provider keys are not available.")) from error
 
 	user = resolve_user(settings.issuer, claims)
+	if session_policy.needs_fresh_authentication(user, claims):
+		# O-25: an employee idle for the limit authenticates again; the open Keycloak cookie does not count.
+		if record.get("force_login"):
+			raise SignInRefused(403, _("The identity provider did not confirm a fresh sign-in."))
+		return build_login_url(record.get("redirect_to") or None, force_login=True)["login_url"]
 	frappe.local.login_manager.login_as(user)
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
+	frappe.local.session.data["session_expiry"] = session_policy.IDLE_TIMEOUT
 	remember_keycloak_session(claims.get("sid"), frappe.session.sid)
 	# Frappe skips the CSRF check while the session has no token (frappe/auth.py:92). Create it now,
 	# so the first write after sign-in already needs the X-Frappe-CSRF-Token header.
