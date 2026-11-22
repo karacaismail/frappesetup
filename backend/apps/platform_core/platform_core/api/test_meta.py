@@ -22,15 +22,15 @@ from platform_core.tests.test_shell_contract import SCHEMA_FILE, matches
 
 class TestMetadataHTTP(ShellHTTPFixture):
 	def test_get_doctype_guest_denied(self):
-		status, headers, _ = self.metadata(self.privileged_sid)
+		status, headers, _unused_body = self.metadata(self.privileged_sid)
 		self.assertEqual(status, 200)
-		status, _, _ = self.metadata(None, {"If-None-Match": headers["ETag"]})
+		status, _unused_headers, _unused_body = self.metadata(None, {"If-None-Match": headers["ETag"]})
 		self.assertEqual(status, 403)
 
 	def test_get_doctype_foreign_data_denied(self):
-		status, headers, _ = self.metadata(self.privileged_sid)
+		status, headers, _unused_body = self.metadata(self.privileged_sid)
 		self.assertEqual(status, 200)
-		status, _, body = self.metadata(self.reader_sid, {"If-None-Match": headers["ETag"]})
+		status, _unused_headers, body = self.metadata(self.reader_sid, {"If-None-Match": headers["ETag"]})
 		self.assertEqual(status, 200)
 		fields = json.loads(body)["message"]["schema"]["fields"]
 		self.assertNotIn("private_note", {field["fieldname"] for field in fields})
@@ -60,7 +60,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(low_headers["Cache-Control"], "private, no-store")
 
 	def test_conditional_get_has_empty_304_body(self):
-		status, headers, _ = self.metadata(self.reader_sid)
+		status, headers, _unused_body = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 		status, new_headers, body = self.metadata(self.reader_sid, {"If-None-Match": "W/" + headers["ETag"]})
 		self.assertEqual(status, 304)
@@ -69,7 +69,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(new_headers["Cache-Control"], "private, no-store")
 
 	def test_post_is_rejected(self):
-		status, _, _ = self.request(
+		status, _unused_headers, _unused_body = self.request(
 			"/api/method/platform_core.api.meta.get_doctype",
 			self.reader_sid,
 			method="POST",
@@ -78,7 +78,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 403)
 
 	def test_role_revocation_invalidates_cached_schema(self):
-		status, headers, _ = self.metadata(self.desk_sid)
+		status, headers, _unused_body = self.metadata(self.desk_sid)
 		self.assertEqual(status, 200)
 		frappe.set_user("Administrator")
 		doc = frappe.get_doc("User", DESK)
@@ -137,7 +137,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 			setter = make_property_setter(DOCTYPE, fieldname, "label", "Site note", "Data")
 		self.addCleanup(self.delete_fixture, setter)
 		frappe.db.commit()
-		status, _, body = self.metadata(self.reader_sid)
+		status, _unused_headers, body = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 		fields = {field["fieldname"]: field for field in json.loads(body)["message"]["schema"]["fields"]}
 		self.assertEqual(fields[fieldname]["label"], "Site note")
@@ -154,7 +154,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		share.add(PROTECTED_DOCTYPE, doc.name, user=READER, read=1)
 		self.addCleanup(share.remove, PROTECTED_DOCTYPE, doc.name, READER)
 		frappe.db.commit()
-		status, _, body = self.metadata(self.reader_sid, doctype=PROTECTED_DOCTYPE)
+		status, _unused_headers, body = self.metadata(self.reader_sid, doctype=PROTECTED_DOCTYPE)
 		self.assertEqual(status, 200)
 		payload = json.loads(body)["message"]
 		self.assertIn("entries", {field["fieldname"] for field in payload["schema"]["fields"]})
@@ -170,26 +170,26 @@ class TestMetadataHTTP(ShellHTTPFixture):
 			CHILD_DOCTYPE,
 		):
 			with self.subTest(doctype=doctype):
-				status, _, body = self.metadata(self.reader_sid, doctype=doctype)
+				status, _unused_headers, body = self.metadata(self.reader_sid, doctype=doctype)
 				self.assertEqual(status, 403)
 				self.assertEqual(json.loads(body)["exc_type"], "PermissionError")
 				bodies.append(json.loads(body))
 		self.assertTrue(all(body == bodies[0] for body in bodies[1:]))
 
 	def test_doctype_returns_the_canonical_name(self):
-		status, _, body = self.metadata(self.reader_sid, doctype=DOCTYPE.lower())
+		status, _unused_headers, body = self.metadata(self.reader_sid, doctype=DOCTYPE.lower())
 		self.assertEqual(status, 200)
 		self.assertEqual(json.loads(body)["message"]["schema"]["name"], DOCTYPE)
 
 	def test_invalid_doctype_names(self):
 		for doctype in ("", "x" * 141):
 			with self.subTest(doctype=doctype):
-				status, _, _ = self.metadata(self.reader_sid, doctype=doctype)
+				status, _unused_headers, _unused_body = self.metadata(self.reader_sid, doctype=doctype)
 				self.assertEqual(status, 417)
 
 	def test_child_fields_inherit_parent_permission_levels(self):
 		for sid, can_read_private in ((self.reader_sid, False), (self.desk_sid, True)):
-			status, _, body = self.metadata(sid)
+			status, _unused_headers, body = self.metadata(sid)
 			self.assertEqual(status, 200)
 			child = json.loads(body)["message"]["child_tables"][CHILD_DOCTYPE]
 			names = {field["fieldname"] for field in child["fields"]}
@@ -212,17 +212,17 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		for doctype in (DOCTYPE, missing):
 			with self.subTest(doctype=doctype):
 				path = f"/api/v2/doctype/{quote(doctype)}/meta"
-				status, _, body = self.request(path, self.reader_sid)
+				status, _unused_headers, body = self.request(path, self.reader_sid)
 				self.assertEqual(status, 403)
 				payload = json.loads(body)
 				self.assertNotIn("data", payload)
 				self.assertEqual([error["type"] for error in payload["errors"]], ["PermissionError"])
 				self.assertNotIn(doctype.encode(), body)
-		status, _, _ = self.metadata(self.reader_sid)
+		status, _unused_headers, _unused_body = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 
 	def test_website_user_cannot_open_desk(self):
-		status, _, _ = self.request("/desk", self.reader_sid)
+		status, _unused_headers, _unused_body = self.request("/desk", self.reader_sid)
 		self.assertEqual(status, 403)
 
 	def test_website_user_cannot_read_native_form_rpc_or_alias(self):
@@ -240,7 +240,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		]
 		for path in paths:
 			with self.subTest(path=path):
-				status, _, body = self.request(path, self.reader_sid)
+				status, _unused_headers, body = self.request(path, self.reader_sid)
 				self.assertEqual(status, 403)
 				self.assertNotIn("data", json.loads(body))
 				self.assertNotIn("message", json.loads(body))
@@ -264,7 +264,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		before = frappe.db.count("Error Log")
 		for path in ("/api/method/xyz", "/?cmd=xyz"):
 			with self.subTest(path=path):
-				status, _, body = self.request(path)
+				status, _unused_headers, body = self.request(path)
 				self.assertEqual(status, 417)
 				self.assertEqual(json.loads(body)["exc_type"], "ValidationError")
 		self.assertEqual(frappe.db.count("Error Log"), before)
@@ -300,7 +300,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 			"/?cmd=" + method,
 		):
 			with self.subTest(path=path):
-				status, _, body = self.request(path, self.reader_sid)
+				status, _unused_headers, body = self.request(path, self.reader_sid)
 				self.assertEqual(status, 200)
 				response = json.loads(body)
 				self.assertEqual(response.get("message", response.get("data")), READER)
@@ -319,7 +319,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		)
 		self.addCleanup(self.delete_fixture, field)
 		frappe.db.commit()
-		status, _, body = self.metadata(self.reader_sid)
+		status, _unused_headers, body = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 		payload = json.loads(body)["message"]
 		self.assertEqual(payload["catalog_version"], 2)
@@ -442,7 +442,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		path = "/api/method/platform_core.api.meta.get_doctype?" + urlencode(
 			{"doctype": DOCTYPE, "_lang": "tr"}
 		)
-		status, _, body = self.request(path, self.reader_sid)
+		status, _unused_headers, body = self.request(path, self.reader_sid)
 		self.assertEqual(status, 200)
 		payload = json.loads(body)["message"]
 		value = next(field for field in payload["schema"]["fields"] if field["fieldname"] == "locale_test")
