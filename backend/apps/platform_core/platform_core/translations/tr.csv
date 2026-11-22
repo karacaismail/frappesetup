@@ -806,3 +806,5 @@ Send either a session cookie or a bearer token.,Oturum çerezi veya belirteç g�
 MCP call counters are internal.,MCP çağrı sayacını yalnız sistem değiştirebilir.,platform_core.ai
 Authentication required,Kimlik doğrulaması gerekli.,platform_core.ai
 MCP call allowance unavailable.,MCP çağrı sınırı denetlenemiyor.,platform_core.ai
+No permission to read this document type.,Bu kayıt türünü okuma izniniz yok.,
+No permission to search this document type.,Bu kayıt türünde arama izniniz yok.,
