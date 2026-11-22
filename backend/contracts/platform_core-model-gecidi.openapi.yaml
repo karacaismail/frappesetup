@@ -136,10 +136,42 @@ paths:
           $ref: '#/components/responses/QuotaError'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.reconcile_stale_pending:
+    post:
+      summary: Reconcile expired pending reservations
+      description: Requires a manager session. Changes up to 500 expired pending reservations to unknown and retains their reserved cost.
+      operationId: reconcile_stale_pending
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Reservations changed to unknown
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [closed, targets]
+                    properties:
+                      closed: {type: integer, minimum: 0, maximum: 500}
+                      targets:
+                        type: array
+                        maxItems: 500
+                        uniqueItems: true
+                        items: {type: string}
+              example:
+                message: {closed: 1, targets: [672234b3-483c-4364-a40a-82a484a88173]}
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
   /api/method/platform_core.api.model.purge_usage:
     post:
       summary: Preview or purge old usage records
-      description: Preview returns the exact batch of up to 500 closed records. The same manager must confirm it within five minutes. Deleted records can be restored through Frappe Deleted Document.
+      description: Preview returns the exact batch of up to 500 closed records. The same manager must confirm it within five minutes. O-32 permanently deletes the confirmed records without a Deleted Document copy. Recovery requires a database backup.
       operationId: purge_usage
       security:
         - session: []

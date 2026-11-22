@@ -53,10 +53,12 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | HTTP | `platform_core.api.model.complete` | Oturum veya kullanıcı anahtarıyla model çağrısı yapar. |
 | HTTP | `platform_core.api.model.test_api` | Yöneticiye bağlantı denemesi sunar. |
 | HTTP | `platform_core.api.model.resolve_usage` | Yöneticinin doğruladığı tutarı kullanım kaydına işler. |
+| HTTP | `platform_core.api.model.reconcile_stale_pending` | Yönetici oturumuyla takılı kayıt grubunu kapatır. |
 | HTTP | `platform_core.api.model.purge_usage` | Silinecek kayıtları gösterir veya onaylı önizlemeye göre siler. |
 | HTTP | `platform_core.api.model.clear_api_credential` | Kapalı bağlantının anahtarını siler. |
 | Bench | `platform_core.model_gecidi.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
 | Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` araçlarını bildirir. |
+| Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |
 | Kanca | `ai_write_closed_doctypes` | Genel yapay zekâ yazmasını `AI API` ve `AI Account` için kapatır. |
 | Kayıt olayı | `validate` | `AI API`, `AI Model`, `AI Provider` ve `AI Route` kayıtlarını yazmadan önce denetler. |
 | Şema olayı | `on_doctype_update` | `PLT AI Route Target` için aynı hedefin ikinci kez yazılmasını engeller. |
@@ -164,6 +166,9 @@ Bu kayıt, istek yarıda kalırsa bütçe denetiminde korunur.
 Geçit çağrı bitince son durumu kalıcı olarak kaydeder.
 Elle başlatılan mutabakat, takılı kayıtları `unknown` durumuna alır.
 Gerçek ücret belirlenene kadar ayrılan tutar korunur.
+Yönetici mutabakatı HTTP üzerinden de başlatabilir.
+Yapay zekâ aracı yalnız önizlemede seçilen tek kaydı kapatır.
+Araç yazımdan önce insan onayı ister.
 İşletim komutu aşağıdadır.
 
 ```sh
@@ -192,5 +197,7 @@ Yönetici önce silinecek kayıtları önizler.
 Geçit önizleme kodunu `preview_token` alanında döner.
 Yönetici silmeyi aynı kodla elle başlatır.
 Temizlik yalnız kapanmış kayıtları siler. Her çağrı en çok 500 kayıt siler.
-Frappe silinen kaydı “Deleted Document” ekranından geri yükleyebilir.
+O-32 kararı gereği saklama temizliği kayıtları kalıcı siler.
+Frappe “Deleted Document” tablosuna kopya yazmaz.
+Geri dönüş için silme öncesi alınan veritabanı yedeği kullanılır.
 Geçit temizliği “Activity Log” kaydına yazar.

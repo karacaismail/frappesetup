@@ -162,6 +162,7 @@ Links one model to one API connection in the route's target order.,Yolun hedef s
 Gateway registry management requires a manager role.,Geçit kayıtlarını yalnız yöneticiler değiştirebilir.,
 Review the gateway registry update.,Geçit kaydındaki değişikliği inceleyin.,
 Review the new gateway registry record.,Yeni geçit kaydını inceleyin.,
+Reconcile the selected expired model gateway reservation.,Seçilen takılı kullanım kaydını kapatın.,AI Usage Log
 Model gateway API credential cleared.,Model geçidi API anahtarı silindi.,
 Create a disabled model provider connection.,Kapalı bir model bağlantısı oluşturun.,
 Update a provider connection and clear its stored credential if its destination changes.,Sağlayıcı bağlantısını güncelleyin. Adres değişirse kayıtlı anahtar silinir.,

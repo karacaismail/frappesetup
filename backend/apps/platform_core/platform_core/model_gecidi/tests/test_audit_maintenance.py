@@ -8,11 +8,12 @@ from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
 import frappe
-from frappe.core.doctype.deleted_document.deleted_document import restore
 from frappe.tests import IntegrationTestCase
 from frappe.utils import now_datetime
 
-from platform_core.model_gecidi import gateway, ledger, maintenance, policy
+from platform_core import hooks
+from platform_core.api import model
+from platform_core.model_gecidi import gateway, ledger, maintenance, management_tools, policy
 
 
 class PreviewRequiredTests(unittest.TestCase):
@@ -28,9 +29,43 @@ class PreviewRequiredTests(unittest.TestCase):
 			self.assertEqual((caught.exception.status, caught.exception.code), (400, "preview_required"))
 			self.assertFalse(framework.db.count.called)
 
-	def test_stale_recovery_has_an_unexposed_entry_point(self):
-		self.assertTrue(hasattr(maintenance, "reconcile_stale_pending"))
-		self.assertNotIn(maintenance.reconcile_stale_pending, frappe.whitelisted)
+	def test_stale_recovery_is_registered_for_http_and_ai_approval(self):
+		self.assertIn("platform_core.model_gecidi.management_tools.declare", hooks.ai_tools)
+		self.assertIn(model.reconcile_stale_pending, frappe.whitelisted)
+		self.assertEqual(
+			frappe.allowed_http_methods_for_whitelisted_func[model.reconcile_stale_pending], ["POST"]
+		)
+		tool = next(item for item in management_tools.declare() if item["name"] == "reconcile_stale_pending")
+		self.assertEqual(
+			(tool["kind"], tool["versioned"], tool["roles"]),
+			(
+				"write",
+				True,
+				sorted(policy.MANAGERS),
+			),
+		)
+		self.assertTrue(tool["preview"])
+
+	def test_retention_uses_permanent_delete(self):
+		now = datetime(2026, 1, 1)
+		with (
+			patch.object(maintenance, "frappe") as framework,
+			patch.object(policy, "require_user"),
+			patch.object(maintenance, "now_datetime", return_value=now),
+		):
+			framework.session.user = "Manager A"
+			framework.conf.get.return_value = 365
+			framework.cache.get_value.return_value = {
+				"user": "Manager A",
+				"days": 365,
+				"cutoff": now - timedelta(days=365),
+				"batch": [("retention-fixture", now)],
+			}
+			framework.qb.get_query.return_value.run.return_value = [
+				SimpleNamespace(name="retention-fixture", modified=now)
+			]
+			maintenance.purge_usage(dry_run=False, preview_token="a" * 64)
+			self.assertIs(framework.delete_doc.call_args.kwargs.get("delete_permanently"), True)
 
 	def test_foreign_preview_rejects_before_querying_records(self):
 		with patch.object(maintenance, "frappe") as framework, patch.object(policy, "require_user"):
@@ -128,7 +163,7 @@ class TestUsageMaintenance(IntegrationTestCase):
 			reserved_cost=Decimal("0.125"),
 		).insert()
 
-	def test_confirmed_purge_can_be_restored_via_deleted_document(self):
+	def test_confirmed_purge_leaves_no_deleted_document_copy(self):
 		old = now_datetime() - timedelta(days=366)
 		log = self._usage("success", old)
 		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 365}):
@@ -141,13 +176,7 @@ class TestUsageMaintenance(IntegrationTestCase):
 		deleted = frappe.db.get_value(
 			"Deleted Document", {"deleted_doctype": "AI Usage Log", "deleted_name": log.name}, "name"
 		)
-		self.assertTrue(deleted)
-		restore(deleted, alert=False)
-		restored = frappe.db.get_value("Deleted Document", deleted, "new_name")
-		record = frappe.get_doc("AI Usage Log", restored)
-		self.assertEqual(
-			(record.account, record.result, record.reserved_cost), (log.account, "success", 0.125)
-		)
+		self.assertIsNone(deleted)
 		with self.assertRaises(policy.Denied) as replay:
 			maintenance.purge_usage(dry_run=False, preview_token=preview["preview_token"])
 		self.assertEqual(replay.exception.code, "preview_invalid")
@@ -176,3 +205,15 @@ class TestUsageMaintenance(IntegrationTestCase):
 		self.assertEqual((stale.result, stale.cost_known, stale.reservation_known), ("unknown", 0, 1))
 		self.assertEqual(stale.reserved_cost, 0.125)
 		self.assertNotIn(stale.name, maintenance.reconcile_stale_pending()["targets"])
+
+	def test_ai_recovery_changes_only_the_named_reservation(self):
+		attempted = now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS + 5)
+		first, second = [self._usage("pending", attempted) for _ in range(2)]
+		preview = management_tools.preview_reconcile_pending(name=first.name)
+		self.assertEqual(preview["target_name"], first.name)
+		self.assertEqual(preview["target_version"], str(first.modified))
+		self.assertEqual(
+			management_tools.reconcile_pending(name=first.name), {"closed": 1, "targets": [first.name]}
+		)
+		second.reload()
+		self.assertEqual(second.result, "pending")

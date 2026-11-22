@@ -54,6 +54,11 @@ class PurgedUsage(TypedDict):
 	preview_token: str | None
 
 
+class ReconciledPending(TypedDict):
+	closed: int
+	targets: list[str]
+
+
 class ClearedCredential(TypedDict):
 	name: str
 	cleared: Literal[True]
@@ -103,6 +108,12 @@ def resolve_usage(
 ) -> ResolvedUsage | ErrorResponse:
 	"""Reconcile a model attempt with its verified cost."""
 	return _respond(maintenance.resolve_usage, log, cost, currency, note)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+def reconcile_stale_pending() -> ReconciledPending | ErrorResponse:
+	"""Close expired reservations as unknown without releasing reserved cost."""
+	return _respond(maintenance.reconcile_stale_pending)
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission

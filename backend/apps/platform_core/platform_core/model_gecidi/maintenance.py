@@ -74,11 +74,26 @@ def resolve_usage(log, cost, currency, note=None):
 	return {"name": log, "result": "resolved", "cost": format(verified_cost, "f"), "currency": currency}
 
 
-def reconcile_stale_pending():
-	"""Close one batch of expired reservations as unknown from the site console."""
+def _pending_cutoff():
+	return now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS)
+
+
+def preview_pending_recovery(name):
+	"""Load an eligible, readable reservation for a single-record approval."""
 	policy.require_user(managers_only=True)
-	cutoff = now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS)
-	filters = {"result": "pending", "attempted_at": ["<=", cutoff]}
+	log = _usage_log(name)
+	log.check_permission("read")
+	if log.result != "pending" or log.attempted_at > _pending_cutoff():
+		raise frappe.ValidationError
+	return log
+
+
+def reconcile_stale_pending(*, name=None):
+	"""Close a batch, or just the record named in an AI approval."""
+	policy.require_user(managers_only=True)
+	filters = {"result": "pending", "attempted_at": ["<=", _pending_cutoff()]}
+	if name is not None:
+		filters["name"] = name
 	targets = frappe.qb.get_query(
 		USAGE_LOG,
 		filters=filters,
@@ -155,9 +170,9 @@ def purge_usage(dry_run=True, preview_token=None):
 			raise policy.Denied(409, "preview_invalid")
 		for name in targets:
 			# The gateway operation checks manager permissions before taking the row locks.
-			# Regular document deletion stays closed; this controlled path keeps a recovery copy.
+			# O-32: retention never leaves a Deleted Document copy.
 			frappe.delete_doc(  # nosemgrep: frappe-ignore-permissions
-				USAGE_LOG, name, ignore_permissions=True, ignore_missing=False
+				USAGE_LOG, name, ignore_permissions=True, ignore_missing=False, delete_permanently=True
 			)
 		deleted = len(targets)
 		# The management operation writes a fixed audit record in the same transaction.

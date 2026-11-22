@@ -379,6 +379,39 @@ class TestModelHTTP(unittest.TestCase):
 		response = self._maintenance("guest", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 403)
 
+	def test_reconcile_stale_pending_guest_denied(self):
+		response = self._maintenance("guest", "reconcile_stale_pending", {})
+		self.assertEqual(response.status_code, 403)
+
+	def test_reconcile_stale_pending_foreign_data_denied(self):
+		for actor in ("regular", "authorized"):
+			with self.subTest(actor=actor):
+				response = self._maintenance(actor, "reconcile_stale_pending", {})
+				self.assertEqual(response.status_code, 403)
+				self.assertEqual(response.json().get("exc_type"), "PermissionError")
+
+	def test_manager_can_reconcile_a_stale_pending_reservation(self):
+		log = self._probe_log()
+		frappe.db.set_value(
+			"AI Usage Log",
+			log,
+			{
+				"result": "pending",
+				"attempted_at": add_days(now_datetime(), -1),
+				"reservation_known": 1,
+				"reserved_cost": "0.125",
+			},
+		)
+		frappe.db.commit()
+		response = self._maintenance("manager", "reconcile_stale_pending", {})
+		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
+		self.assertEqual(response.json()["message"], {"closed": 1, "targets": [log]})
+		frappe.db.rollback()
+		record = frappe.get_doc("AI Usage Log", log)
+		self.assertEqual(
+			(record.result, record.failure_code, record.reserved_cost), ("unknown", "pending_recovery", 0.125)
+		)
+
 	def test_purge_usage_foreign_data_denied(self):
 		response = self._maintenance("regular", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 403)
