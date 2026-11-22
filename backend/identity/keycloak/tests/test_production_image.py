@@ -58,7 +58,7 @@ class ProductionImageFileTest(unittest.TestCase):
 PROD_URL = os.environ.get("PROD_KC_URL", "")
 
 
-@unittest.skipUnless(PROD_URL, "PROD_KC_URL yok. Testi bin/kc-dev.sh prod-check ile çalıştırın.")
+@unittest.skipUnless(PROD_URL, "PROD_KC_URL is not set; run this test with bin/kc-dev.sh prod-check")
 class ProductionImageLiveTest(unittest.TestCase):
     def _admin_token(self) -> str:
         response = istek("POST", f"{PROD_URL}/realms/master/protocol/openid-connect/token", form={

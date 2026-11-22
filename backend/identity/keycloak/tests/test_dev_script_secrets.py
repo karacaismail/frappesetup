@@ -7,7 +7,6 @@ environment file with a made-up secret, so no development secret is touched.
 
 from __future__ import annotations
 
-import os
 import stat
 import subprocess
 import tempfile

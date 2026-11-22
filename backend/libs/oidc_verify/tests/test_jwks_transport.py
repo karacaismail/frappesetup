@@ -49,7 +49,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     body = b""
     paths: list = []
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         type(self).paths.append(self.path)
         if self.path == "/redirect":
             self.send_response(302)

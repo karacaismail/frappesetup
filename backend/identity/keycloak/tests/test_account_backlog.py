@@ -84,7 +84,7 @@ def _login(authorize_url: str):
     return opener, status, headers, html
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL yok, canlı Keycloak testi atlandı")
+@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class AccountBacklogLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

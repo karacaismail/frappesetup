@@ -42,7 +42,8 @@ class EventListenerFileTest(unittest.TestCase):
 
     def test_image_builds_the_listener_with_tests_and_a_pinned_maven_image(self):
         dockerfile = DOCKERFILE.read_text(encoding="utf-8")
-        stage = re.search(r"FROM maven:[^\n]+@sha256:[0-9a-f]{64} AS event-listener-build\n(.*?)\nFROM ",
+        self.assertRegex(dockerfile, r"(?m)^ARG MAVEN_IMAGE=maven:[^\n]+@sha256:[0-9a-f]{64}$")
+        stage = re.search(r"FROM \$\{MAVEN_IMAGE\} AS event-listener-build\n(.*?)\nFROM ",
                           dockerfile, re.S)
         self.assertIsNotNone(stage, "multi-stage Maven build with a digest-pinned image is missing")
         self.assertIn("COPY event-listener/", stage.group(1))
@@ -68,13 +69,20 @@ class EventListenerFileTest(unittest.TestCase):
 
 
 def _sink_requests() -> list:
+    """Requests the sink recorded. An empty list means the sink is up and got nothing yet.
+
+    Standard V-11: a missing sink container or a Docker error raises; it is never read as "no requests",
+    or a test that expects no request would pass with the sink down.
+    """
     context = os.environ.get("DOCKER_CONTEXT", "colima-factory")
     project = os.environ.get("COMPOSE_PROJECT_NAME", "fs-kimlik-realm")
+    # The sink writes the file on its first request; "touch" makes "no request yet" an empty file.
     result = subprocess.run(
-        ["docker", "--context", context, "exec", f"{project}-event-sink-1", "cat", "/tmp/requests.jsonl"],
+        ["docker", "--context", context, "exec", f"{project}-event-sink-1", "sh", "-c",
+         "touch /tmp/requests.jsonl && cat /tmp/requests.jsonl"],
         capture_output=True, text=True, timeout=30, check=False)
     if result.returncode != 0:
-        return []
+        raise RuntimeError(f"event sink is not readable: {result.stderr.strip()[:200]}")
     return [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
 
 
@@ -83,7 +91,7 @@ def _contract_signature(secret: str, timestamp: str, mode: str, body: bytes) -> 
     return "sha256=" + hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL yok, canlı Keycloak testi atlandı")
+@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class EventListenerLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

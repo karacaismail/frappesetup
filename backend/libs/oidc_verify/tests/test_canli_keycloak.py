@@ -22,6 +22,7 @@ def belirtec_al(istemci: str, sir: str, kapsam: str) -> str:
     veri = urllib.parse.urlencode(
         {"grant_type": "client_credentials", "client_id": istemci, "client_secret": sir, "scope": kapsam}
     ).encode()
+    # S310: the URL is the local development Keycloak from KC_PUBLIC_URL, not user input.
     with urllib.request.urlopen(f"{ISS}/protocol/openid-connect/token", data=veri, timeout=30) as yanit:  # noqa: S310
         return json.load(yanit)["access_token"]
 

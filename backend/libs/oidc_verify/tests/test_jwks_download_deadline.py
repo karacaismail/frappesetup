@@ -36,7 +36,7 @@ class _TricklingJwksHandler(http.server.BaseHTTPRequestHandler):
     body = b""
     trickle = True
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         if not self.trickle:
@@ -140,7 +140,7 @@ class DownloadDeadlineTest(_ServerMixin, unittest.TestCase):
         def refresher():
             try:
                 outcome.append(self.access(token, cache)["azp"])
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:
                 outcome.append(error)
             finally:
                 refresh_done.set()
@@ -214,7 +214,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
             gate.wait()
             try:
                 result = self.access(token, cache)["azp"]
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:
                 result = error
             with lock:
                 results.append(result)
@@ -255,7 +255,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
         def first_caller():
             try:
                 first.append(self.access(token, cache)["azp"])
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:
                 first.append(error)
 
         thread = threading.Thread(target=first_caller, daemon=True)

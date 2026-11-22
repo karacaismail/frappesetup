@@ -1,7 +1,7 @@
 """Realm file rules from the gap backlog (backend/docs/gap-backlog.md, kimlik-realm items 2-12).
 
 Expected values come from the backlog, the contract (docs/sozlesmeler.md section 2, d699082),
-mobile.md GR-2 and GR-3, and Proje kaydı O-25 and O-27. Keycloak is not needed.
+mobile.md GR-2 and GR-3, and project record O-25 and O-27. Keycloak is not needed.
 """
 
 from __future__ import annotations
@@ -144,7 +144,7 @@ def _audiences(claims: dict) -> list:
     return [aud] if isinstance(aud, str) else list(aud)
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL yok, canlı Keycloak testi atlandı")
+@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class RealmBacklogLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

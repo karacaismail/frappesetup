@@ -182,6 +182,7 @@ def _http_fetcher(
 
     def fetch() -> dict:
         # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
+        # S310 checks the scheme of a URL opened by urllib: _check_url allows only https and dev http.
         request = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
         deadline = _Deadline()
         opener = urllib.request.build_opener(
@@ -193,7 +194,7 @@ def _http_fetcher(
         def work() -> None:
             try:
                 outcome["value"] = download(opener, request, deadline)
-            except BaseException as error:  # noqa: BLE001 - handed back to the caller below
+            except BaseException as error:
                 outcome["error"] = error
             finally:
                 finished.set()

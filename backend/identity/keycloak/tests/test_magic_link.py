@@ -16,13 +16,13 @@ import unittest
 import urllib.parse
 
 from test_eklentiler import AKIS, _ac, _cerezli_acici, _form_hedefi, _keycloak_icinde_izle
-from test_second_factor import TOTP_SECRET, TOTP_USER, fresh_totp_code
+from test_second_factor import TOTP_USER, fresh_totp_code
 from yardimci import KLASOR, admin, canli_var_mi, istek, ortam, realm_oku, tenant_authorize_url, yonetici_belirteci
 
 MAGIC_LINK = "magiclink"
 MAGIC_LINK_CONTINUATION = "magiclink-continuation"
 MAGIC_LINK_REST_PATH = "magiclink-login"
-MAGIC_LINK_CONFIG = "atonota-sihirli-baglanti"
+MAGIC_LINK_CONFIG = "atonota-magic-link"
 MAX_LIFETIME = 300
 PINNED_COMMIT = "7b4ee949a39a7ee953987162479ae1da2c57c3cb"
 PLAIN_USER = "ayse.ornek@example.test"
@@ -43,7 +43,8 @@ class MagicLinkFileTest(unittest.TestCase):
         self.assertIn(f"ARG MAGICLINK_COMMIT={PINNED_COMMIT}", self.dockerfile)
         self.assertIn("cloudflightio/keycloak-magic-link/archive/${MAGICLINK_COMMIT}.tar.gz", self.dockerfile)
         self.assertRegex(self.dockerfile, r"--checksum=sha256:[0-9a-f]{64} \\\n\s+https://github.com/cloudflightio/keycloak-magic-link/archive")
-        self.assertIn("-Dkeycloak.version=26.8.2", self.dockerfile)
+        self.assertIn("-Dkeycloak.version=${KEYCLOAK_VERSION}", self.dockerfile)
+        self.assertIn("ARG KEYCLOAK_VERSION=26.8.2", self.dockerfile)
 
     def test_magic_link_is_a_flow_step_followed_by_second_factor(self):
         steps = [e for e in self.executions if e.get("authenticator") == MAGIC_LINK]

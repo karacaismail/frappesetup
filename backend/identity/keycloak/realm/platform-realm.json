@@ -78,7 +78,6 @@
   "eventsEnabled": true,
   "eventsExpiration": 2592000,
   "eventsListeners": [
-    "jboss-logging",
     "webhook"
   ],
   "adminEventsEnabled": true,
@@ -565,7 +564,7 @@
     },
     {
       "name": "aud-site-kiraci1",
-      "description": "Belirtece yalnız site-kiraci1 hedefini ekler. Varsayılan değildir, scope ile istenir.",
+      "description": "Adds only the site-kiraci1 audience to the token. Not a default scope; request it with scope.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -589,7 +588,7 @@
     },
     {
       "name": "aud-press",
-      "description": "Belirtece yalnız press hedefini ekler. Varsayılan değildir, scope ile istenir.",
+      "description": "Adds only the press audience to the token. Not a default scope; request it with scope.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -613,7 +612,7 @@
     },
     {
       "name": "admin-api",
-      "description": "identity-sync'in Admin API rolleri: kullanıcı okuma ve yazma, kuruluş okuma ve yazma. Yalnız Admin API için ayrı istenen belirtece girer. kc-admin-api kapsamıyla birlikte istenir.",
+      "description": "Admin API roles of identity-sync: read and write users, read and write organizations. Only the token requested separately for the Admin API carries them. Request it together with kc-admin-api.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -622,7 +621,7 @@
     },
     {
       "name": "kc-admin-api",
-      "description": "Keycloak 26.8 yerleşik kapsamı. Admin REST API hedefini belirtece ekler. Realm içe alımında istemciden önce var olsun diye burada tanımlıdır.",
+      "description": "Built-in scope of Keycloak 26.8. Adds the Admin REST API audience to the token. Defined here so it exists before the clients during realm import.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "true",
@@ -644,7 +643,7 @@
     },
     {
       "name": "aud-identity-sync",
-      "description": "Belirtece yalnız identity-sync hedefini ekler. Varsayılan değildir, scope ile istenir. Yalnız kiracı sitelerinin servis istemcileri ister.",
+      "description": "Adds only the identity-sync audience to the token. Not a default scope; request it with scope. Only tenant service clients and press-service may request it.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -684,7 +683,7 @@
   "clients": [
     {
       "clientId": "site-kiraci1",
-      "name": "Kiracı sitesi kiraci1",
+      "name": "Tenant site kiraci1",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
@@ -809,7 +808,7 @@
     },
     {
       "clientId": "press-service",
-      "name": "Press servis hesabı",
+      "name": "Press service account",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
@@ -953,7 +952,7 @@
   "authenticationFlows": [
     {
       "alias": "atonota-browser",
-      "description": "Atonota tarayıcı girişi: çerez, dış sağlayıcı, sonra parola ya da sihirli bağlantı. İkinci adım her yolda sorulur.",
+      "description": "Atonota browser login: cookie, external provider, then password or magic link. The second factor is asked on every path.",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -983,7 +982,7 @@
     },
     {
       "alias": "atonota-browser-giris",
-      "description": "Kullanıcı parola yolunu ya da sihirli bağlantı yolunu seçer.",
+      "description": "The user chooses the password path or the magic link path.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -992,14 +991,14 @@
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "priority": 10,
-          "flowAlias": "atonota-browser-duzey",
+          "flowAlias": "atonota-browser-level",
           "userSetupAllowed": false
         }
       ]
     },
     {
       "alias": "atonota-browser-parola",
-      "description": "Kullanıcı adı ve parola formu. Passkey bu formdan da çalışır.",
+      "description": "User name and password form. A passkey also works from this form.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1022,7 +1021,7 @@
     },
     {
       "alias": "atonota-browser-2fa",
-      "description": "İkinci adım: kullanıcı TOTP ya da güvenlik anahtarı kurduysa sorulur. Passkey ile girildiyse atlanır.",
+      "description": "Second factor: asked when the user has set up TOTP or a security key. Skipped after a passkey login.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1059,8 +1058,8 @@
       ]
     },
     {
-      "alias": "atonota-browser-sihirli",
-      "description": "Sihirli bağlantı yolu. Bağlantı akışın adımıdır; tıklamadan sonra akış ikinci adımla sürer.",
+      "alias": "atonota-browser-magic-link",
+      "description": "Magic link path. The link is a step of this flow; after the click the flow goes on with the second factor.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1071,20 +1070,20 @@
           "priority": 10,
           "userSetupAllowed": false,
           "authenticator": "magiclink",
-          "authenticatorConfig": "atonota-sihirli-baglanti"
+          "authenticatorConfig": "atonota-magic-link"
         },
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "priority": 20,
           "userSetupAllowed": false,
-          "flowAlias": "atonota-sihirli-2fa"
+          "flowAlias": "atonota-magic-link-2fa"
         }
       ]
     },
     {
-      "alias": "atonota-sihirli-2fa",
-      "description": "Sihirli bağlantıdan sonraki ikinci adım.",
+      "alias": "atonota-magic-link-2fa",
+      "description": "Second factor after the magic link.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1122,7 +1121,7 @@
     },
     {
       "alias": "atonota-post-broker",
-      "description": "Dış sağlayıcıyla (Google, Apple) girişten sonra ikinci adım. Kullanıcı TOTP ya da güvenlik anahtarı kurduysa sorulur.",
+      "description": "Second factor after an external provider login (Google, Apple). Asked when the user has set up TOTP or a security key.",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -1138,7 +1137,7 @@
     },
     {
       "alias": "atonota-post-broker-2fa",
-      "description": "Dış sağlayıcı girişinin ikinci adımı.",
+      "description": "Second factor of the external provider login.",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1175,7 +1174,7 @@
       ]
     },
     {
-      "alias": "atonota-browser-yontem",
+      "alias": "atonota-browser-method",
       "description": "Login methods: password or magic link, each with the second factor.",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -1193,12 +1192,12 @@
           "requirement": "ALTERNATIVE",
           "priority": 20,
           "userSetupAllowed": false,
-          "flowAlias": "atonota-browser-sihirli"
+          "flowAlias": "atonota-browser-magic-link"
         }
       ]
     },
     {
-      "alias": "atonota-browser-duzey",
+      "alias": "atonota-browser-level",
       "description": "Level 1 (ACR employee). Valid for 3600 seconds (O-25). An expired level runs the login again.",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -1216,7 +1215,7 @@
           "authenticatorFlow": true,
           "requirement": "REQUIRED",
           "priority": 20,
-          "flowAlias": "atonota-browser-yontem",
+          "flowAlias": "atonota-browser-method",
           "userSetupAllowed": false
         }
       ]
@@ -1230,7 +1229,7 @@
       }
     },
     {
-      "alias": "atonota-sihirli-baglanti",
+      "alias": "atonota-magic-link",
       "config": {
         "magickey.validity.duration": "300"
       }
@@ -1245,7 +1244,8 @@
   ],
   "attributes": {
     "frontendUrl": "",
-    "cibaBackchannelTokenDeliveryMode": "poll"
+    "cibaBackchannelTokenDeliveryMode": "poll",
+    "adminEventsExpiration": "2592000"
   },
   "requiredActions": [
     {

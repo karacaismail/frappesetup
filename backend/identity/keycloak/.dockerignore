@@ -1,4 +1,4 @@
-# Yalnız realm ve tema klasörleri imaja girer.
+# Only these folders enter the image: realm, themes, conf, event-listener and event-sink.
 *
 !realm/
 !conf/

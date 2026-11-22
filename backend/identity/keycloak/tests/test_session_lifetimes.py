@@ -1,4 +1,4 @@
-"""Gap backlog item 6: Karar 19 session lifetimes (Proje kaydı O-25).
+"""Gap backlog item 6: Karar 19 session lifetimes (project record O-25).
 
 Employee (tenant clients site-kiraci1 and mobile-app): 1 hour idle, 24 hours in total. After the level of
 authentication is older than 1 hour, an open Keycloak cookie does not skip the login.
@@ -71,7 +71,7 @@ class SessionLifetimeFileTest(unittest.TestCase):
         self.assertEqual(condition["authenticatorConfig"], LOA_CONFIG)
         methods = flows[level_flow[1]["flowAlias"]]["authenticationExecutions"]
         self.assertEqual(level_flow[1]["requirement"], "REQUIRED")
-        self.assertEqual({m["flowAlias"] for m in methods}, {"atonota-browser-parola", "atonota-browser-sihirli"})
+        self.assertEqual({m["flowAlias"] for m in methods}, {"atonota-browser-parola", "atonota-browser-magic-link"})
         config = {c["alias"]: c for c in self.realm["authenticatorConfig"]}[LOA_CONFIG]["config"]
         self.assertEqual(config["loa-condition-level"], "1")
         self.assertEqual(config["loa-max-age"], str(HOUR))
@@ -81,7 +81,7 @@ class SessionLifetimeFileTest(unittest.TestCase):
         self.assertEqual(top[0]["authenticator"], "auth-cookie")
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL yok, canlı Keycloak testi atlandı")
+@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class SessionLifetimeLiveTest(unittest.TestCase):
     """Shortens the level's max age to 5 seconds for the test and puts 3600 back afterwards."""
 

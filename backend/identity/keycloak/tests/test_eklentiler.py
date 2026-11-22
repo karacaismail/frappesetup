@@ -32,7 +32,8 @@ class EklentiDosyaTesti(unittest.TestCase):
         self.assertNotIn("sky-cloak", self.dockerfile)
         self.assertIn("klausbetz/apple-identity-provider-keycloak/releases/download/1.17.0/", self.dockerfile)
         self.assertEqual(self.dockerfile.count("--checksum=sha256:"), 2)
-        self.assertRegex(self.dockerfile, r"FROM maven:[0-9.]+-eclipse-temurin-21@sha256:[0-9a-f]{64} AS magiclink-build")
+        self.assertRegex(self.dockerfile, r"(?m)^ARG MAVEN_IMAGE=maven:[0-9.]+-eclipse-temurin-21@sha256:[0-9a-f]{64}$")
+        self.assertIn("FROM ${MAVEN_IMAGE} AS magiclink-build", self.dockerfile)
 
     def test_tarayici_akisinda_sihirli_baglanti_yok(self):
         self.assertEqual(self.realm["browserFlow"], AKIS)

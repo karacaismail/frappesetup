@@ -271,7 +271,7 @@ class StaleKeyWindowTest(unittest.TestCase):
 class _OversizedJwksHandler(http.server.BaseHTTPRequestHandler):
     body = b""
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(self.body)))
@@ -350,7 +350,7 @@ class JwksFetchBoundsTest(unittest.TestCase):
             gate.wait()
             try:
                 result = self.access(token, cache)["azp"]
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:
                 result = error
             with lock:
                 results.append(result)

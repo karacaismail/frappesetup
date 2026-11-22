@@ -63,3 +63,21 @@ cd tests && ../.venv/bin/python -I -m unittest discover -s .
 ```
 
 Canlı Keycloak testi `KC_PUBLIC_URL` ve `ATONOTA_IDENTITY_SYNC_SECRET` değişkenlerini ister. Değişkenler yoksa test atlanır. Keycloak ortamı `backend/identity/keycloak/README.md` dosyasında anlatılır.
+
+## Hazır çözümle karşılaştırma
+
+Bu kitaplığın bağımlılığı PyJWT içinde hazır bir anahtar istemcisi vardır: `jwt.PyJWKClient`. Kural A-1 ve A-2 önce bu sınıfın denenmesini ister. İki sürüm kaynağından okundu: PyJWT 2.13.0 ve 2.15.1. Dosya `jwt/jwks_client.py` dosyasıdır.
+
+`PyJWKClient` şunları sağlar: önbellek, önbellek süresi ve soket zaman aşımı. 2.15.1 sürümü yönlendirmeyi reddeder ve kilit kullanır. 2.13.0 sürümü yönlendirmeyi izler.
+
+Kalan fark şudur. Bu yüzden kendi önbelleğimiz kaldı:
+
+- Anahtar sunucusu yanıt vermezse eski anahtar belli bir süre kullanılır. Bu süre `max_stale_seconds` değeridir. `PyJWKClient` önbellek süresi dolunca eski anahtarı bırakır. Sunucu yanıt vermezse hata verir.
+- İndirmenin toplam süresi `total_timeout` ile sınırlıdır. Bu süre ad çözümünü ve şifreli bağlantı kurulumunu da kapsar. `PyJWKClient` yalnız soket işlemini sınırlar.
+- Yenilemeyi bekleyen çağrı en çok `wait_timeout` bekler.
+- Yanıt gövdesi `max_bytes` ile sınırlıdır. `PyJWKClient` gövdenin tamamını okur.
+- Düz `http` adresi yalnız geliştirme adresinde kabul edilir. `PyJWKClient` her `http` adresini kabul eder.
+- İki PyJWT sürümünde de yönlendirme izlenmez. `PyJWKClient` bunu yalnız 2.15.1 sürümünde yapar.
+
+Geri dönüş koşulu: PyJWT bu farkları kapatırsa `JwksCache`, `PyJWKClient` üzerine kurulur. Dış arayüz değişmez.
+
