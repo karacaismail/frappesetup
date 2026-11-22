@@ -4,6 +4,10 @@
   "displayName": "${IDENTITY_BRAND_NAME}",
   "displayNameHtml": "${IDENTITY_BRAND_NAME}",
   "sslRequired": "${ATONOTA_SSL_REQUIRED}",
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+    "xFrameOptions": "DENY"
+  },
   "organizationsEnabled": true,
   "internationalizationEnabled": true,
   "supportedLocales": [
@@ -593,6 +597,15 @@
       ]
     },
     {
+      "name": "mobile",
+      "description": "Identifies an access token requested by the mobile app.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
       "name": "aud-site-tenant1",
       "description": "Adds only the site-tenant1 audience to the token. Not a default scope; request it with scope.",
       "protocol": "openid-connect",
@@ -1061,7 +1074,10 @@
         "email",
         "basic"
       ],
-      "optionalClientScopes": []
+      "optionalClientScopes": [
+        "aud-site-tenant1",
+        "mobile"
+      ]
     }
   ],
   "users": [

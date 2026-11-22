@@ -26,3 +26,8 @@ requests==2.33.1
 sql-metadata==3.0.1
 sqlparse==0.6.0
 werkzeug==3.1.9
+#
+# Press pins ansible==3.4.0 (ansible-base 2.10), which cannot import on Python 3.12+. The pinned
+# replacement is kept in sync with ansible-requirements.txt (decision 0018).
+ansible==14.6.0
+ansible-core==2.21.6
