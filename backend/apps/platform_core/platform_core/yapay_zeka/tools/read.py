@@ -103,6 +103,15 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 	if not report_doc.is_permitted() or not frappe.has_permission(report_doc.ref_doctype, "report"):
 		raise ToolDenied("permission", _("You may not run report {0}.").format(report))
 
+	# A query report reads with its own SQL and skips the list hook of the access engine.
+	# The access engine's report gate decides whether this user may get the report's data.
+	guard = _report_guard()
+	if guard is None:
+		raise ToolDenied(
+			"report_gate_unavailable",
+			_("Reports are closed until the access engine's report gate is installed."),
+		)
+	guard(report)
 	data = run(report_name=report, filters=filters or {}, ignore_prepared_report=True)
 	source = field_rules.get_meta(report_doc.ref_doctype)
 	columns, keep = [], []
@@ -119,6 +128,18 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 		elif isinstance(row, list | tuple):
 			rows.append([row[index] for index, _name in keep if index < len(row)])
 	return {"columns": columns, "rows": rows, "truncated": len(data.get("result") or []) > limit}
+
+
+def _report_guard():
+	"""Return `platform_core.erisim.reports.guard`, or None while that module is not installed.
+
+	The report tool stays closed without the gate. That is the safe default.
+	"""
+	try:
+		from platform_core.erisim.reports import guard
+	except ImportError:
+		return None
+	return guard
 
 
 def _column(column: Any) -> tuple[str, str, str]:

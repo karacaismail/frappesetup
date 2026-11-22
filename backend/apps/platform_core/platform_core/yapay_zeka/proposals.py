@@ -259,6 +259,10 @@ def _approve(proposal_id: str, digest: str) -> dict:
 	except frappe.DoesNotExistError:
 		frappe.clear_messages()
 		return _denied(doc, "document_changed", new_status="rejected")
+	except frappe.ValidationError:
+		# The preview of an app tool refused the action. Nothing has been written.
+		frappe.clear_messages()
+		return _denied(doc, "invalid_arguments", new_status="rejected")
 	if (spec.get("target_version") or None) != (doc.target_modified or None):
 		return _denied(doc, "document_changed", new_status="rejected")
 	return _execute(doc, tool, arguments)
@@ -272,24 +276,28 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	_log("approve", doc, decision="allowed")
 	frappe.db.commit()  # nosemgrep
 
-	# Yürütme işlem ortasında kesinleştirirse geri alma eksik kalır. Örneğin özel alan
-	# eklemek tablo yapısını değiştirir ve Frappe o sırada kesinleştirir.
 	committed = []
 	frappe.db.after_commit.add(lambda: committed.append(True))
-	extra = {"expected_version": doc.target_modified} if tool.versioned else {}
+
+	# Step 1: the layer's own pre-check. It calls no Frappe document method, so nothing outside
+	# this transaction can have happened. Only an error here may be recorded as `failed`.
 	try:
-		result = tool.handler(**arguments, **extra)
+		prepared = _pre_check(doc, tool, arguments)
 	except Exception as error:
-		wrote = bool(committed) or bool(frappe.db.transaction_writes)
-		frappe.db.rollback()
-		frappe.clear_messages()
-		doc = store.load_proposal(doc.name, for_update=True)
-		doc.result = "failed" if _certainly_undone(tool, error, wrote) else "unknown"
-		doc.error = _error_text(tool, error)
-		store.save_proposal(doc)
-		_log("execute", doc, decision="error", deny_reason="execution_failed")
-		frappe.db.commit()  # nosemgrep: sonuç kalıcı olmalı
-		return {"executed": False, "deny_reason": "execution_failed", "proposal": public(doc)}
+		untouched = not committed and not frappe.db.transaction_writes
+		return _execution_error(doc, tool, error, result="failed" if untouched else "unknown")
+
+	# ---------------------------------------------------------------------------------------
+	# WRITE BOUNDARY. This is the only place that decides between `failed` and `unknown`.
+	# From here on Frappe document methods (insert, save, submit, cancel, delete) and their
+	# hooks run. A hook may reach another system or commit. Every error below this line is
+	# `unknown`, whatever its type, `ToolDenied` included. A human resolves it.
+	# A tool without a pre-check (an app tool) is past the boundary from its first line.
+	# ---------------------------------------------------------------------------------------
+	try:
+		result = tool.handler(prepared) if tool.prepare is not None else tool.handler(**arguments)
+	except Exception as error:
+		return _execution_error(doc, tool, error, result="unknown")
 
 	touched = result.get("name") if isinstance(result, dict) else None
 	doc.result = "succeeded"
@@ -305,16 +313,35 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	return {"executed": True, "deny_reason": None, "proposal": public(doc)}
 
 
-def _certainly_undone(tool: registry.AiTool, error: Exception, wrote: bool) -> bool:
-	"""İş kesin olarak uygulanmadıysa doğru döner. Emin değilsek sonuç `unknown` kalır.
+def _pre_check(doc, tool: registry.AiTool, arguments: dict) -> Any:
+	"""Run the checks that come before the write boundary and return what the write step needs.
 
-	Kesin olan iki durum vardır. Birincisi yerleşik aracın yazmadan önceki kendi reddidir.
-	İkincisi yerleşik araçta hiç yazı ve kesinleştirme olmamasıdır. Yazıdan sonra çalışan
-	kayıt olayları dış sisteme dokunmuş olabilir. Uygulama aracı da dokunmuş olabilir.
+	A built-in tool checks the previewed version itself, under a row lock. For an app tool that
+	declares `versioned`, the layer locks the target row, runs the preview again and compares
+	the version. An app tool may also declare its own `prepare` step.
 	"""
-	if tool.tool_class == "app":
-		return False
-	return isinstance(error, ToolDenied) or not wrote
+	if tool.tool_class != "app":
+		extra = {"expected_version": doc.target_modified} if tool.versioned else {}
+		return tool.prepare(**arguments, **extra)
+	if tool.versioned:
+		if doc.target_doctype and doc.target_name:
+			store.lock_row(doc.target_doctype, doc.target_name)
+		if _run_preview(tool, arguments).get("target_version") != doc.target_modified:
+			raise ToolDenied("document_changed", _("The target changed after the preview."))
+	return tool.prepare(**arguments) if tool.prepare is not None else None
+
+
+def _execution_error(doc, tool: registry.AiTool, error: Exception, *, result: str) -> dict:
+	"""Roll back, record the given result and return the outcome of a failed execution."""
+	frappe.db.rollback()
+	frappe.clear_messages()
+	doc = store.load_proposal(doc.name, for_update=True)
+	doc.result = result
+	doc.error = _error_text(tool, error)
+	store.save_proposal(doc)
+	_log("execute", doc, decision="error", deny_reason="execution_failed")
+	frappe.db.commit()  # nosemgrep: the result must outlive the error response
+	return {"executed": False, "deny_reason": "execution_failed", "proposal": public(doc)}
 
 
 def _error_text(tool: registry.AiTool, error: Exception) -> str:

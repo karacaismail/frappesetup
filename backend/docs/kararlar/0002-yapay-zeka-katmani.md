@@ -465,6 +465,23 @@ Aynı turda kendi başlattığım ikinci inceleme de şu ek düzeltmeleri getird
 - CSRF başlığı her yazan insan isteğinde katmanın kendisi tarafından karşılaştırılır.
 - Aracı belirtecinin çağrı hakkı bilinmeyen araç adında da düşer.
 
+### Üçüncü tur: Codex'in ikinci incelemesi ve CronHR incelemesi
+
+Codex'in ikinci incelemesi B1, B2, B4 ve B5 bulgularını kapalı buldu. B3 ve B6 kısmen açık kaldı. Orkestratör iki bulgu için karar verdi. Kararlar şöyle uygulandı:
+
+- **B3.** Sonuç yalnız bir durumda `failed` olur. Hata katmanın kendi ön denetiminde, Frappe'nin kayıt yöntemi çağrılmadan önce oluşmuştur. Kayıt yöntemi çağrıldıktan sonraki her hata `unknown` olur. `ToolDenied` türü de buna dahildir.
+- Her yerleşik yazma aracı iki işleve ayrıldı. `prepare_*` işlevi ön denetimi yapar ve kayıt yöntemi çağırmaz. `write_*` işlevi kayıt yöntemini çağırır.
+- Sınır kodda tek yerdedir. Yer `proposals.py` içindeki `_execute` işlevinde “WRITE BOUNDARY” yorumuyla işaretlidir.
+- **B6.** Kimliği bilinen üç ret daha günlüğe düşer. Birincisi API anahtarıyla gelen MCP isteğidir. İkincisi süresi dolmuş oturuma bağlı belirteçtir. Üçüncüsü çerezle birlikte gelen belirteçtir. Kayıt hata yanıtından önce kesinleştirilir. Bilinmeyen belirteç ve misafir istisna kalır.
+
+CronHR incelemesi iki konu getirdi:
+
+- Uygulama aracının önizlemesi `frappe.ValidationError` verirse araç `invalid_arguments` döner ve ret günlüğe düşer. Onay anında verirse öneri `rejected` olur. Önceden öneri `pending` kalıyor ve yanıt 417 oluyordu.
+- Uygulama aracı `prepare` ve `versioned` bildirebilir. `versioned` bildirirse katman hedef satırı kilitler, önizlemeyi yeniden çalıştırır ve sürümü karşılaştırır.
+- Rapor aracı raporu çalıştırmadan önce erişim motorunun rapor kapısını çağırır. Kapı `platform_core.erisim.reports.guard` işlevidir. Kapı kurulu değilse rapor aracı kapalı kalır.
+
+Aynı turda araçların sonuç şeması sözleşmeye yazıldı (D-1). Şema `x-mcp-results` bölümündedir. Araç listesi aynı şemayı `outputSchema` olarak yayımlar. Bir test kodu sözleşmeye bağlar.
+
 ## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |

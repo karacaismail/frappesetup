@@ -2,7 +2,7 @@
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import Any
 
@@ -14,7 +14,19 @@ from platform_core.yapay_zeka import policy
 
 APP_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
 DECLARATION_KEYS = frozenset(
-	{"name", "description", "arguments", "kind", "roles", "destructive", "billable", "handler", "preview"}
+	{
+		"name",
+		"description",
+		"arguments",
+		"kind",
+		"roles",
+		"destructive",
+		"billable",
+		"handler",
+		"preview",
+		"prepare",
+		"versioned",
+	}
 )
 
 
@@ -32,6 +44,11 @@ class AiTool:
 	billable: bool = False
 	# Yürütme işlevi önizlemedeki sürümü `expected_version` olarak alıyorsa doğrudur.
 	versioned: bool = False
+	# Pre-check of a write tool. It calls no Frappe document method. When it is set, the handler
+	# takes only what the pre-check returned. See `proposals._execute` for the boundary.
+	prepare: Callable[..., Any] | None = None
+	# JSON Schema of a successful result. Published as `outputSchema`.
+	output_schema: dict | None = None
 
 	@cached_property
 	def input_schema(self) -> dict:
@@ -47,18 +64,51 @@ class AiTool:
 			if self.kind == "read"
 			else {"readOnlyHint": False, "destructiveHint": self.destructive}
 		)
-		return {
+		definition = {
 			"name": self.name,
 			"description": self.description,
 			"inputSchema": self.input_schema,
 			"annotations": annotations,
 		}
+		if self.output_schema is not None:
+			definition["outputSchema"] = self.output_schema
+		return definition
 
 	def visible(self) -> bool:
 		return not self.roles or bool(set(self.roles) & set(frappe.get_roles()))
 
 
+# Pre-check of every built-in write tool, by tool name.
+PREPARE = {
+	"create_document": "prepare_create",
+	"update_document": "prepare_update",
+	"submit_document": "prepare_submit",
+	"cancel_document": "prepare_cancel",
+	"delete_document": "prepare_delete",
+	"add_custom_field": "prepare_custom_field",
+	"set_field_property": "prepare_field_property",
+	"set_role_permission": "prepare_role_permission",
+	"assign_role": "prepare_assign_role",
+	"remove_role": "prepare_remove_role",
+	"purge_action_log": "prepare_purge",
+}
+
+
 def builtin_tools() -> tuple[AiTool, ...]:
+	"""Built-in tools. Every write tool is paired with its pre-check."""
+	from platform_core.yapay_zeka.tools import admin, results, write
+
+	tools = []
+	for tool in _builtin_tools():
+		tool = replace(tool, output_schema=results.schema_for(tool.name, tool.kind))
+		if tool.kind == "write":
+			module = admin if tool.tool_class == "admin" else write
+			tool = replace(tool, prepare=getattr(module, PREPARE[tool.name]))
+		tools.append(tool)
+	return tuple(tools)
+
+
+def _builtin_tools() -> tuple[AiTool, ...]:
 	from platform_core.yapay_zeka import proposals
 	from platform_core.yapay_zeka.tools import admin, definition, read, write
 
@@ -105,7 +155,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"create_document",
 			"Propose a new document." + pending,
 			write.CreateDocumentArguments,
-			write.run_create,
+			write.write_create,
 			"write",
 			"write",
 			write.preview_create,
@@ -114,7 +164,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"update_document",
 			"Propose changes to a document." + pending,
 			write.UpdateDocumentArguments,
-			write.run_update,
+			write.write_update,
 			"write",
 			"write",
 			write.preview_update,
@@ -125,7 +175,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"submit_document",
 			"Propose submitting a draft document." + pending,
 			target,
-			write.run_submit,
+			write.write_submit,
 			"write",
 			"write",
 			write.preview_submit,
@@ -136,7 +186,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"cancel_document",
 			"Propose cancelling a submitted document." + pending,
 			target,
-			write.run_cancel,
+			write.write_cancel,
 			"write",
 			"write",
 			write.preview_cancel,
@@ -147,7 +197,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"delete_document",
 			"Propose deleting a document." + pending,
 			target,
-			write.run_delete,
+			write.write_delete,
 			"write",
 			"write",
 			write.preview_delete,
@@ -180,7 +230,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 					"add_custom_field",
 					"Propose a new custom field on a DocType. A description is required.",
 					admin.AddCustomFieldArguments,
-					admin.run_custom_field,
+					admin.write_custom_field,
 					admin.preview_custom_field,
 					False,
 				),
@@ -188,7 +238,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 					"set_field_property",
 					"Propose a change to one display or validation property of a field.",
 					admin.SetFieldPropertyArguments,
-					admin.run_field_property,
+					admin.write_field_property,
 					admin.preview_field_property,
 					True,
 				),
@@ -196,7 +246,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 					"set_role_permission",
 					"Propose a change to what a role may do with a DocType at one permission level.",
 					admin.SetRolePermissionArguments,
-					admin.run_role_permission,
+					admin.write_role_permission,
 					admin.preview_role_permission,
 					True,
 				),
@@ -204,7 +254,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 					"assign_role",
 					"Propose giving a role to a user. Protected roles cannot be given through AI.",
 					admin.UserRoleArguments,
-					admin.run_assign_role,
+					admin.write_assign_role,
 					admin.preview_assign_role,
 					True,
 				),
@@ -212,7 +262,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 					"remove_role",
 					"Propose taking a role away from a user.",
 					admin.UserRoleArguments,
-					admin.run_remove_role,
+					admin.write_remove_role,
 					admin.preview_remove_role,
 					True,
 				),
@@ -221,7 +271,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 					"Propose deleting AI action logs and proposals older than the retention period. "
 					"Cannot be undone.",
 					admin.PurgeActionLogArguments,
-					admin.run_purge,
+					admin.write_purge,
 					admin.preview_purge,
 					True,
 				),
@@ -265,6 +315,8 @@ def _report_once(title: str, error: Exception) -> None:
 
 def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 	"""Bildirimi doğrular. Kural dışı bildirimde `ValueError` verir."""
+	from platform_core.yapay_zeka.tools import results
+
 	if not isinstance(declaration, dict) or set(declaration) - DECLARATION_KEYS:
 		raise ValueError("declaration has unknown keys")
 	short_name = declaration.get("name")
@@ -293,6 +345,11 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 	preview = declaration.get("preview")
 	if kind == "write" and not preview:
 		raise ValueError(f"{name}: a write tool needs a preview function")
+	prepare = declaration.get("prepare")
+	if (prepare or declaration.get("versioned")) and kind != "write":
+		raise ValueError(f"{name}: prepare and versioned belong to write tools")
+	if prepare is not None and not isinstance(prepare, str):
+		raise ValueError(f"{name}: prepare must be a dotted path")
 	roles = declaration.get("roles") or ()
 	if not all(isinstance(role, str) for role in roles):
 		raise ValueError(f"{name}: roles must be a list of role names")
@@ -308,6 +365,10 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 		roles=tuple(roles),
 		destructive=bool(declaration.get("destructive")),
 		billable=bool(declaration.get("billable")),
+		output_schema=results.APPROVAL_REQUIRED if kind == "write" else None,
+		# Optional for a write tool: its own pre-check, and a version check done by the layer.
+		prepare=frappe.get_attr(prepare) if prepare else None,
+		versioned=bool(declaration.get("versioned")),
 	)
 
 

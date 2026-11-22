@@ -145,3 +145,59 @@ def declare() -> list[dict]:
 			"handler": PATH + "count_records",
 		},
 	]
+
+
+EXTERNAL_MARKER = "ai_test_external_effect"
+
+
+def external_effect_then_fail(doc, method=None) -> None:
+	"""Stand-in for an app hook that touches another system before the row is written, then fails."""
+	frappe.cache.set_value(EXTERNAL_MARKER, doc.name)
+	frappe.throw("The other system rejected the change.")
+
+
+def preview_checked(name: str, title: str) -> dict:
+	"""Preview that fails with a validation error when the record is frozen."""
+	doc = frappe.get_doc(DOCTYPE, name)
+	doc.check_permission("write")
+	if doc.amount == 99:
+		frappe.throw("The record is frozen.")
+	return {
+		"summary": f"Set the title of {name}",
+		"target_doctype": DOCTYPE,
+		"target_name": name,
+		"target_version": str(doc.modified),
+	}
+
+
+def prepare_title(name: str, title: str) -> tuple:
+	"""Pre-check of an app tool. It calls no document method."""
+	if title == "refused in pre-check":
+		frappe.throw("The pre-check refused the title.")
+	return name, title
+
+
+def write_prepared_title(prepared: tuple) -> dict:
+	return set_title(*prepared)
+
+
+def declare_more() -> list[dict]:
+	"""Tools for the validation, pre-check and version rules of app tools."""
+	base = {"arguments": PATH + "TitleArguments", "kind": "write", "preview": PATH + "preview_checked"}
+	return [
+		{**base, "name": "checked_title", "description": "Preview validates.", "handler": PATH + "set_title"},
+		{
+			**base,
+			"name": "prepared_title",
+			"description": "Declares a pre-check.",
+			"prepare": PATH + "prepare_title",
+			"handler": PATH + "write_prepared_title",
+		},
+		{
+			**base,
+			"name": "versioned_title",
+			"description": "Asks the layer to compare the version.",
+			"versioned": True,
+			"handler": PATH + "set_title",
+		},
+	]

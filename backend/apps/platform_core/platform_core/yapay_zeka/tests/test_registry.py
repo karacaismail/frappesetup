@@ -190,7 +190,7 @@ class TestStaticRules(YzTestCase):
 
 	def test_module_boundaries(self):
 		imports = re.compile(r"^\s*(?:from|import)\s+platform_core\.(\w+)", re.MULTILINE)
-		allowed = {"yapay_zeka", "model_gecidi"}
+		allowed = {"yapay_zeka", "model_gecidi", "erisim"}
 		outward = {
 			f"{path.name}: {module}"
 			for path in [*python_files(LAYER, tests=True), APP_ROOT / "api" / "ai.py"]
@@ -276,6 +276,20 @@ class TestContract(YzTestCase):
 		}
 
 		self.assertEqual(actual, declared)
+
+	def test_result_schemas_match_the_contract(self):
+		from platform_core.yapay_zeka import registry
+
+		published = self.contract["x-mcp-results"]
+		declared = {
+			tool["name"]: published[tool["outputSchema"]["$ref"].rsplit("/", 1)[-1]]
+			for tool in self.contract["x-mcp-tools"]
+		}
+		frappe.set_user(MANAGER)
+		actual = {tool.name: tool.output_schema for tool in registry.builtin_tools()}
+
+		self.assertEqual(actual, declared)
+		self.assertNotIn(None, actual.values())
 
 	def test_every_endpoint_of_the_contract_is_whitelisted_with_its_method(self):
 		for path, operations in self.contract["paths"].items():

@@ -148,6 +148,8 @@ class YzTestCase(IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
 		frappe.set_user("Administrator")
+		# Log rows written by earlier tests or runs must not satisfy an assertion of this test.
+		self.log_mark = frappe.db.sql("select max(creation) from `tabAI Action Log`")[0][0]
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -224,6 +226,40 @@ class YzTestCase(IntegrationTestCase):
 	def human(self, client, method: str, endpoint: str, body=None, query=None):
 		return self.send(client, method, API + endpoint, body=body, query=query)
 
+	def open_report_gate(self) -> None:
+		"""Install a report gate that allows every report, for tests about other report rules.
+
+		The real gate is `platform_core.erisim.reports.guard`. Without it the report tool is closed.
+		"""
+		import sys
+		from types import ModuleType
+		from unittest.mock import patch
+
+		module = ModuleType("platform_core.erisim.reports")
+		module.guard = lambda report_name, user=None: None
+		patcher = patch.dict(sys.modules, {"platform_core.erisim.reports": module})
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def in_other_connection(self, action) -> None:
+		"""Run `action` and commit it on a separate database connection, as another request would."""
+		from threading import Thread
+
+		site = self.site
+
+		def run():
+			frappe.init(site)
+			frappe.connect()
+			try:
+				action()
+				frappe.db.commit()  # nosemgrep
+			finally:
+				frappe.destroy()
+
+		thread = Thread(target=run)
+		thread.start()
+		thread.join()
+
 	# --- veri yardımcıları ---
 
 	def make_record(self, owner: str, **values) -> str:
@@ -245,6 +281,9 @@ class YzTestCase(IntegrationTestCase):
 		frappe.db.commit()  # nosemgrep
 
 	def last_log(self, **filters) -> dict | None:
+		"""Return the newest log row this test wrote that matches the filters."""
+		if self.log_mark:
+			filters["creation"] = (">", self.log_mark)
 		rows = frappe.get_all(
 			"AI Action Log",
 			filters=filters,

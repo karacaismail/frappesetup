@@ -60,6 +60,10 @@ def _check_principal() -> None:
 		raise McpError(protocol.INVALID_REQUEST, "Authentication required", status=401)
 	if kind == access.OTHER:
 		# API anahtarı ve OAuth belirteci uzun ömürlüdür ve G-148 sınırlarını taşımaz.
+		# The user is known here, so the denial is logged. The 403 response rolls the request
+		# back, so the log row is committed first. Nothing else has been written yet.
+		access.record("auth", decision="denied", deny_reason="credential_not_accepted")
+		frappe.db.commit()  # nosemgrep
 		raise McpError(
 			protocol.INVALID_REQUEST, "Use a session cookie or an agent token on this endpoint", status=403
 		)
@@ -172,6 +176,9 @@ def call_tool(params: dict) -> dict:
 		return _deny(context, "permission", str(error) or "Not permitted")
 	except frappe.DoesNotExistError as error:
 		return _deny(context, "not_found", str(error) or "Not found")
+	except frappe.ValidationError as error:
+		# A tool, most often the preview of an app tool, refused the input.
+		return _deny(context, "invalid_arguments", str(error) or "Not valid")
 	except McpError:
 		raise
 	except Exception:

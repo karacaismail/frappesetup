@@ -157,6 +157,7 @@ class TestReadTools(YzTestCase):
 			self.assertFalse(policy.is_secret_fieldname(name), name)
 
 	def test_report_needs_report_permission(self):
+		self.open_report_gate()
 		client_a = self.login(USER_A)
 		manager = self.login(MANAGER)
 

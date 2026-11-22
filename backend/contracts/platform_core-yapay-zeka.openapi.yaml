@@ -183,8 +183,9 @@ paths:
         Denetim başarısızsa iş yürümez ve yanıt `executed: false` ile ret nedenini taşır.
 
         Sunucu yürütmeden önce sonucu `unknown` olarak kaydeder. Süreç yarıda kesilirse sonuç `unknown` kalır.
-        Yürütme hata verirse sonuç yalnız geri almanın kesin olduğu durumda `failed` olur.
-        Yürütme o ana kadar veritabanına yazdıysa ya da işlemi kesinleştirdiyse sonuç `unknown` kalır.
+        Yürütme hata verirse sonuç yalnız şu durumda `failed` olur: hata katmanın kendi ön denetiminde,
+        Frappe'nin kayıt yöntemi çağrılmadan önce oluşmuştur. Kayıt yöntemi çağrıldıktan sonraki her hata
+        `unknown` olur. Kayıt yöntemleri `insert`, `save`, `submit`, `cancel`, silme ve bunların kancalarıdır.
         Araç, hedefi yazmadan hemen önce kilitler ve sürümünü önizlemedekiyle karşılaştırır.
         Uygulama aracı hata verirse sonuç yine `unknown` kalır. Araç dış sisteme dokunmuş olabilir.
         Aynı hedefe kör tekrar yapılmaz. İnsan durumu `resolve_proposal` ile kapatır.
@@ -406,6 +407,10 @@ components:
         - not_found
         - not_human_session
         - token_out_of_scope
+        - credential_not_accepted
+        - session_ended
+        - cookie_with_token
+        - report_gate_unavailable
         - token_call_limit
         - unknown_tool
         - not_owner
@@ -511,6 +516,7 @@ x-mcp-tools:
   - name: search_doctypes
     class: definition
     annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/SearchDoctypes"}
     description: Search DocType names the user may read. Child tables are left out.
     inputSchema:
       type: object
@@ -521,6 +527,7 @@ x-mcp-tools:
   - name: get_doctype_schema
     class: definition
     annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/DoctypeSchema"}
     description: >-
       Get the fields of a DocType with their descriptions, and what the user may do with it.
       Secret fields are listed with secret=true and never carry a value.
@@ -533,6 +540,7 @@ x-mcp-tools:
   - name: list_documents
     class: read
     annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ListDocuments"}
     description: "List documents the user may read. A filter is a value or an [operator, value] pair."
     inputSchema:
       type: object
@@ -548,6 +556,7 @@ x-mcp-tools:
   - name: get_document
     class: read
     annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/GetDocument"}
     description: Get one document with its child tables. Fields the user may not read are left out.
     inputSchema:
       type: object
@@ -559,6 +568,7 @@ x-mcp-tools:
   - name: run_report
     class: read
     annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/RunReport"}
     description: Run a report the user may run and return its columns and rows.
     inputSchema:
       type: object
@@ -571,6 +581,7 @@ x-mcp-tools:
   - name: create_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: false}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: Propose a new document. Nothing is written until a human approves the proposal.
     inputSchema:
       type: object
@@ -582,6 +593,7 @@ x-mcp-tools:
   - name: update_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: Propose changes to a document. Nothing is written until a human approves the proposal.
     inputSchema:
       type: object
@@ -594,21 +606,25 @@ x-mcp-tools:
   - name: submit_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose submitting a draft document. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
   - name: cancel_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose cancelling a submitted document. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
   - name: delete_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose deleting a document. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
   - name: get_proposal
     class: flow
     annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ProposalState"}
     description: >-
       Read the status and result of a proposal the user opened. A result of unknown means
       the outcome is not known. Do not repeat the action. Ask the user to check and resolve it.
@@ -623,6 +639,7 @@ x-mcp-tools:
   - name: add_custom_field
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: false}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose a new custom field on a DocType. A description is required. Admin only. Nothing is written until a human approves the proposal."
     inputSchema:
       type: object
@@ -643,6 +660,7 @@ x-mcp-tools:
   - name: set_field_property
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose a change to one display or validation property of a field. Admin only. Nothing is written until a human approves the proposal."
     inputSchema:
       type: object
@@ -658,6 +676,7 @@ x-mcp-tools:
   - name: set_role_permission
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose a change to what a role may do with a DocType at one permission level. Admin only. Nothing is written until a human approves the proposal."
     inputSchema:
       type: object
@@ -673,22 +692,173 @@ x-mcp-tools:
   - name: assign_role
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose giving a role to a user. Protected roles cannot be given through AI. Admin only. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/UserRole"}
   - name: remove_role
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose taking a role away from a user. Admin only. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/UserRole"}
   - name: purge_action_log
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
     description: "Propose deleting AI action logs and proposals older than the retention period. Cannot be undone. Admin only. Nothing is written until a human approves the proposal."
     inputSchema:
       type: object
       additionalProperties: false
       properties:
         older_than_days: {type: integer, minimum: 365, default: 365}
+
+# Araçların sonuç şeması. Başarılı çağrı bu biçimi `structuredContent` içinde döner.
+# `tools/list` aynı şemayı `outputSchema` olarak yayımlar. Bir test kodu bu bölüme bağlar.
+# Reddedilen çağrı bu şemaya uymaz. O çağrı `isError: true` ve `ToolError` nesnesini döner.
+# Yazma ve yönetim araçlarının hepsi `ApprovalRequired` döner. Uygulamaların yazma araçları da öyle.
+x-mcp-results:
+  SearchDoctypes:
+    type: object
+    required: [doctypes]
+    properties:
+      doctypes:
+        type: array
+        items: {type: string}
+  DoctypeSchema:
+    type: object
+    required: [doctype, module, is_submittable, is_single, is_child_table, generic_write_tools, permissions, fields]
+    properties:
+      doctype: {type: string}
+      description:
+        type: [string, 'null']
+      module: {type: string}
+      is_submittable: {type: boolean}
+      is_single: {type: boolean}
+      is_child_table: {type: boolean}
+      title_field:
+        type: [string, 'null']
+      generic_write_tools:
+        type: string
+        enum: [open, closed]
+      permissions:
+        type: object
+        required: [read, write, create, delete, submit, cancel]
+        properties:
+          read: {type: boolean}
+          write: {type: boolean}
+          create: {type: boolean}
+          delete: {type: boolean}
+          submit: {type: boolean}
+          cancel: {type: boolean}
+      fields:
+        type: array
+        items:
+          type: object
+          required: [fieldname, fieldtype, reqd, read_only, permlevel, secret, readable, writable]
+          properties:
+            fieldname: {type: string}
+            fieldtype: {type: string}
+            label: {type: string}
+            description: {type: string}
+            options: {type: string}
+            reqd: {type: boolean}
+            read_only: {type: boolean}
+            permlevel: {type: integer}
+            secret: {type: boolean}
+            readable: {type: boolean}
+            writable: {type: boolean}
+  ListDocuments:
+    type: object
+    required: [documents, has_next_page]
+    properties:
+      documents:
+        type: array
+        items: {type: object}
+      has_next_page: {type: boolean}
+  GetDocument:
+    type: object
+    required: [document]
+    properties:
+      document: {type: object}
+  RunReport:
+    type: object
+    required: [columns, rows, truncated]
+    properties:
+      columns: {type: array}
+      rows: {type: array}
+      truncated: {type: boolean}
+  ApprovalRequired:
+    type: object
+    required: [status, proposal_id, preview, expires_at]
+    properties:
+      status:
+        type: string
+        enum: [approval_required]
+      proposal_id: {type: string}
+      preview:
+        type: object
+        required: [action, summary]
+        properties:
+          action:
+            type: string
+            enum: [create, update, submit, cancel, delete, app_tool, admin]
+          summary: {type: string}
+          changes:
+            type: array
+            items:
+              type: object
+              required: [fieldname, new]
+              properties:
+                fieldname: {type: string}
+                label:
+                  type: [string, 'null']
+                old: {}
+                new: {}
+          details: {type: object}
+      expires_at: {type: string}
+  ProposalState:
+    type: object
+    required: [proposal_id, status, result, tool, destructive, billable, preview, expires_at]
+    properties:
+      proposal_id: {type: string}
+      status:
+        type: string
+        enum: [pending, rejected, expired, consumed]
+      result:
+        type: string
+        enum: ['', unknown, succeeded, failed]
+      tool: {type: string}
+      target_doctype:
+        type: [string, 'null']
+      target_name:
+        type: [string, 'null']
+      destructive: {type: boolean}
+      billable: {type: boolean}
+      preview:
+        type: object
+        required: [action, summary]
+        properties:
+          action:
+            type: string
+            enum: [create, update, submit, cancel, delete, app_tool, admin]
+          summary: {type: string}
+          changes:
+            type: array
+            items:
+              type: object
+              required: [fieldname, new]
+              properties:
+                fieldname: {type: string}
+                label:
+                  type: [string, 'null']
+                old: {}
+                new: {}
+          details: {type: object}
+      expires_at: {type: string}
+      result_document:
+        type: [string, 'null']
+      error:
+        type: [string, 'null']
 
 x-mcp-schemas:
   DocumentTarget:
@@ -714,6 +884,12 @@ x-child-table-rules:
   - Satır `parent`, `parenttype`, `parentfield`, `owner`, `docstatus` ve `idx` alanlarını taşıyamaz.
   - Satır alanlarında da alan düzeyi yazma izni aranır. Gizli alan satırda da yazılamaz.
   - Bu denetimler önizlemede ve yürütmede yapılır.
+
+# `run_report` aracı raporu çalıştırmadan önce erişim motorunun rapor kapısını çağırır.
+x-report-gate:
+  - Kapı `platform_core.erisim.reports.guard(report_name)` işlevidir.
+  - Kapı kullanıcıyı reddederse araç `permission` döner ve rapor çalışmaz.
+  - Kapı kurulu değilse araç `report_gate_unavailable` döner. Rapor aracı kapalı kalır.
 
 # Rapor sütunu şu durumlarda `run_report` yanıtından çıkar.
 x-report-secret-rules:
@@ -750,9 +926,23 @@ x-ai-tools-hook:
       destructive: {type: boolean, default: false}
       billable: {type: boolean, default: false}
       handler: {type: string, description: "İşi yapan işlevin yolu. İşlev kendi izin denetimini yapar. Yazma aracında `name` anahtarıyla etkilenen kaydın adını döner."}
+      prepare:
+        type: string
+        description: |
+          İsteğe bağlı. Yazma aracının ön denetim işlevinin yolu. İşlev Frappe'nin kayıt yöntemini çağırmaz.
+          Değer dönerse `handler` yalnız o değeri alır. Ön denetimdeki hata `failed` sonucunu verir.
+          `prepare` yoksa aracın her hatası `unknown` sonucunu verir.
+      versioned:
+        type: boolean
+        default: false
+        description: |
+          İsteğe bağlı. Doğruysa katman yürütmeden hemen önce hedef satırı kilitler ve önizlemeyi yeniden çalıştırır.
+          `target_version` değiştiyse iş yürümez. Sonuç `failed`, hata `document_changed` olur.
+          Önizleme `target_doctype`, `target_name` ve `target_version` dönmelidir.
       preview:
         type: string
         description: |
           Önizleme üreten işlevin yolu. `kind: write` için zorunludur. İşlev izni denetler ve bir sözlük döner.
+          İşlev `frappe.ValidationError` verirse araç `invalid_arguments` döner. Onay anında verirse öneri `rejected` olur.
           Sözlükte `summary` zorunludur. `target_doctype`, `target_name`, `target_version`, `changes` ve `details` isteğe bağlıdır.
           Katman önizlemeyi onay anında yeniden çalıştırır. `target_version` değiştiyse onayı reddeder.

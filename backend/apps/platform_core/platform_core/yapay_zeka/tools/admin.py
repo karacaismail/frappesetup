@@ -185,22 +185,28 @@ def preview_custom_field(doctype: str, fieldname: str, **values) -> dict:
 	)
 
 
-def run_custom_field(doctype: str, fieldname: str, expected_version=_UNCHECKED, **values) -> dict:
-	# Önizlemenin bütün denetimleri güncel tanımla yeniden çalışır. Alan arada eklendiyse iş durur.
+def prepare_custom_field(doctype: str, fieldname: str, expected_version=_UNCHECKED, **values) -> dict:
+	"""Pre-check: run every preview check again on the current definition."""
 	frappe.clear_cache(doctype=doctype)
 	_verify(preview_custom_field(doctype, fieldname, **values), expected_version)
-	doc = frappe.get_doc(
-		{
-			"doctype": "Custom Field",
-			"dt": doctype,
-			"fieldname": fieldname,
-			"is_system_generated": 0,
-			**{key: value for key, value in values.items() if value is not None},
-		}
-	)
+	return {
+		"doctype": "Custom Field",
+		"dt": doctype,
+		"fieldname": fieldname,
+		"is_system_generated": 0,
+		**{key: value for key, value in values.items() if value is not None},
+	}
+
+
+def write_custom_field(prepared: dict) -> dict:
+	doc = frappe.get_doc(prepared)
 	doc.insert()
-	frappe.clear_cache(doctype=doctype)
+	frappe.clear_cache(doctype=prepared["dt"])
 	return {"name": doc.name}
+
+
+def run_custom_field(doctype: str, fieldname: str, expected_version=_UNCHECKED, **values) -> dict:
+	return write_custom_field(prepare_custom_field(doctype, fieldname, expected_version, **values))
 
 
 # --- alan ayarı ---
@@ -242,35 +248,46 @@ def preview_field_property(doctype: str, fieldname: str, property: str, value: s
 	)
 
 
-def run_field_property(
+def prepare_field_property(
 	doctype: str, fieldname: str, property: str, value: str | int | bool, expected_version=_UNCHECKED
 ) -> dict:
+	"""Pre-check: lock the real target, then read the value again from a fresh definition."""
 	_admin_meta(doctype)
 	new = _property_value(property, value)
 	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
 	existing = frappe.get_list("Property Setter", filters=key, pluck="name", limit_page_length=1)
-	# Asıl hedef kilitlenir, sonra değer güncel tanımdan yeniden okunur.
 	if existing:
 		store.lock_row("Property Setter", existing[0])
 	frappe.clear_cache(doctype=doctype)
 	_verify(preview_field_property(doctype, fieldname, property, value), expected_version)
-	if existing:
-		doc = frappe.get_doc("Property Setter", existing[0])
-		doc.value = new
+	return {"existing": existing[0] if existing else None, "value": new, "key": key}
+
+
+def write_field_property(prepared: dict) -> dict:
+	key = prepared["key"]
+	if prepared["existing"]:
+		doc = frappe.get_doc("Property Setter", prepared["existing"])
+		doc.value = prepared["value"]
 		doc.save()
 	else:
 		doc = frappe.get_doc(
 			{
 				"doctype": "Property Setter",
 				"doctype_or_field": "DocField",
-				"property_type": PROPERTY_TYPES[property],
-				"value": new,
+				"property_type": PROPERTY_TYPES[key["property"]],
+				"value": prepared["value"],
 				"is_system_generated": 0,
 				**key,
 			}
 		).insert()
-	frappe.clear_cache(doctype=doctype)
+	frappe.clear_cache(doctype=key["doc_type"])
 	return {"name": doc.name}
+
+
+def run_field_property(
+	doctype: str, fieldname: str, property: str, value: str | int | bool, expected_version=_UNCHECKED
+) -> dict:
+	return write_field_property(prepare_field_property(doctype, fieldname, property, value, expected_version))
 
 
 # --- rol izni ---
@@ -326,24 +343,44 @@ def preview_role_permission(
 	)
 
 
-def run_role_permission(
+def prepare_role_permission(
 	doctype: str, role: str, permissions: dict[str, bool], permlevel: int = 0, expected_version=_UNCHECKED
 ) -> dict:
+	"""Pre-check: lock the rule row, then compare the current rule with the previewed one."""
 	frappe.only_for(ADMIN_ROLE)
 	row = _permission_row(doctype, role, permlevel)
 	if row is not None:
 		store.lock_row("Custom DocPerm", row.name)
 	frappe.clear_cache(doctype=doctype)
 	_verify(preview_role_permission(doctype, role, permissions, permlevel), expected_version)
-	# `permission_manager` işlevleri yönetici rolünü kendileri de denetler.
-	if _permission_row(doctype, role, permlevel) is None:
+	return {
+		"doctype": doctype,
+		"role": role,
+		"permlevel": permlevel,
+		"permissions": permissions,
+		"add": _permission_row(doctype, role, permlevel) is None,
+	}
+
+
+def write_role_permission(prepared: dict) -> dict:
+	doctype, role, permlevel = prepared["doctype"], prepared["role"], prepared["permlevel"]
+	# The `permission_manager` functions check the admin role themselves as well.
+	if prepared["add"]:
 		permission_manager.add(parent=doctype, role=role, permlevel=permlevel)
-	for ptype, value in permissions.items():
+	for ptype, value in prepared["permissions"].items():
 		permission_manager.update(
 			doctype=doctype, role=role, permlevel=permlevel, ptype=ptype, value="1" if value else "0"
 		)
 	frappe.clear_cache(doctype=doctype)
 	return {"name": f"{doctype}|{role}|{permlevel}"}
+
+
+def run_role_permission(
+	doctype: str, role: str, permissions: dict[str, bool], permlevel: int = 0, expected_version=_UNCHECKED
+) -> dict:
+	return write_role_permission(
+		prepare_role_permission(doctype, role, permissions, permlevel, expected_version)
+	)
 
 
 # --- kullanıcı rolü ---
@@ -380,22 +417,40 @@ def preview_assign_role(user: str, role: str) -> dict:
 	return _role_spec(user, role, adding=True)[0]
 
 
-def run_assign_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
+def prepare_assign_role(user: str, role: str, expected_version=_UNCHECKED) -> tuple:
 	spec, doc = _role_spec(user, role, adding=True, lock=True)
 	_verify(spec, expected_version)
+	return doc, role
+
+
+def write_assign_role(prepared: tuple) -> dict:
+	doc, role = prepared
 	doc.add_roles(role)
-	return {"name": user}
+	return {"name": doc.name}
+
+
+def run_assign_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
+	return write_assign_role(prepare_assign_role(user, role, expected_version))
 
 
 def preview_remove_role(user: str, role: str) -> dict:
 	return _role_spec(user, role, adding=False)[0]
 
 
-def run_remove_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
+def prepare_remove_role(user: str, role: str, expected_version=_UNCHECKED) -> tuple:
 	spec, doc = _role_spec(user, role, adding=False, lock=True)
 	_verify(spec, expected_version)
+	return doc, role
+
+
+def write_remove_role(prepared: tuple) -> dict:
+	doc, role = prepared
 	doc.remove_roles(role)
-	return {"name": user}
+	return {"name": doc.name}
+
+
+def run_remove_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
+	return write_remove_role(prepare_remove_role(user, role, expected_version))
 
 
 # --- elle başlatılan komut: günlük temizliği ---
@@ -410,5 +465,15 @@ def preview_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
 	}
 
 
-def run_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
+def prepare_purge(older_than_days: int = retention.MIN_DAYS) -> int:
+	"""Pre-check: the admin role and the retention period. Counts only."""
+	retention.purge(older_than_days, dry_run=True)
+	return older_than_days
+
+
+def write_purge(older_than_days: int) -> dict:
 	return retention.purge(older_than_days, dry_run=False)
+
+
+def run_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
+	return write_purge(prepare_purge(older_than_days))

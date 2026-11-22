@@ -91,8 +91,10 @@ def authenticate_request() -> None:
 		_log_denied(record, "token_out_of_scope")
 		return
 	if frappe.request.cookies.get("sid") not in (None, "", "Guest"):
+		_log_denied(record, "cookie_with_token")
 		raise frappe.PermissionError(_("Send either a session cookie or an agent token, not both."))
 	if not _session_alive(record["sid"], record["user"]):
+		_log_denied(record, "session_ended")
 		frappe.cache.delete_value(_key(token))
 		return
 	frappe.set_user(record["user"])

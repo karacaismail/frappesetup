@@ -154,13 +154,25 @@ def preview_create(doctype: str, data: dict[str, Any]) -> dict:
 	return _spec("create", f"Create a new {doctype}", doctype, changes=changes)
 
 
-def run_create(doctype: str, data: dict[str, Any]) -> dict:
+def prepare_create(doctype: str, data: dict[str, Any]) -> tuple:
+	"""Pre-check for a create. Calls no Frappe document method."""
 	meta = writable_meta(doctype)
+	if not frappe.has_permission(doctype, "create"):
+		raise ToolDenied("permission", _("You may not create {0}.").format(doctype))
 	check_data(meta, data, allow_name=True)
+	return doctype, data
+
+
+def write_create(prepared: tuple) -> dict:
+	doctype, data = prepared
 	doc = frappe.new_doc(doctype)
 	doc.update(data)
 	doc.insert()
 	return {"name": doc.name}
+
+
+def run_create(doctype: str, data: dict[str, Any]) -> dict:
+	return write_create(prepare_create(doctype, data))
 
 
 # --- güncelleme ---
@@ -194,52 +206,103 @@ def _old_value(meta, doc, key: str) -> Any:
 	return [fields.clean(row.as_dict(), child_meta, meta.name) for row in value]
 
 
-def run_update(doctype: str, name: str, data: dict[str, Any], expected_version: str | None = None) -> dict:
+def prepare_update(
+	doctype: str, name: str, data: dict[str, Any], expected_version: str | None = None
+) -> tuple:
+	"""Pre-check for an update: lock the row, re-check permission, version and every field."""
 	meta, doc = _load(doctype, name, "write", expected_version)
 	check_data(meta, data, doc=doc)
+	return doc, data
+
+
+def write_update(prepared: tuple) -> dict:
+	doc, data = prepared
 	doc.update(data)
 	doc.save()
 	return {"name": doc.name}
 
 
+def run_update(doctype: str, name: str, data: dict[str, Any], expected_version: str | None = None) -> dict:
+	return write_update(prepare_update(doctype, name, data, expected_version))
+
+
 # --- onaya gönderme, iptal, silme ---
+
+
+def _check_submit(meta, doc) -> None:
+	if not meta.is_submittable or doc.docstatus != 0:
+		raise ToolDenied("invalid_arguments", _("Only a draft of a submittable DocType can be submitted."))
+
+
+def _check_cancel(doc) -> None:
+	if doc.docstatus != 1:
+		raise ToolDenied("invalid_arguments", _("Only a submitted document can be cancelled."))
+
+
+def _check_delete(doc) -> None:
+	if doc.docstatus == 1:
+		raise ToolDenied("invalid_arguments", _("Cancel a submitted document before deleting it."))
 
 
 def preview_submit(doctype: str, name: str) -> dict:
 	meta, doc = _load(doctype, name, "submit")
-	if not meta.is_submittable or doc.docstatus != 0:
-		raise ToolDenied("invalid_arguments", _("Only a draft of a submittable DocType can be submitted."))
+	_check_submit(meta, doc)
 	return _spec("submit", f"Submit {doctype} {name}", doctype, doc)
 
 
-def run_submit(doctype: str, name: str, expected_version: str | None = None) -> dict:
-	_meta, doc = _load(doctype, name, "submit", expected_version)
+def prepare_submit(doctype: str, name: str, expected_version: str | None = None):
+	meta, doc = _load(doctype, name, "submit", expected_version)
+	_check_submit(meta, doc)
+	return doc
+
+
+def write_submit(doc) -> dict:
 	doc.submit()
 	return {"name": doc.name}
 
 
+def run_submit(doctype: str, name: str, expected_version: str | None = None) -> dict:
+	return write_submit(prepare_submit(doctype, name, expected_version))
+
+
 def preview_cancel(doctype: str, name: str) -> dict:
 	_meta, doc = _load(doctype, name, "cancel")
-	if doc.docstatus != 1:
-		raise ToolDenied("invalid_arguments", _("Only a submitted document can be cancelled."))
+	_check_cancel(doc)
 	return _spec("cancel", f"Cancel {doctype} {name}", doctype, doc)
 
 
-def run_cancel(doctype: str, name: str, expected_version: str | None = None) -> dict:
+def prepare_cancel(doctype: str, name: str, expected_version: str | None = None):
 	_meta, doc = _load(doctype, name, "cancel", expected_version)
+	_check_cancel(doc)
+	return doc
+
+
+def write_cancel(doc) -> dict:
 	doc.cancel()
 	return {"name": doc.name}
 
 
+def run_cancel(doctype: str, name: str, expected_version: str | None = None) -> dict:
+	return write_cancel(prepare_cancel(doctype, name, expected_version))
+
+
 def preview_delete(doctype: str, name: str) -> dict:
 	_meta, doc = _load(doctype, name, "delete")
-	if doc.docstatus == 1:
-		raise ToolDenied("invalid_arguments", _("Cancel a submitted document before deleting it."))
+	_check_delete(doc)
 	return _spec("delete", f"Delete {doctype} {name}", doctype, doc)
 
 
+def prepare_delete(doctype: str, name: str, expected_version: str | None = None):
+	_meta, doc = _load(doctype, name, "delete", expected_version)
+	_check_delete(doc)
+	return doc
+
+
+def write_delete(doc) -> dict:
+	# `frappe.delete_doc` checks the delete permission and linked documents itself as well.
+	frappe.delete_doc(doc.doctype, doc.name)
+	return {"name": doc.name}
+
+
 def run_delete(doctype: str, name: str, expected_version: str | None = None) -> dict:
-	_load(doctype, name, "delete", expected_version)
-	# `frappe.delete_doc` silme iznini ve bağlı kayıtları kendisi de denetler.
-	frappe.delete_doc(doctype, name)
-	return {"name": name}
+	return write_delete(prepare_delete(doctype, name, expected_version))

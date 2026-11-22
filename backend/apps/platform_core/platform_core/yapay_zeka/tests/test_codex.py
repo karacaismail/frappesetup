@@ -151,6 +151,10 @@ class TestReportSecrets(YzTestCase):
 		"Pin Kodu:Password:120",
 	)
 
+	def setUp(self):
+		super().setUp()
+		self.open_report_gate()
+
 	def run_with(self, rows: list) -> dict:
 		manager = self.login(MANAGER)
 		fake = {"columns": list(self.COLUMNS), "result": rows}
@@ -230,7 +234,7 @@ class TestResultState(YzTestCase):
 			"fieldtype": "Data",
 			"description": "Stays after the failure.",
 		}
-		original = admin.run_custom_field
+		original = admin.write_custom_field
 
 		def fails_after_writing(*args, **kwargs):
 			original(*args, **kwargs)
@@ -240,7 +244,7 @@ class TestResultState(YzTestCase):
 		second = self.call_tool(manager, "add_custom_field", {**arguments, "label": "Ikinci"})[
 			"structuredContent"
 		]
-		with patch.object(admin, "run_custom_field", fails_after_writing):
+		with patch.object(admin, "write_custom_field", fails_after_writing):
 			outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
 		blocked = self.approve(manager, second["proposal_id"]).json["message"]
 
@@ -256,7 +260,7 @@ class TestResultState(YzTestCase):
 		client = self.login(USER_A)
 		proposal_id = self.propose_update(client, name, title="Yeni")["proposal_id"]
 		digest = self.digest_of(client, proposal_id)
-		original = write.run_update
+		original = write.prepare_update
 		seen = {}
 
 		def probe(*args, **kwargs):
@@ -265,7 +269,7 @@ class TestResultState(YzTestCase):
 			seen["state"] = frappe.db.get_value("AI Action Proposal", proposal_id, ["status", "result"])
 			return original(*args, **kwargs)
 
-		with patch.object(write, "run_update", probe):
+		with patch.object(write, "prepare_update", probe):
 			outcome = self.approve(client, proposal_id, digest).json["message"]
 
 		self.assertEqual(tuple(seen["state"]), ("consumed", "unknown"))
@@ -332,7 +336,7 @@ class TestAdminVersion(YzTestCase):
 				}
 			)
 
-		outcome = self.approve_with_rival(manager, proposal["proposal_id"], "run_field_property", rival)
+		outcome = self.approve_with_rival(manager, proposal["proposal_id"], "prepare_field_property", rival)
 		frappe.clear_cache(doctype=DOCTYPE)
 
 		self.assertFalse(outcome["executed"], outcome)
@@ -349,7 +353,7 @@ class TestAdminVersion(YzTestCase):
 		def rival():
 			frappe.permissions.update_permission_property(DOCTYPE, RESTRICTED_ROLE, 0, "cancel", 0)
 
-		outcome = self.approve_with_rival(manager, proposal["proposal_id"], "run_role_permission", rival)
+		outcome = self.approve_with_rival(manager, proposal["proposal_id"], "prepare_role_permission", rival)
 
 		self.assertFalse(outcome["executed"], outcome)
 		row = frappe.db.get_value(
@@ -372,7 +376,7 @@ class TestAdminVersion(YzTestCase):
 			user.bio = "rakip degisiklik"
 			user.save(ignore_permissions=True)
 
-		outcome = self.approve_with_rival(manager, proposal["proposal_id"], "run_assign_role", rival)
+		outcome = self.approve_with_rival(manager, proposal["proposal_id"], "prepare_assign_role", rival)
 		frappe.clear_cache(user=USER_B)
 
 		self.assertFalse(outcome["executed"], outcome)
@@ -385,7 +389,7 @@ class TestAdminVersion(YzTestCase):
 		client = self.login(USER_A)
 		proposal_id = self.propose_update(client, name, title="Onaylanan")["proposal_id"]
 		digest = self.digest_of(client, proposal_id)
-		original = write.run_update
+		original = write.prepare_update
 
 		def raced(*args, **kwargs):
 			frappe.set_user("Administrator")
@@ -396,7 +400,7 @@ class TestAdminVersion(YzTestCase):
 			frappe.db.commit()  # nosemgrep: rakip istek kesinleşmiş sayılır
 			return original(*args, **kwargs)
 
-		with patch.object(write, "run_update", raced):
+		with patch.object(write, "prepare_update", raced):
 			outcome = self.approve(client, proposal_id, digest).json["message"]
 
 		self.assertFalse(outcome["executed"], outcome)

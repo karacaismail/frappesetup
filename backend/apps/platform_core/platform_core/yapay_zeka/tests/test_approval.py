@@ -370,11 +370,13 @@ class TestApproval(YzTestCase):
 		self.assertFalse(outcome["executed"])
 		self.assertEqual(outcome["deny_reason"], "execution_failed")
 		self.assertEqual(
-			(outcome["proposal"]["status"], outcome["proposal"]["result"]), ("consumed", "failed")
+			# The error is raised inside a Frappe document method, so the result stays unknown.
+			(outcome["proposal"]["status"], outcome["proposal"]["result"]),
+			("consumed", "unknown"),
 		)
 		self.assertEqual(frappe.db.count(DOCTYPE, {"title": "Hata"}), 0)
 		log = self.last_log(proposal=proposal["proposal_id"], stage="execute")
-		self.assertEqual((log.decision, log.result), ("error", "failed"))
+		self.assertEqual((log.decision, log.result), ("error", "unknown"))
 
 	def clear_reqd(self):
 		frappe.db.set_value("DocField", {"parent": DOCTYPE, "fieldname": "access_token"}, "reqd", 0)
