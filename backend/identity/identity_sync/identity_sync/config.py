@@ -61,6 +61,9 @@ class Settings:
     # Clients that may request an account deletion. Only Press does (docs/sozlesmeler.md, section 7).
     deletion_azp: frozenset[str] = frozenset()
 
+    # Trusted clients for platform-wide reconciliation and queue operations.
+    operator_azp: frozenset[str] = frozenset()
+
     @property
     def staff_azp(self) -> frozenset[str]:
         """Clients of the preview and approval flow."""
@@ -68,7 +71,7 @@ class Settings:
 
     @property
     def known_azp(self) -> frozenset[str]:
-        return self.execute_azp | self.preview_azp | self.session_azp | self.deletion_azp
+        return self.execute_azp | self.preview_azp | self.session_azp | self.deletion_azp | self.operator_azp
 
     @property
     def issuer(self) -> str:
@@ -146,12 +149,13 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}LOCK_TIMEOUT or {PREFIX}RATE_LIMIT is out of range")
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
+    operator_azp = _names(get("OPERATOR_AZP"))
     deletion_azp = _names(get("DELETION_AZP", DEFAULT_DELETION_AZP))
     # Each list grants a different right. One overlap is intended: a tenant site client both
     # executes approved work and ends sessions (docs/sozlesmeler.md, section 7). A preview
     # client must never execute, and the Press client only requests deletions.
     tenants = _tenants(get("TENANTS"))
-    listed = execute_azp | preview_azp | session_azp | deletion_azp
+    listed = execute_azp | preview_azp | session_azp | deletion_azp | operator_azp
     for tenant in tenants:
         # `site-<tenant>` is the browser login client. It has no service account, so a token
         # with that `azp` is a user's login token. It must never be accepted as a service caller.
@@ -172,11 +176,13 @@ def load_settings(env: Mapping[str, str]) -> Settings:
             f"{client} is not the service client of a configured tenant; "
             f"a tenant named in {PREFIX}TENANTS has the client site-<tenant>-service"
         )
-    if preview_azp & tenant_clients or deletion_azp & (preview_azp | tenant_clients):
-        raise ConfigError(
-            f"a client in {PREFIX}PREVIEW_AZP or {PREFIX}DELETION_AZP cannot be in another list; "
-            f"only {PREFIX}EXECUTE_AZP and {PREFIX}SESSION_AZP may share clients"
-        )
+    platform_groups = (operator_azp, preview_azp, deletion_azp)
+    if any(client.startswith("site-") for group in platform_groups for client in group):
+        raise ConfigError("operator, preview and deletion lists cannot contain site- clients")
+    if any(group & tenant_clients for group in platform_groups) or any(
+        left & right for index, left in enumerate(platform_groups) for right in platform_groups[index + 1:]
+    ):
+        raise ConfigError("operator, preview and deletion lists must be disjoint from each other and tenant clients")
     if len(get("WEBHOOK_SECRET")) < MIN_WEBHOOK_SECRET_LENGTH:
         raise ConfigError(f"{PREFIX}WEBHOOK_SECRET must be at least {MIN_WEBHOOK_SECRET_LENGTH} characters long")
     if len(get("DIGEST_KEY")) < MIN_DIGEST_KEY_LENGTH:
@@ -199,6 +205,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         port=port,
         service_audience=get("AUDIENCE", "identity-sync"),
         realm_id=get("REALM_ID"),
+        operator_azp=operator_azp,
         execute_azp=execute_azp,
         preview_azp=preview_azp,
         session_azp=session_azp,
