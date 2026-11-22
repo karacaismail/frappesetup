@@ -1,10 +1,10 @@
-"""Servis belirtecinin gerçek doğrulama yolu.
+"""The real service token verification path.
 
-Kurallar `docs/sozlesmeler.md` dosyasının 3. bölümündedir. Doğrulamayı ortak `oidc_verify`
-kitaplığı yapar. Bu testler kitaplığı gerçek HTTP girişinden sınar. Anahtarlar testte üretilir.
+The rules are in `docs/sozlesmeler.md`, section 3. The shared `oidc_verify` library
+verifies tokens. These tests exercise it through the real HTTP entry. Keys are generated in tests.
 
-Kitaplık kurulu değilse gerçek yol testleri atlanır. O koşu `not_run` sayılır.
-Kitaplıkla koşmak için komut README dosyasındadır.
+If the library is not installed, real verification tests are skipped and count as `not_run`.
+The README gives the command for running with the library.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ CERTS_PATH = "/realms/platform/protocol/openid-connect/certs"
 
 
 class FailClosedTest(unittest.TestCase):
-    """Doğrulama kurulamıyorsa servis her isteği reddeder."""
+    """The service rejects every request if verification cannot be initialized."""
 
     def setUp(self) -> None:
         self.stack = Stack()
@@ -85,9 +85,9 @@ def _b64(number: int) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-@unittest.skipUnless(HAVE_LIBRARY, "oidc_verify kitaplığı kurulu değil")
+@unittest.skipUnless(HAVE_LIBRARY, "oidc_verify is not installed")
 class RealVerificationTest(unittest.TestCase):
-    """Gerçek RS256 belirteçleri, gerçek anahtar listesi ve gerçek HTTP girişi."""
+    """Real RS256 tokens, a real key set and the real HTTP entry."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -144,7 +144,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(self.token(aud="site-tenant1")), 401)
 
     def test_multiple_audiences_are_rejected(self) -> None:
-        # Servis belirteci yalnız bir `aud` değeri taşır.
+        # A service token carries exactly one `aud` value.
         self.assertEqual(self.status(self.token(aud=["identity-sync", "press"])), 401)
 
     def test_wrong_issuer_is_rejected(self) -> None:
@@ -161,7 +161,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(self.token(iat=now - 600, exp=now - 300)), 401)
 
     def test_token_inside_leeway_is_accepted(self) -> None:
-        # Saat payı 30 saniyedir.
+        # Clock skew allowance is 30 seconds.
         now = int(time.time())
         self.assertEqual(self.status(self.token(iat=now - 600, exp=now - 10)), 200)
 
@@ -172,7 +172,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(self.token(kid="bilinmeyen")), 401)
 
     def test_symmetric_algorithm_is_rejected(self) -> None:
-        # Yalnız RS256 kabul edilir.
+        # Only RS256 is accepted.
         forged = jwt.encode(
             {"iss": self.stack.issuer, "aud": "identity-sync", "azp": "identity-sync-operator", "exp": int(time.time()) + 300},
             "x" * 64,
@@ -197,7 +197,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(agent, "POST", "/v1/dead-letters/replay", execute), 403)
 
     def test_approval_layer_token_may_execute(self) -> None:
-        # Kuyruk boş. Boş planın özeti tutmaz ve servis 409 döner. Yetki denetimi geçmiştir.
+        # The queue is empty. The empty plan digest differs, so the service returns 409 after authorization succeeds.
         execute = json.dumps({"dry_run": False, "preview_digest": "0" * 64, "approval_id": "onay-1"}).encode()
 
         self.assertEqual(self.status(self.token(), "POST", "/v1/dead-letters/replay", execute), 409)

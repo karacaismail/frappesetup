@@ -1,5 +1,5 @@
 """Every path of the account deletion flow, one test per row of the table in README.md
-("Hesap silme yolları"). The rows come from docs/sozlesmeler.md, section 7.
+(the account deletion paths table). The rows come from docs/sozlesmeler.md, section 7.
 
 Each test checks four things together:
 
