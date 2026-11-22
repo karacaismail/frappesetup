@@ -106,7 +106,7 @@ x-site-settings:
     - key: mcp_oauth_resource
       example: https://tenant.example.test/api/method/platform_core.api.ai.mcp
       required: false
-      note: Exact HTTPS MCP URL. The token must have this single audience.
+      note: Exact HTTPS MCP URL. The single audience and the signed mcp_resource claim must equal this URL.
     - key: mcp_oauth_client_ids
       example: [mcp-external]
       required: false

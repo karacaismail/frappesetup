@@ -651,12 +651,16 @@ x-mcp-oauth:
   registration: administrator
   grantType: authorization_code
   pkce: S256
+  redirectUriMatching: exact
   scope: mcp
   audience: exact MCP resource URL
+  requiredSignedResourceClaim: mcp_resource
+  resourceParameterRequiredOnTokenRequests: true
   tokenLocation: Authorization Bearer header
   maxTokenAgeSeconds: 300
   maxToolCallsPerToken: 20
   liveSessionRequired: true
+  sessionCheckDeadlineSeconds: 3
   humanApprovalGranted: false
 
 x-mcp-tools:

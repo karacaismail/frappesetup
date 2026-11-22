@@ -8,18 +8,17 @@ from typing import NoReturn
 from urllib.parse import urlencode, urlsplit
 
 import frappe
-import urllib3
 from oidc_verify import JwksUnavailable, TokenError, verify_access_token
 
 from platform_core.identity import anonymization, helpers, jwks, site_settings
 from platform_core.identity.exceptions import KeycloakKeysUnavailable, ServiceTokenRejected
+from platform_core.identity.mcp_introspection import fetch_introspection
 
 MCP_PATH = "/api/method/platform_core.api.ai.mcp"
 MCP_SCOPE = "mcp"
 MAX_LIFETIME_SECONDS = 300
 _MAX_RESPONSE_BYTES = 64 * 1024
-_TIMEOUT = urllib3.Timeout(connect=3, read=3, total=3)
-_POOL = urllib3.PoolManager()
+_INTROSPECTION_TIMEOUT = 3.0
 _CLIENT_ID = re.compile(r"[A-Za-z0-9._~-]{1,128}")
 _REALM = re.compile(r"[A-Za-z0-9_-]+")
 _URL = re.compile(r"https://[A-Za-z0-9.\-:\[\]]+(?:/[A-Za-z0-9._~/-]*)?")
@@ -112,6 +111,11 @@ def verify_mcp_token(token: str) -> dict:
 	except JwksUnavailable:
 		_unavailable()
 
+	# A matching audience can also come from Keycloak's authorization-code fallback.
+	# This signed claim proves that the current token request supplied the resource.
+	if claims.get("mcp_resource") != settings.resource:
+		_reject()
+
 	issued_at = claims.get("iat")
 	expires_at = claims.get("exp")
 	if type(issued_at) is not int or type(expires_at) is not int:
@@ -174,27 +178,14 @@ def _verify_live_session(
 		"token": token,
 	}
 	try:
-		with _POOL.request(
-			"POST",
+		body = fetch_introspection(
 			settings.introspection_url,
-			body=urlencode(form).encode("ascii"),
-			headers={
-				"Content-Type": "application/x-www-form-urlencoded",
-				"Accept": "application/json",
-				"Accept-Encoding": "identity",
-			},
-			timeout=_TIMEOUT,
-			redirect=False,
-			retries=False,
-			preload_content=False,
-		) as response:
-			if response.status != 200:
-				_unavailable()
-			body = response.read(_MAX_RESPONSE_BYTES + 1, decode_content=False)
-		if len(body) > _MAX_RESPONSE_BYTES:
-			_unavailable()
+			urlencode(form).encode("ascii"),
+			timeout=_INTROSPECTION_TIMEOUT,
+			max_bytes=_MAX_RESPONSE_BYTES,
+		)
 		result = json.loads(body)
-	except (urllib3.exceptions.HTTPError, OSError, ValueError):
+	except (OSError, RecursionError, ValueError):
 		_unavailable()
 
 	if not isinstance(result, dict) or type(result.get("active")) is not bool:

@@ -486,7 +486,10 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - Keşif ucu yanıtı doğrudan JSON olarak döner.
 - İstemci Keycloak'ta yetki kodu akışını ve PKCE S256 yöntemini kullanır.
 - Sunucu `mcp` kapsamını ve tek hedef olarak sitenin tam MCP adresini ister.
+- Sunucu her istekte imzalı `mcp_resource` alanını da tam MCP adresiyle karşılaştırır.
+- Keycloak dönüş adresini tam eşleşmeyle denetler. Joker, parça işareti ve kullanıcı bilgisi reddedilir.
 - Sunucu her çağrıda Keycloak oturumunun açık olduğunu denetler.
+- Oturum sorgusu 3 saniyeyi aşarsa sunucu 503 döner.
 - Belirteç en çok 300 saniye geçerlidir. Bir belirteç en çok 20 araç çağrısı yapabilir.
 - Sayaç veritabanında kalır. Önceki kullanımı gösteren kayıt Redis'te kalır.
 - Bu iki kayıt, tek kayıp durumunda belirtecin yeniden hak almasını önler.

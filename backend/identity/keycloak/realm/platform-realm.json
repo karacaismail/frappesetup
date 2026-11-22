@@ -112,6 +112,15 @@
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
+        },
+        {
+          "name": "mcp-explicit-resource",
+          "protocol": "openid-connect",
+          "protocolMapper": "mcp-explicit-resource",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true"
+          }
         }
       ]
     },
@@ -701,6 +710,58 @@
       }
     ]
   },
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "mcp-external-security",
+        "executors": [
+          {"executor": "mcp-exact-redirect", "configuration": {}},
+          {"executor": "mcp-resource-required", "configuration": {}}
+        ]
+      },
+      {
+        "name": "mcp-redirect-registration",
+        "executors": [
+          {"executor": "mcp-exact-redirect", "configuration": {}}
+        ]
+      }
+    ]
+  },
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "mcp-external-security",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "client-attributes",
+            "configuration": {
+              "attributes": "[{\"key\":\"mcp.external-client\",\"value\":\"true\"}]"
+            }
+          }
+        ],
+        "profiles": ["mcp-external-security"]
+      },
+      {
+        "name": "mcp-redirect-registration",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "client-updater-context",
+            "configuration": {
+              "update-client-source": [
+                "ByAuthenticatedUser",
+                "ByAnonymous",
+                "ByInitialAccessToken",
+                "ByRegistrationAccessToken"
+              ]
+            }
+          }
+        ],
+        "profiles": ["mcp-redirect-registration"]
+      }
+    ]
+  },
   "clients": [
     {
       "clientId": "mcp-external",
@@ -717,6 +778,8 @@
       "webOrigins": [],
       "attributes": {
         "access.token.lifespan": "300",
+        "mcp.external-client": "true",
+        "mcp.expected-resource": "${ATONOTA_MCP_RESOURCE_URL:https://tenant.example.test/api/method/platform_core.api.ai.mcp}",
         "pkce.code.challenge.method": "S256",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",

@@ -75,28 +75,35 @@ MCP, yapay zekâ istemcisinin araç çağırdığı yöntemdir.
 Realm şablonu MCP istemcilerini kapalı tutar. Kabul testleri bitene kadar kapalı bırakın.
 Keycloak 26.8.2, kaynak adresini denetlemek için `resource-indicators` özelliğini ister. [Keycloak kılavuzu](https://www.keycloak.org/securing-apps/mcp-authz-server)
 Dönüş adresini `ATONOTA_MCP_REDIRECT_URI` değerinde tam olarak belirtin.
-HTTPS kullanın. Yalnız yerel testte sabit portlu localhost adresi HTTP kullanabilir.
-Adresin içinde joker işareti kullanmayın. Örneğin adrese `*` koymayın.
-Yönetici, istemciyi açmadan önce dönüş adresini denetler.
+Keycloak, istekteki adresi kayıtlı adresle birebir karşılaştırır.
+Keycloak, adresi kayıtta ve izin isteğinde denetler.
+Keycloak, yıldız, kullanıcı bilgisi veya `#` parçası içeren adresleri reddeder.
+Keycloak, geliştirme dışında HTTPS ister.
+Geliştirmede yalnız sabit portlu yerel adres HTTP kullanabilir.
 
 `ATONOTA_MCP_RESOURCE_URL` sitenin tam MCP adresidir.
-İstemci, izin ve belirteç isteklerinde bu adresi gönderir.
+İstemci, izin, kod değiştirme ve belirteç yenileme isteklerinde bu adresi gönderir.
 Keycloak, erişim belirtecinin hedefini bu adrese bağlar.
-Keycloak, kod değişiminde bilinmeyen adresi reddeder.
-Belirteç isteğinde adres yoksa Keycloak izin isteğindeki adresi kullanır.
+Keycloak, belirteç isteğinde adres eksik veya farklıysa isteği reddeder.
 Platform, oturumun açık olduğunu Keycloak'a sorar.
 Bu sorguda istemci adı olarak tam MCP adresini kullanır.
 Sorgu, `ATONOTA_MCP_INTROSPECTION_SECRET` değerini parola olarak kullanır.
 
+Yeni MCP istemcisini kaydederken `mcp.external-client` değerini `true` yapın.
+`mcp.expected-resource` değerine sitenin tam MCP adresini yazın.
+İstemciye `mcp` kapsamını ekleyin. Bu kapsam MCP araçlarına erişim isteğini bildirir.
+
 Canlı realm testleri için ayrı bir yerel Keycloak kullanın.
 Şablondaki üç MCP istemcisini ve `basic` ile `mcp` kapsamlarını yükleyin.
+Şablondaki istemci kurallarını ve eklentiyi de yükleyin.
 MCP istemcilerini yalnız bu test ortamında açın. Örnek bir kullanıcı oluşturun.
 Örnek kullanıcıya ad, soyad ve e-posta adresi verin.
 Sunucu adresini `KC_PUBLIC_URL`, portu `KC_PORT` ile verin.
 Örnek kullanıcı bilgilerini `KC_MCP_TEST_USER` ve `KC_MCP_TEST_PASSWORD` ile verin.
+Yerel yönetici bilgilerini `KC_BOOTSTRAP_ADMIN_USERNAME` ve `KC_BOOTSTRAP_ADMIN_PASSWORD` ile verin.
 
 ```bash
-KC_MCP_TEST=1 python3 -m unittest discover -s tests -p test_mcp_oauth.py
+KC_MCP_TEST=1 python3 -m unittest discover -s tests -p 'test_mcp_*.py'
 ```
 
 ## Realm'i yeniden içe almak

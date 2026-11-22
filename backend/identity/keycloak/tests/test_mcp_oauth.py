@@ -66,9 +66,10 @@ class McpRealmTest(unittest.TestCase):
         self.assertEqual(self.clients[CLIENT]["optionalClientScopes"], ["mcp"])
         self.assertEqual(self.clients[CLIENT]["defaultClientScopes"], ["basic"])
         mappers = scopes["mcp"]["protocolMappers"]
-        self.assertEqual(len(mappers), 1)
-        self.assertEqual(mappers[0]["protocolMapper"], "oidc-audience-mapper")
-        self.assertEqual(mappers[0]["config"]["included.client.audience"], RESOURCE_CLIENT)
+        by_type = {mapper["protocolMapper"]: mapper for mapper in mappers}
+        self.assertEqual(by_type["oidc-audience-mapper"]["config"]["included.client.audience"], RESOURCE_CLIENT)
+        self.assertIn("mcp-explicit-resource", by_type)
+        self.assertEqual(self.clients[CLIENT]["attributes"]["mcp.expected-resource"], RESOURCE_SETTING)
 
 
 @unittest.skipUnless(os.environ.get("KC_MCP_TEST"), "isolated MCP realm not configured")
@@ -169,6 +170,7 @@ class McpKeycloakTest(unittest.TestCase):
         tokens = response.json()
         claims = jwt_payload(tokens["access_token"])
         self.assertTrue(claims["aud"] in (self.resource, [self.resource]))
+        self.assertEqual(claims.get("mcp_resource"), self.resource)
         self.assertIn("mcp", claims["scope"].split())
         self.assertEqual(claims["azp"], CLIENT)
         self.assertTrue(claims["sid"])
@@ -209,16 +211,51 @@ class McpKeycloakTest(unittest.TestCase):
             self.assertNotIn("code", detail.keys())
             self.assertEqual(detail.get("error"), [error])
         # Keycloak validates a well-formed resource URL against client configuration during exchange.
-        for source, target in ((wrong, wrong), (self.resource, wrong), (wrong, self.resource)):
+        for source, target, error in (
+            (wrong, wrong, "invalid_grant"),
+            (self.resource, wrong, "invalid_grant"),
+            (wrong, self.resource, "invalid_target"),
+        ):
             result = self.exchange(self.code(resource=source), resource=target)
             self.assertEqual(result.status, 400, safe_detail(result))
-            self.assertEqual(result.json().get("error"), "invalid_target")
+            self.assertEqual(result.json().get("error"), error)
 
-    def test_omitting_resource_from_both_requests_does_not_mint_mcp_audience(self):
-        response = self.exchange(self.code(resource=None), resource=None)
+    def test_code_exchange_requires_an_explicit_resource(self):
+        for authorization_resource in (self.resource, None):
+            with self.subTest(authorization_resource=authorization_resource):
+                response = self.exchange(self.code(resource=authorization_resource), resource=None)
+                self.assertEqual(response.status, 400, safe_detail(response))
+                self.assertEqual(response.json().get("error"), "invalid_grant")
+
+    def test_code_exchange_cannot_add_a_resource_not_bound_to_the_code(self):
+        response = self.exchange(self.code(resource=None))
+        self.assertEqual(response.status, 400, safe_detail(response))
+        self.assertEqual(response.json().get("error"), "invalid_target")
+
+    def test_code_exchange_does_not_normalize_the_requested_resource(self):
+        response = self.exchange(self.code(), resource=self.resource + "\n")
+        self.assertEqual(response.status, 400, safe_detail(response))
+        self.assertEqual(response.json().get("error"), "invalid_grant")
+
+    def test_code_exchange_does_not_normalize_the_callback(self):
+        response = self.exchange(self.code(), redirect_uri=self.redirect + "\n")
+        self.assertEqual(response.status, 400, safe_detail(response))
+        self.assertEqual(response.json().get("error"), "invalid_grant")
+
+    def test_refresh_requires_an_explicit_resource(self):
+        response = self.exchange(self.code())
         self.assertEqual(response.status, 200, safe_detail(response))
-        claims = jwt_payload(response.json()["access_token"])
-        self.assertTrue(claims.get("aud") in (RESOURCE_CLIENT, [RESOURCE_CLIENT]))
+        denied = request(
+            "POST",
+            token_endpoint(),
+            form={
+                "client_id": CLIENT,
+                "grant_type": "refresh_token",
+                "refresh_token": response.json()["refresh_token"],
+            },
+        )
+        self.assertEqual(denied.status, 400, safe_detail(denied))
+        self.assertEqual(denied.json().get("error"), "invalid_target")
 
     def test_omitting_mcp_scope_does_not_mint_mcp_audience(self):
         result = self.exchange(self.code(scope=None))
@@ -244,6 +281,7 @@ class McpKeycloakTest(unittest.TestCase):
 
         first = refresh()
         self.assertEqual(first.status, 200, safe_detail(first))
+        self.assertEqual(jwt_payload(first.json()["access_token"]).get("mcp_resource"), self.resource)
         self.assertTrue(first.json()["refresh_token"] != previous)
         replay = refresh()
         self.assertEqual(replay.status, 400, safe_detail(replay))
