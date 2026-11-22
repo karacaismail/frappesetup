@@ -22,6 +22,7 @@ cached key inside the stale window or raises `JwksUnavailable`. The refresh lock
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import threading
 import time
@@ -44,6 +45,39 @@ _READ_CHUNK = 16_384
 _JWK_HATALARI = (jwt.exceptions.PyJWTError, ValueError, TypeError)
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuses every redirect. A redirect could move the download to another host or to plain HTTP."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise OSError(f"JWKS redirect refused ({code})")
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect())
+
+
+def _is_development_host(host: str | None) -> bool:
+    """`localhost`, a name under `.localhost` (RFC 6761) or a loopback address."""
+    if not host:
+        return False
+    host = host.lower().rstrip(".")
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _check_url(jwks_url: str) -> None:
+    """G-13: HTTPS only. Plain HTTP is an explicit exception for development addresses."""
+    parts = urllib.parse.urlsplit(jwks_url)
+    if parts.scheme == "https" and parts.hostname:
+        return
+    if parts.scheme == "http" and _is_development_host(parts.hostname):
+        return
+    raise ValueError("jwks_url must use https; plain http is allowed only for localhost and loopback")
+
+
 def _http_fetcher(
     jwks_url: str,
     timeout: float,
@@ -58,10 +92,10 @@ def _http_fetcher(
     """
 
     def getir() -> dict:
-        # Şema JwksCache.__init__ içinde http/https ile sınırlandı.
+        # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
         istek = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
         deadline = time.monotonic() + total_timeout
-        with urllib.request.urlopen(istek, timeout=timeout) as yanit:  # noqa: S310
+        with _OPENER.open(istek, timeout=timeout) as yanit:
             if yanit.status != 200:
                 raise OSError(f"JWKS yanıtı {yanit.status}")
             parcalar: list[bytes] = []
@@ -124,9 +158,7 @@ class JwksCache:
         total_timeout: float = DEFAULT_TOTAL_TIMEOUT,
         wait_timeout: float | None = None,
     ):
-        sema = urllib.parse.urlsplit(jwks_url).scheme
-        if sema not in ("http", "https"):
-            raise ValueError("jwks_url yalnız http veya https olabilir")
+        _check_url(jwks_url)
         if int(max_stale_seconds) < 0:
             raise ValueError("max_stale_seconds must not be negative")
         if int(max_bytes) <= 0:
