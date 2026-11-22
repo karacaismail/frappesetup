@@ -2838,5 +2838,50 @@
     "owner": "security-tooling",
     "reason": "The regression test invokes the copied security gate with an absolute fixture path and mock tools.",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/bin/dev-resources",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; the local Docker context probe is reviewed separately.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/bin/dev-resources",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e8836a277e2f25f034e1cc21b998e3288f7c196f2beedb7ee0f931853416fcd8",
+    "reason": "The command has fixed inspect arguments and one of two fixed local context names. The caller requires an absolute Docker executable and no shell is used.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/e2e/bin/merge-preview",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; the preview subprocess call remains subject to separate review.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/e2e/stack",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; the stack subprocess call sites are reviewed separately.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/stack",
+    "code": "found = subprocess.run(",
+    "statementSha256": "cd6923b17cf8eb0ce5509fa5f11942c20a11778d46de17c3aa8d372478fa3968",
+    "reason": "The command performs a read-only image inspect without a shell. Its image name comes from checked-in Compose definitions with a validated generated project tag or from the same tag plus a fixed service name.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
   }
 ]
