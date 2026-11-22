@@ -55,7 +55,7 @@ frappe\_mcp'nin Frappe v16 uyumu P3 başında kurulumla teyit edilir (doğrulana
 
 ## 8.2 Agent servisi (G-83)
 
-- Claude Agent SDK (TypeScript) üzerinde stateless işçiler; Docker Engine konteyneri, PostgreSQL (konuşma, önizleme, kota sayaçları), Redis (kuyruk, oran sınırı), SSE akış ucu, imzalı webhook alıcısı. Konteyner, DB, TLS ve ağ kuralları: Hüseyin Cengiz. `agent.<marka>.com.tr` A kaydının değerini Hüseyin Cengiz hazırlar; apex bölgesi GoDaddy'de kaldığı sürece Asistan Hüseyin uygular, Hüseyin Cengiz doğrular.
+- Claude Agent SDK (TypeScript) üzerinde stateless işçiler; Docker Engine konteyneri, PostgreSQL (konuşma, önizleme, kota sayaçları), Redis (kuyruk, oran sınırı), SSE akış ucu, imzalı webhook alıcısı. Konteyner, DB, TLS ve ağ kuralları: DevOps sorumlusu. `agent.<marka>.com.tr` A kaydının değerini DevOps sorumlusu hazırlar; apex bölgesi GoDaddy'de kaldığı sürece alan adı sorumlusu uygular, DevOps sorumlusu doğrular.
 - Model rolleri (model kimlikleri `claude-api` referansıyla doğrulandı, 2026-09-25 önbelleği):
 
 | Rol | Model | Not |
@@ -118,7 +118,7 @@ Bileşen adları kurulu @ant-design/x sürümünde doğrulanır (doğrulanacak).
 
 | Adım | Çıktı | Sahip |
 | --- | --- | --- |
-| 1 | Agent konteyneri, PostgreSQL/Redis, TLS, ağ allowlist, DNS kaydı | Hüseyin Cengiz (DNS uygulaması: Asistan Hüseyin) |
+| 1 | Agent konteyneri, PostgreSQL/Redis, TLS, ağ allowlist, DNS kaydı | DevOps sorumlusu (DNS uygulaması: alan adı sorumlusu) |
 | 2 | Press OAuth Client + `press_tr.mcp.handler` (G-27, G-28); Keycloak `agent-service` servis hesabı; kiracı sitesinde aracı belirteci basımı (G-148, G-82) | Platform ekibi |
 | 3 | platform\_core `auth_hooks`, `ai_tools` kaydı, AI Action Log (G-59, G-64) | Platform ekibi |
 | 4 | Niyet protokolü, `preview_hash`, Haiku sınıflandırıcı, PII maskeleme | Platform ekibi |
