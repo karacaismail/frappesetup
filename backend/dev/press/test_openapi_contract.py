@@ -32,3 +32,13 @@ class PressOpenAPIContractTest(unittest.TestCase):
         callback = self.spec["paths"]["/api/method/press_tr.api.auth.keycloak_callback"]["get"]
         code = next(parameter for parameter in callback["parameters"] if parameter["name"] == "code")
         self.assertEqual(code["schema"].get("maxLength"), 2048)
+
+    def test_identity_inventory_documents_private_service_pagination(self):
+        operation = self.spec["paths"]["/api/method/press_tr.api.identity.list_identities"]["post"]
+        self.assertEqual(operation["security"], [{"identitySync": []}])
+        self.assertIn("403", operation["responses"])
+        response = operation["responses"]["200"]["content"]["application/json"]["schema"]
+        self.assertIn("next_cursor", response["required"])
+        row = response["properties"]["message"]["items"]
+        self.assertCountEqual(row["required"], ["issuer", "subject", "enabled"])
+        self.assertFalse(row["additionalProperties"])

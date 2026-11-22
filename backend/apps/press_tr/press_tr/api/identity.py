@@ -4,14 +4,18 @@ from typing import Any
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Cast
 from redis.exceptions import LockNotOwnedError
 from werkzeug.exceptions import Conflict
 
 from press_tr.kimlik.accounts import disable_user as disable_linked_user
 from press_tr.kimlik.anonymization import RECORD_PAGE_SIZE, anonymize_linked_user, iter_named_rows
-from press_tr.kimlik.identity import as_press_user, bind_identity, create_team, find_identity
+from press_tr.kimlik.identity import IDENTITY_LINK, as_press_user, bind_identity, create_team, find_identity
 from press_tr.kimlik.oidc import claim, reject
+from press_tr.kimlik.oidc import issuer as configured_issuer
 from press_tr.kimlik.service import require_service
+
+IDENTITY_PAGE_SIZE = 100
 
 
 def reset_read_snapshot() -> None:
@@ -185,3 +189,44 @@ def anonymize_user(issuer: str, subject: str) -> dict[str, bool]:
 	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
 		raise Conflict(_("This account is being updated. Try again.", context="press_tr"))
 	return {"anonymized": True, "found": found}
+
+
+class InvalidIdentityPage(frappe.ValidationError):
+	http_status_code = 400
+
+
+@frappe.whitelist(methods=["POST"])
+def list_identities(cursor: Any = None, limit: Any = IDENTITY_PAGE_SIZE) -> list[dict[str, str | bool]]:
+	issuer = configured_issuer()
+	require_service(issuer)
+	if (
+		type(limit) is not int
+		or not 1 <= limit <= IDENTITY_PAGE_SIZE
+		or (cursor is not None and (not isinstance(cursor, str) or not 1 <= len(cursor) <= 255))
+	):
+		frappe.throw(
+			_("Send a valid identity page cursor and limit.", context="press_tr"), InvalidIdentityPage
+		)
+
+	links = frappe.qb.DocType(IDENTITY_LINK)
+	users = frappe.qb.DocType("User")
+	# This verified service operation inventories one issuer and excludes anonymous tombstones.
+	# Keep the indexed lookup, then compare the issuer exactly despite MariaDB's collation.
+	query = (
+		frappe.qb.from_(links)
+		.left_join(users)
+		.on(users.name == links.user)
+		.select(links.issuer, links.subject, users.enabled)
+		.where(links.issuer == issuer)
+		.where(Cast(links.issuer, "BINARY") == issuer)
+		.orderby(links.subject)
+		.limit(limit + 1)
+	)
+	if cursor is not None:
+		query = query.where(links.subject > cursor)
+	rows = query.run(as_dict=True)
+	frappe.response["next_cursor"] = rows[limit - 1]["subject"] if len(rows) > limit else None
+	return [
+		{"issuer": row["issuer"], "subject": row["subject"], "enabled": bool(row["enabled"])}
+		for row in rows[:limit]
+	]

@@ -267,6 +267,81 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					status, _ = self.call(method, body, self.token())
 					self.assertEqual(status, 403)
 
+	def test_list_identities_returns_only_current_issuer_and_public_row_fields(self):
+		prefix = f"zz-inventory-{uuid4().hex}"
+		open_subject, closed_subject = f"{prefix}-1", f"{prefix}-3"
+		tombstone_subject = f"{prefix}-2"
+		other_issuer_subject = f"{prefix}-2b"
+		for subject in (open_subject, closed_subject, tombstone_subject, other_issuer_subject):
+			self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
+
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			frappe.db.set_value("User", f"{closed_subject}@example.test", "enabled", 0)
+			frappe.db.set_value(
+				"Press Identity Link",
+				{"issuer": ISSUER, "subject": tombstone_subject},
+				"issuer",
+				"urn:press-tr:deleted-identity",
+			)
+			frappe.db.set_value(
+				"Press Identity Link",
+				{"issuer": ISSUER, "subject": other_issuer_subject},
+				"issuer",
+				ISSUER.upper(),
+			)
+			frappe.db.commit()
+		finally:
+			frappe.destroy()
+
+		token = self.token()
+		status, first = self.call("list_identities", {"cursor": f"{prefix}-0", "limit": 1}, token)
+		self.assertEqual(status, 200, first)
+		self.assertEqual(
+			first,
+			{
+				"message": [{"issuer": ISSUER, "subject": open_subject, "enabled": True}],
+				"next_cursor": open_subject,
+			},
+		)
+		status, second = self.call("list_identities", {"cursor": first["next_cursor"], "limit": 100}, token)
+		self.assertEqual(status, 200, second)
+		self.assertEqual(
+			second["message"][0], {"issuer": ISSUER, "subject": closed_subject, "enabled": False}
+		)
+		self.assertNotIn(tombstone_subject, {row["subject"] for row in second["message"]})
+		self.assertNotIn(other_issuer_subject, {row["subject"] for row in second["message"]})
+		self.assertTrue(all(set(row) == {"issuer", "subject", "enabled"} for row in second["message"]))
+		self.assertIsNone(second["next_cursor"])
+		status, final = self.call("list_identities", {"cursor": second["message"][-1]["subject"]}, token)
+		self.assertEqual(status, 200, final)
+		self.assertEqual(final, {"message": [], "next_cursor": None})
+
+	def test_list_identities_rejects_untrusted_callers_and_parameters(self):
+		subject = uuid4().hex
+		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
+		signed_input, signature = self.token().rsplit(".", 1)
+		bad_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
+		for name, token, headers in (
+			("missing", None, {}),
+			("malformed", "not-a-token", {}),
+			("bad_signature", f"{signed_input}.{bad_signature}", {}),
+			("wrong_audience", self.token(audience="site-kiraci1"), {}),
+			("wrong_client", self.token(authorized_party="press-service"), {}),
+			("wrong_issuer", self.token(iss="https://other.example.test"), {}),
+			("expired", self.token(exp=int(time.time()) - 120), {}),
+			("human_session", self.token(), session),
+		):
+			with self.subTest(caller=name):
+				status, payload = self.call("list_identities", {}, token, headers)
+				self.assertEqual(status, 403)
+				self.assertNotIn("message", payload if isinstance(payload, dict) else {})
+		self.assertEqual(self.call("list_identities", {"issuer": ISSUER}, self.token())[0], 403)
+		for body in ({"limit": True}, {"limit": 0}, {"limit": 101}, {"cursor": ""}, {"cursor": "a" * 256}):
+			with self.subTest(body=body):
+				self.assertEqual(self.call("list_identities", body, self.token())[0], 400)
+
 	def test_first_binding_requires_verified_email_and_rejects_conflicts(self):
 		subject = uuid4().hex
 		body = {

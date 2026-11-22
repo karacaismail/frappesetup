@@ -205,6 +205,61 @@ paths:
           description: Service identity or owner removal was rejected.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.identity.list_identities:
+    post:
+      operationId: listIdentities
+      summary: List Press identities for reconciliation.
+      description: Lists identities for the configured issuer in subject order. Anonymous deletion records are omitted.
+      security:
+        - identitySync: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                cursor:
+                  type: [string, "null"]
+                  minLength: 1
+                  maxLength: 255
+                  description: Omit on the first page. On later pages send the previous next_cursor.
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 100
+      responses:
+        "200":
+          description: An identity page and a cursor for the next page when one exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, next_cursor]
+                properties:
+                  message:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [issuer, subject, enabled]
+                      properties:
+                        issuer:
+                          type: string
+                        subject:
+                          type: string
+                        enabled:
+                          type: boolean
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          description: The page cursor or limit is invalid.
+        "403":
+          description: The service token or request parameters were rejected.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.identity.anonymize_user:
     post:
       operationId: anonymizeUser
