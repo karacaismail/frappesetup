@@ -5,7 +5,12 @@ import frappe
 from frappe import _
 
 from press_tr.api.auth import start_login
-from press_tr.kimlik.deletion import fresh_reauthentication, human_identity, send_deletion_request
+from press_tr.kimlik.deletion import (
+	clear_reauthentication,
+	fresh_reauthentication,
+	human_identity,
+	send_deletion_request,
+)
 from press_tr.kimlik.oidc import reject
 
 
@@ -30,4 +35,5 @@ def request_deletion(confirm: bool = False) -> dict[str, str | bool]:
 			frappe.PermissionError,
 		)
 	send_deletion_request(link, authenticated_at)
+	clear_reauthentication()
 	return {"submitted": True}

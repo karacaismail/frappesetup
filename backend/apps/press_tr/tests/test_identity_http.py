@@ -164,6 +164,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				authorized_party="press",
 				sub=subject,
 				email=email,
+				sid=uuid4().hex,
 				nonce=query["nonce"][0],
 				auth_time=auth_time,
 			),
@@ -191,6 +192,52 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				"reauthenticated_at": auth_time,
 			},
 		)
+		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')[0], 403)
+
+	def test_reauthentication_links_the_new_keycloak_session(self):
+		subject = uuid4().hex
+		email = f"{subject}@example.test"
+		original_sid, reauthenticated_sid = uuid4().hex, uuid4().hex
+		session = self.sign_in(subject, email, original_sid)
+		status, _, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		csrf = re.search(rb'name="csrf_token" value="([^"]+)"', page).group(1).decode()
+		headers = {**session, "X-Frappe-CSRF-Token": csrf, "Content-Type": "application/json"}
+		status, response_headers, payload = self.exchange(
+			"POST", DELETION_ROUTE, headers, '{"confirm": false}'
+		)
+		self.assertEqual(status, 200, payload)
+		query = parse_qs(urlsplit(json.loads(payload)["message"]["url"]).query)
+		cookies = SimpleCookie()
+		for cookie in response_headers.get_all("Set-Cookie"):
+			cookies.load(cookie)
+		callback_session = {
+			"Cookie": f"{session['Cookie']}; press_tr_login={cookies['press_tr_login'].value}"
+		}
+		code = uuid4().hex
+		self.codes[code] = (
+			query["code_challenge"][0],
+			self.token(
+				authorized_party="press",
+				sub=subject,
+				sid=reauthenticated_sid,
+				nonce=query["nonce"][0],
+				auth_time=int(time.time()),
+			),
+		)
+		callback = "/api/method/press_tr.api.auth.keycloak_callback?" + urlencode(
+			{"state": query["state"][0], "code": code}
+		)
+		self.assertEqual(self.exchange("GET", callback, callback_session)[0], 302)
+		logout = self.token(
+			authorized_party="press",
+			sub=subject,
+			sid=reauthenticated_sid,
+			jti=uuid4().hex,
+			events={"http://schemas.openid.net/event/backchannel-logout": {}},
+		)
+		self.assertEqual(self.post_logout(logout), 200)
+		self.assertIn(self.exchange("GET", ACCOUNT_ROUTE, session)[0], {401, 403})
 
 	def test_service_rejects_wrong_credentials(self):
 		for method in ("ensure_team", "remove_team_member"):
@@ -430,7 +477,12 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			invoice_name = f"anonymization-fixture-{subject}"
 			# Persist a representative invoice without running Press billing hooks.
 			frappe.get_doc({"doctype": "Invoice", "name": invoice_name, "team": team}).db_insert()
-			frappe.db.set_value("Invoice", invoice_name, {"owner": email, "customer_email": email})
+			frappe.db.set_value(
+				"Invoice",
+				invoice_name,
+				{"owner": email, "modified_by": email, "customer_email": email},
+				update_modified=False,
+			)
 			frappe.db.set_value("Team", team, {"billing_name": "Private", "phone_number": "5550100"})
 			activity = frappe.get_doc(
 				{
@@ -443,6 +495,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				}
 			)
 			activity.db_insert()
+			activity_names = [activity.name]
 			self.assertEqual(frappe.db.get_value("Invoice", invoice_name, "owner"), email)
 			frappe.db.set_value("User", email, {"api_key": key, "phone": "5550100", "first_name": "Private"})
 			set_encrypted_password("User", email, secret, "api_secret")
@@ -477,12 +530,40 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				}
 			).insert(ignore_permissions=True)
 			for _ in range(125):
-				frappe.get_doc({"doctype": "Activity Log", "user": email, "full_name": "Private"}).db_insert()
+				row = frappe.get_doc(
+					{
+						"doctype": "Activity Log",
+						"user": email,
+						"full_name": "Private",
+					}
+				)
+				row.db_insert()
+				activity_names.append(row.name)
+			frappe.db.set_value(
+				"Activity Log",
+				{"name": ["in", activity_names]},
+				{"owner": email, "modified_by": email},
+				update_modified=False,
+			)
+			frappe.db.set_value("Team", team, {"owner": email, "modified_by": email}, update_modified=False)
+			self.assertEqual(
+				frappe.db.count(
+					"Activity Log", {"name": ["in", activity_names], "owner": email, "modified_by": email}
+				),
+				126,
+			)
 			from frappe.utils.file_manager import save_file
 
 			profile_file = save_file(
 				f"privacy-{subject}.txt", b"private fixture", "User", email, is_private=1
 			)
+			attachment_note = frappe.get_doc("User", email).add_comment("Attachment", profile_file.file_name)
+			public_file = save_file(f"public-{subject}.txt", subject.encode(), None, None, is_private=0)
+			frappe.db.set_value("File", public_file.name, "owner", email, update_modified=False)
+			shared_file = save_file(
+				f"shared-{subject}.txt", f"shared-{subject}".encode(), "Team", team, is_private=0
+			)
+			frappe.db.set_value("File", shared_file.name, "owner", email, update_modified=False)
 			version = frappe.get_doc(
 				{
 					"doctype": "Version",
@@ -497,9 +578,39 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					"doctype": "Communication",
 					"sender": "sender@example.test",
 					"recipients": f"Private <{email}>, other@example.test",
+					"cc": f"Private <{email}>",
+					"bcc": f"other@example.test, {email}",
+					"content": "Hello Private",
+					"text_content": "Hello Private in plain text",
+					"reference_doctype": "User",
+					"reference_name": email,
 				}
 			)
 			communication.db_insert()
+			comment = frappe.get_doc(
+				{
+					"doctype": "Comment",
+					"comment_type": "Comment",
+					"reference_doctype": "User",
+					"reference_name": email,
+					"content": "Existing comment",
+				}
+			)
+			comment.db_insert()
+			queue = frappe.get_doc(
+				{
+					"doctype": "Email Queue",
+					"message": f"To: {email}\n\nHello Private",
+					"show_as_cc": f"Private <{email}>, other@example.test",
+					"status": "Not Sent",
+				}
+			)
+			queue.db_insert()
+			recipient = queue.append("recipients", {"recipient": email})
+			recipient.db_insert()
+			other_queue = frappe.get_doc({"doctype": "Email Queue", "message": "Unrelated message"})
+			other_queue.db_insert()
+			other_queue.append("recipients", {"recipient": f"other-{email}"}).db_insert()
 			frappe.db.commit()
 		finally:
 			frappe.destroy()
@@ -543,17 +654,64 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			)
 			self.assertEqual(frappe.db.get_value("Team", team, "user"), user)
 			self.assertEqual(
-				frappe.db.get_value("Invoice", invoice_name, ["team", "owner", "customer_email"]),
-				(team, email, email),
+				frappe.db.get_value(
+					"Invoice", invoice_name, ["team", "owner", "modified_by", "customer_email"]
+				),
+				(team, email, email, email),
 			)
-			self.assertFalse(
-				any(
-					email in (content or "")
-					for content in frappe.get_all(
-						"Comment", {"reference_name": user, "comment_type": "Edit"}, pluck="content"
+			with self.subTest(finding="E-1"):
+				for doctype, name in (("Team", team), ("Activity Log", activity.name)):
+					with self.subTest(doctype=doctype):
+						self.assertEqual(
+							frappe.db.get_value(doctype, name, ["owner", "modified_by"]), (user, user)
+						)
+				self.assertEqual(
+					frappe.db.count(
+						"Activity Log", {"name": ["in", activity_names], "owner": user, "modified_by": user}
+					),
+					126,
+				)
+			with self.subTest(finding="K-1"):
+				for doctype, name in (("Comment", comment.name), ("Communication", communication.name)):
+					self.assertEqual(frappe.db.get_value(doctype, name, "reference_name"), user)
+					self.assertFalse(
+						frappe.db.exists(doctype, {"reference_doctype": "User", "reference_name": email})
+					)
+			with self.subTest(finding="K-2"):
+				self.assertFalse(frappe.db.exists("File", public_file.name))
+				self.assertFalse(public_file.exists_on_disk())
+				self.assertTrue(frappe.db.exists("File", shared_file.name))
+				self.assertTrue(shared_file.exists_on_disk())
+			with self.subTest(finding="K-2 retained file data"):
+				self.assertFalse(
+					frappe.db.exists(
+						"Deleted Document",
+						{
+							"deleted_doctype": "File",
+							"deleted_name": ["in", [profile_file.name, public_file.name]],
+						},
 					)
 				)
-			)
+				self.assertFalse(frappe.db.exists("Comment", attachment_note.name))
+			with self.subTest(finding="Ö-2 queue"):
+				self.assertFalse(frappe.db.get_value("Email Queue", queue.name, "message"))
+				self.assertEqual(
+					frappe.db.get_value("Email Queue", queue.name, ["show_as_cc", "status"]),
+					(f"{user}, other@example.test", "Error"),
+				)
+				self.assertEqual(
+					frappe.db.get_value("Email Queue Recipient", recipient.name, "recipient"), user
+				)
+				self.assertEqual(
+					frappe.db.get_value("Email Queue", other_queue.name, "message"), "Unrelated message"
+				)
+			with self.subTest(finding="Ö-2 communication"):
+				self.assertEqual(
+					frappe.db.get_value(
+						"Communication", communication.name, ["cc", "bcc", "content", "text_content"]
+					),
+					(user, f"other@example.test, {user}", None, None),
+				)
 			self.assertFalse(frappe.db.exists("User", email))
 			doc = frappe.get_doc("User", user)
 			self.assertEqual(doc.email, user)

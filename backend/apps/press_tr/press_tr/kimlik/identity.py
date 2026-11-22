@@ -5,6 +5,7 @@ from email.errors import HeaderParseError
 from email.headerregistry import Address
 
 import frappe
+from frappe import _
 from press.press.doctype.team.team import Team
 from werkzeug.exceptions import ServiceUnavailable
 
@@ -19,7 +20,9 @@ DELETED_IDENTITY_ISSUER = "urn:press-tr:deleted-identity"
 def deleted_identity_subject(issuer: str, subject: str) -> str:
 	key = frappe.conf.press_anonymization_hmac_key or frappe.conf.encryption_key
 	if not key:
-		raise ServiceUnavailable("Configure a stable site key for Press anonymization.")
+		raise ServiceUnavailable(
+			_("Configure a stable site key for Press anonymization.", context="press_tr")
+		)
 	message = json.dumps([issuer, subject], separators=(",", ":"), ensure_ascii=False).encode()
 	return hmac.digest(key.encode(), message, "sha256").hex()
 
@@ -35,6 +38,23 @@ def find_identity(issuer, subject, *, for_update=False):
 	if link and (link.issuer != issuer or link.subject != subject):
 		reject()
 	return link
+
+
+def remember_press_session(identity_link: str, keycloak_sid: str) -> None:
+	sid = frappe.session.sid
+	for name in frappe.get_all(
+		"Press Keycloak Session", {"identity_link": identity_link, "keycloak_sid": keycloak_sid}, pluck="name"
+	):
+		if frappe.get_doc("Press Keycloak Session", name).get_password("press_sid") == sid:
+			return
+	frappe.get_doc(
+		{
+			"doctype": "Press Keycloak Session",
+			"identity_link": identity_link,
+			"keycloak_sid": keycloak_sid,
+			"press_sid": sid,
+		}
+	).insert(ignore_permissions=True)
 
 
 def bind_identity(claims):

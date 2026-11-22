@@ -20,6 +20,20 @@ class TranslationContractTest(unittest.TestCase):
 		keys = [(source, context) for source, _, context in self.rows]
 		self.assertEqual(len(keys), len(set(keys)))
 
+	def test_missing_anonymization_key_error_is_translated(self):
+		message = "Configure a stable site key for Press anonymization."
+		tree = ast.parse((APP / "kimlik/identity.py").read_text())
+		key_error = next(
+			node.exc
+			for node in ast.walk(tree)
+			if isinstance(node, ast.Raise)
+			and isinstance(node.exc, ast.Call)
+			and isinstance(node.exc.func, ast.Name)
+			and node.exc.func.id == "ServiceUnavailable"
+		)
+		self.assertEqual(ast.unparse(key_error.args[0]), f"_({message!r}, context='press_tr')")
+		self.assertIn((message, "press_tr"), {(row[0], row[2]) for row in self.rows})
+
 	def test_doctype_descriptions_and_labels_have_form_context(self):
 		keys = {(row[0], row[2]) for row in self.rows if len(row) == 3}
 		for path in (APP / "kimlik/doctype").glob("*/*.json"):

@@ -251,7 +251,7 @@ paths:
     post:
       operationId: requestAccountDeletion
       summary: Request deletion of your own Press account.
-      description: Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. Invoices remain unchanged.
+      description: Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. The Keycloak authentication time may precede the start of reauthentication by up to five seconds. Invoices remain unchanged.
       security:
         - pressSession: []
       parameters:

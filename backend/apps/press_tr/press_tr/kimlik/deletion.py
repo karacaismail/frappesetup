@@ -7,14 +7,15 @@ import requests
 from frappe import _
 from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
-from press_tr.kimlik.identity import IDENTITY_LINK, validate_local_user
-from press_tr.kimlik.oidc import issuer, reject, server_endpoint, verify
+from press_tr.kimlik.identity import IDENTITY_LINK, remember_press_session, validate_local_user
+from press_tr.kimlik.oidc import claim, issuer, reject, server_endpoint, verify
 
 ACCOUNT_DELETION_PAGE = "/account-deletion"
 REAUTHENTICATION_TTL = 300
+REAUTHENTICATION_CLOCK_SKEW = 5
 
 
-def human_identity():
+def human_identity(*, for_update=False):
 	session = frappe.local.session_obj
 	if (
 		not session
@@ -26,35 +27,53 @@ def human_identity():
 		reject()
 	validate_local_user(frappe.session.user)
 	link = frappe.db.get_value(
-		IDENTITY_LINK, {"user": frappe.session.user}, ["issuer", "subject"], as_dict=True
+		IDENTITY_LINK,
+		{"user": frappe.session.user},
+		["name", "issuer", "subject"],
+		as_dict=True,
+		for_update=for_update,
 	)
 	if not link or link.issuer != issuer():
 		reject()
 	return link
 
 
+def reauthentication_key() -> str:
+	return f"press_tr:deletion_reauthenticated_at:{frappe.session.sid}"
+
+
 def fresh_reauthentication() -> int | None:
-	authenticated_at = frappe.session.data.get("press_deletion_reauthenticated_at")
+	authenticated_at = frappe.cache.get_value(reauthentication_key())
 	if type(authenticated_at) is int and 0 <= int(time.time()) - authenticated_at <= REAUTHENTICATION_TTL:
 		return authenticated_at
 	return None
 
 
+def clear_reauthentication() -> None:
+	frappe.cache.delete_value(reauthentication_key())
+
+
 def record_reauthentication(attempt: dict, claims: dict) -> None:
-	link = human_identity()
+	link = human_identity(for_update=True)
 	auth_time = claims.get("auth_time")
 	now = int(time.time())
+	earliest = max(attempt["started_at"] - REAUTHENTICATION_CLOCK_SKEW, now - REAUTHENTICATION_TTL)
 	if (
 		attempt["sid"] != frappe.session.sid
 		or attempt["subject"] != link.subject
 		or claims.get("iss") != link.issuer
 		or claims.get("sub") != link.subject
 		or type(auth_time) is not int
-		or not max(attempt["started_at"], now - REAUTHENTICATION_TTL) <= auth_time <= now
+		or not earliest <= auth_time <= now
 	):
 		reject()
-	frappe.session.data.press_deletion_reauthenticated_at = auth_time
-	frappe.local.session_obj.update(force=True)
+	remember_press_session(link.name, claim(claims, "sid"))
+	# Keep the proof separate from Frappe session data so clearing it never restores a revoked session.
+	key = reauthentication_key()
+	frappe.db.after_commit.add(
+		lambda: frappe.cache.set_value(key, auth_time, expires_in_sec=REAUTHENTICATION_TTL)
+	)
+	frappe.local.flags.commit = True
 
 
 def send_deletion_request(link, authenticated_at: int) -> None:

@@ -6,6 +6,7 @@ from hashlib import sha256
 from time import monotonic
 
 import frappe
+from frappe import _
 from frappe.model.rename_doc import get_link_fields, rename_parent_and_child
 from frappe.utils.password import remove_encrypted_password
 
@@ -18,7 +19,7 @@ PROFILE_FIELDS = (
 	"reset_password_key",
 	"short_bio",
 )
-EXTERNAL_EMAIL_FIELDS = {("Communication", "recipients"), ("Email Unsubscribe", "email")}
+COMMUNICATION_BODIES = ("content", "text_content")
 PRIVATE_CHILDREN = ("User Social Login", "User Email")
 
 
@@ -85,6 +86,10 @@ def close_account(identity_link: str, user: str) -> None:
 def redact_profile(profile, placeholder: str) -> None:
 	user = profile.name
 	email = profile.email
+	redact_email_queue(email, placeholder)
+	for field in ("cc", "bcc"):
+		redact_address_lists("Communication", field, email, placeholder, dict.fromkeys(COMMUNICATION_BODIES))
+
 	fields_by_type = {}
 	for spec in frappe.get_hooks("user_data_fields"):
 		doctype = spec["doctype"]
@@ -110,6 +115,10 @@ def redact_profile(profile, placeholder: str) -> None:
 			continue
 		if not field:
 			continue
+		if doctype == "Communication" and field in {"sender", "recipients"}:
+			redactions = dict.fromkeys((*COMMUNICATION_BODIES, *spec.get("redact_fields", ())))
+			redact_address_lists(doctype, field, email, placeholder, redactions)
+			continue
 		# The framework hooks also mark some values as partial. Scope matching
 		# to the address itself so similarly named accounts remain untouched.
 		values = {
@@ -119,7 +128,7 @@ def redact_profile(profile, placeholder: str) -> None:
 		}
 		values.update(dict.fromkeys(spec.get("redact_fields", ())))
 		frappe.db.set_value(doctype, {field: email}, values, update_modified=False)
-		if (doctype, field) in EXTERNAL_EMAIL_FIELDS:
+		if (doctype, field) == ("Email Unsubscribe", "email"):
 			redact_address_lists(doctype, field, email, placeholder)
 
 	redact_user_contacts(
@@ -152,18 +161,32 @@ def redact_profile(profile, placeholder: str) -> None:
 	)
 	frappe.db.delete("Version", {"ref_doctype": "User", "docname": user})
 
-	for name in get_personal_files(user, profile.user_image):
-		frappe.delete_doc("File", name, ignore_permissions=True)
-
+	personal_files = get_personal_files(user, profile.user_image)
 	clean_press_ownership(user)
+	frappe.db.delete(
+		"Comment",
+		{
+			"reference_doctype": "User",
+			"reference_name": user,
+			"comment_type": ["in", ["Attachment", "Attachment Removed"]],
+		},
+	)
 	rename_linked_record("User", user, placeholder)
+	for doctype in ("Comment", "Communication"):
+		replace_link_by_primary_key(
+			doctype, {"reference_doctype": "User", "reference_name": user}, "reference_name", placeholder
+		)
+	redact_record_ownership(user, placeholder)
+	# File hooks unlink local data immediately. Run the table scan before them.
+	for name in sorted(personal_files):
+		frappe.delete_doc("File", name, ignore_permissions=True, delete_permanently=True)
 	frappe.db.after_commit.add(lambda: clear_session_cache(user, ()))
 
 
 def get_personal_files(user: str, image: str | None) -> set[str]:
 	queries = [
 		{"attached_to_doctype": "User", "attached_to_name": user},
-		{"owner": user, "is_private": 1, "attached_to_doctype": ["is", "not set"]},
+		{"owner": user, "attached_to_doctype": ["is", "not set"], "attached_to_name": ["is", "not set"]},
 	]
 	if image:
 		queries.append({"owner": user, "file_url": image, "attached_to_doctype": ["is", "not set"]})
@@ -175,15 +198,55 @@ def get_personal_files(user: str, image: str | None) -> set[str]:
 	}
 
 
-def redact_address_lists(doctype: str, field: str, email: str, placeholder: str) -> None:
+def redact_address_lists(
+	doctype: str, field: str, email: str, placeholder: str, redactions: dict | None = None
+) -> set[str]:
+	matched = set()
 	for row in frappe.get_all(doctype, {field: ["like", f"%{email}%"]}, ["name", field]):
-		addresses = getaddresses([row[field]])
-		if any(address.lower() == email.lower() for _, address in addresses):
-			replaced = [
-				placeholder if address.lower() == email.lower() else formataddr((name, address))
-				for name, address in addresses
-			]
-			frappe.db.set_value(doctype, row.name, field, ", ".join(replaced), update_modified=False)
+		if redacted := replace_mailbox(row[field], email, placeholder):
+			frappe.db.set_value(
+				doctype, row.name, {**(redactions or {}), field: redacted}, update_modified=False
+			)
+			matched.add(row.name)
+	return matched
+
+
+def replace_mailbox(value: str, email: str, placeholder: str) -> str | None:
+	addresses = getaddresses([value])
+	email = email.lower()
+	if not any(address.lower() == email for _, address in addresses):
+		return None
+	return ", ".join(
+		placeholder if address.lower() == email else formataddr((name, address))
+		for name, address in addresses
+	)
+
+
+def redact_email_queue(email: str, placeholder: str) -> None:
+	queues = redact_address_lists("Email Queue", "sender", email, placeholder)
+	queues.update(redact_address_lists("Email Queue", "show_as_cc", email, placeholder))
+	for row in frappe.get_all(
+		"Email Queue Recipient",
+		{"parenttype": "Email Queue", "recipient": ["like", f"%{email}%"]},
+		["name", "parent", "recipient"],
+	):
+		if redacted := replace_mailbox(row.recipient, email, placeholder):
+			frappe.db.set_value(
+				"Email Queue Recipient", row.name, "recipient", redacted, update_modified=False
+			)
+			queues.add(row.parent)
+	for name in sorted(queues):
+		frappe.db.set_value("Email Queue", name, "message", None, update_modified=False)
+		# Frappe otherwise retries pending mail with an empty body.
+		frappe.db.set_value(
+			"Email Queue",
+			{"name": name, "status": ["in", ["Not Sent", "Partially Sent"]]},
+			{
+				"status": "Error",
+				"error": _("Message cleared after account anonymization.", context="press_tr"),
+			},
+			update_modified=False,
+		)
 
 
 def redact_user_contacts(
@@ -258,7 +321,9 @@ def clean_press_ownership(user: str) -> None:
 		owner = frappe.db.get_value("Team", team, "user", for_update=True)
 		members = frappe.get_all("Team Member", {"parenttype": "Team", "parent": team}, pluck="user")
 		if owner == user:
-			frappe.db.set_value("Team", team, {"billing_name": None, "phone_number": None})
+			frappe.db.set_value(
+				"Team", team, {"billing_name": None, "phone_number": None}, update_modified=False
+			)
 			for version in frappe.get_all(
 				"Version", {"ref_doctype": "Team", "docname": team}, ["name", "data"]
 			):
@@ -272,7 +337,7 @@ def clean_press_ownership(user: str) -> None:
 					)
 
 		if set(members) == {user} or (not members and owner == user):
-			frappe.db.set_value("Team", team, "enabled", 0)
+			frappe.db.set_value("Team", team, "enabled", 0, update_modified=False)
 			for name in frappe.get_all(
 				"Site", {"team": team, "status": ["not in", ["Archived", "Suspended"]]}, pluck="name"
 			):
@@ -282,8 +347,8 @@ def clean_press_ownership(user: str) -> None:
 
 
 def rename_linked_record(doctype: str, old: str, new: str) -> None:
-	# Use the exact link fields from Frappe metadata, without global owner scans,
-	# rename hooks, edit comments or realtime events. Invoice is a legal record.
+	# Use exact Frappe links without rename hooks, edit comments or realtime events.
+	# Invoice is a legal record.
 	rename_parent_and_child(doctype, old, new, frappe.get_meta(doctype))
 	for link in get_link_fields(doctype):
 		table, field = link["parent"], link["fieldname"]
@@ -300,6 +365,22 @@ def rename_linked_record(doctype: str, old: str, new: str) -> None:
 		"link_name",
 		new,
 	)
+
+
+def redact_record_ownership(user: str, placeholder: str) -> None:
+	# Standard ownership columns are physical columns, not Frappe Link fields.
+	columns = frappe.qb.Schema("information_schema").columns
+	for table, field in (
+		frappe.qb.from_(columns)
+		.select(columns.table_name, columns.column_name)
+		.where(columns.table_schema == frappe.db.cur_db_name)
+		.where(columns.table_name.like("tab%"))
+		.where(columns.table_name != "tabInvoice")
+		.where(columns.column_name.isin(("owner", "modified_by")))
+		.orderby(columns.table_name, columns.column_name)
+		.run()
+	):
+		replace_link_by_primary_key(table.removeprefix("tab"), {field: user}, field, placeholder)
 
 
 def replace_link_by_primary_key(doctype: str, filters: dict, field: str, value: str) -> None:

@@ -115,7 +115,7 @@ class RequestGuardsTest(unittest.TestCase):
 		):
 			for stamp, result in ((700, 700), (699, None), (1001, None), (True, None), (None, None)):
 				with self.subTest(stamp=stamp):
-					facade.session.data = {"press_deletion_reauthenticated_at": stamp}
+					facade.cache.get_value.return_value = stamp
 					self.assertEqual(deletion.fresh_reauthentication(), result)
 
 	def test_account_deletion_reauthentication_is_bound_to_the_press_session(self):
@@ -129,7 +129,42 @@ class RequestGuardsTest(unittest.TestCase):
 					{"sid": "initiating-session", "subject": "subject", "started_at": 0},
 					{"iss": "issuer", "sub": "subject", "auth_time": int(deletion.time.time())},
 				)
-			facade.local.session_obj.update.assert_not_called()
+			facade.db.after_commit.add.assert_not_called()
+
+	def test_account_deletion_accepts_five_seconds_of_clock_skew(self):
+		from press_tr.kimlik import deletion
+
+		attempt = {"sid": "session", "subject": "subject", "started_at": 990}
+		with (
+			patch.object(deletion, "frappe") as facade,
+			patch.object(
+				deletion,
+				"human_identity",
+				return_value=SimpleNamespace(name="link", issuer="issuer", subject="subject"),
+			),
+			patch.object(deletion, "remember_press_session") as remember,
+			patch.object(deletion.time, "time", return_value=1000),
+			patch.object(deletion, "reject", side_effect=Forbidden),
+		):
+			facade.session.sid = "session"
+			for stamp in (995, 985):
+				with self.subTest(stamp=stamp):
+					deletion.record_reauthentication(
+						attempt, {"iss": "issuer", "sub": "subject", "sid": "keycloak", "auth_time": stamp}
+					)
+					remember.assert_called_with("link", "keycloak")
+					facade.db.after_commit.add.call_args.args[0]()
+					facade.cache.set_value.assert_called_with(
+						"press_tr:deletion_reauthenticated_at:session", stamp, expires_in_sec=300
+					)
+			with self.assertRaises(Forbidden):
+				deletion.record_reauthentication(
+					attempt, {"iss": "issuer", "sub": "subject", "auth_time": 984}
+				)
+			with self.assertRaises(Forbidden):
+				deletion.record_reauthentication(
+					attempt, {"iss": "issuer", "sub": "subject", "auth_time": 1001}
+				)
 
 	def test_snapshot_reset_rejects_pending_writes(self):
 		with patch.object(identity, "frappe") as facade:
@@ -310,7 +345,6 @@ class RequestGuardsTest(unittest.TestCase):
 			count.assert_called_once()
 
 	def test_unknown_rpc_app_is_not_resolved(self):
-
 		with (
 			patch.object(request_policy, "frappe") as facade,
 			patch.object(request_policy, "get_server_script_map", return_value={}),

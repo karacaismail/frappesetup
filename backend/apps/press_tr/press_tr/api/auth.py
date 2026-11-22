@@ -12,7 +12,7 @@ from frappe.rate_limiter import rate_limit
 from werkzeug.exceptions import Conflict
 
 from press_tr.kimlik.deletion import ACCOUNT_DELETION_PAGE, record_reauthentication
-from press_tr.kimlik.identity import bind_identity, ensure_personal_team
+from press_tr.kimlik.identity import bind_identity, ensure_personal_team, remember_press_session
 from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
 
 STATE_TTL = 600
@@ -164,14 +164,7 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 	try:
 		frappe.local.login_manager.login_as(link.user)
 		# The OIDC callback is the only writer of this internal session mapping.
-		frappe.get_doc(
-			{
-				"doctype": "Press Keycloak Session",
-				"identity_link": link.name,
-				"keycloak_sid": keycloak_sid,
-				"press_sid": frappe.session.sid,
-			}
-		).insert(ignore_permissions=True)
+		remember_press_session(link.name, keycloak_sid)
 	except Exception:
 		if sid := getattr(getattr(frappe.local, "session_obj", None), "sid", None):
 			frappe.cache.hdel("session", sid)
