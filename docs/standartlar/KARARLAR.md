@@ -67,7 +67,6 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
 21. Proje sahibi kararları Claude'a bıraktı. Claude açık kararları kapatır ve kayda yazar.
 22. Sisteme n tane yapay zekâ sağlayıcısı, hesabı ve API'si eklenebilir.
-23. Kod tabanı ve dosya adları İngilizcedir.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -721,7 +720,7 @@ Sonuç şudur:
 - Kod frappesetup deposunun `backend/` klasöründe durur. Kodun lisansı deponun kod lisansıdır, yani MIT'dir.
 - Çalışma dalının adı `backend` oldu. Dal `standartlar-ve-kararlar` dalından açıldı.
 - İlk tur şu işleri kapsar: geliştirme ortamı, Keycloak realm'i ve Atonota markası, `platform_core` içinde giriş ve ekran verisi uçları, kullanıcı eşitleme servisi ve `press_tr` içinde Press girişi.
-- Ayrıntılı kayıt `backend/PROJECT-RECORD.md` dosyasındadır. Açık kararlar ve çelişkiler de oradadır.
+- Ayrıntılı kayıt `backend/PROJE-KAYDI.md` dosyasındadır. Açık kararlar ve çelişkiler de oradadır.
 
 ### Karar 35. Bütün uygulamalar Frappe 16 ile yazılacak
 
@@ -746,7 +745,7 @@ Sonuç şudur:
 - Var olan Press kurulumu değiştirilmez. Onun imajı ve kurulum betikleri yeniden kullanılır.
 - Bu karar sitedeki K1 kararını değiştirir. K1, Press'i Frappe 15 üzerinde kurar.
 - Kurulumun kendi notuna göre Press bu sürümde yalnız yamalarla açılır. Sunucu kurma ve Ansible çalışmaz.
-- Üretimde Press'in hangi sürümle çalışacağı ayrı karardır. Konu `backend/PROJECT-RECORD.md` dosyasında A-11 maddesidir.
+- Üretimde Press'in hangi sürümle çalışacağı ayrı karardır. Konu `backend/PROJE-KAYDI.md` dosyasında A-11 maddesidir.
 
 ### Karar 36. Her şey yapay zekâyla yönetilebilir olacak
 
@@ -768,7 +767,7 @@ Sonuç şudur:
 - Dış arayüz MCP ve OpenAPI olur. Frappe uygulamalarında model sağlayıcısı kitaplığı ve model adı yoktur.
 - Sitenin AI bölümündeki kurallar geçerlidir. Örneğin her yazma insan onaylıdır. Gizli alan hiç okunmaz.
 - Veritabanına ham SQL aracı açılmaz. Veritabanı DocType katmanından açılır. Bu kural standartların G-5 ve G-10 kurallarından gelir.
-- Sitenin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. Bu karar sağlayıcıdan bağımsızlıkla çelişir. Konu `backend/PROJECT-RECORD.md` dosyasında A-12 maddesidir.
+- Sitenin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. Bu karar sağlayıcıdan bağımsızlıkla çelişir. Konu `backend/PROJE-KAYDI.md` dosyasında A-12 maddesidir.
 
 ### Karar 37. Kararlar Claude'a bırakıldı
 
@@ -776,7 +775,7 @@ Claude açık kalan kararları listeledi. Proje sahibi şöyle cevap verdi:
 
 > Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma
 
-Sonuç şudur. Claude açık kararları kapattı. Kararların tam listesi `backend/PROJECT-RECORD.md` dosyasının “Orkestratörün kararları” bölümündedir. Özeti şudur:
+Sonuç şudur. Claude açık kararları kapattı. Kararların tam listesi `backend/PROJE-KAYDI.md` dosyasının “Orkestratörün kararları” bölümündedir. Özeti şudur:
 
 | Konu | Karar |
 |---|---|
@@ -811,23 +810,7 @@ Sonuç şudur:
 - Gizli anahtar şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
 - Her kiracı kendi sağlayıcılarını ekleyebilir. Platformun ortak hesapları sonraki turdadır.
 - Sağlık denetimi zamanlanmaz. Sağlık gerçek çağrıların sonucundan çıkar.
-- Ayrıntı `backend/docs/contracts.md` dosyasının 11. bölümündedir.
-
-### Karar 39. Kod tabanı İngilizce olacak
-
-Proje sahibi şunu yazdı:
-
-> yeni dosya oluşturursen, türkçe değil, codebase ingilizce olsun, dosya adları ingilizce olsun
-
-Sonuç şudur:
-
-- Dosya, klasör, modül ve kod adları İngilizce olur.
-- Koddaki yorumlar ve hata iletileri İngilizce olur.
-- Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur.
-- Belgelerin içeriği Türkçe kalabilir. Belge dosyalarının adı İngilizce olur.
-- Var olan Türkçe adlar aynı gün İngilizceye çevrildi. Örneğin `PROJE-KAYDI.md` dosyası `PROJECT-RECORD.md` oldu. `kimlik` modülü `identity` oldu.
-- Ad eşleşme tablosu `backend/PROJECT-RECORD.md` dosyasındadır.
-- `docs/standartlar/` klasöründeki standart belgelerinin adları değişmedi. Bu belgeler proje sahibinindir.
+- Ayrıntı `backend/docs/sozlesmeler.md` dosyasının 11. bölümündedir.
 
 ## Modellerin kararları
 
