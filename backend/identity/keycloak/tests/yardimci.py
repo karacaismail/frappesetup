@@ -125,6 +125,28 @@ def pkce_pair() -> tuple:
     return verifier, challenge
 
 
+def tenant_authorize_with_pkce(state: str = "test-state", nonce: str = "test-nonce") -> tuple:
+    """Returns (authorize_url, code_verifier) for the tenant client with a fresh S256 challenge."""
+    verifier, challenge = pkce_pair()
+    sorgu = urllib.parse.urlencode(
+        {
+            "client_id": "site-kiraci1",
+            "response_type": "code",
+            "scope": "openid",
+            "redirect_uri": tenant_callback_url(),
+            "state": state,
+            "nonce": nonce,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        }
+    )
+    return f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{sorgu}", verifier
+
+
+def tenant_callback_url() -> str:
+    return f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/platform_core.api.auth.keycloak_callback"
+
+
 def tenant_authorize_url(state: str = "test-state", nonce: str = "test-nonce") -> str:
     """Authorize URL for the tenant client with the contract's callback and a fresh S256 challenge."""
     _, challenge = pkce_pair()

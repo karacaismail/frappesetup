@@ -7,7 +7,8 @@ Arayüz `backend/docs/sozlesmeler.md` dosyasının 3. bölümünde sabitlendi:
 ```python
 from oidc_verify import JwksCache, TokenError, verify_access_token, verify_id_token, verify_logout_token
 
-cache = JwksCache(jwks_url, ttl_seconds=600)  # isteğe bağlı: max_stale_seconds=3600, max_bytes=1_048_576
+cache = JwksCache(jwks_url, ttl_seconds=600)
+# İsteğe bağlı anahtar kelimeler: max_stale_seconds=3600, max_bytes=1_048_576, total_timeout=10.0, wait_timeout=11.0
 claims = verify_access_token(token, cache=cache, issuer=iss, audience="site-kiraci1", allowed_azp={"identity-sync"}, leeway=30)
 claims = verify_id_token(token, cache=cache, issuer=iss, client_id="press", nonce=nonce, leeway=30)
 claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", leeway=30)
@@ -24,8 +25,10 @@ claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", 
 - Anahtar listesi `ttl_seconds` süresince saklanır. Bilinmeyen `kid` gelince liste bir kez yenilenir. Art arda gelen bilinmeyen `kid` istekleri listeyi 5 saniyede en çok bir kez yeniletir.
 - Liste çekilemezse önbellekteki eski anahtarlar kullanılmaya devam eder. Yeni deneme en erken 5 saniye sonra yapılır. Listedeki tek bir bozuk anahtar kaydı atlanır, öteki anahtarlar yüklenir.
 - Eski anahtarlar sınırsız süre kullanılmaz. Son başarılı çekimden sonra `ttl_seconds + max_stale_seconds` saniye geçince eski anahtarlar da reddedilir. Bu durumda `JwksUnavailable` yükselir. Yeni bir çekim başarılı olunca süre yeniden başlar. `max_stale_seconds` varsayılan 3600 saniyedir ve `JwksCache` kurucusuna anahtar kelimeyle verilir.
-- Aynı anda yalnız bir çekim çalışır. Anahtarı önbellekte olan çağrı, süren çekimi beklemez. Bilinmeyen `kid` ile gelen çağrılar süren çekimi bekler ve ikinci bir çekim başlatmaz.
+- Aynı anda yalnız bir çekim çalışır. Anahtarı önbellekte olan çağrı, süren çekimi beklemez. Bilinmeyen `kid` ile gelen çağrılar süren çekimi bekler ve ikinci bir çekim başlatmaz. Aynı anda başlayan iki yenileme tek çekim yapar. İkinci çağrı birincinin sonucunu okur.
 - Çekilen yanıt en çok `max_bytes` bayt okunur. Varsayılan 1 MiB'dir. Daha büyük yanıt hata sayılır ve eski anahtarlar korunur.
+- Bir indirmenin tamamı en çok `total_timeout` saniye sürer. Varsayılan 10 saniyedir. `timeout` değeri tek bir soket işlemini sınırlar. Varsayılan 5 saniyedir. Sunucu yavaş yavaş birkaç bayt gönderebilir. İndirme yine `total_timeout` sonunda kesilir. Kesilen indirme başarısız çekim sayılır. Eski anahtarlar korunur. En kötü durumda indirme `total_timeout + timeout` saniye sürer.
+- Yenileme bekleyen çağrı en çok `wait_timeout` saniye bekler. Varsayılan `total_timeout + 1` saniyedir. Anahtar önbellekte varsa ve eski anahtar süresi dolmadıysa süre dolan çağrı o anahtarı kullanır. Başka durumda `JwksUnavailable` yükselir. Çekim kilidi her durumda bırakılır. Çekim hata verse ya da süre dolsa bile kilit bırakılır.
 - Kimlik belirtecinde `nonce=None` verilirse `nonce` denetimi atlanır. Bu yalnız `nonce` göndermeyen akışlar içindir. Giriş akışı `nonce` gönderdiyse çağıran değeri vermek zorundadır.
 - Çıkış belirtecinde imza, `iss`, `aud`, `exp`, `iat`, `jti`, `events` anahtarı, `sid` ya da `sub` varlığı ve `nonce` yokluğu denetlenir. `exp`, `iat` ve `jti` zorunludur. `jti` boş olmayan metin olmalıdır. `events` bir nesne olmalı ve `http://schemas.openid.net/event/backchannel-logout` anahtarının değeri de nesne olmalıdır. `sid` ve `sub` varsa boş olmayan metin olmalıdır.
 - Geçersiz belirteçte `TokenError` yükselir. `code` alanı nedeni söyler: `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`, `wrong_azp`, `expired`, `not_yet_valid`, `wrong_nonce`, `not_logout_token`.

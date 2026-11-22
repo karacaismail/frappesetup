@@ -25,7 +25,7 @@ Proje sahibi iki giriş yolunu MVP'ye aldı (O-6). Birincisi sihirli bağlantıd
 
 ## Karar
 
-- Sihirli bağlantı için `sky-cloak/keycloak-magic-link` v0.3.0 seçildi.
+- Sihirli bağlantı için `sky-cloak/keycloak-magic-link` v0.3.0 seçilmişti. Güvenlik incelemesi sonrası MVP'den çıkarıldı. Ayrıntı aşağıdaki durum bölümündedir.
 - Apple ile giriş için `klausbetz/apple-identity-provider-keycloak` 1.17.0 seçildi.
 
 ### Gerekçe
@@ -46,21 +46,36 @@ Proje sahibi iki giriş yolunu MVP'ye aldı (O-6). Birincisi sihirli bağlantıd
 - Skycloak eklentisinin yönetici ucu (`/realms/platform/skycloak-magic-link`) `manage-users` rolü ister. Bu uç hesaba giriş vermekle eşdeğerdir. Bu turda hiçbir servis bu ucu çağırmaz.
 - İki depoda da yayımlanmış bir güvenlik açığı kaydı bulunmadı (GitHub Security Advisories, 22 Kasım 2026).
 
-## Durum: sihirli bağlantı adımı kapalı (22 Kasım 2026, güvenlik incelemesi E1)
+## Durum: sihirli bağlantı eklentisi MVP'den çıkarıldı (22 Kasım 2026, ikinci güvenlik incelemesi)
 
-Bağımsız güvenlik incelemesi bir engelleyici buldu. Eklentinin v0.3.0 sürümü bağlantıya tıklanınca tarayıcı akışının kalan adımlarını çalıştırmıyor. `MagicLinkActionTokenHandler.handleToken` doğrudan `nextRequiredAction` ve `redirectToRequiredActions` çağırıyor (kaynak: `src/main/java/io/skycloak/keycloak/magiclink/MagicLinkActionTokenHandler.java`, 119 ve 121. satırlar). Bu yüzden ikinci doğrulama adımı atlanıyor. TOTP kurmuş kullanıcı e-postadaki bağlantıyla kod girmeden giriş yapabiliyor. Bu durum canlı testle gösterildi: `tests/test_second_factor.py`.
+Bağımsız güvenlik incelemesi iki engelleyici buldu. Orkestratör eklentiyi MVP'den tamamen çıkardı.
 
-Karar: `skycloak-magic-link` yürütmesi realm'de `DISABLED` durumunda kalır. Eklenti ve ayarları imajda ve realm'de durur. Giriş sayfası sihirli bağlantı seçeneğini göstermez. Kullanıcı parola ve passkey ile girer.
+- E1: Eklentinin v0.3.0 sürümü bağlantıya tıklanınca tarayıcı akışının kalan adımlarını çalıştırmıyor. `MagicLinkActionTokenHandler.handleToken` doğrudan `redirectToRequiredActions` çağırıyor (119 ve 121. satırlar). İkinci doğrulama atlanıyor. Bu durum canlı testle gösterildi.
+- E2: Eklentinin yönetici ucu (`/realms/platform/skycloak-magic-link`) belirtecin hedefini ve rolünü denetlemiyor. Hesabın kayıtlı rolüne bakıyor (`MagicLinkResource.java` 334 ve 346. satırlar). Kiracı hedefli bir servis belirteci ele geçirilirse bu uçla giriş bağlantısı üretilebilir.
 
-Açılma koşulu şudur: eklenti bağlantıdan sonra tarayıcı akışını sürdürmeli ya da ikinci doğrulamayı kendisi istemelidir. Bu düzeltme gelince `tests/test_second_factor.py` içindeki `test_magic_link_cannot_skip_totp` testi geçmelidir. Test, TOTP'li kullanıcının bağlantıdan sonra OTP formu görmesini bekler.
+Yapılan şudur: Dockerfile eklentiyi yüklemez. Realm'de ilgili yürütme ve ayar yoktur. Kullanıcı parola ve passkey ile girer.
 
-Bu açık iş teknik borçtur. Sorumlusu kimlik-realm işidir. Eklenti deposuna sorun kaydı açmak proje sahibinin kararıdır. Dış servise yazma bu turda yapılmadı.
+### Teknik borç ve geri dönüş koşulu
+
+Sihirli bağlantı ancak şu iki koşulu sağlayan bir sürümle geri gelir:
+
+1. Eklenti, bağlantıdan sonra tarayıcı akışını sürdürür ya da ikinci doğrulamayı kendisi ister. Kabul testi: TOTP'li kullanıcı bağlantıdan sonra OTP formu görür. Yanlış kod reddedilir. Doğru kod girişi tamamlar.
+2. Eklentinin yönetici ucu belirtecin hedefini ve belirteçteki rolü denetler. Kabul testi: kiracı hedefli servis belirteci bu uca gönderilir ve 401 ya da 403 alır.
+
+Bugünkü kabul testi eklentinin uçlarının 404 döndüğünü gösterir: `tests/test_eklentiler.py` içindeki `test_magic_link_endpoints_are_gone`. Sorumlusu kimlik-realm işidir. Eklenti deposuna sorun kaydı açmak proje sahibinin kararıdır.
+
+### identity-sync en az yetki
+
+Aynı incelemenin eki: identity-sync servis hesabı yalnız `view-users` ve `query-users` rollerini taşır. `manage-users`, `manage-clients` ve `view-organizations` kaldırıldı. Canlı test bu hesabın Admin API'den kullanıcı okuyabildiğini gösterir. Aynı test kullanıcı oluşturma isteğinin 403 aldığını gösterir. identity-sync Keycloak'a yazmaz. Yazma gerekirse bu karar yeniden açılır.
+
+### Sosyal girişte ikinci adım (O6)
+
+Google ve Apple sağlayıcıları `postBrokerLoginFlowAlias` olarak `atonota-post-broker` akışını kullanır. Akış, kullanıcının kurulu TOTP ya da güvenlik anahtarını ister. Gerçek sosyal giriş denenmedi, çünkü sağlayıcı anahtarı yok. Akışın bağlı olduğu canlı testle gösterildi.
 
 ## Kurulum
 
-- `backend/identity/keycloak/Dockerfile` iki jar dosyasını `/opt/keycloak/providers/` klasörüne ekler. Özetler sabittir.
-- Realm'in tarayıcı akışı `atonota-browser` adını taşır. Kullanıcı parola ve passkey ekranını görür. Sihirli bağlantı adımı yukarıdaki nedenle kapalıdır. Açılınca “Başka yol dene” bağlantısı sihirli bağlantıyı gösterir.
-- Sihirli bağlantı ömrü 300 saniyedir. Bu süre realm'in e-posta eylem bağlantılarıyla aynıdır. Kullanıcı kendiliğinden açılmaz. Bir IP dakikada 20, bir e-posta dakikada 3 bağlantı isteyebilir.
+- `backend/identity/keycloak/Dockerfile` Apple jar dosyasını `/opt/keycloak/providers/` klasörüne ekler. Özet sabittir.
+- Realm'in tarayıcı akışı `atonota-browser` adını taşır. Kullanıcı parola ve passkey ekranını görür.
 - Apple sağlayıcısı realm'de kapalı durur. Anahtarlar `.env` dosyasındaki yer tutuculardan gelir. Gerçek anahtar yoktur.
 
 ## Geri dönüş

@@ -610,7 +610,7 @@
     },
     {
       "name": "admin-api",
-      "description": "identity-sync'in Admin API rolleri. Yalnız Admin API için ayrı istenen belirtece girer. Admin API çağrısında kc-admin-api kapsamıyla birlikte istenir.",
+      "description": "identity-sync'in Admin API rolleri: yalnız kullanıcı okuma (view-users, query-users). Yalnız Admin API için ayrı istenen belirtece girer. kc-admin-api kapsamıyla birlikte istenir.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -645,9 +645,8 @@
       {
         "clientScope": "admin-api",
         "roles": [
-          "manage-users",
-          "manage-clients",
-          "view-organizations"
+          "view-users",
+          "query-users"
         ]
       }
     ]
@@ -809,9 +808,8 @@
       "serviceAccountClientId": "identity-sync",
       "clientRoles": {
         "realm-management": [
-          "manage-users",
-          "manage-clients",
-          "view-organizations"
+          "view-users",
+          "query-users"
         ]
       }
     }
@@ -833,7 +831,8 @@
         "clientSecret": "${ATONOTA_GOOGLE_CLIENT_SECRET}",
         "syncMode": "IMPORT",
         "defaultScope": "openid email profile"
-      }
+      },
+      "postBrokerLoginFlowAlias": "atonota-post-broker"
     },
     {
       "alias": "apple",
@@ -853,7 +852,8 @@
         "keyId": "${ATONOTA_APPLE_KEY_ID}",
         "defaultScope": "name email",
         "syncMode": "IMPORT"
-      }
+      },
+      "postBrokerLoginFlowAlias": "atonota-post-broker"
     }
   ],
   "defaultDefaultClientScopes": [
@@ -871,7 +871,7 @@
   "authenticationFlows": [
     {
       "alias": "atonota-browser",
-      "description": "Atonota tarayıcı girişi: çerez, dış sağlayıcı, parola ve passkey, sihirli bağlantı.",
+      "description": "Atonota tarayıcı girişi: çerez, dış sağlayıcı, parola ve passkey, ikinci adım.",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -895,31 +895,7 @@
           "requirement": "ALTERNATIVE",
           "priority": 30,
           "userSetupAllowed": false,
-          "flowAlias": "atonota-browser-giris"
-        }
-      ]
-    },
-    {
-      "alias": "atonota-browser-giris",
-      "description": "Kullanıcı parola yolunu kullanır. Sihirli bağlantı adımı kapalıdır: eklenti v0.3.0 bağlantıdan sonra ikinci doğrulamayı sormaz (docs/kararlar/0003-keycloak-eklentileri.md).",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticatorFlow": true,
-          "requirement": "ALTERNATIVE",
-          "priority": 10,
-          "userSetupAllowed": false,
           "flowAlias": "atonota-browser-parola"
-        },
-        {
-          "authenticatorFlow": false,
-          "requirement": "DISABLED",
-          "priority": 20,
-          "userSetupAllowed": false,
-          "authenticator": "skycloak-magic-link",
-          "authenticatorConfig": "atonota-sihirli-baglanti"
         }
       ]
     },
@@ -983,6 +959,60 @@
           "authenticator": "webauthn-authenticator"
         }
       ]
+    },
+    {
+      "alias": "atonota-post-broker",
+      "description": "Dış sağlayıcıyla (Google, Apple) girişten sonra ikinci adım. Kullanıcı TOTP ya da güvenlik anahtarı kurduysa sorulur.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-post-broker-2fa"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-post-broker-2fa",
+      "description": "Dış sağlayıcı girişinin ikinci adımı.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "atonota-passkey-kosulu"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "userSetupAllowed": false,
+          "authenticator": "webauthn-authenticator"
+        }
+      ]
     }
   ],
   "authenticatorConfig": [
@@ -990,15 +1020,6 @@
       "alias": "atonota-passkey-kosulu",
       "config": {
         "credentials": "webauthn-passwordless"
-      }
-    },
-    {
-      "alias": "atonota-sihirli-baglanti",
-      "config": {
-        "token-lifespan-seconds": "300",
-        "auto-create-user": "false",
-        "requests-per-minute-per-ip": "20",
-        "requests-per-minute-per-email": "3"
       }
     }
   ],

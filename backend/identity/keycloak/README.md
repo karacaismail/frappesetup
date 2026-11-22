@@ -12,7 +12,7 @@ Bu klasör Atonota kimlik servisinin geliştirme kurulumunu tutar. Atonota, Keyc
 | `realm/password-blacklists/yaygin-parolalar.txt` | Parola politikasının yaygın parola listesi. Kaynağı `KAYNAK.md` dosyasındadır. |
 | `.env.example` | Gerekli ortam değişkenleri ve sahte değerler |
 | `bin/kc-dev.sh` | Ortamı açan, kapatan ve testleri çalıştıran betik |
-| `Dockerfile` | Realm dosyalarını ve iki eklentiyi (sihirli bağlantı, Apple) imaja ekler |
+| `Dockerfile` | Realm dosyalarını ve Apple eklentisini imaja ekler |
 | `tests/` | Realm dosyası testleri, canlı Keycloak testleri ve eklenti testleri |
 
 ## Çalıştırma
@@ -66,9 +66,9 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 
 ## Eklentiler
 
-İki eklenti imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
+Apple eklentisi imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
 
-- Sihirli bağlantıyı `sky-cloak/keycloak-magic-link` v0.3.0 eklentisi sağlar. Adım şimdilik realm'de kapalıdır. Eklenti bağlantıdan sonra ikinci doğrulamayı sormuyor. Ayrıntı karar notundadır. Açılınca bağlantı 300 saniye geçerlidir ve tek kullanımlıktır.
+- Sihirli bağlantı eklentisi MVP'den çıkarıldı. Güvenlik incelemesi iki engelleyici buldu. Geri dönüş koşulu karar notundadır.
 - Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.
 
 ## Kapatma

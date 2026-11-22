@@ -13,6 +13,11 @@ Past that window every lookup raises `JwksUnavailable` until a fetch succeeds ag
 Locking: `_state_lock` guards the key dict and timestamps and is held only briefly. `_refresh_lock`
 serialises network fetches so at most one runs at a time. A reader whose `kid` is cached never waits
 for an in-flight fetch; readers with an unknown `kid` wait for the running fetch and then look again.
+
+Bounds: the HTTP fetcher gives up once the whole download has taken `total_timeout` seconds, however
+slowly the server trickles bytes (the per-operation socket `timeout` alone does not bound that). A caller
+that must wait for an in-flight refresh waits at most `wait_timeout` seconds; on timeout it serves a
+cached key inside the stale window or raises `JwksUnavailable`. The refresh lock is always released.
 """
 
 from __future__ import annotations
@@ -31,23 +36,52 @@ from oidc_verify.hatalar import JwksUnavailable, TokenError
 Fetcher = Callable[[], dict]
 
 DEFAULT_MAX_BYTES = 1_048_576
+DEFAULT_TOTAL_TIMEOUT = 10.0
+# Read the body in pieces so the deadline is checked between socket reads.
+_READ_CHUNK = 16_384
 
 # PyJWT 2.13 bozuk JWK için ValueError ya da TypeError verir. PyJWT 2.15 bunları InvalidKeyError içine sarar.
 _JWK_HATALARI = (jwt.exceptions.PyJWTError, ValueError, TypeError)
 
 
-def _http_fetcher(jwks_url: str, timeout: float, max_bytes: int = DEFAULT_MAX_BYTES) -> Fetcher:
+def _http_fetcher(
+    jwks_url: str,
+    timeout: float,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    total_timeout: float = DEFAULT_TOTAL_TIMEOUT,
+) -> Fetcher:
+    """Builds the default fetcher.
+
+    `timeout` bounds each socket operation (connect, header read, one body read). `total_timeout` bounds
+    the whole body download: a server that sends a few bytes before every socket timeout cannot keep the
+    fetch alive. The worst case is `total_timeout + timeout`. The body is capped at `max_bytes`.
+    """
+
     def getir() -> dict:
         # Şema JwksCache.__init__ içinde http/https ile sınırlandı.
         istek = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
+        deadline = time.monotonic() + total_timeout
         with urllib.request.urlopen(istek, timeout=timeout) as yanit:  # noqa: S310
             if yanit.status != 200:
                 raise OSError(f"JWKS yanıtı {yanit.status}")
-            # Read one byte past the cap so an oversized body is detected without buffering all of it.
-            govde = yanit.read(max_bytes + 1)
-            if len(govde) > max_bytes:
-                raise ValueError("JWKS response exceeds the size limit")
-            return json.loads(govde.decode("utf-8"))
+            parcalar: list[bytes] = []
+            uzunluk = 0
+            while True:
+                if time.monotonic() >= deadline:
+                    # Leaving the `with` block closes the response and the connection.
+                    raise TimeoutError("JWKS download exceeded total_timeout")
+                # read1 returns after one socket read, so a trickling server cannot block this call
+                # for longer than `timeout`. Read one byte past the cap to detect an oversized body
+                # without buffering all of it.
+                parca = yanit.read1(min(_READ_CHUNK, max_bytes + 1 - uzunluk))
+                if not parca:
+                    break
+                parcalar.append(parca)
+                uzunluk += len(parca)
+                if uzunluk > max_bytes:
+                    raise ValueError("JWKS response exceeds the size limit")
+            govde = b"".join(parcalar)
+        return json.loads(govde.decode("utf-8"))
 
     return getir
 
@@ -87,6 +121,8 @@ class JwksCache:
         min_refresh_seconds: float = 5.0,
         max_stale_seconds: int = 3600,
         max_bytes: int = DEFAULT_MAX_BYTES,
+        total_timeout: float = DEFAULT_TOTAL_TIMEOUT,
+        wait_timeout: float | None = None,
     ):
         sema = urllib.parse.urlsplit(jwks_url).scheme
         if sema not in ("http", "https"):
@@ -95,11 +131,19 @@ class JwksCache:
             raise ValueError("max_stale_seconds must not be negative")
         if int(max_bytes) <= 0:
             raise ValueError("max_bytes must be positive")
+        if float(total_timeout) <= 0:
+            raise ValueError("total_timeout must be positive")
+        if wait_timeout is None:
+            wait_timeout = float(total_timeout) + 1.0
+        if float(wait_timeout) <= 0:
+            raise ValueError("wait_timeout must be positive")
         self.jwks_url = jwks_url
         self.ttl_seconds = int(ttl_seconds)
         self.max_stale_seconds = int(max_stale_seconds)
         self.max_bytes = int(max_bytes)
-        self._fetch = fetcher or _http_fetcher(jwks_url, timeout, self.max_bytes)
+        self.total_timeout = float(total_timeout)
+        self.wait_timeout = float(wait_timeout)
+        self._fetch = fetcher or _http_fetcher(jwks_url, timeout, self.max_bytes, self.total_timeout)
         self._clock = clock
         self._min_refresh = float(min_refresh_seconds)
         # Short lock for the dict and timestamps; separate lock so only one fetch runs at a time.
@@ -137,13 +181,19 @@ class JwksCache:
 
     # --- refresh ---
 
-    def _attempt_refresh(self, seen_generation: int, *, forced: bool) -> bool:
+    def _attempt_refresh(self, seen_generation: int, *, forced: bool) -> bool | None:
         """Runs at most one fetch. Returns True when a fetch was attempted since `seen_generation`.
+
+        Returns False when the failure throttle skipped the fetch, and None when the refresh lock could
+        not be taken within `wait_timeout` (another thread's fetch is still running). The caller decides
+        whether a cached key may still be served in that case.
 
         The network call happens outside `_state_lock`, so readers with a cached `kid` are never blocked.
         Throttling (`min_refresh_seconds`) is applied inside `_refresh_lock` so it is race free.
         """
-        with self._refresh_lock:
+        if not self._refresh_lock.acquire(timeout=self.wait_timeout):
+            return None
+        try:
             with self._state_lock:
                 if self._generation != seen_generation:
                     # Another thread already fetched while this one waited for the lock.
@@ -166,6 +216,8 @@ class JwksCache:
                 self._failed_at = None
                 self._generation += 1
             return True
+        finally:
+            self._refresh_lock.release()
 
     def refresh(self) -> None:
         """Fetches the list now (subject to the failure throttle). Raises when no usable keys remain."""
@@ -180,7 +232,7 @@ class JwksCache:
         anahtar, expired, generation = self._lookup(kid)
         if anahtar is not None and not expired:
             return anahtar
-        attempted = False
+        attempted: bool | None = False
         if expired:
             if anahtar is not None and self._refresh_lock.locked() and self._usable():
                 # A refresh is already running in another thread. Serve the cached key without waiting.
@@ -191,9 +243,14 @@ class JwksCache:
             anahtar, _, generation = self._lookup(kid)
             if anahtar is not None:
                 return anahtar
+            if attempted is None:
+                # Waited `wait_timeout` for another thread's fetch and the kid is still not cached.
+                raise JwksUnavailable("Anahtar listesi alınamadı")
         if not attempted:
-            self._attempt_refresh(generation, forced=True)
+            attempted = self._attempt_refresh(generation, forced=True)
             anahtar = self._lookup(kid)[0]
             if anahtar is not None:
                 return anahtar
+            if attempted is None:
+                raise JwksUnavailable("Anahtar listesi alınamadı")
         raise TokenError("unknown_kid")

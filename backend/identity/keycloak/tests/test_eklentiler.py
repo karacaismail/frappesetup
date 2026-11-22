@@ -5,22 +5,19 @@ Beklenen değerler docs/kararlar/0003-keycloak-eklentileri.md notundan ve eklent
 belgelerinden alındı. Sihirli bağlantı kısa ömürlü ve tek kullanımlık olmalıdır.
 """
 
-import base64
-import json
 import re
-import time
 import unittest
 import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 
-from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, jwt_govdesi, ortam, realm_oku, tenant_authorize_url, yonetici_belirteci
+from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, istemci_belirteci, ortam, realm_oku, yonetici_belirteci
 
 DOCKERFILE = KLASOR / "Dockerfile"
 YER_TUTUCU = re.compile(r"^\$\{[A-Z0-9_]+\}$")
 SIHIRLI = "skycloak-magic-link"
 AKIS = "atonota-browser"
-EN_UZUN_OMUR = 300
+POST_BROKER = "atonota-post-broker"
 
 
 class EklentiDosyaTesti(unittest.TestCase):
@@ -30,33 +27,32 @@ class EklentiDosyaTesti(unittest.TestCase):
         cls.dockerfile = DOCKERFILE.read_text(encoding="utf-8")
 
     def test_eklenti_jarlari_sabit_surum_ve_ozetle_eklenir(self):
-        self.assertIn("sky-cloak/keycloak-magic-link/releases/download/v0.3.0/", self.dockerfile)
+        # The magic link extension is out of the MVP (second review, E1 and E2). Only Apple remains.
+        self.assertNotIn("keycloak-magic-link", self.dockerfile)
         self.assertIn("klausbetz/apple-identity-provider-keycloak/releases/download/1.17.0/", self.dockerfile)
-        self.assertEqual(self.dockerfile.count("--checksum=sha256:"), 2)
+        self.assertEqual(self.dockerfile.count("--checksum=sha256:"), 1)
 
-    def test_tarayici_akisi_sihirli_baglanti_tasir(self):
+    def test_tarayici_akisinda_sihirli_baglanti_yok(self):
         self.assertEqual(self.realm["browserFlow"], AKIS)
-        akislar = {a["alias"]: a for a in self.realm["authenticationFlows"]}
-        self.assertIn(AKIS, akislar)
-        yurutmeler = [y for a in akislar.values() for y in a["authenticationExecutions"]]
-        sihirli = [y for y in yurutmeler if y.get("authenticator") == SIHIRLI]
-        self.assertEqual(len(sihirli), 1)
-        # Disabled until the extension continues the browser flow after the link (review finding E1).
-        # Enabling it would let a TOTP user log in without the second factor.
-        self.assertEqual(sihirli[0]["requirement"], "DISABLED")
+        yurutmeler = [y for a in self.realm["authenticationFlows"] for y in a["authenticationExecutions"]]
+        self.assertEqual([y for y in yurutmeler if y.get("authenticator") == SIHIRLI], [])
+        self.assertNotIn("atonota-sihirli-baglanti", {a["alias"] for a in self.realm["authenticatorConfig"]})
         parola = [y for y in yurutmeler if y.get("authenticator") == "auth-username-password-form"]
-        self.assertEqual(len(parola), 1, "parola yolu korunur")
+        self.assertEqual(len(parola), 1, "password path stays")
         otp = [y for y in yurutmeler if y.get("authenticator") == "auth-otp-form"]
-        self.assertEqual(otp[0]["requirement"], "ALTERNATIVE")
+        self.assertTrue(otp and all(o["requirement"] == "ALTERNATIVE" for o in otp))
 
-    def test_sihirli_baglanti_ayari_kisa_omur(self):
-        ayarlar = {a["alias"]: a["config"] for a in self.realm["authenticatorConfig"]}
-        sihirli = [y for a in self.realm["authenticationFlows"] for y in a["authenticationExecutions"] if y.get("authenticator") == SIHIRLI][0]
-        ayar = ayarlar[sihirli["authenticatorConfig"]]
-        self.assertLessEqual(int(ayar["token-lifespan-seconds"]), EN_UZUN_OMUR)
-        self.assertEqual(ayar["auto-create-user"], "false")
-        self.assertGreater(int(ayar["requests-per-minute-per-email"]), 0)
-        self.assertGreater(int(ayar["requests-per-minute-per-ip"]), 0)
+    def test_social_providers_have_post_broker_second_factor(self):
+        # O6: after a social login the second factor must be asked when the user has one.
+        akislar = {a["alias"]: a for a in self.realm["authenticationFlows"]}
+        for alias in ("google", "apple"):
+            idp = [s for s in self.realm["identityProviders"] if s["alias"] == alias][0]
+            self.assertEqual(idp.get("postBrokerLoginFlowAlias"), POST_BROKER, alias)
+        self.assertIn(POST_BROKER, akislar)
+        alt = [y.get("flowAlias") for y in akislar[POST_BROKER]["authenticationExecutions"] if y.get("authenticatorFlow")]
+        yurutmeler = [y for a in [akislar[POST_BROKER]] + [akislar[x] for x in alt] for y in a["authenticationExecutions"]]
+        self.assertIn("conditional-user-configured", [y.get("authenticator") for y in yurutmeler])
+        self.assertIn("auth-otp-form", [y.get("authenticator") for y in yurutmeler])
 
     def test_apple_saglayicisi_kapali_ve_anahtarsiz(self):
         apple = [s for s in self.realm["identityProviders"] if s["alias"] == "apple"]
@@ -108,40 +104,16 @@ def _form_hedefi(html: str) -> str:
     return eslesme.group(1).replace("&amp;", "&")
 
 
-class Mailpit:
-    def __init__(self, adres: str):
-        self.adres = adres
-
-    def temizle(self):
-        istek("DELETE", f"{self.adres}/api/v1/messages")
-
-    def son_baglanti(self, alici: str, sure: int = 20) -> str:
-        bitis = time.time() + sure
-        while time.time() < bitis:
-            liste = istek("GET", f"{self.adres}/api/v1/messages").json().get("messages", [])
-            for ileti in liste:
-                if any(a.get("Address") == alici for a in ileti.get("To", [])):
-                    ayrinti = istek("GET", f"{self.adres}/api/v1/message/{ileti['ID']}").json()
-                    metin = (ayrinti.get("Text") or "") + " " + (ayrinti.get("HTML") or "")
-                    bulunan = re.search(r"https?://[^\s\"'<>]+login-actions/action-token[^\s\"'<>]+", metin)
-                    if bulunan:
-                        return bulunan.group(0).replace("&amp;", "&")
-            time.sleep(1)
-        raise AssertionError(f"{alici} için sihirli bağlantı e-postası gelmedi")
-
-
 @unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL yok, canlı Keycloak testi atlandı")
 class EklentiCanliTesti(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.kc = ortam("KC_PUBLIC_URL")
         cls.yonetici = yonetici_belirteci()
-        cls.mailpit = Mailpit(f"http://127.0.0.1:{ortam('MAILPIT_UI_PORT')}")
 
     def test_eklentiler_sunucuda_yuklu(self):
         bilgi = istek("GET", f"{self.kc}/admin/serverinfo", belirtec=self.yonetici).json()
         saglayicilar = bilgi["providers"]
-        self.assertIn(SIHIRLI, saglayicilar["authenticator"]["providers"])
         self.assertIn("apple", saglayicilar["social"]["providers"])
         # Passkey özelliği sunucuda açık olmalı. Yoksa realm'deki passkey ayarı etkisizdir.
         ozellikler = {o["name"]: o for o in bilgi.get("features", [])}
@@ -154,7 +126,7 @@ class EklentiCanliTesti(unittest.TestCase):
         self.assertEqual(saglayicilar["auth-otp-form"]["requirement"], "ALTERNATIVE")
         self.assertEqual(saglayicilar["conditional-credential"]["requirement"], "REQUIRED")
         self.assertEqual(saglayicilar["webauthn-authenticator"]["requirement"], "ALTERNATIVE")
-        self.assertEqual(saglayicilar[SIHIRLI]["requirement"], "DISABLED")
+        self.assertNotIn(SIHIRLI, saglayicilar)
         self.assertEqual(saglayicilar["auth-username-password-form"]["requirement"], "REQUIRED")
 
     def test_tarayici_akisi_bagli_ve_apple_kapali(self):
@@ -164,65 +136,30 @@ class EklentiCanliTesti(unittest.TestCase):
         self.assertFalse(apple["enabled"])
         self.assertEqual(apple["config"]["teamId"], ortam("ATONOTA_APPLE_TEAM_ID"))
 
-    def _magic_link_enabled(self) -> bool:
-        yurutmeler = admin(f"/authentication/flows/{AKIS}/executions", self.yonetici).json()
-        return [y for y in yurutmeler if y.get("providerId") == SIHIRLI][0]["requirement"] != "DISABLED"
+    def test_magic_link_endpoints_are_gone(self):
+        # Acceptance for removing the extension: its realm resource no longer exists.
+        saglik = istek("GET", f"{self.kc}/realms/platform/skycloak-magic-link/health")
+        self.assertEqual(saglik.durum, 404)
+        yanit = istemci_belirteci("identity-sync", ortam("ATONOTA_IDENTITY_SYNC_SECRET"), "admin-api kc-admin-api")
+        self.assertEqual(yanit.durum, 200)
+        uretim = istek(
+            "POST",
+            f"{self.kc}/realms/platform/skycloak-magic-link",
+            govde={"email": "ayse.ornek@example.test", "clientId": "site-kiraci1", "redirectUri": "https://x.example", "send": False},
+            belirtec=yanit.json()["access_token"],
+        )
+        self.assertEqual(uretim.durum, 404)
+        bilgi = istek("GET", f"{self.kc}/admin/serverinfo", belirtec=self.yonetici).json()["providers"]
+        self.assertNotIn(SIHIRLI, bilgi["authenticator"]["providers"])
 
-    def _sihirli_baglanti_iste(self, eposta: str):
-        """Giriş sayfasını açar, 'başka yol' ile sihirli bağlantıyı seçer, e-postayı gönderir."""
-        if not self._magic_link_enabled():
-            self.skipTest("magic link step is disabled in the realm (review finding E1); flow test not run")
-        acici = _cerezli_acici()
-        durum, _, html = _ac(acici, tenant_authorize_url())
-        self.assertEqual(durum, 200)
-        self.assertTrue("tryAnotherWay" in html, "giriş sayfasında başka yol bağlantısı olmalı")
-        hedef = _form_hedefi(html)
-        durum, _, html = _ac(acici, hedef, urllib.parse.urlencode({"tryAnotherWay": "on"}).encode())
-        self.assertEqual(durum, 200)
-        secim = re.search(r'name="authenticationExecution" value="([^"]+)"[^>]*>(?:(?!</button>).)*?Magic Link', html, re.S)
-        if not secim:
-            # Düğme metni çeviriye göre değişebilir. Yürütme kimliğini yönetici ucundan bul.
-            yurutmeler = admin(f"/authentication/flows/{AKIS}/executions", self.yonetici).json()
-            kimlik = [y["id"] for y in yurutmeler if y.get("providerId") == SIHIRLI][0]
-        else:
-            kimlik = secim.group(1)
-        hedef = _form_hedefi(html)
-        durum, _, html = _ac(acici, hedef, urllib.parse.urlencode({"authenticationExecution": kimlik}).encode())
-        self.assertEqual(durum, 200)
-        self.assertTrue('name="email"' in html, "sihirli bağlantı e-posta formu açılmalı")
-        hedef = _form_hedefi(html)
-        durum, _, html = _ac(acici, hedef, urllib.parse.urlencode({"email": eposta}).encode())
-        self.assertEqual(durum, 200)
-        return acici
-
-    def test_sihirli_baglanti_kisa_omurlu_ve_tek_kullanimlik(self):
-        eposta = "ayse.ornek@example.test"
-        self.mailpit.temizle()
-        acici = self._sihirli_baglanti_iste(eposta)
-        baglanti = self.mailpit.son_baglanti(eposta)
-        anahtar = urllib.parse.parse_qs(urllib.parse.urlsplit(baglanti).query)["key"][0]
-        govde = jwt_govdesi(anahtar)
-        self.assertLessEqual(govde["exp"] - govde["iat"], EN_UZUN_OMUR, "bağlantı ömrü kısa olmalı")
-        # Aynı tarayıcıda ilk tıklama girişi tamamlar: Keycloak istemciye kod ile yönlendirir.
-        durum, basliklar, _ = _keycloak_icinde_izle(acici, baglanti, self.kc)
-        konum = basliklar.get("Location", "")
-        self.assertEqual(durum, 302, "ilk kullanım istemciye yönlendirmeli")
-        self.assertTrue(konum.startswith(ortam("ATONOTA_SITE_KIRACI1_URL")), konum[:120])
-        self.assertIn("code=", konum)
-        # İkinci tıklama aynı tarayıcıda bile kod vermez.
-        durum2, basliklar2, _ = _keycloak_icinde_izle(acici, baglanti, self.kc)
-        konum2 = basliklar2.get("Location", "")
-        self.assertNotIn("code=", konum2, "bağlantı tek kullanımlıktır")
-
-    def test_sihirli_baglanti_baska_tarayicida_calismaz(self):
-        eposta = "mehmet.ornek@example.test"
-        self.mailpit.temizle()
-        self._sihirli_baglanti_iste(eposta)
-        baglanti = self.mailpit.son_baglanti(eposta)
-        yabanci = _cerezli_acici()
-        durum, basliklar, _ = _keycloak_icinde_izle(yabanci, baglanti, self.kc)
-        self.assertNotIn("code=", basliklar.get("Location", ""))
-        self.assertIn(durum, (400, 403))
+    def test_post_broker_flow_is_bound_to_social_providers(self):
+        for alias in ("google", "apple"):
+            idp = admin(f"/identity-provider/instances/{alias}", self.yonetici).json()
+            self.assertEqual(idp.get("postBrokerLoginFlowAlias"), POST_BROKER, alias)
+        yurutmeler = admin(f"/authentication/flows/{POST_BROKER}/executions", self.yonetici).json()
+        saglayicilar = {y.get("providerId"): y for y in yurutmeler}
+        self.assertIn("conditional-user-configured", saglayicilar)
+        self.assertEqual(saglayicilar["auth-otp-form"]["requirement"], "ALTERNATIVE")
 
 
 if __name__ == "__main__":

@@ -123,6 +123,7 @@ claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", 
 - Her işlev geçerli belirtecin alanlarını sözlük olarak döner.
 - Geçersiz belirteçte `TokenError` yükseltir. Hatanın `code` alanı nedeni söyler.
 - `code` değerleri şunlardır: `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`, `wrong_azp`, `expired`, `not_yet_valid`, `wrong_nonce`, `not_logout_token`.
+- Anahtar listesi alınamazsa ve önbellekte güvenilir anahtar kalmadıysa kitaplık `JwksUnavailable` yükseltir. Bu hata `TokenError` değildir. Geçici bir hizmet sorunudur. Çağıran uç bu hatayı 503 gibi açık bir geçici hata olarak döner. Belirteci geçersiz saymaz.
 - Kitaplık kimlik doğrulama sonucunu günlüğe yazmaz. Belirteci hiçbir yere yazmaz.
 
 ## 4. Kimlik bağı

@@ -22,6 +22,10 @@ def aud_listesi(govde: dict) -> list:
 
 @unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL yok, canlı Keycloak testi atlandı")
 class ServisBelirteciTesti(unittest.TestCase):
+    @classmethod
+    def yonetici_token(cls) -> str:
+        return yonetici_belirteci()
+
     def belirtec(self, istemci: str, sir_adi: str, kapsam=None) -> dict:
         yanit = istemci_belirteci(istemci, ortam(sir_adi), kapsam)
         self.assertEqual(yanit.durum, 200, yanit.govde[:300])
@@ -59,12 +63,22 @@ class ServisBelirteciTesti(unittest.TestCase):
         veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")
         govde = jwt_govdesi(veri["access_token"])
         roller = set(govde["resource_access"]["realm-management"]["roles"])
-        # view-organizations bileşik roldür. Keycloak alt rolü (query-organizations) de açar.
-        self.assertTrue({"manage-users", "manage-clients", "view-organizations"} <= roller, roller)
+        # Least privilege (second review E2): read-only user roles; view-users expands to query-* roles.
+        self.assertTrue({"view-users", "query-users"} <= roller, roller)
+        self.assertFalse({r for r in roller if r.startswith("manage-")}, roller)
         self.assertIn("realm-management", aud_listesi(govde))
         self.assertIn(f"{ortam('KC_PUBLIC_URL')}/admin/realms/platform", aud_listesi(govde))
         self.assertNotIn("site-kiraci1", aud_listesi(govde))
         self.assertEqual(admin("/users?max=1", veri["access_token"]).durum, 200)
+
+    def test_identity_sync_cannot_write_to_keycloak(self):
+        # D-6: the real Admin API must refuse a write with the identity-sync token while reads work.
+        veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")
+        token = veri["access_token"]
+        self.assertEqual(admin("/users?max=1", token).durum, 200)
+        olustur = admin("/users", token, yontem="POST", govde={"username": "yazma-denemesi@example.test", "enabled": True})
+        self.assertEqual(olustur.durum, 403, olustur.govde[:200])
+        self.assertEqual(admin("/users?username=yazma-denemesi@example.test&exact=true", self.__class__.yonetici_token()).json(), [])
 
     def test_yonetim_rolleri_kc_admin_api_olmadan_admin_api_acmaz(self):
         veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api")

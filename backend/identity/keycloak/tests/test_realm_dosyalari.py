@@ -129,6 +129,13 @@ class RealmDosyasiTesti(unittest.TestCase):
             self.assertNotIn("email", kullanici)
             self.assertNotIn("credentials", kullanici)
 
+    def test_identity_sync_has_least_privilege(self):
+        # Second review E2: identity-sync only reads users. No manage-* role anywhere.
+        eslemeler = self.realm["clientScopeMappings"]["realm-management"]
+        self.assertEqual(set(eslemeler[0]["roles"]), {"view-users", "query-users"})
+        hesap = [u for u in self.realm["users"] if u.get("serviceAccountClientId") == "identity-sync"][0]
+        self.assertEqual(set(hesap["clientRoles"]["realm-management"]), {"view-users", "query-users"})
+
     def test_yonetim_rolleri_yalniz_ayri_kapsamda(self):
         eslemeler = self.realm["clientScopeMappings"]["realm-management"]
         kapsamlar = {e["clientScope"] for e in eslemeler}
