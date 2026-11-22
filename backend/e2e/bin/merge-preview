@@ -125,7 +125,10 @@ def main():
     overrides = [name for name in GIT_ROUTING if os.getenv(name)]
     if overrides:
         parser.error("Git routing overrides are set: " + ", ".join(overrides))
-    repo = Path(git(".", "rev-parse", "--show-toplevel").stdout.strip())
+    try:
+        repo = Path(git(".", "rev-parse", "--show-toplevel").stdout.strip())
+    except MergeError as error:
+        parser.error(str(error))
     order = (SUITE / "preview" / "branches.txt").read_text().split()
     scratch = Path(os.environ.get("PANE_SCRATCH_DIR", repo / ".pane" / "scratch")).resolve()
     scratch.mkdir(parents=True, exist_ok=True)

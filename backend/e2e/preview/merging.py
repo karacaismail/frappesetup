@@ -6,6 +6,7 @@ import io
 import json
 import pprint
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,7 @@ TRANSLATIONS = f"{APP}/platform_core/translations/tr.csv"
 MODULES = f"{APP}/platform_core/modules.txt"
 DEPENDENCIES = f"{APP}/pyproject.toml"
 MISSING = object()
+GIT_PATH = shutil.which("git")
 
 
 class MergeError(Exception):
@@ -22,8 +24,10 @@ class MergeError(Exception):
 
 
 def git(worktree, *arguments, check=True):
+    if not GIT_PATH or not Path(GIT_PATH).is_absolute():
+        raise MergeError("An absolute Git executable path is required. Check PATH.")
     return subprocess.run(
-        ["git", "-C", str(worktree), *arguments], check=check, capture_output=True, text=True
+        [GIT_PATH, "-C", str(worktree), *arguments], check=check, capture_output=True, text=True
     )
 
 
