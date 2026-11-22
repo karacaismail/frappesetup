@@ -85,7 +85,9 @@ def project_sidebar(source: dict) -> dict:
 
 def get_bootstrap(user: str) -> dict:
 	if not user or user == "Guest" or user != frappe.session.user:
-		frappe.throw(frappe._("Log in to access this resource."), frappe.PermissionError)
+		frappe.throw(
+			frappe._("Log in to access this resource.", context="shell.session"), frappe.PermissionError
+		)
 	context = SidebarContext.for_modules(get_navigable_modules(), user)
 	pages = [
 		page

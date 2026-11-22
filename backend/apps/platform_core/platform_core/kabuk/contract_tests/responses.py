@@ -17,10 +17,22 @@ PROBE = "/api/method/frappe.auth.get_logged_user"
 DOCTYPE = "Kabuk Test Record"
 
 
+def parse_json(source: str | bytes):
+	def unique_object(pairs):
+		result = {}
+		for key, value in pairs:
+			if key in result:
+				raise ValueError(f"Duplicate JSON key: {key}")
+			result[key] = value
+		return result
+
+	return json.loads(source, object_pairs_hook=unique_object)
+
+
 class TestShellResponses(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
-		cls.contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+		cls.contract = parse_json(CONTRACT.read_text(encoding="utf-8"))
 		cls.target = urlsplit(os.environ["PANEL_TEST_URL"])
 		if cls.target.scheme != "http" or cls.target.hostname != "127.0.0.1":
 			raise ValueError("Use the dedicated test site on HTTP loopback.")
@@ -72,7 +84,7 @@ class TestShellResponses(unittest.TestCase):
 				"components": self.contract["components"],
 			}
 		)
-		validator.validate(json.loads(body))
+		validator.validate(parse_json(body))
 		self.assertIn("example", media)
 		validator.validate(media["example"])
 
@@ -90,6 +102,12 @@ class TestShellResponses(unittest.TestCase):
 		self.validate(PROBE, 200, self.request(PROBE, sid=self.sid))
 		self.validate(PROBE, 401, self.request(PROBE, sid="missing-shell-contract-session"))
 		self.validate(PROBE, 403, self.request(PROBE))
+
+
+class TestContractParsing(unittest.TestCase):
+	def test_duplicate_keys_are_rejected(self):
+		with self.assertRaisesRegex(ValueError, "Duplicate JSON key"):
+			parse_json('{"field": 1, "field": 2}')
 
 
 if __name__ == "__main__":

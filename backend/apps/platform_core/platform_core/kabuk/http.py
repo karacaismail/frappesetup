@@ -29,7 +29,9 @@ def require_session() -> str:
 	)
 	user = frappe.session.user
 	if not has_session_cookie():
-		frappe.throw(frappe._("Log in to access this resource."), frappe.PermissionError)
+		frappe.throw(
+			frappe._("Log in to access this resource.", context="shell.session"), frappe.PermissionError
+		)
 	return user
 
 

@@ -152,14 +152,18 @@ class TestMetadataHTTP(ShellHTTPFixture):
 
 	def test_protected_and_missing_doctypes_are_indistinguishable(self):
 		bodies = []
-		for doctype in (PROTECTED_DOCTYPE, "Nonexistent Shell Test DocType", CHILD_DOCTYPE):
+		for doctype in (
+			PROTECTED_DOCTYPE,
+			"Nonexistent Shell Test DocType",
+			"Missing O'Reilly Record",
+			CHILD_DOCTYPE,
+		):
 			with self.subTest(doctype=doctype):
 				status, _, body = self.metadata(self.reader_sid, doctype=doctype)
 				self.assertEqual(status, 403)
 				self.assertEqual(json.loads(body)["exc_type"], "PermissionError")
 				bodies.append(json.loads(body))
-		self.assertEqual(bodies[0], bodies[1])
-		self.assertEqual(bodies[0], bodies[2])
+		self.assertTrue(all(body == bodies[0] for body in bodies[1:]))
 
 	def test_doctype_returns_the_canonical_name(self):
 		status, _, body = self.metadata(self.reader_sid, doctype=DOCTYPE.lower())
@@ -255,9 +259,9 @@ class TestMetadataHTTP(ShellHTTPFixture):
 			{
 				"fieldname": "locale_test",
 				"fieldtype": "Select",
-				"label": "Admin panel",
-				"description": "Admin panel",
-				"options": "Admin panel",
+				"label": "User",
+				"description": "User",
+				"options": "User",
 			},
 		)
 		self.addCleanup(self.delete_fixture, field)
@@ -269,9 +273,9 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 200)
 		payload = json.loads(body)["message"]
 		value = next(field for field in payload["schema"]["fields"] if field["fieldname"] == "locale_test")
-		self.assertEqual(value["label"], "Yönetim paneli")
-		self.assertEqual(value["description"], "Yönetim paneli")
-		self.assertEqual(value["choices"], [{"value": "Admin panel", "label": "Yönetim paneli"}])
+		self.assertEqual(value["label"], "Kullan\u0131c\u0131")
+		self.assertEqual(value["description"], "Kullan\u0131c\u0131")
+		self.assertEqual(value["choices"], [{"value": "User", "label": "Kullan\u0131c\u0131"}])
 
 	def test_verified_mobile_identity_cannot_select_web_metadata(self):
 		frappe.set_user(PRIVILEGED)

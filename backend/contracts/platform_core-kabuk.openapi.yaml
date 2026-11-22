@@ -15,13 +15,21 @@
       "get": {
         "operationId": "getBootstrap",
         "summary": "Read the current user's shell data",
-        "description": "Returns the current user, installed applications and native permission-filtered navigation. No manually maintained menu is added.",
+        "description": "Returns the current user, installed applications and native permission-filtered navigation. No manually maintained menu is added. Unknown request parameters are rejected. Each signed-in account is limited to 120 requests per 60 seconds.",
         "parameters": [
           {
             "name": "If-None-Match",
             "in": "header",
             "required": false,
             "description": "Previous ETag. Lists, weak validators and * follow conditional GET semantics.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_lang",
+            "in": "query",
+            "description": "Optional Frappe display language for the response.",
             "schema": {
               "type": "string"
             }
@@ -143,6 +151,32 @@
                 }
               }
             }
+          },
+          "417": {
+            "description": "Request parameters failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-account request limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "RateLimitExceededError"
+                }
+              }
+            }
           }
         }
       }
@@ -151,7 +185,7 @@
       "get": {
         "operationId": "getDocType",
         "summary": "Read an effective DocType definition",
-        "description": "Checks DocType read permission and filters fields for the current user. Includes child schemas reached through readable parent table fields. Authorization is rechecked before 304.",
+        "description": "Checks DocType read permission and filters fields for the current user. Includes child schemas reached through readable parent table fields. Authorization is rechecked before 304. Unknown request parameters are rejected. Each signed-in account is limited to 240 requests per 60 seconds.",
         "parameters": [
           {
             "name": "doctype",
@@ -184,6 +218,14 @@
                 "mobile"
               ],
               "default": "web"
+            }
+          },
+          {
+            "name": "_lang",
+            "in": "query",
+            "description": "Optional Frappe display language for the response.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -292,11 +334,14 @@
             }
           },
           "417": {
-            "description": "Invalid DocType argument.",
+            "description": "Request parameters failed validation.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "ValidationError"
                 }
               }
             }
@@ -311,6 +356,19 @@
                 "example": {
                   "exc_type": "SessionExpired",
                   "session_expired": 1
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-account request limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "RateLimitExceededError"
                 }
               }
             }

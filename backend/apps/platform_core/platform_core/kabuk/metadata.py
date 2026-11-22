@@ -14,11 +14,18 @@ TABLE_FIELD_TYPES = {"Table", "Table MultiSelect"}
 def get_doctype(doctype: str, user: str, *, surface: str = "web") -> dict:
 	"""Authorize the current user before returning the parent and visible child schemas."""
 	if not user or user == "Guest" or user != frappe.session.user:
-		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
+		frappe.throw(
+			frappe._("You cannot read this DocType.", context="shell.metadata"), frappe.PermissionError
+		)
 	if not isinstance(doctype, str) or not doctype.strip() or len(doctype) > 140:
-		frappe.throw(frappe._("A valid DocType name is required."), frappe.ValidationError)
+		frappe.throw(
+			frappe._("A valid DocType name is required.", context="shell.metadata"), frappe.ValidationError
+		)
 	if surface not in {"web", "mobile"}:
-		frappe.throw(frappe._("A valid metadata surface is required."), frappe.ValidationError)
+		frappe.throw(
+			frappe._("A valid metadata surface is required.", context="shell.metadata"),
+			frappe.ValidationError,
+		)
 
 	# The identity hook establishes this context after verifying a mobile token.
 	mobile = surface == "mobile" or getattr(frappe.local, "mobile_identity", None) is not None
@@ -30,7 +37,7 @@ def get_doctype(doctype: str, user: str, *, surface: str = "web") -> dict:
 		or not has_permission(meta.name, "read", user=user, print_logs=False)
 		or (mobile and not mobile_allows(meta.name))
 	):
-		message = frappe._("You cannot read this DocType.")
+		message = frappe._("You cannot read this DocType.", context="shell.metadata")
 		frappe.msgprint(message, indicator="red")
 		raise frappe.PermissionError(message)
 

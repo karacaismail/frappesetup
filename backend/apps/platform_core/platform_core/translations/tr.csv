@@ -1,8 +1,9 @@
-Admin panel,Yönetim paneli
-The panel is not available yet.,Panel henüz kullanıma açık değil.
-Log in to access this resource.,Bu sayfaya erişmek için giriş yapın.
-A valid DocType name is required.,Kayıt türü için geçerli bir ad girin.
-You cannot read this DocType.,Bu kayıt türünü okuma izniniz yok.
-Skip to main content,Ana içeriğe geçin
-Go to site home,Sitenin ana sayfasına gidin
-A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.
+Admin panel,Yönetim paneli,shell.panel
+The panel is not available yet.,Panel henüz kullanıma açık değil.,shell.panel
+Log in to access this resource.,Bu sayfaya erişmek için giriş yapın.,shell.session
+A valid DocType name is required.,Kayıt türü için geçerli bir ad girin.,shell.metadata
+You cannot read this DocType.,Bu kayıt türünü okuma izniniz yok.,shell.metadata
+Skip to main content,Ana içeriğe geçin,shell.panel
+Go to site home,Sitenin ana sayfasına gidin,shell.panel
+A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.,shell.metadata
+The request has invalid parameters.,İstekte geçersiz alanlar var.,shell.request

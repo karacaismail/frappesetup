@@ -44,3 +44,5 @@ doc_events = {
 
 # Frappe resolves cookie and token authentication before calling this hook.
 auth_hooks = ["platform_core.kabuk.native_metadata.guard_native_metadata"]
+
+after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]

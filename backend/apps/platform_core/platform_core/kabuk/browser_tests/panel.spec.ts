@@ -228,10 +228,17 @@ test('reveals the focused skip link when the focus script cannot run', async ({ 
   await expect(page.locator('html')).not.toHaveAttribute('data-keyboard-focus', '');
 });
 
-test('serves versioned panel styles and scripts', async ({ page }) => {
+test('serves versioned panel assets without publishing source maps', async ({ page }) => {
   await openPanel(page);
-  await expect(page.locator('link[rel=stylesheet]')).toHaveAttribute('href', /panel\.bundle\.[\w-]+\.css$/);
-  await expect(page.locator('script[src]')).toHaveAttribute('src', /panel-focus\.bundle\.[\w-]+\.js$/);
+  const styles = page.locator('link[rel=stylesheet]');
+  const script = page.locator('script[src]');
+  await expect(styles).toHaveAttribute('href', /panel\.bundle\.[\w-]+\.css$/);
+  await expect(script).toHaveAttribute('src', /panel-focus\.bundle\.[\w-]+\.js$/);
+  for (const path of [await styles.getAttribute('href'), await script.getAttribute('src')]) {
+    if (!path) throw new Error('Expected a versioned asset path.');
+    expect((await page.request.get(path)).status()).toBe(200);
+    expect((await page.request.get(path + '.map')).status()).toBe(404);
+  }
 });
 
 test('fits larger user text and CSS zoom in a short viewport', async ({ page }) => {

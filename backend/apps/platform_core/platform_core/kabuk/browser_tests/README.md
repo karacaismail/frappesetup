@@ -2,7 +2,7 @@
 
 Use an isolated Frappe site named `test-kabuk.localhost` with `platform_core`
 installed. Run `bench build --app platform_core` to publish the panel assets.
-Serve the site through a loopback port. Set `PANEL_TEST_URL` to that origin and
+The build hook removes generated panel source maps. Serve the site through a loopback port. Set `PANEL_TEST_URL` to that origin and
 provide a synthetic account through `PANEL_TEST_USERNAME` and
 `PANEL_TEST_PASSWORD`.
 

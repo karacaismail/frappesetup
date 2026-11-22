@@ -17,4 +17,6 @@ def guard_native_metadata() -> None:
 		# Frappe handles routing errors and redirects itself.
 		return
 	if endpoint is get_meta and not is_system_user():
-		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
+		frappe.throw(
+			frappe._("You cannot read this DocType.", context="shell.metadata"), frappe.PermissionError
+		)

@@ -146,3 +146,41 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 			self.assertEqual(self.request(path)[0], 403)
 			self.assertEqual(self.request(path, sid)[0], 401)
 		self.assertEqual(self.metadata(sid)[0], 401)
+
+	def test_shell_requests_refuse_unknown_parameters(self):
+		paths = (
+			"/api/method/platform_core.api.shell.get_bootstrap?",
+			"/api/method/platform_core.api.meta.get_doctype?" + urlencode({"doctype": DOCTYPE}) + "&",
+		)
+		for path in paths:
+			for key in ("role", "user", "ignore_permissions"):
+				with self.subTest(path=path, key=key):
+					status, _, body = self.request(
+						path + urlencode({key: "forbidden-user-marker"}), self.reader_sid
+					)
+					self.assertEqual(status, 417)
+					self.assertEqual(json.loads(body)["exc_type"], "ValidationError")
+					self.assertNotIn(b"forbidden-user-marker", body)
+
+	def test_metadata_missing_doctype_is_a_validation_error(self):
+		status, _, body = self.request("/api/method/platform_core.api.meta.get_doctype", self.reader_sid)
+		self.assertEqual(status, 417)
+		self.assertEqual(json.loads(body)["exc_type"], "ValidationError")
+
+	def test_shell_rate_limits_apply_per_account_and_endpoint(self):
+		for suffix, limit in (("shell.get_bootstrap", 120), ("meta.get_doctype", 240)):
+			with self.subTest(endpoint=suffix):
+				endpoint = f"platform_core.api.{suffix}"
+				path = f"/api/method/{endpoint}"
+				if suffix == "meta.get_doctype":
+					path += "?" + urlencode({"doctype": DOCTYPE})
+				key = frappe.cache.make_key(f"rl:{endpoint}:{READER}") + b":60"
+				frappe.cache.setex(key, 60, limit - 1)
+				try:
+					self.assertEqual(self.request(path, self.reader_sid)[0], 200)
+					status, _, body = self.request(path, self.reader_sid)
+					self.assertEqual(status, 429)
+					self.assertEqual(json.loads(body)["exc_type"], "RateLimitExceededError")
+					self.assertEqual(self.request(path, self.privileged_sid)[0], 200)
+				finally:
+					frappe.cache.delete(key)
