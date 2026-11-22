@@ -24,3 +24,12 @@ Başarısız tarama birleştirmeyi durdurur.
 Zorunlu taramalardan biri çalışmazsa birleştirme durur.
 
 Bu komutlar ek sır gerektirmez. Zamanlanmış iş kurmayın.
+
+## Güvenlik karnesi
+
+Depo kökünde `backend/dev/bin/security-scorecard` çalıştırın.
+Komut son denetim sonuçlarını sayar.
+Açık bulgu sayısını inceleme kaydından alın. Sayıyı `--open-findings` ile girin.
+Paket açığı sayısını tarama çıktısından alın. Sayıyı `--package-vulnerabilities` ile girin.
+Reddedilen istek sayısını test kaydından alın. Sayıyı `--rejected-requests` ile girin.
+Bir sayıyı girmediğinizde karne “Ölçülmedi” yazar.

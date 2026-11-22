@@ -47,6 +47,16 @@ class SecurityScanTests(unittest.TestCase):
 
         self.assertEqual(requests, [("/", f"dev.localhost:{port}")])
 
+    def test_scorecard_distinguishes_zero_from_missing_measurement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            scans.save(path, "full", [scans.Result("Bandit", "1.9.4", "bandit", "fail")])
+            scorecard = scans.scorecard(path, open_findings=0, package_vulnerabilities=15)
+            self.assertIn("| Açık bulgu | 0 |", scorecard)
+            self.assertIn("| Paket açığı | 15 |", scorecard)
+            self.assertIn("| Reddedilen istek | Ölçülmedi |", scorecard)
+            self.assertIn("| Başarısız denetim | 1 |", scorecard)
+
     def test_report_keeps_skipped_results_visible(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)

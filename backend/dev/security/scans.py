@@ -38,19 +38,46 @@ def save(directory, name, results):
         temporary.unlink(missing_ok=True)
 
 
+def load_results(directory):
+    for name, command in (("full", "security-full"), ("local", "dast-scan")):
+        path = directory / f"{name}.json"
+        if path.exists():
+            yield from (Result(**entry) for entry in json.loads(path.read_text()))
+        else:
+            yield Result(command, "—", f"backend/dev/bin/{command}", "not_run")
+
+
 def report(directory):
     lines = ["# Güvenlik taraması sonuçları", "",
              "| Araç | Sürüm | Komut | Sonuç |", "| --- | --- | --- | --- |"]
-    for name in ("full", "local"):
-        path = directory / f"{name}.json"
-        if path.exists():
-            results = [Result(**entry) for entry in json.loads(path.read_text())]
-        else:
-            command = "security-full" if name == "full" else "dast-scan"
-            results = [Result(command, "—", f"backend/dev/bin/{command}", "not_run")]
-        for result in results:
-            lines.append(f"| {result.tool} | {result.version} | `{result.command}` | `{result.status}` |")
+    for result in load_results(directory):
+        lines.append(f"| {result.tool} | {result.version} | `{result.command}` | `{result.status}` |")
     return "\n".join(lines)
+
+
+def scorecard(directory, *, open_findings=None, package_vulnerabilities=None, rejected_requests=None):
+    statuses = [result.status for result in load_results(directory)]
+    rows = [
+        ("Başarılı denetim", statuses.count("pass")),
+        ("Başarısız denetim", statuses.count("fail")),
+        ("Çalışmayan denetim", statuses.count("not_run")),
+        ("Geçerli olmayan denetim", statuses.count("not_applicable")),
+        ("Açık bulgu", open_findings),
+        ("Paket açığı", package_vulnerabilities),
+        ("Reddedilen istek", rejected_requests),
+    ]
+    lines = ["# Güvenlik karnesi", "", "| Ölçüm | Sayı |", "| --- | --- |"]
+    for name, count in rows:
+        value = "Ölçülmedi" if count is None else count
+        lines.append(f"| {name} | {value} |")
+    return "\n".join(lines)
+
+
+def nonnegative_count(value):
+    count = int(value)
+    if count < 0:
+        raise argparse.ArgumentTypeError("Expected a nonnegative count.")
+    return count
 
 
 def run(tool, version, command):
@@ -145,6 +172,10 @@ def main():
     local = subcommands.add_parser("local")
     local.add_argument("target")
     subcommands.add_parser("report")
+    card = subcommands.add_parser("scorecard")
+    card.add_argument("--open-findings", type=nonnegative_count)
+    card.add_argument("--package-vulnerabilities", type=nonnegative_count)
+    card.add_argument("--rejected-requests", type=nonnegative_count)
     args = parser.parse_args()
     if args.mode == "full":
         return scan_full(args.requirements)
@@ -153,7 +184,12 @@ def main():
             return scan_local(args.target)
         except ValueError as error:
             parser.error(str(error))
-    print(report(RESULTS))
+    if args.mode == "scorecard":
+        print(scorecard(RESULTS, open_findings=args.open_findings,
+                        package_vulnerabilities=args.package_vulnerabilities,
+                        rejected_requests=args.rejected_requests))
+    else:
+        print(report(RESULTS))
     return 0
 
 
