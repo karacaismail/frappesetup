@@ -18,6 +18,10 @@ def _render_browser_rate_limit(function: Callable[..., None]) -> Callable[..., N
 		try:
 			return function(*args, **kwargs)
 		except frappe.RateLimitExceededError:
+			if frappe.form_dict.get("cmd") and not frappe.request.path.startswith("/api/"):
+				# Legacy cmd dispatch builds its own JSON response and ignores the return value.
+				frappe.local.response.update(http_status_code=429, exc_type="RateLimitExceededError")
+				return
 			accept = frappe.get_request_header("Accept") or ""
 			if not accept.startswith("text") or "application/json" in accept or frappe.local.is_ajax:
 				raise
@@ -79,7 +83,7 @@ def keycloak_callback(
 	PKCE, verifies the ID token and opens the Frappe session. Answers with a redirect or an HTML error page."""
 	try:
 		target = sign_in.complete_callback(code, state, error)
-	except sign_in.SignInRefused as refusal:
+	except sign_in.SignInRefusedError as refusal:
 		# Releases the identity lock at once (merge review E1). Nothing of a refused sign-in is kept.
 		frappe.db.rollback()
 		frappe.respond_as_web_page(

@@ -5,9 +5,9 @@ Expected behaviour comes from the orchestrator's decisions on the review finding
   and reads the account state again under the lock. Tested with two database connections.
 - E2: identity endpoints write only safe fields to the Error Log and the app log. `subject`, `email`,
   `new_email` and the token never appear there, nor in the response. Tested for 500 and 503.
-- Minor finding 1: a cookie session is checked for idle time even when the request carries an Authorization header.
-- Minor finding 2: a background method does not renew the idle time in any address form Frappe accepts.
-- Minor finding 3: the back-channel logout fallback finds old sessions on every page, not only on the first one.
+- Important finding 1: a cookie session is checked for idle time even when the request carries an Authorization header.
+- Important finding 2: a background method does not renew the idle time in any address form Frappe accepts.
+- Important finding 3: the back-channel logout fallback finds old sessions on every page, not only on the first one.
 """
 
 import glob
@@ -135,6 +135,26 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(h.session_count(FAKE_EMAIL) + h.session_count(anon), 0)
 		self.assertEqual(h.logged_user(client), "Guest")
 
+	def test_deletion_retries_when_a_query_after_the_lock_deadlocks(self):
+		from platform_core.identity import anonymization_scope
+
+		anonymize = anonymization_scope.anonymize
+		attempts = 0
+
+		def fail_once(*args, **kwargs):
+			nonlocal attempts
+			attempts += 1
+			if attempts == 1:
+				raise frappe.QueryDeadlockError("Test deadlock after the identity lock")
+			return anonymize(*args, **kwargs)
+
+		with patch.object(anonymization_scope, "anonymize", side_effect=fail_once):
+			response, _token = self.service("anonymize_user", {"issuer": h.ISSUER, "subject": FAKE_SUBJECT})
+		self.assertEqual(response.status_code, 200, response.data[:200])
+		self.assertEqual(attempts, 2)
+		h.refresh()
+		self.assertFalse(frappe.db.exists(LINK, self.link.name))
+
 	def test_sign_in_after_step_one_is_refused_under_the_lock(self):
 		anonymization.disable_step(h.ISSUER, FAKE_SUBJECT)
 		frappe.db.commit()
@@ -204,7 +224,7 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(response.json.get("exc_type"), "DeletionKeyMissing")
 		self._assert_no_personal_data(response, token, since)
 
-	# --- Minor finding 1 -----------------------------------------------------------------------------------------
+	# --- Important finding 1 -----------------------------------------------------------------------------------------
 
 	def test_idle_cookie_session_ends_even_with_an_authorization_header(self):
 		for header in ("token abc:def", "Bearer not-a-token", "Basic YWJjOmRlZg=="):
@@ -227,7 +247,7 @@ class TestMergeReview(FrappeAPITestCase):
 			self.assertEqual(h.logged_user(client), "Guest", header)
 			h.reset_rate_limits()
 
-	# --- Minor finding 2 -----------------------------------------------------------------------------------------
+	# --- Important finding 2 -----------------------------------------------------------------------------------------
 
 	def test_background_method_does_not_renew_in_any_address_form(self):
 		client = h.new_client()
@@ -250,7 +270,7 @@ class TestMergeReview(FrappeAPITestCase):
 			self.assertEqual(answer.json.get("message", answer.json.get("data")), FAKE_EMAIL)
 			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 
-	# --- Minor finding 3 -----------------------------------------------------------------------------------------
+	# --- Important finding 3 -----------------------------------------------------------------------------------------
 
 	def test_sub_fallback_finds_old_sessions_after_a_full_page_of_new_ones(self):
 		now = frappe.utils.now_datetime()
@@ -278,7 +298,7 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(h.session_count(FAKE_EMAIL), 105)
 
 	def test_sub_fallback_has_no_page_limit(self):
-		# Merge review 2, minor finding 3: the search goes to the last page. The page size and the old cap are made small
+		# Merge review 2, important finding 3: the search goes to the last page. The page size and the old cap are made small
 		# so that the old session sits after the old cap.
 		from platform_core.identity import sign_out
 

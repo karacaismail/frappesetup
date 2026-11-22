@@ -10,8 +10,8 @@ Two steps, both safe to repeat:
    identity link, so the raw `sub` is gone. No session is left, so no Frappe call commits early.
 
 The deletion record keeps only the HMAC-SHA256 digest of `(iss, sub)` (`identity_hash`). Provisioning,
-enabling and e-mail changes check it first and take the same row locks in the same order:
-identity link first, deletion record second.
+enabling and e-mail changes check it before altering data. All paths use the same lock order:
+existing User first, then the identity link and the deletion record.
 
 Frappe's “Personal Data Deletion Request” is not used. Its engine replaces the full name in every row of
 some tables (personal_data_deletion_request.py:317), which could change another person's text.
@@ -48,7 +48,9 @@ def identity_hash(issuer: str, subject: str) -> str:
 	key = frappe.conf.get(KEY_SETTING)
 	if not key:
 		frappe.throw(
-			_("The deletion key is not configured: {0}", context="platform_core.identity").format(KEY_SETTING),
+			_("The deletion key is not configured: {0}", context="platform_core.identity").format(
+				KEY_SETTING
+			),
 			DeletionKeyMissing,
 		)
 	message = f"{issuer}\n{subject}".encode()
@@ -85,7 +87,7 @@ def lock_identity(
 
 def refuse_if_deleted(issuer: str, subject: str, *, candidate_user: str | None = None) -> frappe._dict | None:
 	"""For provisioning, enabling and e-mail changes. Returns the locked link, or raises 410."""
-	link, record = lock_identity(issuer, subject, candidate_user=candidate_user)
+	link, record = _lock_identity_with_retry(issuer, subject, candidate_user=candidate_user)
 	if record:
 		frappe.throw(
 			_("This identity was deleted and cannot be used again.", context="platform_core.identity"),
@@ -111,20 +113,28 @@ def anonymize_user(data: dict) -> dict:
 	return _with_retry(anonymize_step, issuer, subject)
 
 
-def _with_retry(step, issuer: str, subject: str, attempts: int = 3):
-	"""Runs a step in a fresh transaction. Retries when a parallel call changed the locked rows.
-
-	MariaDB refuses a locking read of a row that changed after the transaction's snapshot
-	(error 1020, `QueryDeadlockError` in Frappe). Starting a new transaction just before the lock and
-	retrying makes the second of two parallel calls see the first call's committed result.
-	"""
-	for attempt in range(attempts):
+def _with_retry(step, issuer: str, subject: str):
+	"""Run each repeatable deletion step in a fresh transaction."""
+	for attempt in range(3):
 		frappe.db.commit()
 		try:
 			return step(issuer, subject)
 		except frappe.QueryDeadlockError:
 			frappe.db.rollback()
-			if attempt == attempts - 1:
+			if attempt == 2:
+				raise
+
+
+def _lock_identity_with_retry(
+	issuer: str, subject: str, *, candidate_user: str | None = None, require_key: bool = True
+) -> tuple[frappe._dict | None, frappe._dict | None]:
+	"""Retry a changed snapshot before any write or irreversible side effect."""
+	for attempt in range(3):
+		try:
+			return lock_identity(issuer, subject, candidate_user=candidate_user, require_key=require_key)
+		except frappe.QueryDeadlockError:
+			frappe.db.rollback()
+			if attempt == 2:
 				raise
 
 

@@ -47,7 +47,7 @@ class TestKeycloakOnly(FrappeAPITestCase):
 			password = self.password_login()
 			self.assertEqual(password.status_code, 401, password.data[:200])
 
-			with h.single_value("System Settings", "login_with_email_link", 1):
+			with h.SingleValue("System Settings", "login_with_email_link", 1):
 				link = h.request(
 					h.new_client().post,
 					"/api/method/frappe.www.login.send_login_link",
@@ -138,7 +138,7 @@ class TestKeycloakOnly(FrappeAPITestCase):
 			self.assertEqual(via_cmd_login.status_code, 401, via_cmd_login.data[:200])
 
 	def test_every_gated_function_answers_403_for_guest_and_signed_in_user(self):
-		# Contract `x-yerel-giris-kapisi`: each of the 16 wrappers (LDAP included, minor finding 3) refuses with 403 `PermissionError` while the
+		# Contract `x-yerel-giris-kapisi`: each of the 16 wrappers (LDAP included, important finding 3) refuses with 403 `PermissionError` while the
 		# gate is on, both under Frappe's path (override) and under the wrapper's own path, with or without a session.
 		self.assertEqual(len(login_policy.GATED_FUNCTIONS), 16)
 		with h.SiteSettings({"identity_keycloak_only": 1}):
@@ -179,6 +179,19 @@ class TestKeycloakOnly(FrappeAPITestCase):
 					self.assertEqual(denied.status_code, 403, denied.data[:200])
 					self.assertEqual(denied.json.get("exc_type"), "PermissionError")
 			self.assertEqual(h.logged_user(website_user), h.AYSE)
+
+	def test_gate_off_rejects_empty_post_bodies(self):
+		with h.SiteSettings({"identity_keycloak_only": 0}):
+			for name, methods in login_policy.GATED_FUNCTIONS.values():
+				if "POST" in methods:
+					with self.subTest(name=name):
+						response = h.request(
+							h.new_client().post,
+							f"/api/method/platform_core.identity.login_policy.{name}",
+							json={},
+						)
+						self.assertEqual(response.status_code, 400, response.data[:200])
+						self.assertEqual(response.json.get("exc_type"), "InvalidInput")
 
 	def test_gate_off_delegates_to_the_original_functions(self):
 		# With the gate off the wrappers must behave like Frappe: reset_password answers 200 for any address.

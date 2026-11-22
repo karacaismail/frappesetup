@@ -13,7 +13,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.identity import provider_setup
+from platform_core.identity import anonymization, provider_setup
 from platform_core.identity.tests import helpers as h
 
 PROVISION = "/api/method/platform_core.api.identity.provision"
@@ -88,9 +88,7 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		self.assertEqual(user.user_type, "Website User")
 		self.assertEqual(user.first_name, "Yeni")
 		self.assertEqual([r.role for r in user.roles if r.role not in frappe.permissions.AUTOMATIC_ROLES], [])
-		self.assertEqual(
-			frappe.db.count("PLT Identity Link", {"issuer": h.ISSUER, "subject": "sub-new"}), 1
-		)
+		self.assertEqual(frappe.db.count("PLT Identity Link", {"issuer": h.ISSUER, "subject": "sub-new"}), 1)
 		self.assertEqual(frappe.db.count("Email Queue", {"reference_name": NEW}), 0)
 
 	def test_provision_unverified_email_creates_no_link(self):
@@ -151,9 +149,7 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		self.assertEqual(response.status_code, 409, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "IdentityConflict")
 		h.refresh()
-		self.assertFalse(
-			frappe.db.exists("PLT Identity Link", {"issuer": h.ISSUER, "subject": "sub-ops"})
-		)
+		self.assertFalse(frappe.db.exists("PLT Identity Link", {"issuer": h.ISSUER, "subject": "sub-ops"}))
 		self.assertEqual(frappe.db.get_value("User", admin, "user_type"), "System User")
 
 	def test_provision_requires_email_verified_and_text_names(self):
@@ -292,6 +288,31 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		repeated = self.call(CHANGE_EMAIL, body)
 		self.assertEqual(repeated.status_code, 200, repeated.data[:300])
 		self.assertEqual(response.json["message"], repeated.json["message"])
+
+	def test_identity_writes_retry_when_the_locked_link_changes(self):
+		identity = {"issuer": h.ISSUER, "subject": "sub-new"}
+		lock_identity = anonymization.lock_identity
+		for endpoint, body, expected in (
+			(
+				PROVISION,
+				provision_body(),
+				{"user": NEW, "enabled": True, "linked": True, "user_type": "Website User"},
+			),
+			(SET_ENABLED, {**identity, "enabled": False}, {"user": NEW, "enabled": False}),
+			(CHANGE_EMAIL, {**identity, "new_email": NEW_2}, {"user": NEW_2}),
+		):
+			with self.subTest(endpoint=endpoint):
+
+				def fail_once(*args, **kwargs):
+					if locking.call_count == 1:
+						raise frappe.QueryDeadlockError("Test concurrent link change")
+					return lock_identity(*args, **kwargs)
+
+				with patch.object(anonymization, "lock_identity", side_effect=fail_once) as locking:
+					response = self.call(endpoint, body)
+				self.assertEqual(response.status_code, 200, response.data[:200])
+				self.assertEqual(response.json["message"], expected)
+				self.assertEqual(locking.call_count, 2)
 
 	def test_change_email_to_used_address_is_409(self):
 		self.call(PROVISION, provision_body())
