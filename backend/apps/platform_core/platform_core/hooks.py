@@ -14,6 +14,8 @@ before_request = [
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
 ]
 on_session_creation = ["platform_core.identity.session_policy.on_session_creation"]
+# Keep the idle clock across site cache clears. Frappe matches prefixes.
+persistent_cache_keys = ["kimlik_activity:"]
 # Keep a single list assignment. Credential hooks must precede the metadata guard (platform-core-kabuk).
 auth_hooks = [
 	"platform_core.identity.service_token.validate",
