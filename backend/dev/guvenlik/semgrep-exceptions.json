@@ -1,6 +1,6 @@
 {
   "scope": "backend/apps/press_tr",
-  "sha256": "f6b6f9a6e6d7e45f5bc00153b1d42297108bf5f4adabb399d90d81a40d649d0c",
+  "sha256": "991acab52e01beb0190f9e6e2aa048907a83d1da1a07ff7c2f5a75dad912cfe2",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
