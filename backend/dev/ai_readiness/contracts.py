@@ -11,6 +11,7 @@ HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "tra
 METHOD_PATH = re.compile(r"(?:[A-Za-z_]\w*\.)+[A-Za-z_]\w*\Z")
 METHOD_PREFIXES = ("/api/method/", "/api/v1/method/", "/api/v2/method/", "/method/")
 FIELDS = ("summary", "description")
+ORIGINAL = "x-frappe-original"
 YAML_ENTRY = re.compile(r"""("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^\s:]+):(?=\s|$)\s*(.*)""")
 BLOCK_SCALAR = re.compile(r"[|>](?:[+-][1-9]?|[1-9][+-]?)?$")
 NUMBER = re.compile(
@@ -59,7 +60,7 @@ def json_mapping(source: str, start: int) -> Iterator[tuple[str, int, int, objec
         offset += 1
 
 
-def json_operations(source: str, start: int) -> Iterator[tuple[str, int, tuple[str, ...]]]:
+def json_operations(source: str, start: int) -> Iterator[tuple[str, int, tuple[str, ...], tuple[str, ...]]]:
     document = json.loads(source)
     if not isinstance(document, dict):
         raise ContractError(1, "OpenAPI document must be an object.")
@@ -81,7 +82,36 @@ def json_operations(source: str, start: int) -> Iterator[tuple[str, int, tuple[s
                 line = source.count("\n", 0, key_offset) + 1
                 if not isinstance(operation, dict) or "$ref" in operation:
                     raise ContractError(line, "Frappe operation must be an inline object.")
-                yield target, line, tuple(field for field in FIELDS if not nonempty(operation.get(field)))
+                missing = tuple(field for field in FIELDS if not nonempty(operation.get(field)))
+                originals = original_methods(operation[ORIGINAL], line) if ORIGINAL in operation else ()
+                yield target, line, missing, originals
+
+
+def original_methods(value, line):
+    entries = value if isinstance(value, list) else [value]
+    if any(not isinstance(entry, str) or not METHOD_PATH.fullmatch(entry) for entry in entries):
+        raise ContractError(line, "x-frappe-original must contain dotted Frappe methods.")
+    return tuple(entries)
+
+
+def yaml_original_methods(value, children, line):
+    text = re.split(r"(?:^|\s)#", value, maxsplit=1)[0].strip()
+    if children and not text:
+        entries = []
+        for child_line, child in children:
+            child = child.strip()
+            if not child.startswith("- "):
+                raise ContractError(child_line, "Expected a list of original Frappe methods.")
+            entries.append(re.split(r"(?:^|\s)#", child[2:], maxsplit=1)[0].strip())
+    elif text.startswith("[") and text.endswith("]") and not children:
+        entries = [entry.strip() for entry in text[1:-1].split(",")]
+        if entries[-1] == "":
+            entries.pop()
+    elif not children:
+        entries = [text]
+    else:
+        raise ContractError(line, "Expected original Frappe methods.")
+    return original_methods([entry.strip("\"'") for entry in entries], line)
 
 
 def nonempty(value: object) -> bool:
@@ -144,7 +174,7 @@ def yaml_text(value: str, children: list[tuple[int, str]], line: int) -> bool:
     return True
 
 
-def yaml_operations(source: str) -> Iterator[tuple[str, int, tuple[str, ...]]]:
+def yaml_operations(source: str) -> Iterator[tuple[str, int, tuple[str, ...], tuple[str, ...]]]:
     lines = [
         (number, line.rstrip())
         for number, line in enumerate(source.splitlines(), 1)
@@ -170,15 +200,18 @@ def yaml_operations(source: str) -> Iterator[tuple[str, int, tuple[str, ...]]]:
                     continue
                 yaml_block(value, line)
                 found = set()
+                originals = ()
                 for field, value, field_line, children in yaml_entries(properties):
                     if field in {"$ref", "<<"}:
                         raise ContractError(field_line, "Referenced Frappe operations are unsupported.")
                     if field in FIELDS and yaml_text(value, children, field_line):
                         found.add(field)
-                yield target, line, tuple(field for field in FIELDS if field not in found)
+                    if field == ORIGINAL:
+                        originals = yaml_original_methods(value, children, field_line)
+                yield target, line, tuple(field for field in FIELDS if field not in found), originals
 
 
-def operations(path: Path) -> Iterator[tuple[str, int, tuple[str, ...]]]:
+def operations(path: Path) -> Iterator[tuple[str, int, tuple[str, ...], tuple[str, ...]]]:
     """Yield the dotted method, its operation line, and missing documentation fields."""
     source = path.read_text(encoding="utf-8-sig")
     if source.lstrip().startswith("{"):

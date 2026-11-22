@@ -129,11 +129,16 @@ def sql_calls(nodes, aliases):
             name = qualified(value, aliases)
             if name in {"frappe.db", "frappe.local.db"}:
                 aliases[target] = name
-        if not isinstance(item, ast.Call):
-            continue
-        name = qualified(item.func, aliases)
-        if name in {"getattr", "builtins.getattr"} and len(item.args) >= 2:
+        if isinstance(item, (ast.Name, ast.Attribute)) and isinstance(item.ctx, ast.Load):
+            name = qualified(item, aliases)
+        elif (
+            isinstance(item, ast.Call)
+            and qualified(item.func, aliases) in {"getattr", "builtins.getattr"}
+            and len(item.args) >= 2
+        ):
             name = qualified(item.args[0], aliases) + "." + (string(item.args[1], {}) or "")
+        else:
+            continue
         owner, _, method = name.rpartition(".")
         if owner in {"frappe.db", "frappe.local.db"} and method in {"sql", "sql_list", "multisql", "sql_ddl"}:
             yield item.lineno

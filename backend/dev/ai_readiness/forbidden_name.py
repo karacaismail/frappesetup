@@ -10,20 +10,41 @@ from pathlib import Path
 
 NAME_DIGEST = bytes.fromhex("17618b2344e07d3418e161912308ad63a118158bf4e3f1307329b5543b5fd743")
 WINDOW_LENGTH = 6
+# Case-folded lookalikes, grouped by script and ordered by alphabet.
 CONFUSABLES = str.maketrans(
     {
-        "с": "c",
-        "г": "r",
-        "о": "o",
-        "ո": "n",
-        "һ": "h",
+        # Greek
+        "α": "a",
+        "β": "b",
+        "ι": "i",
+        "κ": "k",
+        "ν": "v",
+        "ο": "o",
+        "ρ": "p",
+        "τ": "t",
+        "υ": "y",
+        "χ": "x",
+        # Cyrillic
         "а": "a",
+        "в": "b",
+        "г": "r",
         "е": "e",
-        "і": "i",
         "к": "k",
+        "м": "m",
+        "н": "h",
+        "о": "o",
         "р": "p",
-        "х": "x",
+        "с": "c",
+        "т": "t",
         "у": "y",
+        "х": "x",
+        "і": "i",
+        "ј": "j",
+        "ѕ": "s",
+        "һ": "h",
+        "ӏ": "l",
+        # Armenian
+        "ո": "n",
     }
 )
 

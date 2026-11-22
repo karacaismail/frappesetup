@@ -379,15 +379,210 @@ class GateTests(unittest.TestCase):
         self.write_contract()
         contract = self.root / CONTRACT
         contract.write_text(
-            contract.read_text()
+            contract.read_text().replace(
+                "responses:", "x-frappe-original: frappe.example.run\n      responses:"
+            )
+        )
+        self.scan()
+
+    def test_imported_test_base_exempts_shared_subclasses(self):
+        self.write(
+            "dev/module-boundaries.json", json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.ai"}})
+        )
+        self.write(
+            f"{APP}/ai/tests/base.py",
+            """
+            from frappe.tests import IntegrationTestCase
+            class CommonCase(IntegrationTestCase):
+                pass
+        """,
+        )
+        self.write(
+            f"{APP}/ai/tests/test_x.py",
+            """
+            import frappe
+            from .base import CommonCase as Base
+            class Check(Base):
+                def test_sql(self):
+                    frappe.db.sql("SELECT 1")
+                    model = "gpt-4o"
+        """,
+        )
+        self.scan()
+
+    def test_local_import_does_not_turn_non_test_base_into_test_case(self):
+        self.write(
+            "dev/module-boundaries.json", json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.ai"}})
+        )
+        self.write(
+            f"{APP}/ai/tests/base.py",
+            """
+            class Base:
+                pass
+            def local_test():
+                from unittest import TestCase as Base
+            class CommonCase(Base):
+                pass
+        """,
+        )
+        self.write(
+            f"{APP}/ai/tests/test_x.py",
+            """
+            import frappe
+            from .base import CommonCase
+            class Check(CommonCase):
+                def run(self):
+                    frappe.db.sql("SELECT 1")
+        """,
+        )
+        self.scan("sql")
+
+    def test_override_requires_original_on_target_operation(self):
+        self.write(f"{APP}/api.py", "import frappe\n@frappe.whitelist()\ndef run(): pass\n")
+        self.write(
+            f"{APP}/hooks.py",
+            """
+            override_whitelisted_methods = {
+                "frappe.example.run": "sample_app.api.run",
+                "hrms.example.run": "sample_app.api.run",
+            }
+        """,
+        )
+        self.write_contract()
+        self.scan("endpoint", "endpoint")
+        path = self.root / CONTRACT
+        source = path.read_text()
+        path.write_text(
+            source
             + """
   /api/method/frappe.example.run:
     post:
-      summary: Run.
+      summary: Run the original route.
       description: Run a card.
 """
         )
+        self.scan("endpoint", "endpoint")
+        for extension in (
+            'x-frappe-original: ["frappe.example.run", hrms.example.run]',
+            "x-frappe-original:\n      - frappe.example.run\n      - hrms.example.run",
+        ):
+            with self.subTest(extension=extension):
+                path.write_text(source.replace("responses:", extension + "\n      responses:"))
+                self.scan()
+        path.write_text(
+            json.dumps(
+                {
+                    "paths": {
+                        "/api/method/sample_app.api.run": {
+                            "post": {
+                                "summary": "Run.",
+                                "description": "Run.",
+                                "x-frappe-original": ["frappe.example.run", "hrms.example.run"],
+                            }
+                        }
+                    }
+                }
+            )
+        )
         self.scan()
+
+    def test_registered_tool_follows_same_app_helper_and_breaks_cycles(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            from . import service as helpers
+            def declare():
+                return [{"handler": "sample_app.tools.run"}]
+            def run():
+                helpers.read()
+        """,
+        )
+        self.write(
+            f"{APP}/service.py",
+            """
+            import frappe
+            from .tools import run
+            def read():
+                run()
+                frappe.db.sql("SELECT 1")
+        """,
+        )
+        self.scan("sql")
+
+    def test_tool_helper_resolution_ignores_unrelated_local_alias(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            from .service import raw as read
+            def declare():
+                return [{"handler": "sample_app.tools.run"}]
+            def run():
+                read()
+            def unrelated():
+                from .service import safe as read
+                read()
+        """,
+        )
+        self.write(
+            f"{APP}/service.py",
+            """
+            import frappe
+            def raw():
+                frappe.db.sql("SELECT 1")
+            def safe():
+                pass
+        """,
+        )
+        self.scan("sql")
+
+    def test_sql_method_references(self):
+        self.write(
+            "dev/module-boundaries.json", json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.ai"}})
+        )
+        self.write(
+            f"{APP}/ai.py",
+            """
+            import frappe
+            run = frappe.db.sql
+            map(frappe.db.sql, queries)
+        """,
+        )
+        self.scan("sql", "sql")
+
+    def test_runtime_whitelist_in_production(self):
+        self.write(f"{APP}/hooks.py", 'before_request = ["sample_app.api.register"]')
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+            def read():
+                pass
+            def register():
+                frappe.whitelist(allow_guest=True)(read)
+        """,
+        )
+        self.scan("endpoint")
+
+    def test_frappe_provider_imports(self):
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+            frappe.get_attr("transformers.pipeline")
+            frappe.get_module("vertexai")
+            frappe.get_module("genai")
+        """,
+        )
+        self.scan("provider", "provider", "provider")
+
+    def test_scheduled_record_fixtures(self):
+        self.write(
+            f"{APP}/fixtures/schedules.json",
+            json.dumps([{"doctype": "Auto Repeat"}, {"doctype": "Auto Email Report"}]),
+        )
+        self.scan("scheduler", "scheduler")
 
     def test_sql_public_paths_and_database_aliases(self):
         self.write(
@@ -549,6 +744,7 @@ class GateTests(unittest.TestCase):
             "".join(chr(ord(char) + 0xFEE0) for char in spelling),
             spelling.replace("c", "ć"),
             spelling.replace("c", chr(0x441)),
+            spelling.replace("o", chr(0x3BF)),
         ):
             with self.subTest(variation=variation):
                 self.assertEqual(list(match_lines([variation])), [1])
@@ -608,9 +804,8 @@ class GateTests(unittest.TestCase):
         with patch("sys.version_info", (3, 14)):
             self.assertTrue(supports_python())
 
-    def test_security_gate_runs_readiness_tests(self):
-        source = (COMMAND.parent / "guvenlik-denetimi").read_text()
-        self.assertIn("backend/dev/bin/ai-readiness --self-test", source)
+    def test_readiness_command_exposes_self_test(self):
+        self.assertIn("--self-test", COMMAND.read_text())
         self.assertIn("unittest discover", COMMAND.read_text())
 
     def test_only_documented_layout_fields_are_exempt(self):

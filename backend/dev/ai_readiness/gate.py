@@ -35,15 +35,21 @@ PROVIDERS = {
     "anthropic",
     "azure.ai.openai",
     "cohere",
+    "genai",
     "google.genai",
     "google.generativeai",
     "groq",
+    "huggingface_hub",
     "langchain",
     "litellm",
     "llama_index",
     "mistralai",
     "ollama",
     "openai",
+    "replicate",
+    "together",
+    "transformers",
+    "vertexai",
 }
 MODEL = re.compile(
     r"(?<![\w-])(?:gpt|claude|gemini|llama|mistral|mixtral|deepseek|qwen)"
@@ -117,17 +123,16 @@ def test_module(module):
     return any(part in {"test", "tests"} or part.startswith("test_") for part in module.split("."))
 
 
-def imported_aliases(tree, package):
+def imported_aliases(nodes, package):
     aliases = {}
-    for item in ast.walk(tree):
+    for item in nodes:
         for alias, name in imports(item, package):
             if not isinstance(item, ast.Import) or "." not in name or alias != name.split(".")[0]:
                 aliases[alias] = name
     return aliases
 
 
-def test_classes(tree, aliases):
-    tests = set()
+def test_classes(sources):
     bases = {
         "unittest.TestCase",
         "unittest.IsolatedAsyncioTestCase",
@@ -136,10 +141,27 @@ def test_classes(tree, aliases):
         "frappe.tests.IntegrationTestCase",
         "frappe.tests.UnitTestCase",
     }
-    for item in ast.walk(tree):
-        if isinstance(item, ast.ClassDef) and any(qualified(base, aliases) in bases for base in item.bases):
-            tests.add(item)
-            bases.add(item.name)
+    classes = {}
+    for module, (_, _, tree, _, _, package) in sources.items():
+        aliases = imported_aliases(scope_nodes(tree.body), package)
+        for item in tree.body:
+            if isinstance(item, ast.ClassDef):
+                parents = set()
+                for base in item.bases:
+                    name = qualified(base, aliases)
+                    if isinstance(base, ast.Name) and name == base.id:
+                        name = f"{module}.{name}"
+                    parents.add(name)
+                classes[f"{module}.{item.name}"] = (module, item, parents)
+    tests = {}
+    while new := {
+        name: (module, item)
+        for name, (module, item, parents) in classes.items()
+        if name not in bases and parents & bases
+    }:
+        bases.update(new)
+        for module, item in new.values():
+            tests.setdefault(module, set()).add(item)
     return tests
 
 
@@ -211,6 +233,19 @@ def whitelist_checks(tree, bindings, module, path, emit):
     return functions, exposed
 
 
+def runtime_whitelist_checks(tree, bindings, path, emit):
+    modules, decorators, _ = frappe_names(tree)
+    documented = set(bindings.values())
+    for item in ast.walk(tree):
+        if (
+            isinstance(item, ast.Call)
+            and item not in documented
+            and isinstance(item.func, ast.Call)
+            and is_whitelist(item.func, modules | {"frappe"}, decorators)
+        ):
+            emit(path, item.lineno, "endpoint", "Cannot resolve runtime whitelist registration.")
+
+
 def doctype_checks(path, emit):
     source = path.read_text(encoding="utf-8")
     try:
@@ -220,11 +255,12 @@ def doctype_checks(path, emit):
         return
     records = document if isinstance(document, list) else [document]
     for record in records:
-        if (
-            isinstance(record, dict)
-            and record.get("doctype") == "Server Script"
-            and record.get("script_type") == "Scheduler Event"
-        ):
+        if not isinstance(record, dict):
+            continue
+        record_type = record.get("doctype")
+        if record_type in ("Auto Repeat", "Auto Email Report"):
+            emit(path, 1, "scheduler", f"Scheduled {record_type} is forbidden.")
+        elif record_type == "Server Script" and record.get("script_type") == "Scheduler Event":
             emit(path, 1, "scheduler", "Scheduled Server Script is forbidden.")
     if not isinstance(document, dict) or document.get("doctype") != "DocType":
         return
@@ -359,6 +395,8 @@ def provider_checks(path, tree, package, aliases, bindings, providers, emit):
             "__import__",
             "builtins.__import__",
             "importlib.import_module",
+            "frappe.get_attr",
+            "frappe.get_module",
         }:
             argument = (
                 item.args[0]
@@ -371,6 +409,46 @@ def provider_checks(path, tree, package, aliases, bindings, providers, emit):
         for name in names:
             if any(matches(name, provider) or name.startswith(provider + "_") for provider in providers):
                 emit(path, item.lineno, "provider", f"Provider import is forbidden: {name}.")
+
+
+def tool_sql_checks(targets, functions, sources, emit):
+    pending = []
+    for target, (hook, line) in targets.items():
+        if target not in functions:
+            emit(hook, line, "sql", f"Cannot inspect registered AI tool {target}.")
+        else:
+            pending.append(target)
+    visited = set()
+    referenced = set()
+    while pending:
+        target = pending.pop()
+        if target in visited:
+            continue
+        visited.add(target)
+        module, fn = functions[target]
+        referenced.add(module)
+        path, _, tree, _, _, package = sources[module]
+        module_aliases = imported_aliases(scope_nodes(tree.body), package)
+        local_nodes = list(scope_nodes(fn.body))
+        local_aliases = imported_aliases(local_nodes, package)
+        outer_aliases = module_aliases.copy()
+        for item in tree.body:
+            for name, value in assignments(item):
+                owner = qualified(value, outer_aliases)
+                if owner in {"frappe.db", "frappe.local.db"}:
+                    outer_aliases[name] = owner
+        for sql_line in sql_calls(walk(fn), outer_aliases | local_aliases):
+            emit(path, sql_line, "sql", "Raw SQL is forbidden in AI tools.")
+        app = module.partition(".")[0]
+        for item in local_nodes:
+            if not isinstance(item, ast.Call):
+                continue
+            name = qualified(item.func, module_aliases | local_aliases)
+            if isinstance(item.func, ast.Name) and name == item.func.id:
+                name = f"{module}.{name}"
+            if name in functions and name.partition(".")[0] == app and name not in visited:
+                pending.append(name)
+    return referenced
 
 
 def scan(root, commit_base=None):
@@ -412,7 +490,7 @@ def scan(root, commit_base=None):
 
         module = module_name(path, root)
         package = module if path.stem == "__init__" else module.rpartition(".")[0]
-        aliases = imported_aliases(tree, package)
+        aliases = imported_aliases(ast.walk(tree), package)
         bindings = dict(pair for item in tree.body for pair in assignments(item))
         local, exposed = whitelist_checks(tree, bindings, module, path, emit)
         endpoints.update(exposed)
@@ -432,9 +510,7 @@ def scan(root, commit_base=None):
             )
 
     for public, (target, path, line) in overrides.items():
-        if target in endpoints:
-            endpoints[public] = path, line
-        else:
+        if target not in endpoints:
             emit(path, line, "endpoint", f"No whitelisted override target for {public}.")
 
     targets = dict(registered)
@@ -450,21 +526,7 @@ def scan(root, commit_base=None):
             else:
                 targets[target] = hook, line
 
-    for target, (hook, line) in targets.items():
-        if target not in functions:
-            emit(hook, line, "sql", f"Cannot inspect registered AI tool {target}.")
-            continue
-        module, fn = functions[target]
-        referenced.add(module)
-        path, _, tree, aliases, _, _ = sources[module]
-        outer_aliases = aliases.copy()
-        for item in tree.body:
-            for name, value in assignments(item):
-                owner = qualified(value, outer_aliases)
-                if owner in {"frappe.db", "frappe.local.db"}:
-                    outer_aliases[name] = owner
-        for sql_line in sql_calls(walk(fn), outer_aliases):
-            emit(path, sql_line, "sql", "Raw SQL is forbidden in AI tools.")
+    referenced.update(tool_sql_checks(targets, functions, sources, emit))
 
     for owner in set(ai_paths.values()):
         if not any(matches(module, owner) for module in sources):
@@ -484,14 +546,18 @@ def scan(root, commit_base=None):
         production.update(pending)
         referenced.update(name for module in pending for name in dependencies[module])
 
-    for module, (path, source, tree, aliases, _, _) in sources.items():
-        excluded = test_classes(tree, aliases) if module not in production else set()
+    tests = test_classes(sources)
+    for module, (path, source, tree, aliases, bindings, _) in sources.items():
+        excluded = tests.get(module, set()) if module not in production else set()
+        if module in production:
+            runtime_whitelist_checks(tree, bindings, path, emit)
         model_checks(path, source, emit, excluded, tree)
         if any(matches(module, scope) for scope in scopes):
             for line in sql_calls(walk(tree, excluded), aliases):
                 emit(path, line, "sql", "Raw SQL is forbidden in AI tools.")
 
     contracted = set()
+    originals_by_target = {}
     for path in (
         source_files(root / "contracts", emit)
         if (root / "contracts").exists() or (root / "contracts").is_symlink()
@@ -500,10 +566,11 @@ def scan(root, commit_base=None):
         if path.suffix not in {".yaml", ".yml", ".json"} or path.parent != root / "contracts":
             continue
         try:
-            for name, line, missing in operations(path):
-                if name.startswith("frappe.") and name not in overrides:
+            for name, line, missing, originals in operations(path):
+                if name not in endpoints and (name.startswith("frappe.") or name in overrides):
                     continue
                 contracted.add(name)
+                originals_by_target.setdefault(name, set()).update(originals)
                 if name not in endpoints:
                     emit(path, line, "endpoint", f"No whitelisted function for {name}.")
                 for field in missing:
@@ -513,6 +580,10 @@ def scan(root, commit_base=None):
     for name, (path, line) in endpoints.items():
         if name not in contracted:
             emit(path, line, "endpoint", f"Missing OpenAPI operation for {name}.")
+
+    for public, (target, path, line) in overrides.items():
+        if target in endpoints and public not in originals_by_target.get(target, set()):
+            emit(path, line, "endpoint", f"Missing x-frappe-original for {public} on {target}.")
 
     for path, line, message in tracked_findings(root, commit_base):
         findings.add(Finding(path, line, "forbidden-name", message))
