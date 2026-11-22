@@ -1,4 +1,4 @@
-"""Sign-in and sign-out endpoints. Business rules live in `platform_core.kimlik`; this file stays thin."""
+"""Sign-in and sign-out endpoints. The identity module implements the sign-in policy."""
 
 from collections.abc import Callable
 from functools import wraps
@@ -24,7 +24,10 @@ def _render_browser_rate_limit(function: Callable[..., None]) -> Callable[..., N
 			# Frappe's site-wide limiter cannot render an endpoint-level 429.
 			frappe.respond_as_web_page(
 				_("Sign-in failed", context="platform_core.identity"),
-				_("You hit the rate limit because of too many requests. Please try after sometime."),
+				_(
+					"You hit the rate limit because of too many requests. Please try after sometime.",
+					context="platform_core.identity",
+				),
 				http_status_code=429,
 				indicator_color="red",
 			)

@@ -451,6 +451,8 @@ The identity provider keys are not available.,Kimlik sunucusunun anahtarları al
 There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.,platform_core.identity
 This user is disabled.,Bu kullanıcı kapalı.,platform_core.identity
 Sign-in failed,Giriş başarısız,platform_core.identity
+You hit the rate limit because of too many requests. Please try after sometime.,Çok fazla istek gönderdiniz. Biraz sonra yeniden deneyin.,platform_core.identity
+Required sign-in arguments are missing.,Oturum açmak için gereken bilgiler eksik.,platform_core.identity
 Local sign-in is disabled. Sign in with the identity provider.,Yerel giriş kapalı. Kimlik sunucusu ile oturum açın.,platform_core.identity
 This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yönetim kullanıcısına ait. Eşitleme ile açılamaz.,platform_core.identity
 Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.,platform_core.identity
