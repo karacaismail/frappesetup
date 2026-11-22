@@ -31,6 +31,8 @@ HRMS, iptal sırasında “Leave Ledger Entry” ve “Attendance” kayıtları
 Başka bir “Leave Application” kaydı, düzeltme bağlantısıyla silmeyi durdurabilir.
 Özel bağlantılar da Frappe'nin silme denetimine girer.
 Bu durumda komut hata verir. Geri dönüş için veritabanı yedeği kullanılır.
+Hata çıkarsa ekrandaki ilk hata metnini okuyun.
+
 
 Komut yalnız izin kayıtlarını siler. Çalışan kaydı kalır.
 “Leave Allocation”, “Leave Ledger Entry”, “Attendance”, “Salary Slip” ve “Shift Assignment” kayıtları kalır.
