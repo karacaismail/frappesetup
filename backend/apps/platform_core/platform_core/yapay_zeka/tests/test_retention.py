@@ -149,6 +149,10 @@ class TestRetentionPeriods(YzTestCase):
 	def test_delete_leaves_no_copy_behind(self):
 		"""Decision O-32: a retention delete is permanent. No "Deleted Document" copy is kept."""
 		manager = self.login(MANAGER)
+		# Copies an earlier run may have left on this test site are not this run's result.
+		frappe.db.delete(
+			"Deleted Document", {"deleted_doctype": ("in", ["AI Action Log", "AI Action Proposal"])}
+		)
 		proposal = self.proposal(manager, status="rejected", decided_at=ago(31))
 		log = frappe.get_all("AI Action Log", filters={"proposal": proposal}, pluck="name")[0]
 		frappe.db.set_value("AI Action Log", log, "creation", ago(400), update_modified=False)

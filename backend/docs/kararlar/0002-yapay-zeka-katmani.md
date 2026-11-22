@@ -576,6 +576,21 @@ Katmanın yorumları, docstring'leri, iletileri ve OpenAPI açıklamaları İngi
 
 Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `website_user_allowed_methods` kancasındadır. `purge_logs` ucu listede yoktur, çünkü bu uç “System Manager” rolü ister. Kuralı `tests/test_website_user_methods.py` sınar.
 
+### Onuncu tur: birleştirme öncesi üçüncü inceleme ve saklama kararları
+
+Üçüncü inceleme bir engel ve bir önemli bulgu yazdı. Katman ikisini de düzeltti. O-32 kararı da bu turda uygulandı.
+
+- **Öneri 30 gün sonra silinir.** Süre karar tarihinden ya da süre dolumundan başlar. Hangisi önceyse o geçerlidir. Her önerinin `expires_at` değeri vardır. Bu yüzden sonucu `unknown` olan öneri de aynı kuralla silinir.
+- **“AI Action Log” 365 gün kalır.** `older_than_days` girdisi yalnız bu günlüğün süresidir. En az 365 olabilir.
+- **“AI Usage Log” 365 gün kalır.** Bu günlük model geçidi modülünündür. Silme komutu geçidin kendi komutunu çağırır: `platform_core.api.model.purge_usage`. Geçit kayıtları 500'lük gruplarla siler. Geçit kapanmamış denemeleri silmez.
+- **Sayım kipi silinecek kayıtları sayar.** `dry_run` ile gelen sayı, silmenin kaldırdığı sayıya eşittir.
+- **Silme kopya bırakmaz (O-32).** Komut her kaydı `delete_permanently=True` ile siler. “Deleted Document” tablosunda kopya kalmaz. Günlük kaydının denetleyicisi öteki her silmeyi yine reddeder.
+- **Konuşma kimliğinin yalnız özeti saklanır.** `session_id` alanı kimliğin SHA-256 özetini tutar. Aynı konuşmanın satırları aynı özeti taşır.
+- **İstemci adı ve sürümü yalnız izinli biçimde saklanır.** Ad en çok 40 karakterdir ve düz kelimelerden oluşur. Bir kelime en çok 24 karakter olabilir. Sürüm bir sayıyla başlar. Biçime uymayan ad hiç saklanmaz. Biçime uymayan sürüm atılır.
+- Testler `tests/test_retention.py` ve `tests/test_client_text.py` dosyalarındadır.
+
+Frappe'nin liste süzgeci boş tarihi çok eski bir tarih sayar. Kaynak Frappe 16.56.0 sürümünde `frappe/database/query.py` dosyasının 745. satırıdır. Bu yüzden komut önce karar tarihi dolu olan önerileri ister.
+
 ## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |

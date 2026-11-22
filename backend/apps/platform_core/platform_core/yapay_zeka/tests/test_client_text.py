@@ -13,7 +13,8 @@ import frappe
 from platform_core.yapay_zeka.tests.base import DOCTYPE, MCP_PATH, USER_A, YzTestCase
 
 # A made-up value shaped like a credential.
-FAKE_TOKEN = "fsat_Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZg"
+# Built from a repeated pair, so that a secret scanner does not take it for a real credential.
+FAKE_TOKEN = "fsat_" + "x1" * 20
 LATEST = "2026-07-28"
 
 
