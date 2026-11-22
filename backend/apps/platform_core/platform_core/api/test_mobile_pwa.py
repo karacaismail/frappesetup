@@ -68,7 +68,8 @@ class MobilePwaTest(IntegrationTestCase):
 
 	def test_website_user_can_call_only_declared_mobile_cookie_methods(self):
 		methods = {
-			f"platform_core.api.mobile_pwa.v1_{name}"
+			f"platform_core.api.{namespace}.v1_{name}"
+			for namespace in ("mobile", "mobile_pwa")
 			for name in (
 				"activity",
 				"list_installations",
@@ -87,17 +88,20 @@ class MobilePwaTest(IntegrationTestCase):
 		response = self.post(client, "v1_register", body, headers)
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
 		self.assertEqual(response.json["message"], body)
-		for path in (
-			"platform_core.api.mobile.v1_register",
-			"platform_core.api.mobile.revoke_user_installations",
-		):
+		cookie_denied = {method for method in methods if ".api.mobile." in method}
+		for path in sorted(cookie_denied | {"platform_core.api.mobile.revoke_user_installations"}):
 			response = make_request(
 				client.open,
 				args=(),
 				kwargs={"path": f"/api/method/{path}", "method": "POST", "json": body, "headers": headers},
 				site=self.site,
 			)
-			self.assertIn(response.status_code, (401, 403))
+			if path in cookie_denied and frappe.override_whitelisted_method(path) == path:
+				self.assertEqual(
+					(response.status_code, response.json.get("code")), (401, "mobile_token_required")
+				)
+			else:
+				self.assertEqual(response.status_code, 403)
 
 	def test_user_rename_preserves_installation_and_operation_replay(self):
 		from platform_core.mobil.tests.test_service import RECORD, SampleCommand
@@ -165,8 +169,8 @@ class MobilePwaTest(IntegrationTestCase):
 		self.assertIn(response.status_code, (401, 403))
 
 	def foreign_data_denied(self, operation):
-		owner, _, owner_headers = self.login()
-		other, _, other_headers = self.login()
+		owner, _unused, owner_headers = self.login()
+		other, _unused, other_headers = self.login()
 		body = {"installation_id": str(uuid4())}
 		self.assertEqual(self.post(owner, "v1_register", body, owner_headers).status_code, 200)
 		if operation == "v1_push":
@@ -181,8 +185,8 @@ class MobilePwaTest(IntegrationTestCase):
 		self.guest_denied("v1_list_installations")
 
 	def test_v1_list_installations_foreign_data_denied(self):
-		owner, _, owner_headers = self.login()
-		other, _, other_headers = self.login()
+		owner, _unused, owner_headers = self.login()
+		other, _unused, other_headers = self.login()
 		body = {"installation_id": str(uuid4())}
 		self.assertEqual(self.post(owner, "v1_register", body, owner_headers).status_code, 200)
 		response = self.post(other, "v1_list_installations", {}, other_headers)
@@ -193,8 +197,8 @@ class MobilePwaTest(IntegrationTestCase):
 		self.guest_denied("v1_revoke_installation")
 
 	def test_v1_revoke_installation_foreign_data_denied(self):
-		owner, _, headers = self.login()
-		other, _, other_headers = self.login()
+		owner, _unused, headers = self.login()
+		other, _unused, other_headers = self.login()
 		body = {"installation_id": str(uuid4())}
 		self.assertEqual(self.post(owner, "v1_register", body, headers).status_code, 200)
 		result = self.post(other, "v1_revoke_installation", body, other_headers)

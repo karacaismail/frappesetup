@@ -8,7 +8,7 @@ from uuid import uuid4
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from platform_core.mobil import lifecycle
+from platform_core.mobil import lifecycle, store
 from platform_core.mobil.store import MobileStore
 
 
@@ -89,7 +89,7 @@ class ServiceRevocationTest(IntegrationTestCase):
 			patch("platform_core.mobil.sessions.send_session_revocations") as send,
 			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
 		):
-			for _ in range(2):
+			for _unused in range(2):
 				self.assertEqual(revoke_user_installations(), {"revoked": 1})
 			self.assertTrue(is_session_revoked(sid))
 			self.assertFalse(is_session_closure_pending(sid))
@@ -97,6 +97,38 @@ class ServiceRevocationTest(IntegrationTestCase):
 				callback.args[0]()
 			self.request.after_response.add.assert_not_called()
 			send.assert_not_called()
+
+	def test_account_revocation_reads_installations_in_bounded_batches(self):
+		identity = SimpleNamespace(account=self.account, scope="mobile", principal="fixture", sid=None)
+		repository = MobileStore()
+		installations = sorted(str(uuid4()) for _unused in range(3))
+		for installation in installations:
+			identity.sid = str(uuid4())
+			repository.install(identity, installation)
+		frappe.db.set_value("Mobile Installation", installations[0], "revoked", 1)
+
+		with (
+			patch.object(store, "REVOCATION_BATCH_SIZE", 2, create=True),
+			patch.object(store, "_select", wraps=store._select) as select,
+			patch.object(frappe.db, "get_value", wraps=frappe.db.get_value) as get_value,
+		):
+			self.assertEqual(repository.revoke_account_installations(self.account), (3, 2))
+		pages = [
+			call
+			for call in select.call_args_list
+			if call.args[0] == "Mobile Installation" and call.args[2].get("account") == self.account
+		]
+		self.assertEqual([call.kwargs.get("limit") for call in pages], [2, 2])
+		self.assertEqual(pages[1].args[2]["name"], [">", installations[1]])
+		self.assertFalse(
+			any(call.args and call.args[0] == "Mobile Installation" for call in get_value.call_args_list)
+		)
+		session_reads = [
+			call
+			for call in get_value.call_args_list
+			if call.args and call.args[0] == "Mobile Revoked Session"
+		]
+		self.assertEqual(session_reads, [])
 
 	def test_no_identity_link_returns_404_without_creating_state(self):
 		from platform_core.api.mobile import revoke_user_installations

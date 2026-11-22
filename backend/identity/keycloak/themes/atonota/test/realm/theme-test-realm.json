@@ -1,0 +1,27 @@
+{
+  "realm": "theme-test",
+  "displayName": "${IDENTITY_BRAND_NAME}",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "verifyEmail": false,
+  "rememberMe": false,
+  "editUsernameAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["tr", "en"],
+  "defaultLocale": "tr",
+  "loginTheme": "atonota",
+  "emailTheme": "atonota",
+  "accountTheme": "atonota",
+  "passwordPolicy": "length(12)",
+  "webAuthnPolicyPasswordlessPasskeysEnabled": true,
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "kimlik@ornek.test",
+    "fromDisplayName": "${IDENTITY_BRAND_NAME}"
+  }
+}
