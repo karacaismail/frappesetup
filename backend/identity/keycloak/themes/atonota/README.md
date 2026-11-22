@@ -278,8 +278,11 @@ Görüntüler `test/reference/` klasörüne yazılır. Bu görüntüler macOS'ta
 - Tema, kendi çevirisi yoksa Keycloak’ın Türkçe metnini kullanır. Hesap bağlama ve kullanım koşulu ekranları bu metni kullanır.
 - Kayıt formuna seçmeli alan eklenirse Keycloak işletim sisteminin açılır listesini çizer. Bu liste markalı değildir. Realm'e seçmeli profil alanı eklemeyin.
 - Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar. Örneğin “USB” yazısı Keycloak'tan gelir.
-- Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrildi ama canlı denenmedi. Deneme ortamında eklenti kurulu değildir.
-- E-posta sözleşmesi testi şablon adlarını ve konu anahtarını kurulu eklentinin arşivinden okur. Arşiv yolunu `MAGIC_LINK_PROVIDER_JAR` ile verin.
+- Tema deneme imajı e-posta bağlantısı eklentisini içermez. Giriş seçeneğini eklentili Keycloak imajında sınayın.
+- E-posta testi, eklenti arşivindeki şablon adlarını ve konu anahtarını temayla karşılaştırır.
+- Test giriş iletilerini de iki dilde denetler. İleti anahtarları `magiclink-display-name`, `magiclink-help-text` ve `magiclink-emailSentText` değerleridir. Test boş e-posta hatasının `Email cannot be empty` anahtarını da arar.
+- Eklenti kaynağı `cloudflightio/keycloak-magic-link` deposundaki `7b4ee949a39a7ee953987162479ae1da2c57c3cb` kaydıdır. [Keycloak Dockerfile](../../Dockerfile) eklentiyi Keycloak 26.8.2 için derler.
+- `MAGIC_LINK_PROVIDER_JAR` için ürün imajındaki `/opt/keycloak/providers/keycloak-magic-link-7b4ee94.jar` dosyasını kullanın. `docker cp` ile arşivi kendi deneme klasörünüze alın.
 - Eklentili Keycloak adresini `MAGIC_LINK_KC_URL` ile verin. Deneme hesabı açmak için `MAGIC_LINK_ADMIN_TOKEN` gerekir. Canlı test bağlantıyı giriş ekranından ister.
 - E-postalar gerçek e-posta programlarında denenmedi. Örneğin Gmail ve Outlook denenmedi.
 
