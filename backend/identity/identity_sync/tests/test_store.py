@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 import unittest
 
 from identity_sync.events import Event
@@ -369,3 +370,59 @@ class RepeatClaimTest(unittest.TestCase):
         found = store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0)
 
         self.assertEqual([letter.event.id for letter in found], ["del-1", "del-2", "del-3"])
+
+
+class TwoLockDeadlineTest(unittest.TestCase):
+    """Inceleme 20: the connection lock and the file lock together stay within one deadline."""
+
+    def setUp(self) -> None:
+        import sqlite3
+        import threading
+
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = os.path.join(self.dir.name, "identity_sync.sqlite3")
+        self.store = Store(self.path)
+        self.addCleanup(self.store.close)
+        self.release = threading.Event()
+        file_held, connection_held = threading.Event(), threading.Event()
+
+        def hold_file() -> None:
+            # Another process holds the database file. EXCLUSIVE blocks readers too.
+            other = sqlite3.connect(self.path, isolation_level=None)
+            other.execute("BEGIN EXCLUSIVE")
+            file_held.set()
+            self.release.wait(10)
+            other.execute("ROLLBACK")
+            other.close()
+
+        def hold_connection() -> None:
+            # Another thread of this process uses the shared connection for a while.
+            with self.store._db_lock:
+                connection_held.set()
+                time.sleep(0.25)
+
+        threads = [threading.Thread(target=hold_file), threading.Thread(target=hold_connection)]
+        for thread in threads:
+            thread.start()
+            self.addCleanup(thread.join, 10)
+        # Cleanups run last in, first out: the file is released before the threads are joined.
+        self.addCleanup(self.release.set)
+        self.assertTrue(file_held.wait(5) and connection_held.wait(5))
+
+    def assert_within(self, call, limit: float = 0.4) -> None:
+        from identity_sync.deadline import deadline
+
+        started = time.monotonic()
+        with deadline(limit, grace=0.0), self.assertRaises(Busy):
+            call()
+        self.assertLess(time.monotonic() - started, limit + 0.08)
+
+    def test_a_write_before_a_target_call(self) -> None:
+        self.assert_within(lambda: self.store.begin(EVENT))
+
+    def test_an_outcome_record(self) -> None:
+        self.assert_within(lambda: self.store.add_dead_letter(EVENT, "failed"))
+
+    def test_the_queue_query(self) -> None:
+        self.assert_within(lambda: self.store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0))

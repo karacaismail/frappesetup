@@ -549,6 +549,7 @@ The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
 A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
 Name lookups, connections and TLS handshakes end at that deadline.
 So do the wait for the work lock, every database wait, every network read and every retry pause.
+A database wait has two parts: the shared connection and the database file. Together they end at the deadline.
 The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
 So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
 Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
@@ -584,6 +585,7 @@ Two calls for the same job never run at the same time. Before each try the servi
 The claim and the completion check are one database step. A job another process finished is not run again.
 When another process holds the claim, the service leaves the job alone and replies with the queue state.
 Before every external write the service extends the claim to `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds from that moment.
+Every retry of a step, for example after a 409, is a new write and extends the claim again.
 So the claim also covers a last call that starts late in the request.
 After an unknown outcome the claim stays: the target may still work on the last call. No second call goes out meanwhile.
 The claim ends by itself at that time, so a crashed process cannot keep it.
@@ -791,6 +793,7 @@ Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır.
 Silme isteği tek bir son an taşır. Son an istek başladıktan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
 Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
 İş kilidi beklemesi, veritabanı beklemeleri, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
+Veritabanı beklemesi iki kilitten oluşur: ortak bağlantı ve veritabanı dosyası. İki bekleme birlikte bu son anı aşmaz.
 Sonuç kayıtları ortak ve daha geç bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
 Bu yüzden servis en geç `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 5 saniyede cevap verir. Bu süre varsayılan olarak 35, en çok 85 saniyedir.
 Press en çok 90 saniye bekler. Press beklemeyi bırakınca müşteriye silmenin sürdüğünü söyler.
@@ -826,6 +829,7 @@ Aynı iş için iki çağrı aynı anda çalışmaz. Servis her denemeden önce 
 Ayırma ve tamamlanma denetimi aynı veritabanı adımıdır. Başka bir sürecin bitirdiği iş yeniden çalışmaz.
 İşi başka bir süreç ayırdıysa servis işe dokunmaz. Cevap işin kuyruktaki durumunu verir.
 Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer.
+Bir adımın her yeniden denemesi de yeni bir yazmadır. Örneğin 409 cevabından sonraki deneme ayırmayı yeniden uzatır.
 Böylece ayırma, istekte geç başlayan son çağrıyı da kapsar.
 Sonuç belirsizse ayırma kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir. Bu sürede ikinci çağrı gitmez.
 Ayırma bu sürenin sonunda kendiliğinden biter. Böylece çöken süreç işi tutamaz.

@@ -141,6 +141,7 @@ info:
     A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
     Name lookups, connections and TLS handshakes end at that deadline.
     So do the wait for the work lock, every database wait, every network read and every retry pause.
+    A database wait has two parts: the shared connection and the database file. Together they end at the deadline.
     The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
     So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
     Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
@@ -176,6 +177,7 @@ info:
     The claim and the completion check are one database step. A job another process finished is not run again.
     When another process holds the claim, the service leaves the job alone and replies with the queue state.
     Before every external write the service extends the claim to `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds from that moment.
+    Every retry of a step, for example after a 409, is a new write and extends the claim again.
     So the claim also covers a last call that starts late in the request.
     After an unknown outcome the claim stays: the target may still work on the last call. No second call goes out meanwhile.
     The claim ends by itself at that time, so a crashed process cannot keep it.

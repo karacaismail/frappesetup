@@ -261,6 +261,7 @@ Silme isteğinin toplam süresi de sınırlıdır:
 - İstek tek bir son an taşır. Son an `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
 - Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
 - İş kilidi beklemesi, veritabanı beklemesi, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
+- Veritabanı beklemesi iki kilitten oluşur: ortak bağlantı ve veritabanı dosyası. İki bekleme birlikte bu son anı aşmaz.
 - Sonuç kayıtları ortak bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
 - Varsayılan ayarlarla servis en geç 35 saniyede cevap verir. En büyük ayarla bu süre 85 saniyedir.
 - Press en çok 90 saniye bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
@@ -306,6 +307,7 @@ Aynı iş için iki çağrı aynı anda çalışmaz:
 - Ayırma ve tamamlanma denetimi aynı veritabanı adımındadır. Başka bir süreç işi bitirdiyse servis işi yeniden çalıştırmaz.
 - İşi başka bir süreç ayırdıysa servis o işe dokunmaz. Cevap işin kuyruktaki durumunu verir.
 - Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer.
+- Bir adımın her yeniden denemesi de yeni bir yazmadır. Örneğin 409 cevabından sonraki deneme ayırmayı yeniden uzatır.
 - Böylece ayırma geç başlayan son çağrıyı da kapsar.
 - Sonuç belirsizse ayırma hemen kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir. Bu sürede ikinci çağrı gitmez.
 - Ayırma bu sürenin sonunda kendiliğinden biter. Böylece çöken bir süreç işi kilitli bırakmaz.

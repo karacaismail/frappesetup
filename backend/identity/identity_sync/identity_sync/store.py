@@ -199,18 +199,19 @@ class Store:
         - `record`: the record of an outcome. All records share one end, the deadline plus its grace.
         Without `bound`, or outside a deadline, the usual wait applies.
         """
-        if bound == "work":
-            wait = bounded(_SQLITE_TIMEOUT_SECONDS)
-        elif bound == "record":
-            wait = bounded_for_records(_SQLITE_TIMEOUT_SECONDS)
-        else:
-            wait = _SQLITE_TIMEOUT_SECONDS
-        limited = wait != _SQLITE_TIMEOUT_SECONDS
+        measure = {"work": bounded, "record": bounded_for_records}.get(bound)
+        limited = measure is not None and remaining() is not None
+        wait = measure(_SQLITE_TIMEOUT_SECONDS) if limited else _SQLITE_TIMEOUT_SECONDS
         if not self._db_lock.acquire(timeout=wait):
             raise Busy
         try:
             if limited:
-                self._db.execute(f"PRAGMA busy_timeout = {int(wait * 1000)}")
+                # The wait for the connection used part of the time. Measure again, so the wait
+                # for the database file ends at the same deadline (inceleme 20).
+                left = measure(_SQLITE_TIMEOUT_SECONDS)
+                if left <= 0:
+                    raise Busy
+                self._db.execute(f"PRAGMA busy_timeout = {max(1, int(left * 1000))}")
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 yield
@@ -539,10 +540,15 @@ class Store:
         """
         if remaining() is None:
             return self._db.execute(sql, args).fetchall()
-        wait = bounded(_SQLITE_TIMEOUT_SECONDS)
-        if not self._db_lock.acquire(timeout=wait):
+        if not self._db_lock.acquire(timeout=bounded(_SQLITE_TIMEOUT_SECONDS)):
             raise Busy
         try:
+            # Measured after the connection lock: the wait for the database file ends at the same
+            # deadline as the query (inceleme 20).
+            left = bounded(_SQLITE_TIMEOUT_SECONDS)
+            if left <= 0:
+                raise Busy
+            self._db.execute(f"PRAGMA busy_timeout = {max(1, int(left * 1000))}")
             self._db.set_progress_handler(lambda: 1 if not remaining() else 0, 1000)
             try:
                 return self._db.execute(sql, args).fetchall()
@@ -552,6 +558,7 @@ class Store:
                 raise
         finally:
             self._db.set_progress_handler(None, 0)
+            self._db.execute(f"PRAGMA busy_timeout = {int(_SQLITE_TIMEOUT_SECONDS * 1000)}")
             self._db_lock.release()
 
     def extend_repeat(self, job_id: str, *, hold: float) -> None:

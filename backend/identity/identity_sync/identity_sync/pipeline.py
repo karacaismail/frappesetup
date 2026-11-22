@@ -608,14 +608,8 @@ class Processor:
             for action in pending:
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
-                if event.type in JOB_TYPES:
-                    # The claim must outlast this call, even when it starts late (inceleme 19).
-                    try:
-                        self._store.extend_repeat(event.id, hold=self._hold())
-                    except Busy:
-                        raise _Failed(f"{label}: deadline passed") from None
                 try:
-                    self._retry(label, lambda action=action: self._execute(action))
+                    self._retry(label, lambda action=action, label=label: self._attempt(event, action, label))
                 except _Failed as failure:
                     failures.append(str(failure))
                 except UnknownOutcome:
@@ -640,6 +634,19 @@ class Processor:
             if not any(isinstance(action, EnsureOrganization) for action in actions):
                 return names
         raise _Failed("keycloak.ensure_organization: membership not visible yet")
+
+    def _attempt(self, event: Event, action: Action, label: str) -> None:
+        """One network attempt of one step. A retry after a 409 or a 5xx is a new attempt.
+
+        For an account job the claim is extended right before every attempt, so it outlasts that
+        call even when the call starts late (inceleme 19 and 20).
+        """
+        if event.type in JOB_TYPES:
+            try:
+                self._store.extend_repeat(event.id, hold=self._hold())
+            except Busy:
+                raise _Failed(f"{label}: deadline passed") from None
+        self._execute(action)
 
     def _execute(self, action: Action) -> None:
         if isinstance(action, EnsureOrganization):

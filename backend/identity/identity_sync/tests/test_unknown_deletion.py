@@ -613,3 +613,27 @@ class NetworkDeadlineTest(unittest.TestCase):
             with self.assertRaises(ConnectFailed):  # nothing was sent, so the outcome is not unknown
                 request_json("POST", "http://slow-name.invalid:9/x", timeout=10.0, json_body={})
         self.assertLess(time.monotonic() - started, 0.8)
+
+
+class RetryClaimTest(UnknownDeletionCase):
+    def test_every_new_attempt_of_a_step_extends_the_claim_first(self) -> None:
+        # The tenant first answers 409 (a lock conflict), then does the work. The pipeline retries.
+        tenant = self.stack.tenant
+        work = tenant._defaults[("POST", fakes.TENANT_ANONYMIZE)]
+        answers = iter([fakes.frappe_error(409, "IdentityConflict")])
+        tenant.on("POST", fakes.TENANT_ANONYMIZE, lambda req: next(answers, None) or work(req))
+        store = self.stack.app.store
+        extend = store.extend_repeat
+        seen = []
+
+        def spy(job_id: str, *, hold: float) -> None:
+            seen.append(self.tenant_anonymize_calls())
+            extend(job_id, hold=hold)
+
+        with mock.patch.object(store, "extend_repeat", spy):
+            reply = self.press_request()
+
+        self.assertEqual(reply["status"], "processed")
+        self.assertEqual(self.tenant_anonymize_calls(), 2)
+        # One extension came before the first tenant call, one after it and before the retry.
+        self.assertIn(1, seen)
