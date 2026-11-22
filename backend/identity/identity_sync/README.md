@@ -418,6 +418,13 @@ Servis yeni giriş zamanını doğrular. İşi ilk yazmadan önce kaydeder.
 `tests.test_server.AccountDeletionEndpointTest` sınıfı bu kuralları sınar.
 `tests.test_deletion_paths.DeletionPathsTest` sınıfı hata sonrası devam etmeyi ve tekrarlanan isteği sınar.
 
+### Telefon kurulumlarını iptal etme
+
+Servis, kullanıcı kapatılınca `platform_core.api.mobile.revoke_user_installations` ucunu çağırır.
+Çağrı `identity_sync/sites.py` dosyasındaki `revoke_user_installations` işlevindedir.
+`tests/test_pipeline.py` dosyasındaki `test_disabled_user_loses_the_phone_installations` testi iki kurulumun kaldırıldığını doğrular.
+Bu test sahte kiracı kullanır. Telefon sunucusunun iç uygulaması bu paketin kapsamı dışındadır.
+
 ## Testler
 
 Testleri `backend/identity/identity_sync` klasöründe çalıştırın:
