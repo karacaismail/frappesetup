@@ -37,9 +37,8 @@ async function withFreshRequest<T>(run: (request: APIRequestContext) => Promise<
   }
 }
 
-async function mcp(token: string, name: string, args: object) {
+async function mcpRequest(token: string, data: { jsonrpc: string; id: string; method: string; params?: object }) {
   return withFreshRequest(async (request) => {
-    const data = mcpCall(name, args);
     const response = await request.post(aiMethod('mcp'), {
       maxRedirects: 0,
       headers: { ...bearer(token), 'Mcp-Conversation-Id': randomUUID() },
@@ -52,6 +51,39 @@ async function mcp(token: string, name: string, args: object) {
     expect(body.error).toBeUndefined();
     return body.result;
   });
+}
+
+function mcp(token: string, name: string, args: object) {
+  return mcpRequest(token, mcpCall(name, args));
+}
+
+type DocumentTool = {
+  name: string;
+  inputSchema: { required?: string[] };
+  outputSchema?: { properties?: Record<string, unknown> };
+};
+
+async function documentTools(token: string) {
+  // tools/list publishes the live registry. Match the contract's schemas so
+  // renaming a tool does not leave a stale name in a test.
+  const { tools }: { tools: DocumentTool[] } = await mcpRequest(token, {
+    jsonrpc: '2.0', id: randomUUID(), method: 'tools/list',
+  });
+  function tool(output: string, inputs: string[]) {
+    const matches = tools.filter(({ inputSchema, outputSchema }) =>
+      Object.hasOwn(outputSchema?.properties ?? {}, output)
+      && inputSchema.required?.length === inputs.length
+      && inputs.every((field) => inputSchema.required?.includes(field)),
+    );
+    expect(matches, `tools/list must publish exactly one tool for ${output} with required inputs ${inputs.join(', ')}`)
+      .toHaveLength(1);
+    return matches[0].name;
+  }
+  return {
+    list: () => tool('documents', ['doctype']),
+    get: () => tool('document', ['doctype', 'name']),
+    update: () => tool('proposal_id', ['doctype', 'name', 'data']),
+  };
 }
 
 function fixtures() {
@@ -105,24 +137,35 @@ test('identity sync provisions a Website User', async ({ request }) => {
 test('agent token lists permitted records only', async ({ request }) => {
   const { doctype, visible, hidden } = fixtures();
   const token = await issueAgentToken(request, 'reader');
-  const result = await mcp(token, 'list_documents', {
+  const tools = await documentTools(token);
+  const result = await mcp(token, tools.list(), {
     doctype, filters: { name: ['in', [visible, hidden]] }, fields: ['name'],
   });
   expect(result.isError).toBe(false);
   expect(result.structuredContent.documents).toEqual([{ name: visible }]);
-  const denied = await mcp(token, 'get_document', { doctype, name: hidden });
+  const denied = await mcp(token, tools.get(), { doctype, name: hidden });
   expect(denied.isError).toBe(true);
   expect(denied.structuredContent?.error?.code).toBe('permission');
 });
 
 test('MCP rejects an agent token sent with a session cookie', async ({ request }) => {
+  const { doctype, visible } = fixtures();
   const token = await issueAgentToken(request, 'reader');
-  const response = await request.post(aiMethod('mcp'), {
-    headers: { ...sessionHeaders('reader'), ...bearer(token), 'Mcp-Conversation-Id': randomUUID() },
-    data: mcpCall('list_documents', { doctype: fixtures().doctype }),
-    maxRedirects: 0,
+  const tools = await documentTools(token);
+  const name = tools.list();
+  const args = { doctype, filters: { name: visible }, fields: ['name'] };
+  const allowed = await mcp(token, name, args);
+  expect(allowed.isError).toBe(false);
+  expect(allowed.structuredContent.documents).toEqual([{ name: visible }]);
+
+  await withFreshRequest(async (agent) => {
+    const response = await agent.post(aiMethod('mcp'), {
+      headers: { ...bearer(token), Cookie: sessionHeaders('reader').Cookie, 'Mcp-Conversation-Id': randomUUID() },
+      data: mcpCall(name, args),
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(403);
   });
-  expect(response.status()).toBe(403);
 });
 
 test('an update takes effect only after one valid human approval', async ({ request }) => {
@@ -138,7 +181,8 @@ test('an update takes effect only after one valid human approval', async ({ requ
   const before = await readValue();
   expect(before).toBeDefined();
   const token = await issueAgentToken(request, 'operator');
-  const result = await mcp(token, 'update_document', { doctype, name, data: { [field]: value } });
+  const tools = await documentTools(token);
+  const result = await mcp(token, tools.update(), { doctype, name, data: { [field]: value } });
   expect(result.isError).toBe(false);
   expect(result.structuredContent.status).toBe('approval_required');
   const { proposal_id } = result.structuredContent;
