@@ -20,6 +20,7 @@ import frappe
 from frappe.app import application
 from frappe.database.database import Database
 from platform_core.api import mobile
+from platform_core.kimlik import service_token
 from platform_core.mobil.protocol import PAGE_SIZE
 from platform_core.mobil.tests.loopback_http import open_loopback
 from werkzeug.serving import make_server
@@ -119,6 +120,7 @@ def timed_application(environ, start_response):
 def benchmark_server(phones, *, site=None, threaded=True, workers=0):
     auth = {f"Bearer {phone.token}": phone.account for phone in phones}
     original_override = frappe.override_whitelisted_method
+    original_identity = service_token.validate
 
     def resolve(method):
         if method.startswith("platform_core.api.mobile."):
@@ -128,18 +130,27 @@ def benchmark_server(phones, *, site=None, threaded=True, workers=0):
     if site is not None:
         require_performance_site(site)
 
-    def authenticate():
-        if (
+    def is_fixture_request():
+        return (
             site is not None
             and frappe.local.site == site
             and frappe.local.request.headers.get("Authorization") in auth
-        ):
+        )
+
+    def authenticate():
+        if is_fixture_request():
             fixture._authenticate()
 
-    # Use the real Website User gate and original routes. Only the business adapter is synthetic.
+    def validate_identity():
+        # The fixture has already authenticated this request with a run-owned identity.
+        if not (is_fixture_request() and getattr(frappe.local, "mobile_identity", None)):
+            original_identity()
+
+    # Use the real Website User gate and routes with the isolated benchmark identity and data.
     with (
         patch.object(fixture, "TOKENS", auth),
         patch.object(fixture, "authenticate", authenticate),
+        patch.object(service_token, "validate", validate_identity),
         patch.object(Database, "sql", capture_db_failures(Database.sql)),
         patch.object(frappe, "override_whitelisted_method", resolve),
         patch.object(mobile, "COMMANDS", {"fixture.update": fixture.FixtureCommand("update")}),
