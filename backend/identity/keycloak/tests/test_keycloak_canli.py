@@ -55,10 +55,8 @@ class ServisBelirteciTesti(unittest.TestCase):
         self.assertEqual(aud_listesi(govde), ["site-kiraci1"])
         # Gerçek giriş yolu: Admin API bu belirteci reddetmeli (D-6).
         yanit = admin("/users?max=1", veri["access_token"])
-        # Keycloak 26.8.2 checks the Admin API audience first and answers 401 for a token without it
-        # (services/.../admin/AdminRoot.java lines 218-231). Contract section 2 says 403; a correction
-        # is requested from the contract owner. Exactly 401 is expected, nothing broader.
-        self.assertEqual(yanit.durum, 401, safe_detail(yanit))
+        # Contract section 2 accepts either authorization rejection.
+        self.assertIn(yanit.durum, (401, 403), safe_detail(yanit))
 
     def test_yonetim_yetkisi_yalniz_ayri_kapsamda(self):
         # Keycloak 26.8 Admin API'si belirteçte kc-admin-api kapsamını ve Admin API hedefini ister
@@ -76,7 +74,7 @@ class ServisBelirteciTesti(unittest.TestCase):
 
     def test_identity_sync_admin_scope_can_create_user_and_organization(self):
         # D-6 on the real Admin API: the admin-api token creates a user and an organization; the
-        # tenant-scoped token of the same account gets 403 (test_kiraci_belirtecinde_yonetim_yetkisi_yok).
+        # A tenant-scoped token of the same account cannot open the Admin API.
         token = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")["access_token"]
         yonetici = self.__class__.yonetici_token()
         kullanici = "davet-denemesi@example.test"

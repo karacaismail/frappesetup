@@ -25,7 +25,8 @@ Komutların hepsi `PANE_PORT` değişkenini ister.
 
 | Komut | Yaptığı iş |
 | --- | --- |
-| `bin/kc-dev.sh config` | Compose ayarını gösterir. |
+| `bin/kc-dev.sh config` | Compose şablonunu gösterir. Gizli değerleri açmaz. |
+| `bin/kc-dev.sh config --quiet` | Compose ayarını çıktı vermeden doğrular. |
 | `bin/kc-dev.sh up` | Ortamı açar. İmaj varsa yeniden kullanır. |
 | `bin/kc-dev.sh build` | İmajı derler. Realm ya da eklenti değişince kullanın. |
 | `bin/kc-dev.sh down` | Ortamı ve tüneli kapatır. Birim silinmez. |
@@ -36,7 +37,7 @@ Komutların hepsi `PANE_PORT` değişkenini ister.
 | `bin/kc-dev.sh test` | Bütün testleri çalıştırır. |
 | `bin/kc-dev.sh tunel` | Portları ssh tüneliyle bu Mac'e taşır. |
 | `bin/kc-dev.sh tunel-kapat` | Tüneli kapatır. |
-| `bin/kc-dev.sh prod-check` | Üretim imajını compose ayarı olmadan açar ve sınar. Sonra container'ları siler. |
+| `bin/kc-dev.sh prod-check` | Üretim imajını Compose ayarı olmadan açar. Keycloak hazırsa testleri çalıştırır. Sonra geçici container'ları siler. |
 | `bin/kc-dev.sh realm-reload --yes` | Realm dosyasını imaj derlemeden yükler. Realm verisini siler. |
 | `bin/kc-dev.sh realm-delete-only --yes` | Yalnız realm'i siler. |
 | `bin/kc-dev.sh realm-sil --evet` | Realm'i siler ve imajdaki realm dosyasını yeniden içe alır. |

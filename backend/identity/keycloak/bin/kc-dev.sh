@@ -129,7 +129,13 @@ shift || true
 ortam_yukle
 
 case "$komut" in
-  config) compose config "$@" ;;
+  config)
+    case "$#:${1:-}" in
+      0:) compose config --no-interpolate --no-env-resolution ;;
+      1:--quiet) compose config --quiet ;;
+      *) echo "Usage: $0 config [--quiet]" >&2; exit 2 ;;
+    esac
+    ;;
   # İmaj varsa yeniden kullanılır. Realm ya da eklenti değişince imajı "build" komutuyla derleyin.
   up) compose up -d --wait "$@" ;;
   build) compose build "$@" ;;
@@ -185,10 +191,19 @@ case "$komut" in
     prod_run "$prod_name" "https://identity-sync.example.test/v1/events" -p "127.0.0.1:$prod_port:8080"
     # Colima's port forwarding does not carry new ports (backend/AGENTS.md, known issue 2).
     curl -fs -o /dev/null --max-time 2 "http://127.0.0.1:$prod_port/" 2>/dev/null || ssh_tunel "$prod_tunnel_pid" "$prod_port"
+    prod_ready=no
     for _ in $(seq 1 90); do
-      curl -fs -o /dev/null "http://127.0.0.1:$prod_port/realms/platform" && break
+      if prod_status="$(curl -fs -o /dev/null --max-time 2 -w '%{http_code}' \
+        "http://127.0.0.1:$prod_port/realms/platform")" && [ "$prod_status" = 200 ]; then
+        prod_ready=yes
+        break
+      fi
       sleep 2
     done
+    if [ "$prod_ready" != yes ]; then
+      echo "Production Keycloak did not become ready." >&2
+      exit 1
+    fi
     (cd "$KLASOR/tests" && PROD_KC_URL="http://127.0.0.1:$prod_port" PROD_HTTP_REFUSED="$PROD_HTTP_REFUSED" \
       python3 -I -m unittest discover -s . -p 'test_production_image.py' -v "$@")
     ;;
