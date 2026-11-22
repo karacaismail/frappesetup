@@ -144,7 +144,7 @@ test('expired magic link is rejected and a new send works', async ({ browser, pa
     const fresh = await requestLink(retryPage, request, email);
     expect(fresh.url.toString() !== expired.url.toString()).toBe(true);
     await retryPage.goto(fresh.url.toString());
-    expect(fresh.authorized()).toBe(true);
+    await expect.poll(fresh.authorized).toBe(true);
   } finally {
     await retry.close();
   }

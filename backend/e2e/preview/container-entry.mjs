@@ -1,3 +1,5 @@
+import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { forwardLoopback } from './container-network.mjs';
 
 const port = Number(process.env.PANE_PORT);
@@ -16,6 +18,18 @@ try {
     [7, 'e2e-provider', port + 7],
   ]) {
     relays.push(await forwardLoopback(port + offset, service, servicePort));
+  }
+  if (process.env.E2E_FULL_BROWSER_FIXTURES === '1') {
+    // Chromium and WebKit follow OAuth redirects directly. Serve the loopback
+    // callback without storing or logging the query parameters.
+    const callback = createServer((request, response) => {
+      const path = request.url?.split('?', 1)[0];
+      response.writeHead(path === '/callback' ? 200 : 404, { 'Cache-Control': 'no-store' });
+      response.end();
+    });
+    callback.listen(port + 8, '127.0.0.1');
+    await once(callback, 'listening');
+    relays.push(callback);
   }
   await import('./run-tests.mjs');
 } finally {

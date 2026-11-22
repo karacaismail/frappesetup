@@ -136,6 +136,8 @@ def main():
         config.pop("keycloak_service_client_secret", None)
         if os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1":
             config["allow_cors"] = [f"http://127.0.0.1:{port + 8}"]
+            config["mobile_identity_sync_url"] = "https://identity-sync:9443"
+            config["keycloak_internal_url"] = "https://identity-sync:9444"
         provider_urls = {
             part: f"http://e2e-provider:{port + 7}/{part}" for part in ("limited", "fallback")
         }

@@ -153,13 +153,14 @@ class PreviewFixturesTest(unittest.TestCase):
         seeds = [accounts[key]["otp_seed"] for key in enrolled]
         self.assertNotEqual(*seeds)
         credential = fixtures.browser_keycloak.otp_credential(seeds[0])
-        self.assertEqual(json.loads(credential["secretData"])["value"], seeds[0])
+        self.assertEqual(json.loads(credential["secretData"])["value"], base64.b32decode(seeds[0]).decode())
         self.assertEqual(json.loads(credential["credentialData"])["period"], 30)
 
     def test_browser_client_configuration_grants_the_reader_only_view_users(self):
         responses = {
             "/client-scopes": [
                 {"name": "mobile", "id": "mobile-scope"},
+                {"name": "kc-admin-api", "id": "admin-api-scope"},
                 {"name": "aud-site-tenant1", "id": "tenant-scope"},
             ],
             "/clients?clientId=mobile-app": [{"id": "mobile", "attributes": {}}],
@@ -188,6 +189,7 @@ class PreviewFixturesTest(unittest.TestCase):
         self.assertTrue(secret)
         self.assertIn(("/clients/mobile/default-client-scopes/roles-scope", {"method": "DELETE"}), calls)
         self.assertIn(("/clients/mobile/optional-client-scopes/tenant-scope", {"method": "PUT", "data": {}}), calls)
+        self.assertIn(("/clients/reader/default-client-scopes/admin-api-scope", {"method": "PUT", "data": {}}), calls)
         role = {"id": "view", "name": "view-users"}
         grants = [(path, values["data"]) for path, values in calls if "/clients/management" in path and "data" in values]
         self.assertEqual(grants, [

@@ -130,7 +130,7 @@ PYTHON
         PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" close >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
     fi
     rm -f -- "$DEV_ENV_FILE" "$keycloak_env" "$press_env" "$sync_env" "$PREVIEW_DIR/fixtures.json"
-    rm -rf -- "$PREVIEW_DIR/browser" "$PREVIEW_DIR/api" "$PREVIEW_DIR/lifecycle" "$tunnel_state" "$docker_config"
+    rm -rf -- "$PREVIEW_DIR/browser" "$PREVIEW_DIR/api" "$PREVIEW_DIR/lifecycle" "$tunnel_state" "$docker_config" "$PREVIEW_DIR/session-tls"
     if [[ "${cleanup_failed:-}" ]]; then
         printf '%s\n' "Preview cleanup failed. See $PREVIEW_DIR/cleanup.log." >&2
         if (( result == 0 )); then result=1; fi
@@ -322,6 +322,10 @@ wait_http() {
 wait_http "$KC_PUBLIC_URL/realms/platform/.well-known/openid-configuration" keycloak
 wait_http "http://$sync_host:$sync_port/healthz" identity-sync
 wait_http "http://$E2E_PROVIDER_HOST:$provider_port/attempts" "$E2E_PROVIDER_HOST"
+
+if [[ "${E2E_FULL_BROWSER_FIXTURES:-0}" == 1 ]]; then
+    bash "$suite_dir/preview/session-tls.sh" "$docker_context" "$sync" "$tenant" "$sync_port" "$KC_PORT" "$PREVIEW_DIR/session-tls"
+fi
 
 # Frappe caches site settings on requests, including the readiness ping.
 E2E_TENANT_MODULE_DIR="$(docker_preview exec "$tenant" env/bin/python -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-tenant-"))')"

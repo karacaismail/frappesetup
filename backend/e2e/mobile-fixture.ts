@@ -16,10 +16,15 @@ export async function authorizeMobile(browser: Browser, client: string, redirect
   try {
     const page = await context.newPage();
     let code: string | null = null;
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.origin === redirect.origin && url.pathname === redirect.pathname && url.searchParams.get('state') === state) {
+        code = url.searchParams.get('code');
+      }
+    });
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url());
       if (url.origin === redirect.origin && url.pathname === redirect.pathname) {
-        if (url.searchParams.get('state') === state) code = url.searchParams.get('code');
         await route.fulfill({ status: 200, body: 'Preview callback' });
       } else if (url.origin === identity) {
         await route.continue();

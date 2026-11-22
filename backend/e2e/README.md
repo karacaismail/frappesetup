@@ -89,6 +89,8 @@ Varsayılan profilde bellek yetmezse `FS_COLIMA_PROFILE=factory` ile deneyin.
 Kalan tarayıcı senaryoları için `E2E_FULL_BROWSER_FIXTURES=1` de ekleyin.
 Önizleme, her tarayıcı için ayrı örnek hesaplar açar. Parolaları çalışırken üretir.
 Çalışan oturumu testi iki tarayıcıda aynı anda ilerler. Test gerçek saatte bir saat bekler.
+Önizleme, telefon iptali için geçici HTTPS sertifikasını çalışırken üretir.
+Sertifika yalnız geçici kiracı ortamında güvenilir sayılır. Ortam kapanınca dosyalar silinir.
 
 ### Press gerektirmeyen testler
 

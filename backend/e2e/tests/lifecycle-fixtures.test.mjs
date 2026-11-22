@@ -10,3 +10,21 @@ test('browser fixtures isolate the accounts for each engine and reject missing d
   assert.deepEqual(engineFixture(settings, 'webkit'), { E2E_DELETE_EMAIL: 'e2e-delete-webkit@example.test' });
   assert.throws(() => engineFixture({}, 'webkit'), /Missing fixture/);
 });
+
+test('a failed runner does not cancel the independent one-hour check', async () => {
+  const { browserRunStatuses } = await import('../preview/browser-fixtures.mjs');
+  let complete;
+  const pending = new Promise((resolve) => { complete = resolve; });
+  let settled = false;
+  const reported = [];
+  const work = browserRunStatuses([Promise.reject(new Error('report failed')), pending],
+    (error) => reported.push(error.message)).then((statuses) => {
+    settled = true;
+    return statuses;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  complete(0);
+  assert.deepEqual(await work, [1, 0]);
+  assert.deepEqual(reported, ['report failed']);
+});

@@ -6,3 +6,11 @@ export function engineFixture(settings, engine) {
   if (!Object.keys(values).length) throw new Error('Missing fixture for ' + engine);
   return values;
 }
+
+export async function browserRunStatuses(runs, reportFailure) {
+  return (await Promise.allSettled(runs)).map((result) => {
+    if (result.status === 'fulfilled') return result.value;
+    reportFailure(result.reason);
+    return 1;
+  });
+}

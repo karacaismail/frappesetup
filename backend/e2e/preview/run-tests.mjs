@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
-import { engineFixture } from './browser-fixtures.mjs';
+import { browserRunStatuses, engineFixture } from './browser-fixtures.mjs';
 
 const worktree = resolve(process.argv[2]);
 const previewDir = process.env.PREVIEW_DIR;
@@ -164,7 +164,7 @@ async function runFullPreview(projects) {
 
   const shared = Object.fromEntries(Object.entries(env)
     .filter(([name]) => !/^E2E_(CHROMIUM|WEBKIT)_/.test(name) && name !== 'E2E_LIFECYCLE_READER_SECRET'));
-  return Promise.all(projects.flatMap((project) => {
+  const runs = projects.flatMap((project) => {
     const engine = project.slice('--project='.length);
     const settings = {
       ...shared, ...engineFixture(fixture, engine),
@@ -181,7 +181,8 @@ async function runFullPreview(projects) {
       runPlaywright(engine + '-scenarios', [project, 'lifecycle.spec.ts', 'magic-link.spec.ts',
         'mobile-pkce.spec.ts', '--grep-invert', idle], 'json', settings),
     ];
-  }));
+  });
+  return browserRunStatuses(runs, (error) => process.stderr.write(sanitize(String(error)) + '\n'));
 }
 
 try {

@@ -55,8 +55,7 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
     const postMobile = (method: string, accessToken?: string, cookie?: string, extra = {}) => context.post(
       methods + 'platform_core.api.mobile.v1_' + method,
       { maxRedirects: 0,
-        headers: { ...mobileHeaders(accessToken, installation),
-          ...(cookie ? { Cookie: cookie } : {}) },
+        headers: { ...mobileHeaders(accessToken, installation), Cookie: cookie ?? 'sid=Guest' },
         data: { installation_id: randomUUID(), ...extra },
       },
     );
@@ -71,8 +70,9 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
 
     const expiredClaims = claims(expired);
     if (fullPreview) {
-      const delay = (expiredClaims.exp + 61) * 1000 - Date.now();
-      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+      await expect.poll(() => Math.floor(Date.now() / 1000) - expiredClaims.exp, {
+        timeout: 70_000, intervals: [1000],
+      }).toBeGreaterThan(60);
     }
     expect(expiredClaims.iss === payload.iss && [expiredClaims.aud].flat().includes(audience)
       && expiredClaims.exp < Math.floor(Date.now() / 1000) - 60).toBe(true);
@@ -90,7 +90,7 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
       (await postMobile('pull', token, undefined, { ...device, cmd: 'ping' })).status(),
     );
     const outside = await context.get(methods + 'frappe.auth.get_logged_user', {
-      headers: { Authorization: 'Bearer ' + token }, maxRedirects: 0,
+      headers: { Authorization: 'Bearer ' + token, Cookie: 'sid=Guest' }, maxRedirects: 0,
     });
     expect([401, 403]).toContain(outside.status());
 

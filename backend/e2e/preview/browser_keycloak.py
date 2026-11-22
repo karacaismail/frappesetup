@@ -21,7 +21,7 @@ def browser_accounts():
                 "password": "Aa9!" + secrets.token_urlsafe(24),
             }
             if scenario == "magic-otp":
-                account["otp_seed"] = base64.b32encode(secrets.token_bytes(20)).decode()
+                account["otp_seed"] = base64.b32encode(secrets.token_urlsafe(20).encode()).decode()
             accounts[f"{engine}_{scenario}"] = account
     return accounts
 
@@ -29,7 +29,7 @@ def browser_accounts():
 def otp_credential(seed):
     return {
         "type": "otp",
-        "secretData": json.dumps({"value": seed}),
+        "secretData": json.dumps({"value": base64.b32decode(seed).decode()}),
         "credentialData": json.dumps({
             "subType": "totp", "digits": 6, "counter": 0, "period": 30, "algorithm": "HmacSHA1",
         }),
@@ -82,6 +82,7 @@ def configure_browser_clients(call, redirect):
         "defaultClientScopes": ["roles"],
     })
     reader, = call(f"/clients?clientId={reader_id}")
+    call(f"/clients/{reader['id']}/default-client-scopes/{scopes['kc-admin-api']['id']}", method="PUT", data={})
     management, = call("/clients?clientId=realm-management")
     service_user = call(f"/clients/{reader['id']}/service-account-user")
     role = call(f"/clients/{management['id']}/roles/view-users")

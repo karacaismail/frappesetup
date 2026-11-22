@@ -7,6 +7,7 @@ const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 
 const LOGIN_METHOD = '/api/method/platform_core.api.auth.get_login_url';
 const LOGGED_USER = '/api/method/frappe.auth.get_logged_user';
+const PRESS_ACCOUNT = '/api/method/press.api.account.get';
 const CALLBACK = '/api/method/platform_core.api.auth.keycloak_callback';
 const IDLE_MS = 60 * 60 * 1000;
 
@@ -74,7 +75,7 @@ async function loggedUser(request: APIRequestContext) {
 
 function mobilePull(request: APIRequestContext, token: string, installation: string) {
   return request.post(sites().tenant + '/api/method/platform_core.api.mobile.v1_pull', {
-    headers: mobileHeaders(token, installation),
+    headers: { ...mobileHeaders(token, installation), Cookie: 'sid=Guest' },
     data: { installation_id: installation }, maxRedirects: 0,
   });
 }
@@ -87,7 +88,7 @@ async function lifecycleMobile(browser: Browser, request: APIRequestContext, sce
   const tokens = await previewMobileToken(browser, request, required(`E2E_${scenario}_EMAIL`), required(`E2E_${scenario}_PASSWORD`));
   const installation = randomUUID();
   const registered = await request.post(sites().tenant + '/api/method/platform_core.api.mobile.v1_register', {
-    headers: mobileHeaders(tokens.access, installation), data: { installation_id: installation }, maxRedirects: 0,
+    headers: { ...mobileHeaders(tokens.access, installation), Cookie: 'sid=Guest' }, data: { installation_id: installation }, maxRedirects: 0,
   });
   expect(registered.status(), 'preview mobile installation').toBe(200);
   return { ...tokens, installation };
@@ -124,8 +125,8 @@ test.describe('Press account deletion', () => {
     expect(tokenClaims(mobileToken).sub === subject).toBe(true);
     const readUser = (origin: string, cookie: string, name = email) =>
       resource(request, origin, cookie, 'User', name);
-    const pressAccess = () => request.get(press + LOGGED_USER, {
-      headers: { Authorization: pressKey }, maxRedirects: 0,
+    const pressAccess = () => request.get(press + PRESS_ACCOUNT, {
+      headers: { Authorization: pressKey, Cookie: 'sid=Guest' }, maxRedirects: 0,
     });
     const business = {
       doctype: required('E2E_DELETE_RECORD_DOCTYPE'),
@@ -144,7 +145,7 @@ test.describe('Press account deletion', () => {
     expect((await readUser(press, pressReader)).enabled).toBe(1);
     const pressSession = await pressAccess();
     expect(pressSession.status()).toBe(200);
-    expect((await pressSession.json()).message === email).toBe(true);
+    expect((await pressSession.json()).message?.user?.name === email).toBe(true);
     expect((await mobilePull(request, mobileToken, installation)).status()).toBe(200);
     const before = await readBusinessValue();
     const anonymous = JSON.parse(business.anonymous);
