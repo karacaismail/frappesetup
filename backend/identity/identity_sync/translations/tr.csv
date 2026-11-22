@@ -549,7 +549,8 @@ The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
 A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
 Name lookups, connections and TLS handshakes end at that deadline.
 So do the wait for the work lock, every database wait, every network read and every retry pause.
-A database wait has two parts: the shared connection and the database file. Together they end at the deadline.
+A database wait has three parts: the shared connection, the start of the write and its commit.
+Together they end at the deadline. Without time left the write is rolled back.
 The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
 So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
 Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
@@ -793,7 +794,8 @@ Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır.
 Silme isteği tek bir son an taşır. Son an istek başladıktan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
 Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
 İş kilidi beklemesi, veritabanı beklemeleri, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
-Veritabanı beklemesi iki kilitten oluşur: ortak bağlantı ve veritabanı dosyası. İki bekleme birlikte bu son anı aşmaz.
+Veritabanı beklemesi üç parçadan oluşur: ortak bağlantı, yazmanın başlaması ve yazmanın kaydı.
+Üç bekleme birlikte bu son anı aşmaz. Süre kalmadıysa yazma geri alınır.
 Sonuç kayıtları ortak ve daha geç bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
 Bu yüzden servis en geç `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 5 saniyede cevap verir. Bu süre varsayılan olarak 35, en çok 85 saniyedir.
 Press en çok 90 saniye bekler. Press beklemeyi bırakınca müşteriye silmenin sürdüğünü söyler.
