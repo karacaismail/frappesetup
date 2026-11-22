@@ -131,6 +131,8 @@ Sözleşme, arayüz ile sunucunun anlaştığı istek ve yanıt biçimidir.
 
 **TS-8 (ZORUNLU).** Dizi ve nesne erişiminde eksik değeri ele alın. `strict` bu hatayı tek başına yakalamaz.
 
+**TS-9 (ZORUNLU).** Kod adlarını İngilizce ve ASCII yazın. Değişken, sabit, tür ve bileşen adı da dahildir. `class`, `id`, çeviri anahtarı, dosya ve kendi API alanınız da dahildir.
+
 **ÖNERİLİR.** Yeni projede `noUncheckedIndexedAccess` ve `verbatimModuleSyntax` bayraklarını açın. `target`, `module`, `moduleResolution` ve `types` ayarını açıkça yazın.
 
 ## 7. React bileşenleri ve durum
@@ -211,7 +213,7 @@ Sözleşme, arayüz ile sunucunun anlaştığı istek ve yanıt biçimidir.
 
 ## 11. İçerik ve çeviri dosyaları
 
-**IC-1 (ZORUNLU).** Görünen metni koda gömmeyin. Metni çeviri veya içerik dosyasından alın. Cümleyi parçalardan birleştirmeyin. Değer için yer tutucu kullanın.
+**IC-1 (ZORUNLU).** Görünen metni koda gömmeyin. Metni çeviri veya içerik dosyasından alın. Çevirinin kaynak metni İngilizcedir. Cümleyi parçalardan birleştirmeyin. Değer için yer tutucu kullanın.
 
 **IC-2 (ZORUNLU).** Türkçeyi yalın yazın ve yazım denetimini çalıştırın.
 
