@@ -18,3 +18,7 @@
   code: custom_ptr_keycloak_org_id
   scope: Team Custom Field
   definition_tr: Bu alan Press takımına bağlı Keycloak kuruluşunun kimliğini saklar.
+- term_tr: Ansible köprüsü
+  code: ansible_bridge
+  scope: press_tr package
+  definition_tr: Bu paket Press'in Ansible geri çağrısını yeni Ansible sürümüne bağlar.

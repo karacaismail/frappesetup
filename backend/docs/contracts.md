@@ -337,7 +337,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 ### Anonim yapma kuralları
 
-Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve Press'te (`press_tr.api.identity.anonymize_user`) aynıdır. Kararın kaynağı proje kaydındaki O-27'dir.
+Temel kurallar kiracı sitesi (`platform_core.api.identity.anonymize_user`) ve Press (`press_tr.api.identity.anonymize_user`) için geçerlidir. Kuralların kaynağı proje kaydındaki O-27'dir.
 
 1. Silme iki adımdır. Birinci adım hesabı kapatır, oturumları sayfalayarak kapatır, API anahtarlarını iptal eder ve silme durumunu kaydeder. İkinci adım kişisel veriyi anonim yapar. İki adım da tekrar güvenlidir.
 2. Silme kaydı ham kimliği tutmaz. Kayıt `(iss, sub)` çiftinin HMAC-SHA256 özetini tutar. Anahtar site ayarındaki gizli değerdir. Kimlik bağındaki ham `sub` silinir.
@@ -351,9 +351,11 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
    - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
    - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
 
-   Kiracıda `clear_fields` içindeki zorunlu olmayan alan boşaltılır. Zorunlu alan bu listeye yazılamaz.
-   Bu seçenek yalnız `redact_fields` içinde bulunan alanlar için geçerlidir.
-   Kod, listeye yazılmış zorunlu alanda olağan anonim değeri kullanır.
+   Kiracı sitesi `user_data_fields` kancasını aşağıdaki kurallarla uygular.
+
+   - `clear_fields`, `redact_fields` içindeki tek değerli alanları boşaltır. Sistem, zorunlu olmayan alana `null` yazar. Listede zorunlu bir alan varsa sistem hata verir.
+   - Sistem, boşalttığı `Attach` ve `Attach Image` alanlarına bağlı “File” kayıtlarını siler. Başka bir dosya kaydı aynı içeriği kullanıyorsa içerik diskte kalır. Başka bir kayıt ortak küçük resmi kullanıyorsa sistem küçük resmi korur. Son bağlı kayıt silindiğinde dosya da diskten silinir. Sistem, aynı kayıtta aynı dosya adresi kullanılmıyorsa geçmişteki yükleme bağlantısını da siler.
+   - Sistem, ilgili kaydın “Version” geçmişinde seçili tek değerli alanların eski ve yeni değerlerini temizler. Sistem bu işlemi geçmişi kimin yazdığına bakmadan yapar. Alt tablo ve diğer alanların geçmişi kalır. Geçmiş verisi bozuksa sistem hata verir ve mevcut geçmişi korur.
 
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
@@ -383,6 +385,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `keycloak_service_client_id` | `site-tenant1-service` ya da `press-service` | Servis belirteci için |
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `mobile_allow_development_http` | Kapalı | Yalnız geliştirmede açılır. `developer_mode` da açık olmalıdır. Mobil iptal isteği yalnız yerel kimlik servisine HTTP ile gider. Keycloak belirteç adresi HTTPS kalır. |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
@@ -393,7 +396,7 @@ Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini 
 
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. Eğitim ve önceki iş alt tabloları kalır (O-41). |
+| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Sistem fotoğraf alanını boşaltır ve bağlı dosya kaydını siler. Dosyanın diskten silinmesi ve yükleme bağlantısının temizlenmesi 7. bölümdeki kurallara uyar. Sistem, seçili kart alanlarının eski ve yeni değerlerini İK'nın yazdığı geçmişten de temizler. Eğitim ve önceki iş alt tabloları kalır (O-41). |
 | HRMS TR iş kayıtları | Hesap silme kayıtları korur. İzin, devam ve bordrodaki çalışan adı kopyaları değişmez (O-41). `hrms_tr.retention.purge` yalnız süresi dolan taslak ve iptal edilmiş izinleri siler (O-39). |
 
 ## 9. Geliştirme ortamı

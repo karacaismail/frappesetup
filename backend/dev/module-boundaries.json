@@ -19,6 +19,7 @@
     "press_tr.press_identity": [
       "oidc_verify"
     ],
+    "press_tr.ansible_bridge": [],
     "identity_sync": [
       "oidc_verify"
     ],
