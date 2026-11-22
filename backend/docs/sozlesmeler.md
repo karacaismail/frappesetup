@@ -40,12 +40,14 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | --- | --- | --- | --- | --- |
 | `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `press` | Gizli sırlı | Yetkilendirme kodu | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
+| `site-kiraci1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
+- Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. `aud-identity-sync` kapsamını yalnız bu istemci isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
 - `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.
 
 ### Hedef kapsamları
@@ -56,7 +58,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 | --- | --- | --- |
 | `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
 | `aud-press` | `press` | `identity-sync` |
-| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri. Örnek: `site-kiraci1` |
+| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri. Örnek: `site-kiraci1-service` |
 
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
 - Servis belirteci yalnız bir `aud` değeri taşır.
@@ -336,7 +338,7 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
-- `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
+- `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır. Listede yalnız `site-<kiracı>-service` istemcileri bulunur.
 - Onaylı işlem yürütme ucunu da kiracı sitesinin servis istemcisi çağırır. Onay kiracı sitesindeki yapay zekâ katmanında verilir. Bu yüzden `IDENTITY_SYNC_EXECUTE_AZP` ayarı kiracı servis istemcilerinin listesidir. Liste `IDENTITY_SYNC_SESSION_AZP` ile aynı istemcileri taşır.
 - Mutabakat için Press ve kiracı sitesi `list_identities` ucunu sunar. Uç yalnız identity-sync servis belirtecini kabul eder. Yanıt sayfalıdır ve her satırda yalnız `issuer`, `subject` ve hesabın açık ya da kapalı durumu bulunur. E-posta ve ad dönmez. Uç adları `press_tr.api.identity.list_identities` ve `platform_core.api.identity.list_identities` olur.
   - Uç `GET` ile çağrılır. İstek `start` ve `page_length` sorgu alanlarını alır. `cursor` ve `limit` alanları kullanılmaz. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
@@ -356,6 +358,8 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_realm` | `platform` | |
 | `keycloak_client_id` | `site-kiraci1` ya da `press` | |
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `keycloak_service_client_id` | `site-kiraci1-service` ya da `press-service` | Servis belirteci için |
+| `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 
