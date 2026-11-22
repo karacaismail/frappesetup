@@ -375,7 +375,8 @@ Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini 
 
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan ve izin kayıtları | Hesap silme, `user_data_fields` kancasıyla kullanıcıya bağlı çalışan kaydını seçer. Ad, soyad, kişisel ve tercih edilen e-posta, cep telefonu ve doğum tarihi anonimleşir. Çalışan ve iş kayıtları kalır. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
+| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Ad, soyad, orta ad, görünen ad, e-posta ve telefon alanları anonimleşir. Acil durum kişisi, yakınlık, adresler, biyografi ve fotoğraf alanı da anonimleşir. Pasaport numarası, düzenlenme ve geçerlilik tarihi ile düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası, aile bilgisi ve devam cihazı kimliği anonimleşir. Doğum tarihi, kan grubu ve medeni durum alanları boşalır. Eğitim ve önceki iş alt tabloları kalır (O-41). |
+| HRMS TR iş kayıtları | Hesap silme kayıtları korur. İzin, devam ve bordrodaki çalışan adı kopyaları değişmez (O-41). `hrms_tr.retention.purge` yalnız süresi dolan taslak ve iptal edilmiş izinleri siler (O-39). |
 
 ## 9. Geliştirme ortamı
 

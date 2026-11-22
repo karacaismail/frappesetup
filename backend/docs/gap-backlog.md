@@ -32,6 +32,8 @@ Kurallar şunlardır:
 5. Kapandı. OpenAPI, `logout` ve `setup_keycloak_login` için 401 yanıtını tanımlar. `test_idle_session_answers_401_session_expired` oturum reddini sınar.
 6. Kapandı. `pyproject.toml` bağımlılığı `oidc_verify==0.1.0` olarak sabitler. Kitaplık bu sürümle depoda yer alır.
 
+7. O-41 için hesap silme kancası ekleyin. Kanca, kullanıcı bağı yenilenmeden önce kullanıcı ve anonim kimlik değerlerini versin. İzin, devam ve bordro kayıtlarındaki `employee_name` kopyalarını HRMS TR bu kancayla temizlesin. İş kayıtları kalsın. Eğitim ve önceki iş alt tablolarının temizliği de açık borçtur.
+
 ## identity-sync
 
 1. Olay alıcısı kimlik-realm'in çatal eklentisiyle canlı denensin. Bozuk imza ve eski zaman damgası reddedilsin.
