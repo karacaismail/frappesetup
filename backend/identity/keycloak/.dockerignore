@@ -1,0 +1,5 @@
+# Yalnız realm klasörü imaja girer.
+*
+!realm/
+!realm/**
+.env
