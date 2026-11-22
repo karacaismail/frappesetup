@@ -1282,6 +1282,463 @@
     "type": "reference"
   },
   {
+    "old": "eposta-dogrulama-dark.png",
+    "new": "email-verification-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "eposta-dogrulama-light.png",
+    "new": "email-verification-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-dark.png",
+    "new": "login-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-hata-dark.png",
+    "new": "login-error-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-hata-light.png",
+    "new": "login-error-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-light.png",
+    "new": "login-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-yolu-dark.png",
+    "new": "login-method-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-yolu-light.png",
+    "new": "login-method-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-dark.png",
+    "new": "registration-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-hata-dark.png",
+    "new": "registration-error-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-hata-light.png",
+    "new": "registration-error-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-light.png",
+    "new": "registration-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-1-parola.png",
+    "new": "focus-dark-1-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-2-goster.png",
+    "new": "focus-dark-2-show-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-3-unuttum.png",
+    "new": "focus-dark-3-forgot-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-4-oturum-ac.png",
+    "new": "focus-dark-4-sign-in.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-5-passkey.png",
+    "new": "focus-dark-5-passkey.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-6-hesap-ac.png",
+    "new": "focus-dark-6-create-account.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-7-dil.png",
+    "new": "focus-dark-7-language.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-8-giris-yolu.png",
+    "new": "focus-dark-8-login-method.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-9-onay-kutusu.png",
+    "new": "focus-dark-9-checkbox.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-1-parola.png",
+    "new": "focus-light-1-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-2-goster.png",
+    "new": "focus-light-2-show-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-3-unuttum.png",
+    "new": "focus-light-3-forgot-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-4-oturum-ac.png",
+    "new": "focus-light-4-sign-in.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-5-passkey.png",
+    "new": "focus-light-5-passkey.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-6-hesap-ac.png",
+    "new": "focus-light-6-create-account.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-7-dil.png",
+    "new": "focus-light-7-language.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-8-giris-yolu.png",
+    "new": "focus-light-8-login-method.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-9-onay-kutusu.png",
+    "new": "focus-light-9-checkbox.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-sifirlama-dark.png",
+    "new": "password-reset-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-sifirlama-light.png",
+    "new": "password-reset-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-yenileme-dark.png",
+    "new": "password-update-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-yenileme-light.png",
+    "new": "password-update-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-giris-dark.png",
+    "new": "passkey-login-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-giris-light.png",
+    "new": "passkey-login-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-hata-dark.png",
+    "new": "passkey-error-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-hata-light.png",
+    "new": "passkey-error-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-kayit-dark.png",
+    "new": "passkey-registration-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-kayit-light.png",
+    "new": "passkey-registration-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-giris-dark.png",
+    "new": "totp-login-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-giris-light.png",
+    "new": "totp-login-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-kurulum-dark.png",
+    "new": "totp-setup-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-kurulum-light.png",
+    "new": "totp-setup-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "dogrulama-tr-320-webkit.png",
+    "new": "verification-tr-320-webkit.png",
+    "type": "reference"
+  },
+  {
+    "old": "dogrulama-tr-600-chromium.png",
+    "new": "verification-tr-600-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "islem-tr-320-webkit.png",
+    "new": "required-actions-tr-320-webkit.png",
+    "type": "reference"
+  },
+  {
+    "old": "islem-tr-600-chromium.png",
+    "new": "required-actions-tr-600-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-en-320-chromium.png",
+    "new": "password-reset-en-320-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-tr-320-webkit.png",
+    "new": "password-reset-tr-320-webkit.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-tr-600-chromium.png",
+    "new": "password-reset-tr-600-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris",
+    "new": "login",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "giris-hata",
+    "new": "login-error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "giris-yolu",
+    "new": "login-method",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "kayit",
+    "new": "registration",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "kayit-hata",
+    "new": "registration-error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "parola-sifirlama",
+    "new": "password-reset",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "parola-yenileme",
+    "new": "password-update",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "totp-kurulum",
+    "new": "totp-setup",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "totp-giris",
+    "new": "totp-login",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "passkey-kayit",
+    "new": "passkey-registration",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "passkey-giris",
+    "new": "passkey-login",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "passkey-hata",
+    "new": "passkey-error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "eposta-dogrulama",
+    "new": "email-verification",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "dogrulama",
+    "new": "verification",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "islem",
+    "new": "required-actions",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "parola",
+    "new": "password-reset",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "referans",
+    "new": "reference",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "webkit-masaustu",
+    "new": "webkit-desktop",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "npx playwright test gorsel",
+    "new": "npx playwright test visual",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "GORSEL",
+    "new": "KC_THEME_VISUAL",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "EPOSTA_GORUNTU",
+    "new": "KC_THEME_EMAIL_SCREENSHOTS",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "masaustu",
+    "new": "desktop",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/playwright.config.ts"
+    ]
+  },
+  {
+    "old": "yatay",
+    "new": "landscape",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/playwright.config.ts"
+    ]
+  },
+  {
+    "old": "sihirli-${lang}-${width}-${browser}.png",
+    "new": "magic-link-${lang}-${width}-${browser}.png",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
     "old": "backend/PROJE-KAYDI.md",
     "new": "backend/PROJECT-RECORD.md",
     "type": "path"
@@ -1869,6 +2326,501 @@
   {
     "old": "backend/identity/keycloak/themes/atonota/test/realm/tema-deneme-realm.json",
     "new": "backend/identity/keycloak/themes/atonota/test/realm/theme-test-realm.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/eposta-dogrulama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/email-verification-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/eposta-dogrulama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/email-verification-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-yolu-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-method-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-yolu-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-method-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-sifirlama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-reset-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-sifirlama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-reset-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-yenileme-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-update-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-yenileme-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-update-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-kurulum-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-setup-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-kurulum-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-setup-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/dogrulama-tr-320-webkit.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/verification-tr-320-webkit.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/dogrulama-tr-600-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/verification-tr-600-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/islem-tr-320-webkit.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/required-actions-tr-320-webkit.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/islem-tr-600-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/required-actions-tr-600-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/parola-en-320-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/password-reset-en-320-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/parola-tr-320-webkit.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/password-reset-tr-320-webkit.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/parola-tr-600-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/password-reset-tr-600-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/eposta-dogrulama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/email-verification-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/eposta-dogrulama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/email-verification-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-yolu-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-method-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-yolu-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-method-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-sifirlama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-reset-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-sifirlama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-reset-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-yenileme-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-update-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-yenileme-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-update-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-kurulum-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-setup-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-kurulum-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-setup-light.png",
     "type": "path"
   },
   {
