@@ -466,6 +466,21 @@ Sonucu okurken şunları bilin:
 - Mutabakat ve yeniden işletme uçları aynı anda tek onaylı planı yürütür. Aynı önizleme için verilen 20 onaydan biri çalışır. Ötekiler 409 alır ve hiçbir şey yazmaz. Rapor bunları hata saymaz, `concurrent_conflicts` alanında verir.
 - Sunucu istekleri tek tek işler. 20 istek aynı anda gelirse sonuncusu öncekileri bekler. Rapor bu bekleme süresini `concurrent_wait_p95_ms` alanında verir. Bu alan sınırla karşılaştırılmaz.
 
+## Container doğrulaması
+
+22 Kasım 2026 Pazar günü mevcut `Dockerfile` yeniden derlendi.
+Çalışma dizini `backend` oldu. Komut şuydu:
+
+```bash
+docker --context colima-factory build -f identity/identity_sync/Dockerfile -t fs-identity-sync:handoff .
+```
+
+İmaj Python 3.14.10 ve `oidc_verify` 0.1.0 ile açıldı.
+İmajda PyJWT 2.15.1 ve cryptography 50.0.2 vardı.
+Ağ erişimi kapalı deneme container'ında `/healthz` isteği 200 döndü.
+Deneme container'ı, geçici birimi ve imaj etiketi iş bitince silindi.
+Bu kontrol, canlı Press ve kiracı uyumunu doğrulamaz.
+
 ## Bilinen eksikler
 
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
