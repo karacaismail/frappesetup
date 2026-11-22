@@ -20,7 +20,9 @@ def is_keys_unavailable(error: BaseException) -> bool:
 
 def report_keys_unavailable(jwks_url: str) -> None:
 	"""Error Log entry without request data: only the JWKS address is recorded."""
-	frappe.log_error(title="Identity provider keys unavailable", message=f"JWKS could not be fetched: {jwks_url}")
+	frappe.log_error(
+		title="Identity provider keys unavailable", message=f"JWKS could not be fetched: {jwks_url}"
+	)
 
 
 def jwks_cache(jwks_url: str):

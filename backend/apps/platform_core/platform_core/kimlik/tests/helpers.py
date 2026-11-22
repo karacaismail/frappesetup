@@ -100,10 +100,16 @@ def clear_sessions_of(*users: str) -> None:
 			delete_session(sid, user=user, reason="Test cleanup")
 
 
+def reset_rate_limits() -> None:
+	"""Rate limits count per IP; the test client always comes from the same address (frappe/rate_limiter.py)."""
+	frappe.cache.delete_keys("rl:")
+
+
 def clear_links(*extra_users: str):
-	"""Removes identity links of the test issuer and closes sessions of the sample users."""
+	"""Removes identity links of the test issuer, closes sessions of the sample users, resets rate limits."""
 	frappe.db.delete("Platform Identity Link", {"issuer": ISSUER})
 	clear_sessions_of(*SAMPLE_USERS, *extra_users)
+	reset_rate_limits()
 	refresh()
 
 
@@ -236,6 +242,24 @@ def logged_user(client) -> str:
 		# The cookie points at a deleted session (frappe/sessions.py:346).
 		return "Guest"
 	return response.json.get("message")
+
+
+def csrf_token_of(client) -> str | None:
+	"""CSRF token stored in the session the client's `sid` cookie points at."""
+	refresh()
+	cookie = client.get_cookie("sid")
+	if not cookie:
+		return None
+	sessions = frappe.qb.DocType("Sessions")
+	rows = frappe.qb.from_(sessions).select(sessions.sessiondata).where(sessions.sid == cookie.value).run()
+	if not rows:
+		return None
+	return frappe.parse_json(rows[0][0] or "{}").get("csrf_token")
+
+
+def csrf_headers(client) -> dict:
+	token = csrf_token_of(client)
+	return {"X-Frappe-CSRF-Token": token} if token else {}
 
 
 def session_count(user: str) -> int:

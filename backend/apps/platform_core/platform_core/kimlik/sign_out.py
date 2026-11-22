@@ -71,7 +71,9 @@ def handle_logout_token(logout_token: object) -> dict:
 
 	subject = claims.get("sub")
 	if closed == 0 and isinstance(subject, str) and subject:
-		user = frappe.db.get_value("Platform Identity Link", {"issuer": settings.issuer, "subject": subject}, "user")
+		user = frappe.db.get_value(
+			"Platform Identity Link", {"issuer": settings.issuer, "subject": subject}, "user"
+		)
 		if user:
 			closed += _close(sessions_for_user_before, user, int(claims["iat"]))
 
@@ -143,7 +145,8 @@ def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
 	selected = []
 	for sid, owner, raw in rows:
 		created = _created_epoch(raw, now)
-		if created is None or created <= iat:
+		# `iat` has second precision; a session opened within that same second is treated as older.
+		if created is None or created < iat + 1:
 			selected.append((sid, owner))
 	return selected
 

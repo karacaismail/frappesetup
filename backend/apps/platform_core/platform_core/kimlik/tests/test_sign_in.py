@@ -50,6 +50,11 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertIn("platform_core.kimlik.service_token.validate", frappe.get_hooks("auth_hooks"))
 		self.assertIn("platform_core.kimlik.login_policy.before_login", frappe.get_hooks("before_login"))
 		self.assertIn("platform_core.kimlik.login_policy.before_request", frappe.get_hooks("before_request"))
+		overrides = frappe.get_hooks("override_whitelisted_methods")
+		self.assertIn(
+			"platform_core.kimlik.login_policy.send_login_link",
+			overrides.get("frappe.www.login.send_login_link", []),
+		)
 
 	def test_get_login_url_binds_browser_and_uses_pkce(self):
 		response, query = h.start_login(self.client, "/panel", headers={"Accept-Language": "tr"})
@@ -70,8 +75,10 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertGreaterEqual(len(query["code_challenge"]), 43)
 		self.assertEqual(result["brand_name"], "Atonota")
 		self.assertEqual(result["label"], "Atonota ile oturum aç")
-		cookie = response.headers.get("Set-Cookie", "")
-		self.assertIn(f"{h.LOGIN_COOKIE}=", cookie)
+		cookie = next(
+			(c for c in response.headers.getlist("Set-Cookie") if c.startswith(f"{h.LOGIN_COOKIE}=")), ""
+		)
+		self.assertTrue(cookie, response.headers.getlist("Set-Cookie"))
 		self.assertIn("HttpOnly", cookie)
 		self.assertIn("SameSite=Lax", cookie)
 		self.assertIn("Max-Age=600", cookie)
@@ -98,7 +105,23 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertEqual(digest, query["code_challenge"])
 		self.assertEqual(h.exchange_calls[-1]["redirect_uri"], "http://kiraci1.localhost:8661" + h.CALLBACK)
 		# The login cookie is cleared after use.
-		self.assertIn(f"{h.LOGIN_COOKIE}=;", response.headers.get("Set-Cookie", "").replace('""', ""))
+		cleared = [c for c in response.headers.getlist("Set-Cookie") if c.startswith(f"{h.LOGIN_COOKIE}=")]
+		self.assertTrue(
+			cleared and "Expires=" in cleared[0] and f"{h.LOGIN_COOKIE}=;" in cleared[0].replace('""', "")
+		)
+
+	def test_csrf_token_exists_right_after_sign_in(self):
+		# Frappe skips the CSRF check while the session has no token (frappe/auth.py:92).
+		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
+		self.assertTrue(h.csrf_token_of(self.client))
+		without = h.request(self.client.post, "/api/method/platform_core.api.auth.logout")
+		self.assertEqual(without.status_code, 400, without.data[:200])
+		self.assertEqual(without.json.get("exc_type"), "CSRFTokenError")
+		self.assertEqual(h.logged_user(self.client), h.AYSE)
+		with_token = h.request(
+			self.client.post, "/api/method/platform_core.api.auth.logout", headers=h.csrf_headers(self.client)
+		)
+		self.assertEqual(with_token.status_code, 200, with_token.data[:200])
 
 	def test_default_redirect_is_panel_url(self):
 		_started, query = h.start_login(self.client)
@@ -194,10 +217,19 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertEqual(h.logged_user(attacker), "Guest")
 
 	def test_link_owned_by_another_user_is_refused(self):
+		# AU-4: the identity is linked to Mehmet but the token now carries another user's e-mail. Nobody signs in.
 		h.make_link("sub-mehmet", h.MEHMET)
 		response = h.login_with_keycloak(self.client, h.userinfo("sub-mehmet", h.AYSE))
 		self.assertEqual(response.status_code, 403)
 		self.assertEqual(h.logged_user(self.client), "Guest")
+
+	def test_linked_user_signs_in_without_email_claim(self):
+		h.make_link("sub-mehmet", h.MEHMET)
+		claims = h.userinfo("sub-mehmet", h.MEHMET)
+		claims.pop("email")
+		response = h.login_with_keycloak(self.client, claims)
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(h.logged_user(self.client), h.MEHMET)
 
 	def test_unknown_email_cannot_sign_up(self):
 		response = h.login_with_keycloak(self.client, h.userinfo("sub-new", "yeni.kisi@example.test"))
@@ -250,7 +282,9 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 	def test_logout_closes_session_and_returns_keycloak_url(self):
 		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
-		response = h.request(self.client.post, "/api/method/platform_core.api.auth.logout")
+		response = h.request(
+			self.client.post, "/api/method/platform_core.api.auth.logout", headers=h.csrf_headers(self.client)
+		)
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		url = response.json["message"]["logout_url"]
 		self.assertTrue(

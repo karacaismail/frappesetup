@@ -38,8 +38,10 @@ class TestServiceToken(FrappeAPITestCase):
 		h.make_link("sub-ayse", h.AYSE)
 
 	def call(self, token=None, client=None, path=ENDPOINT, body=BODY, **extra):
+		client = client or h.new_client()
 		headers = {"Authorization": f"Bearer {token}"} if token else {}
-		return h.request((client or h.new_client()).post, path, json=body, headers=headers, **extra)
+		headers.update(h.csrf_headers(client))
+		return h.request(client.post, path, json=body, headers=headers, **extra)
 
 	def test_valid_token_is_accepted(self):
 		response = self.call(self.key.sign(h.access_payload()))

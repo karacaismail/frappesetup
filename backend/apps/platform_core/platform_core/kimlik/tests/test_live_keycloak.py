@@ -38,6 +38,7 @@ class TestLiveKeycloak(IntegrationTestCase):
 	def setUpClass(cls):
 		super().setUpClass()
 		provider_setup.ensure_social_login_key()
+		cls.register_callback_uri()
 		h.ensure_user(USER)
 		frappe.db.delete("Platform Identity Link", {"issuer": site_settings.issuer()})
 		frappe.db.commit()
@@ -47,6 +48,38 @@ class TestLiveKeycloak(IntegrationTestCase):
 		frappe.db.delete("Platform Identity Link", {"issuer": site_settings.issuer()})
 		frappe.db.commit()
 		super().tearDownClass()
+
+	@classmethod
+	def register_callback_uri(cls):
+		"""The development realm still registers Frappe's old callback (kimlik-realm owns the realm file).
+		Until it is updated, the own callback is added to the client of this disposable Keycloak."""
+		token = requests.post(
+			f"{KC_URL}/realms/master/protocol/openid-connect/token",
+			data={
+				"grant_type": "password",
+				"client_id": "admin-cli",
+				"username": ADMIN,
+				"password": ADMIN_PASSWORD,
+			},
+			timeout=TIMEOUT,
+		).json()["access_token"]
+		headers = {"Authorization": f"Bearer {token}"}
+		clients = requests.get(
+			f"{KC_URL}/admin/realms/platform/clients",
+			params={"clientId": site_settings.get().client_id},
+			headers=headers,
+			timeout=TIMEOUT,
+		).json()
+		client = clients[0]
+		callback = f"{SITE_URL}/api/method/platform_core.api.auth.keycloak_callback"
+		if callback not in client.get("redirectUris", []):
+			client["redirectUris"] = [*client.get("redirectUris", []), callback]
+			requests.put(
+				f"{KC_URL}/admin/realms/platform/clients/{client['id']}",
+				json=client,
+				headers=headers,
+				timeout=TIMEOUT,
+			).raise_for_status()
 
 	def sign_in_through_keycloak(self) -> requests.Session:
 		browser = requests.Session()
@@ -78,15 +111,25 @@ class TestLiveKeycloak(IntegrationTestCase):
 		self.assertEqual(callback.status_code, 302, callback.text[:300])
 		location = callback.headers["Location"]
 		self.assertTrue(
-			location.startswith(
-				f"{SITE_URL}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak?"
-			)
+			location.startswith(f"{SITE_URL}/api/method/platform_core.api.auth.keycloak_callback?")
 		)
 
 		site = browser.get(location, allow_redirects=False, timeout=TIMEOUT)
 		self.assertEqual(site.status_code, 302, site.text[:300])
 		self.assertTrue(site.headers["Location"].endswith("/panel"))
 		return browser
+
+	def csrf_token(self, browser) -> str:
+		frappe.db.commit()
+		sessions = frappe.qb.DocType("Sessions")
+		rows = (
+			frappe.qb.from_(sessions)
+			.select(sessions.sessiondata)
+			.where(sessions.sid == browser.cookies.get("sid"))
+			.run()
+		)
+		self.assertTrue(rows, "session record not found")
+		return frappe.parse_json(rows[0][0] or "{}").get("csrf_token") or ""
 
 	def logged_user(self, browser) -> str:
 		response = browser.get(f"{SITE_URL}/api/method/frappe.auth.get_logged_user", timeout=TIMEOUT)
@@ -150,7 +193,11 @@ class TestLiveKeycloak(IntegrationTestCase):
 
 	def test_logout_endpoint_returns_keycloak_logout_url(self):
 		browser = self.sign_in_through_keycloak()
-		response = browser.post(f"{SITE_URL}/api/method/platform_core.api.auth.logout", timeout=TIMEOUT)
+		response = browser.post(
+			f"{SITE_URL}/api/method/platform_core.api.auth.logout",
+			headers={"X-Frappe-CSRF-Token": self.csrf_token(browser)},
+			timeout=TIMEOUT,
+		)
 		self.assertEqual(response.status_code, 200, response.text[:300])
 		url = response.json()["message"]["logout_url"]
 		self.assertTrue(url.startswith(f"{KC_URL}/realms/platform/protocol/openid-connect/logout?"))

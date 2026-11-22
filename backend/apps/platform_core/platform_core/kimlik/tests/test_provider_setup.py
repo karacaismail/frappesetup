@@ -87,11 +87,11 @@ class TestSetup(FrappeAPITestCase):
 		h.login_with_keycloak(end_user, h.userinfo("sub-ayse", h.AYSE))
 		self.addCleanup(h.clear_links)
 		self.assertEqual(h.logged_user(end_user), h.AYSE)
-		response = h.request(end_user.post, endpoint)
+		response = h.request(end_user.post, endpoint, headers=h.csrf_headers(end_user))
 		self.assertEqual(response.status_code, 403)
 
 		admin = h.new_client()
 		admin.set_cookie("sid", self.sid)
-		response = h.request(admin.post, endpoint)
+		response = h.request(admin.post, endpoint, headers=h.csrf_headers(admin))
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		self.assertEqual(response.json["message"]["social_login_key"], "keycloak")

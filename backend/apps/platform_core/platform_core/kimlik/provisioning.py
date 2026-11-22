@@ -52,7 +52,9 @@ def provision(data: dict) -> dict:
 			doc = frappe.get_doc("User", email)
 			# End-user provisioning never takes over a desk account (O-3 in the security review).
 			if doc.user_type != WEBSITE_USER or doc.has_desk_access():
-				frappe.throw(_("This e-mail belongs to a desk user and cannot be provisioned."), IdentityConflict)
+				frappe.throw(
+					_("This e-mail belongs to a desk user and cannot be provisioned."), IdentityConflict
+				)
 		else:
 			doc = frappe.new_doc("User")
 			doc.update({"email": email, "user_type": WEBSITE_USER, "send_welcome_email": 0})

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: platform_core kimlik uçları
-  version: 0.1.0
-  summary: Keycloak ile giriş, çıkış ve kullanıcı eşitleme uçları.
+  version: 0.2.0
+  summary: Keycloak ile giriş, dönüş, çıkış ve kullanıcı eşitleme uçları.
   description: |
     Bu sözleşme `platform_core.kimlik` modülünün uçlarını tarif eder.
     Kurallar `backend/docs/sozlesmeler.md` dosyasının 3, 4, 5 ve 8. bölümlerindedir.
@@ -12,32 +12,48 @@ info:
     Kullanıcının kalıcı anahtarı `(iss, sub)` çiftidir. E-posta yalnız iletişim bilgisidir.
     Eşitleme servisi (`identity_sync`) kullanıcıyı bu uçlarla açar, kapatır ve günceller.
 
-    Keycloak'tan dönüş ucu bu dosyada yoktur. Dönüş ucu Frappe'nin hazır ucudur:
-    `frappe.integrations.oauth2_logins.login_via_keycloak`.
+    Kiracı girişi kendi dönüş ucunu kullanır. Dönüş ucu `keycloak_callback` ucudur.
+    Frappe'nin hazır `login_via_keycloak` ucu kullanılmaz. Nedeni şudur.
+    Hazır uç `state` değerini tarayıcıya bağlamaz. Hazır uç kimlik belirtecini de saklamaz.
+    Bu yüzden Keycloak oturum kimliği (`sid`) bulunmaz.
     Bu dosyada yalnız platform-core-kimlik işinin yazdığı uçlar vardır.
 
     Üç kimlik türü vardır.
 
-    - Misafir uçlar kimlik istemez. `get_login_url` ve `keycloak_backchannel_logout` böyledir.
-      Bu iki uç istek sınırlıdır. Sınır aşılınca 429 döner.
+    - Misafir uçlar kimlik istemez. `get_login_url`, `keycloak_callback` ve `keycloak_backchannel_logout` böyledir.
+      Bu üç uç istek sınırlıdır. Sınır aşılınca 429 döner.
     - Oturum uçları `sid` çerezini ve `X-Frappe-CSRF-Token` başlığını birlikte ister.
       `logout` ve `setup_keycloak_login` böyledir.
     - Servis uçları `Authorization: Bearer <JWT>` başlığını ister. `identity.*` uçları böyledir.
       Belirteç kuralları `serviceToken` şemasının açıklamasındadır.
 
-    Bütün uçlar POST ister. Yol `/api/method/<python yolu>` biçimindedir. Bu Frappe'nin RPC yoludur.
+    Yol `/api/method/<python yolu>` biçimindedir. Bu Frappe'nin RPC yoludur.
+    `keycloak_callback` GET ister. Öteki uçlar POST ister.
+
+    Giriş akışı şöyledir.
+
+    1. Panel `get_login_url` ucunu çağırır. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` üretir.
+       Sunucu bir tarayıcı değeri de üretir. Değer `kimlik_login` çerezine yazılır.
+       Sunucu `state` kaydında bu değerin SHA-256 özetini, PKCE doğrulayıcısını, `nonce` değerini ve dönüş yolunu saklar. Kayıt 600 saniye yaşar.
+    2. Tarayıcı `login_url` adresine gider. Kullanıcı Keycloak'ta oturum açar.
+    3. Keycloak tarayıcıyı `keycloak_callback` ucuna döndürür. Sunucu `state` kaydını tek bölünmez işlemle okur ve siler.
+       Sunucu çerezi ve kimlik belirtecini doğrular. Sunucu Frappe oturumu açar ve tarayıcıyı dönüş yoluna yönlendirir.
 
     Başarı gövdesi Frappe sarmalıdır: `{"message": <sonuç>}`.
+    `keycloak_callback` ucu bunun dışındadır. O uç tarayıcı akışıdır. Yanıtı HTML sayfa ya da yönlendirmedir.
+
     Hata gövdesi Frappe'nin olağan biçimidir. Şeması `FrappeError` altındadır.
     İstemci hatayı `exc_type` alanından tanır. Her hata yanıtında beklenen `exc_type` değerleri yazılıdır.
     `identity.*` uçlarında eksik ya da yanlış biçimli alan 400 ve `InvalidInput` döner.
-    Öteki uçlarda Frappe'nin genel doğrulama hatası 400 ve `ValidationError` döner.
+    Gövde JSON olarak ayrıştırılamazsa Frappe uca gelmeden 417 ve `DataError` döner.
+    Bu durum uçtaki `InvalidInput` denetiminden önce olur. Bu yanıt her JSON gövdeli uçta olabilir.
     Keycloak anahtar listesi alınamazsa belirteç doğrulanamaz. O zaman uç 503 ve `KeycloakKeysUnavailable` döner.
 
     `x-yikici` alanı ucun oturum kapatan ya da kullanıcıyı kapatan iş yapıp yapmadığını söyler.
     Hiçbir uç ücretli iş yapmaz.
 
     Site ayarları `x-site-settings` uzantısındadır. Sır değerleri bu dosyada yoktur.
+    Yerel giriş kapısının kapsamı `x-yerel-giris-kapisi` uzantısındadır.
   license:
     name: MIT
     identifier: MIT
@@ -52,7 +68,7 @@ servers:
 
 tags:
   - name: giris
-    description: Tarayıcının giriş ve çıkış uçları.
+    description: Tarayıcının giriş, dönüş ve çıkış uçları.
   - name: kurulum
     description: Sitede Keycloak girişini açan yönetim ucu.
   - name: eşitleme
@@ -91,37 +107,71 @@ x-site-settings:
     - key: platform_panel_url
       example: http://kiraci1.localhost:8661/panel
       required: true
-      note: Çıkıştan sonra tarayıcının döneceği adres.
+      note: Çıkıştan sonra tarayıcının döneceği adres. Girişte `redirect_to` yoksa dönüş adresi de budur.
     - key: kimlik_yalniz_keycloak
       example: 0
       required: false
-      note: Varsayılan 0. Değer 1 olunca parola girişi kapanır (AU-19).
+      note: Varsayılan 0. Değer 1 olunca yerel giriş kapanır (AU-19). Kapsam `x-yerel-giris-kapisi` uzantısındadır.
     - key: kimlik_servis_azp
       example: ["identity-sync"]
       required: false
       note: Servis belirtecinde kabul edilen `azp` listesi. Varsayılan `["identity-sync"]`.
+
+x-yerel-giris-kapisi:
+  description: |
+    `kimlik_yalniz_keycloak` ayarı 1 iken Frappe'nin yerel giriş işlevleri kapanır.
+    Kapatma adrese değil, çağrılan işleve uygulanır. Bunun için `override_whitelisted_methods` kancası kullanılır.
+    `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi kapsamdadır.
+    `keycloak_callback` ucu ve bu dosyadaki öteki uçlar etkilenmez.
+    Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar.
+  parola_girisi:
+    description: Parola girişi 401 ve `AuthenticationError` döner.
+    yollar:
+      - /api/method/login
+      - /api/v2/method/login
+      - cmd=login
+  kapatilan_islevler:
+    description: Şu işlevler 403 ve `PermissionError` döner.
+    islevler:
+      - frappe.core.doctype.user.user.reset_password
+      - frappe.core.doctype.user.user.update_password
+      - frappe.core.doctype.user.user.sign_up
+      - frappe.www.login.send_login_link
+      - frappe.www.login.login_via_key
+      - frappe.www.login.login_via_token
+      - frappe.integrations.oauth2_logins.* (hazır sosyal giriş uçları)
 
 paths:
   /platform_core.api.auth.get_login_url:
     post:
       tags: [giris]
       operationId: getLoginUrl
-      summary: Keycloak giriş adresini üretir.
+      summary: Keycloak giriş adresini üretir ve tarayıcı çerezini verir.
       description: |
         Panel sayfası bu ucu çağırır. Kullanıcı henüz oturum açmamıştır.
-        Uç Keycloak'ın yetki adresini üretir ve döner. `state` değerini sunucu üretir.
-        Sunucu `state` değerini 600 saniye saklar.
+        Uç Keycloak'ın yetki adresini üretir ve döner.
+
+        `login_url` içinde şunlar bulunur: `state`, `nonce`, `code_challenge`,
+        `code_challenge_method=S256` ve `redirect_uri`.
+        `redirect_uri` değeri `<site>/api/method/platform_core.api.auth.keycloak_callback` olur.
+        `state`, `nonce` ve PKCE doğrulayıcısını sunucu üretir. Sunucu bunları 600 saniye saklar.
+
+        Yanıt `Set-Cookie` başlığıyla bir tarayıcı değeri verir. Çerezin adı geliştirmede `kimlik_login` olur.
+        HTTPS'te adı `__Host-kimlik_login` olur. Çerez `HttpOnly` ve `SameSite=Lax` olur.
+        HTTPS'te `Secure` de olur. Ömrü 600 saniyedir.
+        Sunucu `state` kaydında bu değerin SHA-256 özetini saklar. Dönüş ucu çerezi bu özetle karşılaştırır.
 
         `redirect_to` isteğe bağlıdır. Giriş bitince tarayıcı bu yola döner.
-        Yalnız `/` ile başlayan göreli yol kabul edilir. `//` ve `/\` ile başlayan yol reddedilir.
-        Boşluk ya da denetim karakteri içeren yol reddedilir. En çok 2048 karakter olabilir.
-        Uygun olmayan yol 400 ve `InvalidRedirect` döner.
+        Yalnız `/` ile başlayan göreli yol kabul edilir. `//` ile başlayan yol reddedilir.
+        Ters eğik çizgi hiçbir yerde kabul edilmez. Boşluk ya da denetim karakteri de kabul edilmez.
+        En çok 2048 karakter olabilir. Uygun olmayan yol 400 ve `InvalidRedirect` döner.
+        `redirect_to` yoksa dönüş adresi `platform_panel_url` ayarıdır.
 
-        Sitede “Social Login Key” kaydı `keycloak` yoksa ya da kapalıysa uç 503 döner.
-        Bu durumda yönetici `setup_keycloak_login` ucunu çalıştırır.
+        Zorunlu site ayarlarından biri eksikse uç 503 döner.
+        Zorunlu anahtarlar `x-site-settings` uzantısında yazılıdır.
 
         Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
-        Uç kayıt değiştirmez. Uç kişisel veri dönmez.
+        Uç kalıcı kayıt değiştirmez. Uç kişisel veri dönmez.
       x-yikici: false
       security: []
       requestBody:
@@ -135,11 +185,24 @@ paths:
                 summary: Giriş bitince panele dön.
                 value: {redirect_to: /panel}
               gövdesiz:
-                summary: Dönüş yolu verilmedi. Frappe varsayılanı geçerlidir.
+                summary: Dönüş yolu verilmedi. Dönüş adresi `platform_panel_url` olur.
                 value: {}
       responses:
         "200":
-          description: Giriş adresi ve düğme metni.
+          description: Giriş adresi, düğme metni ve tarayıcı çerezi.
+          headers:
+            Set-Cookie:
+              description: |
+                Giriş akışını tarayıcıya bağlayan çerez. Adı geliştirmede `kimlik_login`, HTTPS'te `__Host-kimlik_login` olur.
+                Öznitelikleri `HttpOnly`, `SameSite=Lax`, `Path=/` ve `Max-Age=600` olur. HTTPS'te `Secure` de olur.
+                Değer rastgeledir. Sunucu yalnız özetini saklar.
+              schema:
+                type: string
+              examples:
+                gelistirme:
+                  value: "kimlik_login=9f3b2c1d8e7a6b5c4d3e2f1a0b9c8d7e; Path=/; Max-Age=600; HttpOnly; SameSite=Lax"
+                https:
+                  value: "__Host-kimlik_login=9f3b2c1d8e7a6b5c4d3e2f1a0b9c8d7e; Path=/; Max-Age=600; Secure; HttpOnly; SameSite=Lax"
           content:
             application/json:
               schema:
@@ -151,13 +214,11 @@ paths:
                 atonota:
                   value:
                     message:
-                      login_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Ffrappe.integrations.oauth2_logins.login_via_keycloak&state=a1b2c3d4e5f6a7b8"
+                      login_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
                       brand_name: Atonota
                       label: Atonota ile oturum aç
         "400":
-          description: |
-            `redirect_to` güvenli değil. `exc_type` değeri `InvalidRedirect` olur.
-            Gövde JSON değilse `exc_type` değeri `ValidationError` olur.
+          description: "`redirect_to` güvenli değil. `exc_type` değeri `InvalidRedirect` olur."
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -165,14 +226,16 @@ paths:
                 disAdres:
                   value:
                     exc_type: InvalidRedirect
-                    exception: "platform_core.kimlik.exceptions.InvalidRedirect: redirect_to"
+                    exception: "platform_core.kimlik.hatalar.InvalidRedirect: redirect_to"
                     _server_messages: '["{\"message\": \"Dönüş yolu güvenli değil.\"}"]'
+        "417":
+          $ref: "#/components/responses/GovdeBozuk"
         "429":
           $ref: "#/components/responses/IstekSiniri"
         "503":
           description: |
             Keycloak girişi bu sitede kurulu değil. `exc_type` değeri `KeycloakLoginNotConfigured` olur.
-            “Social Login Key” kaydı `keycloak` yok ya da kapalı.
+            Zorunlu site ayarlarından biri eksik. Hata iletisi eksik anahtarın adını söyler. Değerini söylemez.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -180,8 +243,128 @@ paths:
                 kuruluDegil:
                   value:
                     exc_type: KeycloakLoginNotConfigured
-                    exception: "platform_core.kimlik.exceptions.KeycloakLoginNotConfigured: keycloak"
-                    _server_messages: '["{\"message\": \"Keycloak girişi bu sitede kurulu değil.\"}"]'
+                    exception: "platform_core.kimlik.hatalar.KeycloakLoginNotConfigured: keycloak_client_id"
+                    _server_messages: '["{\"message\": \"Keycloak girişi bu sitede kurulu değil: keycloak_client_id\"}"]'
+
+  /platform_core.api.auth.keycloak_callback:
+    get:
+      tags: [giris]
+      operationId: keycloakCallback
+      summary: Keycloak'tan dönen tarayıcıyı karşılar ve Frappe oturumu açar.
+      description: |
+        Keycloak tarayıcıyı bu uca döndürür. Kullanıcı Keycloak'ta oturum açmıştır.
+        Bu uç tarayıcı akışıdır. Yanıt HTML sayfa ya da yönlendirmedir.
+        Hata yanıtları JSON değildir. Bu yüzden `exc_type` yoktur. Sayfa bir başlık ve kısa bir açıklama gösterir.
+
+        Sunucu şu sırayla çalışır.
+
+        1. Sunucu `state` kaydını tek bölünmez işlemle okur ve siler. Örneğin Redis `GETDEL` kullanılır.
+           Kayıt yoksa, süresi dolmuşsa ya da daha önce kullanılmışsa 400 döner.
+        2. Sunucu `kimlik_login` çerezini okur. Çerez yoksa 400 döner.
+           Çerezdeki değerin SHA-256 özeti kayıttaki özetle eşleşmezse 403 döner.
+        3. Keycloak `error` döndürmüşse sunucu 400 döner. Kod değişimi yapılmaz.
+        4. Sunucu kodu Keycloak token ucunda PKCE `code_verifier` ile belirteçle değiştirir.
+           Değişim başarısız olursa 400 döner.
+        5. Sunucu kimlik belirtecini `oidc_verify.verify_id_token` ile doğrular. `nonce` da denetlenir.
+           Belirteç geçersizse 400 döner.
+        6. Sunucu kullanıcıyı `(iss, sub)` bağıyla bulur.
+           Bağ yoksa ve e-posta doğrulanmışsa aynı e-postalı kullanıcıya ilk bağ kurulur.
+           Doğrulanmamış e-postayla ilk bağ kurulmaz. Bu durumda 403 döner.
+           Bilinmeyen e-posta 403 alır. Kayıt açılmaz. Kullanıcıyı eşitleme servisi açar.
+           Bağ başka kullanıcıya aitse 403 döner. Aynı e-posta başka `sub` değerine bağlıysa 403 döner.
+           Kapalı kullanıcı 403 alır.
+        7. Sunucu Frappe oturumu açar. Keycloak oturum kimliği (`sid`) oturum verisine yazılır.
+           Arka kanal çıkışı bu değerle eşleşir.
+        8. Sunucu tarayıcıyı `redirect_to` yoluna yönlendirir. Yol kayıtta yoksa `platform_panel_url` adresine yönlendirir.
+
+        Keycloak'a ulaşılamazsa ya da anahtar listesi alınamazsa 503 döner.
+        Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
+
+        Uç oturum açar. Uç oturum kapatmaz. Uç kullanıcı kaydı açmaz.
+      x-yikici: false
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Keycloak'ın verdiği yetki kodu. Tek kullanımlıktır.
+          schema: {type: string, minLength: 1, maxLength: 4096}
+        - name: state
+          in: query
+          required: true
+          description: "`get_login_url` ucunun ürettiği `state` değeri. Kayıt bu değerle bulunur."
+          schema: {type: string, minLength: 1, maxLength: 255}
+        - name: error
+          in: query
+          required: false
+          description: Keycloak giriş başarısız olunca bunu gönderir. Örneğin `access_denied`. Varsa sunucu 400 döner.
+          schema: {type: string, maxLength: 255}
+        - name: error_description
+          in: query
+          required: false
+          description: Keycloak'ın hata açıklaması. Sayfada kullanıcıya gösterilmez. Günlüğe kısaltılarak yazılır.
+          schema: {type: string, maxLength: 1024}
+        - name: kimlik_login
+          in: cookie
+          required: true
+          description: |
+            `get_login_url` ucunun verdiği tarayıcı çerezi. HTTPS'te adı `__Host-kimlik_login` olur.
+            Çerez yoksa 400 döner. Özeti kayıtla eşleşmezse 403 döner.
+          schema: {type: string, minLength: 1, maxLength: 255}
+      responses:
+        "302":
+          description: Giriş başarılı. Frappe oturumu açıldı. Tarayıcı dönüş yoluna gider.
+          headers:
+            Location:
+              description: "`redirect_to` yolu. Kayıtta yol yoksa `platform_panel_url` adresi."
+              schema: {type: string}
+              examples:
+                panel:
+                  value: /panel
+            Set-Cookie:
+              description: Frappe oturum çerezleri. `sid` bunlardan biridir. Giriş çerezi `kimlik_login` silinir.
+              schema: {type: string}
+        "400":
+          description: |
+            Giriş tamamlanamadı. Sayfa başlığı “Giriş tamamlanamadı” olur. Nedenlerden biri şudur:
+
+            - `state` eksik, süresi dolmuş ya da daha önce kullanılmış,
+            - `kimlik_login` çerezi eksik,
+            - Keycloak `error` döndürmüş,
+            - kod değişimi başarısız,
+            - kimlik belirteci geçersiz. `nonce` uyuşmazlığı da buna girer.
+
+            Sayfa kullanıcıya girişi yeniden başlatmasını söyler.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+        "403":
+          description: |
+            Giriş reddedildi. Sayfa başlığı “Giriş reddedildi” olur. Nedenlerden biri şudur:
+
+            - çerez özeti kayıtla uyuşmuyor,
+            - kimlik bağı başka kullanıcıya ait,
+            - aynı e-posta başka bir `sub` değerine bağlı,
+            - e-posta doğrulanmamış,
+            - kullanıcı bu sitede yok,
+            - kullanıcı kapalı.
+
+            Sayfa nedeni ayrıntılı yazmaz. Sayfa kullanıcıya yöneticisine başvurmasını söyler.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+        "429":
+          description: İstek sınırı aşıldı. Sınır IP adresine göre sayılır. Yanıt HTML sayfadır.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+        "503":
+          description: |
+            Keycloak'a ulaşılamadı ya da anahtar listesi alınamadı. Sayfa başlığı “Kimlik sunucusuna ulaşılamadı” olur.
+            Sayfa kullanıcıya biraz sonra yeniden denemesini söyler.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
 
   /platform_core.api.auth.logout:
     post:
@@ -198,7 +381,7 @@ paths:
         Keycloak oturumu ancak o zaman kapanır.
         Adres `client_id` ve `post_logout_redirect_uri` taşır. Dönüş adresi `platform_panel_url` ayarıdır.
 
-        Bilinen sınır: Adreste `id_token_hint` yoktur. Frappe'nin hazır giriş akışı `id_token` saklamaz.
+        Bilinen sınır: Adreste `id_token_hint` yoktur. Sunucu kimlik belirtecini saklamaz.
         Bu yüzden Keycloak bir onay ekranı gösterebilir.
 
         İstek gövdesizdir. Misafir isteği 403 alır.
@@ -239,7 +422,8 @@ paths:
 
         Uç “Social Login Key” kaydı `keycloak` yoksa kaydı açar. Kayıt varsa kaydı günceller.
         Kayıt `provider_name` alanında marka adını taşır. Kullanıcı kimliği `sub` alanından okunur.
-        Kayıt dönüş adresini Frappe'nin hazır `login_via_keycloak` ucuna bağlar.
+        Kayıt yalnız yönetim ekranında görünürlük içindir. Giriş akışı bu kayıttan geçmez.
+        Giriş akışı `get_login_url` ve `keycloak_callback` uçlarındadır.
 
         Uç aynı isteği iki kez alırsa aynı sonucu döner. İkinci çağrı bir şey bozmaz.
 
@@ -279,7 +463,7 @@ paths:
                 markaEksik:
                   value:
                     exc_type: KeycloakSettingsMissing
-                    exception: "platform_core.kimlik.exceptions.KeycloakSettingsMissing: kimlik_marka_adi"
+                    exception: "platform_core.kimlik.hatalar.KeycloakSettingsMissing: kimlik_marka_adi"
                     _server_messages: '["{\"message\": \"Site ayarı eksik: kimlik_marka_adi\"}"]'
         "403":
           description: |
@@ -299,14 +483,18 @@ paths:
 
         **Bu uç oturum kapatır.** Eşleşen bütün Frappe oturumları hemen kapanır. Geri alınamaz.
 
-        Belirteç şöyle doğrulanır: imza, `iss`, `aud`, `iat`, çıkış olayı anahtarı,
+        Belirteç şöyle doğrulanır: imza, `iss`, `aud`, `iat`, `exp`, `jti`, çıkış olayı anahtarı,
         `sid` ya da `sub` varlığı ve `nonce` yokluğu. Saat payı 30 saniyedir.
+        `events` içindeki çıkış olayının değeri JSON nesnesi olmalıdır. `sid` varsa metin olmalıdır.
+        Sunucu işlenen `jti` değerini belirtecin ömrü boyunca saklar. Aynı `jti` yeniden gelirse reddedilir.
         Kurallar `docs/sozlesmeler.md` 3. bölümdedir.
 
         Eşleşme sırası:
 
         1. Belirteçte `sid` varsa oturum verisinde aynı `keycloak_sid` değerini taşıyan oturumlar kapanır.
-        2. Eşleşme yoksa ve `sub` varsa `(iss, sub)` bağındaki kullanıcının bütün oturumları kapanır.
+        2. Eşleşme yoksa ve `sub` varsa `(iss, sub)` bağındaki kullanıcının oturumları kapanır.
+           Bu yedek yol yalnız belirtecin `iat` değerinden önce açılmış oturumları kapatır.
+           Bildiriden sonra açılan oturumlar açık kalır.
 
         Eşleşen oturum yoksa yanıt yine 200 olur. `closed_sessions` değeri 0 olur.
         Yanıt `Cache-Control: no-store` başlığı taşır.
@@ -352,8 +540,20 @@ paths:
                   value: {message: {closed_sessions: 0}}
         "400":
           description: |
-            Belirteç eksik ya da geçersiz. `exc_type` değeri `InvalidLogoutToken` olur.
-            İstek Guest dışı oturum çerezi taşıyorsa da aynı hata döner.
+            Belirteç kabul edilmedi. `exc_type` değeri `InvalidLogoutToken` olur. Nedenlerden biri şudur:
+
+            - `logout_token` eksik,
+            - imza, `iss` ya da `aud` yanlış,
+            - `iat`, `exp` ya da `jti` eksik,
+            - `exp` geçmiş ya da `iat` ileride,
+            - `events` içinde çıkış olayı yok ya da değeri JSON nesnesi değil,
+            - `sid` ve `sub` ikisi de yok,
+            - `sid` var ama metin değil,
+            - `nonce` var,
+            - aynı `jti` daha önce işlenmiş (tekrar gönderim),
+            - istek Guest dışı oturum çerezi taşıyor.
+
+            İleti nedeni ayrıntılı yazmaz.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -361,7 +561,7 @@ paths:
                 gecersiz:
                   value:
                     exc_type: InvalidLogoutToken
-                    exception: "platform_core.kimlik.exceptions.InvalidLogoutToken: logout_token"
+                    exception: "platform_core.kimlik.hatalar.InvalidLogoutToken: logout_token"
                     _server_messages: '["{\"message\": \"Çıkış belirteci geçersiz.\"}"]'
         "429":
           $ref: "#/components/responses/IstekSiniri"
@@ -376,7 +576,11 @@ paths:
       description: |
         Eşitleme servisi bu ucu çağırır. Servis belirteci `azp=identity-sync` taşımalıdır.
 
-        Uç önce `issuer` değerini sitenin `iss` değeriyle karşılaştırır. Farklıysa 400 döner.
+        Uç önce girdiyi denetler. `issuer`, `subject`, `email`, `email_verified` ve `enabled` zorunludur.
+        `email_verified` ve `enabled` doğru ya da yanlış olmalıdır. `first_name` ve `last_name` metin olmalıdır.
+        `role_profiles` içindeki her rol profili sitede var olmalıdır. Aksi durumda 400 ve `InvalidInput` döner.
+
+        Uç sonra `issuer` değerini sitenin `iss` değeriyle karşılaştırır. Farklıysa 400 döner.
 
         Bağ `(issuer, subject)` varsa kullanıcı bulunmuştur. Uç ad, soyad, `enabled` ve
         `role_profiles` alanlarını günceller. `email` kullanıcının adından farklıysa 409 döner.
@@ -384,6 +588,9 @@ paths:
 
         Bağ yoksa uç yeni bağ kurar. Bunun için `email_verified` doğru olmalıdır.
         Aynı e-postalı kullanıcı aynı `issuer` ile başka bir `subject` değerine bağlıysa 409 döner.
+        Aynı e-postalı kullanıcı var ama “Website User” değilse 409 döner.
+        Aynı e-postalı kullanıcının masaüstü erişimi açık bir rolü varsa da 409 döner.
+        Yönetim hesapları eşitlemeyle sahiplenilmez.
         Kullanıcı yoksa uç “Website User” türünde kullanıcı açar. Hoş geldin e-postası gönderilmez.
         Yeni kullanıcıya rol verilmez.
 
@@ -437,8 +644,9 @@ paths:
 
             - `issuer` sitenin `iss` değerinden farklıysa `UnknownIssuer` döner.
             - `role_profiles` içinde masaüstü erişimi veren rol varsa `DeskRoleNotAllowed` döner.
-            - Alan eksikse ya da yanlış biçimliyse `InvalidInput` döner. Örneğin `email` eksik,
-              `enabled` doğru ya da yanlış değil, `role_profiles` içinde var olmayan rol profili var.
+            - Alan eksikse ya da yanlış biçimliyse `InvalidInput` döner. Örnekler şunlardır.
+              `email` eksik. `email_verified` eksik. `enabled` doğru ya da yanlış değil.
+              `first_name` metin değil. `role_profiles` içinde var olmayan rol profili var.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -446,8 +654,13 @@ paths:
                 yabanciIssuer:
                   value:
                     exc_type: UnknownIssuer
-                    exception: "platform_core.kimlik.exceptions.UnknownIssuer: issuer"
+                    exception: "platform_core.kimlik.hatalar.UnknownIssuer: issuer"
                     _server_messages: '["{\"message\": \"issuer bu sitenin kimlik sunucusu değil.\"}"]'
+                dogrulamaEksik:
+                  value:
+                    exc_type: InvalidInput
+                    exception: "platform_core.kimlik.hatalar.InvalidInput: email_verified"
+                    _server_messages: '["{\"message\": \"email_verified alanı zorunlu.\"}"]'
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
         "403":
@@ -459,6 +672,8 @@ paths:
             - Bağ var ama `email` kullanıcının adından farklıysa `EmailMismatch` döner. E-postayı `change_email` ile değiştirin.
             - Bağ yok ve `email_verified` yanlışsa `EmailNotVerified` döner. İlk bağ kurulmaz.
             - Aynı e-postalı kullanıcı aynı `issuer` ile başka bir `subject` değerine bağlıysa `IdentityConflict` döner.
+            - Bağsız var olan kullanıcı “Website User” değilse `IdentityConflict` döner.
+            - Bağsız var olan kullanıcının masaüstü erişimi açık bir rolü varsa `IdentityConflict` döner.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -466,8 +681,15 @@ paths:
                 dogrulanmamis:
                   value:
                     exc_type: EmailNotVerified
-                    exception: "platform_core.kimlik.exceptions.EmailNotVerified: email_verified"
+                    exception: "platform_core.kimlik.hatalar.EmailNotVerified: email_verified"
                     _server_messages: '["{\"message\": \"E-posta doğrulanmadan ilk bağ kurulmaz.\"}"]'
+                yonetimHesabi:
+                  value:
+                    exc_type: IdentityConflict
+                    exception: "platform_core.kimlik.hatalar.IdentityConflict: email"
+                    _server_messages: '["{\"message\": \"Bu e-posta eşitlemeyle sahiplenilemeyen bir hesaba ait.\"}"]'
+        "417":
+          $ref: "#/components/responses/GovdeBozuk"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -522,6 +744,8 @@ paths:
           $ref: "#/components/responses/ServisYetkisiYok"
         "404":
           $ref: "#/components/responses/BagYok"
+        "417":
+          $ref: "#/components/responses/GovdeBozuk"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -588,8 +812,10 @@ paths:
                 kullanimda:
                   value:
                     exc_type: EmailInUse
-                    exception: "platform_core.kimlik.exceptions.EmailInUse: new_email"
+                    exception: "platform_core.kimlik.hatalar.EmailInUse: new_email"
                     _server_messages: '["{\"message\": \"Bu e-posta başka bir kullanıcıya ait.\"}"]'
+        "417":
+          $ref: "#/components/responses/GovdeBozuk"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -634,7 +860,14 @@ components:
     IstekSiniri:
       description: |
         İstek sınırı aşıldı. Sınır IP adresine göre sayılır.
-        `exc_type` değeri Frappe'nin `TooManyRequestsError` değeridir.
+        `exc_type` değeri Frappe'nin `RateLimitExceededError` değeridir.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
+    GovdeBozuk:
+      description: |
+        Gövde JSON olarak ayrıştırılamadı. Frappe isteği uca iletmeden reddetti.
+        `exc_type` değeri Frappe'nin `DataError` değeridir.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -652,7 +885,7 @@ components:
             suresiDolmus:
               value:
                 exc_type: ServiceTokenRejected
-                exception: "platform_core.kimlik.exceptions.ServiceTokenRejected: expired"
+                exception: "platform_core.kimlik.hatalar.ServiceTokenRejected: expired"
                 _server_messages: '["{\"message\": \"Servis belirteci reddedildi: expired\"}"]'
     ServisYetkisiYok:
       description: |
@@ -675,7 +908,7 @@ components:
             enabledYanlis:
               value:
                 exc_type: InvalidInput
-                exception: "platform_core.kimlik.exceptions.InvalidInput: enabled"
+                exception: "platform_core.kimlik.hatalar.InvalidInput: enabled"
                 _server_messages: '["{\"message\": \"enabled alanı doğru ya da yanlış olmalı.\"}"]'
     AnahtarListesiYok:
       description: |
@@ -688,7 +921,7 @@ components:
             keycloakKapali:
               value:
                 exc_type: KeycloakKeysUnavailable
-                exception: "platform_core.kimlik.exceptions.KeycloakKeysUnavailable: jwks"
+                exception: "platform_core.kimlik.hatalar.KeycloakKeysUnavailable: jwks"
                 _server_messages: '["{\"message\": \"Keycloak anahtar listesi alınamadı.\"}"]'
     BagYok:
       description: "`(issuer, subject)` bağı yok. `exc_type` değeri `IdentityNotFound` olur."
@@ -699,24 +932,28 @@ components:
             bagYok:
               value:
                 exc_type: IdentityNotFound
-                exception: "platform_core.kimlik.exceptions.IdentityNotFound: subject"
+                exception: "platform_core.kimlik.hatalar.IdentityNotFound: subject"
                 _server_messages: '["{\"message\": \"Bu kimlik için bağ yok.\"}"]'
 
   schemas:
     Issuer:
       type: string
       format: uri
-      maxLength: 2048
+      minLength: 1
+      maxLength: 255
       description: |
         Kimlik sunucusunun `iss` değeri. Sitenin `iss` değeriyle tam eşleşmelidir.
         Biçim `<keycloak_public_url>/realms/<keycloak_realm>` olur.
+        En çok 255 karakter olur. “Platform Identity Link” kaydının `issuer` alanı da bu uzunluktadır.
       examples:
         - http://kimlik.localhost:8660/realms/platform
     Subject:
       type: string
       minLength: 1
-      maxLength: 255
-      description: Kullanıcının Keycloak'taki `sub` değeri. Kalıcı anahtarın ikinci parçasıdır.
+      maxLength: 140
+      description: |
+        Kullanıcının Keycloak'taki `sub` değeri. Kalıcı anahtarın ikinci parçasıdır.
+        En çok 140 karakter olur. “Platform Identity Link” kaydının `subject` alanı da bu uzunluktadır.
       examples:
         - 11111111-1111-4111-8111-111111111111
     Email:
@@ -727,6 +964,12 @@ components:
       examples:
         - kiraci1.kullanici1@example.test
 
+    HtmlSayfa:
+      type: string
+      description: |
+        Tarayıcıya gösterilen HTML sayfa. Sayfanın bir başlığı ve kısa bir açıklaması vardır.
+        Sayfa `exc_type` taşımaz. Sayfa belirteç, kod ya da kişisel veri göstermez.
+
     LoginUrlRequest:
       type: object
       additionalProperties: false
@@ -734,11 +977,11 @@ components:
         redirect_to:
           type: string
           maxLength: 2048
-          pattern: '^/(?![/\\])[^\s\x00-\x1f\x7f]*$'
+          pattern: '^/(?!/)[^\\\s\x00-\x1f\x7f]*$'
           description: |
-            Giriş bitince dönülecek göreli yol. `/` ile başlar.
-            `//` ve `/\` ile başlayamaz. Boşluk ve denetim karakteri içeremez.
-            En çok 2048 karakter olur.
+            Giriş bitince dönülecek göreli yol. `/` ile başlar. `//` ile başlayamaz.
+            Ters eğik çizgi hiçbir yerde olamaz. Boşluk ve denetim karakteri içeremez.
+            En çok 2048 karakter olur. Verilmezse dönüş adresi `platform_panel_url` olur.
           examples:
             - /panel
             - /panel/kayitlar?durum=acik
@@ -750,7 +993,10 @@ components:
         login_url:
           type: string
           format: uri
-          description: Keycloak yetki adresi. `state` değerini taşır. Tarayıcı bu adrese gider.
+          description: |
+            Keycloak yetki adresi. Tarayıcı bu adrese gider.
+            Adres `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` ve `redirect_uri` taşır.
+            `redirect_uri` değeri bu sitenin `keycloak_callback` ucudur.
         brand_name:
           type: string
           description: Marka adı. `kimlik_marka_adi` ayarından gelir.
@@ -776,7 +1022,7 @@ components:
         logout_token:
           type: string
           minLength: 1
-          description: Keycloak'ın imzaladığı çıkış belirteci (JWT).
+          description: Keycloak'ın imzaladığı çıkış belirteci (JWT). `exp` ve `jti` alanları zorunludur.
 
     BackchannelLogoutResult:
       type: object
@@ -813,18 +1059,18 @@ components:
         email: {$ref: "#/components/schemas/Email"}
         email_verified:
           type: boolean
-          description: Keycloak e-postayı doğruladı mı? Yanlışsa ilk bağ kurulmaz.
+          description: Keycloak e-postayı doğruladı mı? Zorunludur. Yanlışsa ilk bağ kurulmaz.
         first_name:
           type: string
           maxLength: 140
-          description: Ad. İsteğe bağlı.
+          description: Ad. İsteğe bağlı. Verilirse metin olmalıdır.
         last_name:
           type: string
           maxLength: 140
-          description: Soyad. İsteğe bağlı.
+          description: Soyad. İsteğe bağlı. Verilirse metin olmalıdır.
         enabled:
           type: boolean
-          description: Kullanıcı açık mı? Yanlışsa kullanıcı kapanır.
+          description: Kullanıcı açık mı? Zorunludur. Yanlışsa kullanıcı kapanır.
         role_profiles:
           type: array
           uniqueItems: true
@@ -833,7 +1079,7 @@ components:
             maxLength: 140
           description: |
             Kullanıcıya verilecek rol profilleri. İsteğe bağlı.
-            Masaüstü erişimi veren rol içeremez.
+            Her rol profili sitede var olmalıdır. Masaüstü erişimi veren rol içeremez.
 
     ProvisionResult:
       type: object
@@ -901,8 +1147,9 @@ components:
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
         `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput` ve `KeycloakKeysUnavailable`.
-        Frappe'nin genel değerleri `PermissionError`, `AuthenticationError`, `ValidationError`,
-        `CSRFTokenError` ve `TooManyRequestsError` olabilir.
+        Frappe'nin genel değerleri `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
+        `DataError` ve `RateLimitExceededError` olabilir.
+        `keycloak_callback` ucu bu gövdeyi dönmez. O uç HTML sayfa döner.
       required: [exc_type]
       properties:
         exc_type:

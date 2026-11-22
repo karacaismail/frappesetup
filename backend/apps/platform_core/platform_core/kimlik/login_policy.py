@@ -20,7 +20,9 @@ GATE_MESSAGE = "Local sign-in is disabled. Sign in with the identity provider."
 def before_login(login_manager=None) -> None:
 	"""Runs at the start of `LoginManager.login`. Stops password sign-in while the gate is on."""
 	if site_settings.keycloak_only():
-		frappe.throw(_("Password sign-in is disabled. Sign in with the identity provider."), frappe.AuthenticationError)
+		frappe.throw(
+			_("Password sign-in is disabled. Sign in with the identity provider."), frappe.AuthenticationError
+		)
 
 
 def before_request() -> None:
@@ -87,7 +89,9 @@ login_via_github = _gated("frappe.integrations.oauth2_logins.login_via_github", 
 login_via_facebook = _gated("frappe.integrations.oauth2_logins.login_via_facebook", "login_via_facebook")
 login_via_frappe = _gated("frappe.integrations.oauth2_logins.login_via_frappe", "login_via_frappe")
 login_via_office365 = _gated("frappe.integrations.oauth2_logins.login_via_office365", "login_via_office365")
-login_via_salesforce = _gated("frappe.integrations.oauth2_logins.login_via_salesforce", "login_via_salesforce")
+login_via_salesforce = _gated(
+	"frappe.integrations.oauth2_logins.login_via_salesforce", "login_via_salesforce"
+)
 login_via_fairlogin = _gated("frappe.integrations.oauth2_logins.login_via_fairlogin", "login_via_fairlogin")
 login_via_keycloak = _gated("frappe.integrations.oauth2_logins.login_via_keycloak", "login_via_keycloak")
 custom = _gated("frappe.integrations.oauth2_logins.custom", "custom")

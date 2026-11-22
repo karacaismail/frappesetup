@@ -1,4 +1,7 @@
-"""identity-sync endpoints. Only the `identity-sync` service token is accepted (docs/sozlesmeler.md, section 5)."""
+"""identity-sync endpoints. Only the `identity-sync` service token is accepted (docs/sozlesmeler.md, section 5).
+
+Parameters carry no type hints on purpose: Frappe would answer a wrong type with its own 417 before the
+module runs. `provisioning` validates every field and answers 400 `InvalidInput` (the contract's single shape)."""
 
 import frappe
 
@@ -9,14 +12,14 @@ SERVICE = "identity-sync"
 
 @frappe.whitelist(methods=["POST"])
 def provision(
-	issuer: str | None = None,
-	subject: str | None = None,
-	email: str | None = None,
-	email_verified: bool | str | int | None = None,
-	first_name: str | None = None,
-	last_name: str | None = None,
-	enabled: bool | str | int | None = None,
-	role_profiles: list | str | None = None,
+	issuer=None,
+	subject=None,
+	email=None,
+	email_verified=None,
+	first_name=None,
+	last_name=None,
+	enabled=None,
+	role_profiles=None,
 ) -> dict:
 	"""Creates or updates the user. The same request returns the same result twice."""
 	service_token.require_service(SERVICE)
@@ -35,16 +38,14 @@ def provision(
 
 
 @frappe.whitelist(methods=["POST"])
-def set_enabled(
-	issuer: str | None = None, subject: str | None = None, enabled: bool | str | int | None = None
-) -> dict:
+def set_enabled(issuer=None, subject=None, enabled=None) -> dict:
 	"""Enables or disables the user. Disabling closes all of the user's sessions."""
 	service_token.require_service(SERVICE)
 	return provisioning.set_enabled({"issuer": issuer, "subject": subject, "enabled": enabled})
 
 
 @frappe.whitelist(methods=["POST"])
-def change_email(issuer: str | None = None, subject: str | None = None, new_email: str | None = None) -> dict:
+def change_email(issuer=None, subject=None, new_email=None) -> dict:
 	"""Changes the e-mail with `rename_doc`. The identity link follows the user."""
 	service_token.require_service(SERVICE)
 	return provisioning.change_email({"issuer": issuer, "subject": subject, "new_email": new_email})

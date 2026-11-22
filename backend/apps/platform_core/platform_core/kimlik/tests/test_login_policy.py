@@ -122,10 +122,14 @@ class TestKeycloakOnly(FrappeAPITestCase):
 					response.status_code, 403, f"{path}: {response.status_code} {response.data[:120]}"
 				)
 			for path in ("/api/v2/method/login", "/api/v1/method/login"):
+				# Frappe 16 opens password sessions only for /api/method/login or cmd=login (frappe/auth.py:135);
+				# the v1/v2 spellings are no-ops (frappe/api/v2.py:56). Nobody may end up signed in.
+				client = h.new_client()
 				response = h.request(
-					h.new_client().post, path, data={"usr": self.admin_user, "pwd": self.admin_password}
+					client.post, path, data={"usr": self.admin_user, "pwd": self.admin_password}
 				)
-				self.assertEqual(response.status_code, 401, f"{path}: {response.status_code}")
+				self.assertIn(response.status_code, (200, 401), f"{path}: {response.status_code}")
+				self.assertEqual(h.logged_user(client), "Guest", path)
 			via_cmd_login = h.request(
 				h.new_client().post,
 				"/",
@@ -145,7 +149,8 @@ class TestKeycloakOnly(FrappeAPITestCase):
 	def test_portal_block_survives_path_tricks(self):
 		client = h.new_client()
 		h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
-		for path in ("//me", "/me.html", "/./me", "/me/", "/update-password/x"):
+		# `//me` is a scheme-relative URL for browsers and the test client alike, so it is not a path variant.
+		for path in ("/me.html", "/./me", "/me/", "/me//", "/update-password/x"):
 			response = h.request(client.get, path, follow_redirects=True)
 			self.assertEqual(response.status_code, 403, f"{path}: {response.status_code}")
 

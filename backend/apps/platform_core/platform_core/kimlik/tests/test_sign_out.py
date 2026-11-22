@@ -39,11 +39,13 @@ class TestBackChannelLogout(FrappeAPITestCase):
 		self.client = h.new_client()
 
 	def send(self, token, client=None):
+		client = client or h.new_client()
 		return h.request(
-			(client or h.new_client()).post,
+			client.post,
 			ENDPOINT,
 			data={"logout_token": token} if token is not None else {},
 			content_type="application/x-www-form-urlencoded",
+			headers=h.csrf_headers(client),
 		)
 
 	def test_invalid_tokens_are_rejected(self):

@@ -21,7 +21,11 @@ from frappe import _
 from frappe.utils import get_url
 
 from platform_core.kimlik import helpers, jwks, site_settings
-from platform_core.kimlik.exceptions import InvalidRedirect, KeycloakLoginNotConfigured, KeycloakSettingsMissing
+from platform_core.kimlik.exceptions import (
+	InvalidRedirect,
+	KeycloakLoginNotConfigured,
+	KeycloakSettingsMissing,
+)
 
 LINK_DOCTYPE = "Platform Identity Link"
 STATE_PREFIX = "kimlik_login_state"
@@ -94,7 +98,9 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 
 	record = _pop_state(state)
 	if record is None:
-		raise SignInRefused(400, _("This sign-in attempt is unknown, expired or already used. Please try again."))
+		raise SignInRefused(
+			400, _("This sign-in attempt is unknown, expired or already used. Please try again.")
+		)
 	browser_token = frappe.request.cookies.get(_cookie_name()) if frappe.request else None
 	if not browser_token:
 		raise SignInRefused(400, _("The sign-in cookie is missing. Please start again in this browser."))
@@ -165,6 +171,9 @@ def resolve_user(issuer: str, claims: dict) -> str:
 		create_link(issuer, subject, email)
 		return email
 
+	if email and email != user.lower():
+		# The identity is linked, but the provider now reports another user's address (AU-4: refuse on mismatch).
+		raise SignInRefused(403, _("This identity is linked to a different user."))
 	if not frappe.db.get_value("User", user, "enabled"):
 		raise SignInRefused(403, _("This user is disabled."))
 	return user

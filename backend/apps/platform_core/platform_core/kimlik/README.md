@@ -6,16 +6,28 @@ Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis be
 
 | Dosya | İşi |
 | --- | --- |
-| `helpers.py` | Frappe'ye bağlı olmayan yardımcılar. Adres üretir, yönlendirmeyi denetler. |
+| `helpers.py` | Frappe'ye bağlı olmayan yardımcılar. Adres üretir, yönlendirmeyi ve yolu denetler. |
 | `site_settings.py` | Site ayarlarını okur. Eksik ayarı açık hatayla bildirir. |
 | `provider_setup.py` | Keycloak için “Social Login Key” kaydını kurar. İki kez çalışınca zarar vermez. |
-| `sign_in.py` | `on_social_login` kancası. Kullanıcıyı `(iss, sub)` çiftiyle doğrular. |
-| `sign_out.py` | Çıkış ve Keycloak arka kanal çıkışı. |
+| `sign_in.py` | Kendi dönüş ucu: giriş adresi, tarayıcı çerezi, PKCE, `nonce`, kullanıcı eşleme. |
+| `sign_out.py` | Çıkış ve Keycloak arka kanal çıkışı. Tekrar koruması vardır. |
 | `service_token.py` | `auth_hooks` kancası. Servis belirtecini `oidc_verify` ile doğrular. |
 | `provisioning.py` | identity-sync için kullanıcı açma, kapatma ve e-posta değiştirme. |
-| `login_policy.py` | Parola girişini kapatan kapı ve portal sayfalarının kapatılması. |
+| `login_policy.py` | Yerel girişi kapatan kapı ve portal sayfalarının kapatılması. |
+| `jwks.py` | Anahtar listesi önbelleği. |
 | `hooks_fragment.py` | `hooks.py` dosyasına eklenecek satırlar. |
 | `doctype/platform_identity_link/` | Kimlik bağı kaydı. `issuer` ve `subject` çifti tekildir. |
+
+## Giriş akışı
+
+1. Uygulama `get_login_url` ucunu çağırır. Sunucu rastgele bir tarayıcı değeri üretir. Değer `HttpOnly` çerezde durur. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` değerlerini 600 saniye saklar.
+2. Tarayıcı Keycloak'ta oturum açar. Keycloak `platform_core.api.auth.keycloak_callback` ucuna döner.
+3. Dönüş ucu `state` kaydını tek işlemle okur ve siler. Çerezdeki değerin özeti kayıtla eşleşmezse giriş reddedilir.
+4. Dönüş ucu kodu PKCE doğrulayıcısıyla değiştirir. Kimlik belirtecini `oidc_verify.verify_id_token` ile doğrular. `nonce` değerini denetler.
+5. Kullanıcı `(iss, sub)` çiftiyle bulunur. İlk bağ yalnız doğrulanmış e-postayla kurulur. Bilinmeyen e-posta ile kayıt açılmaz.
+6. Frappe oturumu açılır. Keycloak oturum kimliği ve CSRF belirteci oturuma yazılır. Tarayıcı `redirect_to` yoluna döner.
+
+Frappe'nin hazır `login_via_keycloak` ucu kullanılmaz. “Social Login Key” kaydı kapalı durur. Kayıt yalnız istemci bilgisini Frappe'nin olağan yerinde tutar.
 
 ## Site ayarları
 
@@ -29,8 +41,8 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `keycloak_client_id` | Evet | Bu sitenin istemcisi, örneğin `site-kiraci1` |
 | `keycloak_client_secret` | Evet | İstemci sırrı |
 | `kimlik_marka_adi` | Evet | Düğme metni bundan üretilir, örneğin `Atonota` |
-| `platform_panel_url` | Evet | Çıkıştan sonra dönülen adres |
-| `kimlik_yalniz_keycloak` | Hayır | `1` ise parola girişi ve e-posta bağlantısıyla giriş kapanır |
+| `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
+| `kimlik_yalniz_keycloak` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |
 | `kimlik_servis_azp` | Hayır | Servis belirtecinde izinli `azp` listesi. Varsayılan `["identity-sync"]` |
 
 ## Kurulum adımı
@@ -45,9 +57,11 @@ Aynı iş HTTP ile de yapılır. Uç `platform_core.api.auth.setup_keycloak_logi
 
 Komut iki kez çalışınca zarar vermez. Kayıt adı `keycloak` kalır. Görünen ad `kimlik_marka_adi` ayarından gelir.
 
+Keycloak istemcisinin dönüş adresi `<site>/api/method/platform_core.api.auth.keycloak_callback` olmalıdır. Realm tanımı kimlik-realm işinindir.
+
 ## Yalnız Keycloak ile giriş
 
-Keycloak girişi yöneticide de çalışınca parola girişini kapatın. Önce bir System Manager kullanıcısının Keycloak bağının çalıştığını deneyin. Sonra şu komutu çalıştırın:
+Keycloak girişi yöneticide de çalışınca yerel girişi kapatın. Önce bir System Manager kullanıcısının Keycloak bağının çalıştığını deneyin. Sonra şu komutu çalıştırın:
 
 ```bash
 bench --site <site> set-config kimlik_yalniz_keycloak 1
@@ -55,10 +69,13 @@ bench --site <site> set-config kimlik_yalniz_keycloak 1
 
 Bu ayar açıkken şunlar reddedilir:
 
-- `/api/method/login` ile parola girişi,
-- `frappe.www.login.send_login_link` ve `login_via_key` ile e-posta bağlantısı girişi.
+- `/api/method/login` ve `cmd=login` ile parola girişi (401),
+- parola sıfırlama ve güncelleme: `reset_password`, `update_password` (403),
+- kayıt: `sign_up` (403),
+- e-posta bağlantısıyla giriş: `send_login_link`, `login_via_key`, `login_via_token` (403),
+- Frappe'nin hazır sosyal giriş uçları: `frappe.integrations.oauth2_logins.*` (403).
 
-Keycloak dönüş ucu etkilenmez.
+Kapatma çağrılan işleve uygulanır. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi kapsamdadır. Keycloak dönüş ucu etkilenmez.
 
 ### Geri açma yolu
 
@@ -68,10 +85,11 @@ Yönetici erişimi kaybolursa sunucu kabuğundan ayarı kapatın:
 bench --site <site> set-config kimlik_yalniz_keycloak 0
 ```
 
-Ayar kapanınca parola girişi hemen açılır. Yeniden başlatma gerekmez.
+Ayar kapanınca yerel giriş hemen açılır. Yeniden başlatma gerekmez.
 
 ## Bilinen sınırlar
 
-- Çıkış adresinde `id_token_hint` yoktur. Frappe'nin hazır girişi kimlik belirtecini saklamaz. Keycloak çıkış onay ekranı gösterebilir.
-- Arka kanal çıkışında `sid` eşleşmezse kullanıcının bütün oturumları kapanır. Bu, güvenli tarafta kalan seçimdir.
-- Servis belirteci yalnız `platform_core.api.identity.*` yollarında kabul edilir. Başka uçta Bearer başlığı 401 alır.
+- Çıkış adresinde `id_token_hint` yoktur. Kimlik belirteci girişten sonra saklanmaz. Keycloak çıkış onay ekranı gösterebilir.
+- Arka kanal çıkışında `sid` eşleşmezse `sub` yedeği devreye girer. Yedek yalnız belirteçten önce açılmış oturumları kapatır.
+- Servis belirteci yalnız üç identity ucunda kabul edilir. Başka uçta Bearer başlığı 401 alır.
+- `kimlik_yalniz_keycloak` açıkken Frappe'nin `/login` sayfası parola formunu yine gösterir. Form gönderimi 401 alır.
