@@ -14,6 +14,13 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "backend/e2e/stack"
 CONTAINER_ID = "0123456789ab"
+# setup() derives the URLs. The credential file supplies the two fake client values.
+PRESS_ENVIRONMENT = {
+    "ATONOTA_PRESS_URL": "http://press.localhost:7153",
+    "KC_PUBLIC_URL": "http://identity.localhost:7150",
+    "ATONOTA_PRESS_SECRET": "fake-press-client-value",
+    "ATONOTA_PRESS_SERVICE_SECRET": "fake-press-service-value",
+}
 
 
 class StackTests(unittest.TestCase):
@@ -80,7 +87,7 @@ class StackTests(unittest.TestCase):
         namespace = runpy.run_path(str(STACK))
         for realm_id in ("", "first-id\nsecond-id\n", "invalid realm"):
             with self.subTest(realm_id=realm_id):
-                environment = {}
+                environment = dict(PRESS_ENVIRONMENT)
                 with (
                     patch.dict(
                         namespace["up"].__globals__,
@@ -299,6 +306,33 @@ class StackTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Service is not ready: web"):
                 check(["compose"], {})
 
+    def test_up_names_missing_press_settings_before_any_command(self):
+        namespace = runpy.run_path(str(STACK))
+        for missing in PRESS_ENVIRONMENT:
+            with self.subTest(missing=missing):
+                environment = {key: value for key, value in PRESS_ENVIRONMENT.items() if key != missing}
+                with (
+                    patch.dict(
+                        namespace["up"].__globals__,
+                        {
+                            "resources": lambda *args: self.fail("Must reject before measuring"),
+                            "run": lambda *args, **kwargs: self.fail("Must reject before Docker"),
+                        },
+                    ),
+                    patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
+                ):
+                    with self.assertRaisesRegex(ValueError, missing) as caught:
+                        namespace["up"](["docker"], ["compose"], environment)
+                for value in PRESS_ENVIRONMENT.values():
+                    self.assertNotIn(value, str(caught.exception))
+
+    def test_setup_supplies_every_press_setting_from_the_templates(self):
+        namespace = runpy.run_path(str(STACK))
+        with patch.dict(os.environ, self.env):
+            environment, _, _ = namespace["setup"]()
+        for key in PRESS_ENVIRONMENT:
+            self.assertTrue(environment.get(key), key)
+
     def test_up_refuses_low_resources_before_building(self):
         namespace = runpy.run_path(str(STACK))
         up = namespace["up"]
@@ -314,7 +348,7 @@ class StackTests(unittest.TestCase):
                 ),
             ):
                 with self.assertRaisesRegex(ValueError, "Startup requires"):
-                    up([], [], {})
+                    up([], [], dict(PRESS_ENVIRONMENT))
 
     def test_credentials_are_not_published_when_write_fails(self):
         namespace = runpy.run_path(str(STACK))
@@ -429,7 +463,7 @@ class StackTests(unittest.TestCase):
             ),
             patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
         ):
-            namespace["up"](["docker"], ["compose"], {})
+            namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
         migrations = [
             command for command in calls if "bench --site press.localhost migrate" in " ".join(command)
         ]
@@ -490,7 +524,7 @@ class StackTests(unittest.TestCase):
             patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
         ):
             with self.assertRaises(subprocess.CalledProcessError):
-                namespace["up"](["docker"], ["compose"], {})
+                namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
         self.assertFalse(any("exec bench start" in " ".join(command) for command in calls))
 
     def test_rejects_environment_file_outside_the_repository(self):
@@ -668,7 +702,7 @@ class StackTests(unittest.TestCase):
             },
         ):
             with self.assertRaisesRegex(ValueError, "container ID"):
-                namespace["up"](["docker"], ["compose"], {})
+                namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
         self.assertFalse(any("stats" in command for command in calls))
 
     def test_ready_probe_uses_the_validating_runner(self):
@@ -692,7 +726,7 @@ class StackTests(unittest.TestCase):
             ),
             patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
         ):
-            namespace["up"](["docker"], ["compose"], {})
+            namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
         probe = ["compose", "exec", "-T", "web", "test", "-f", "/home/frappe/benches/.stack-installed"]
         self.assertIn((probe, False), calls)
 

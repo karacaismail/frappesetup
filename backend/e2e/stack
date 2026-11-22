@@ -373,7 +373,22 @@ def check_resources(engine, environment):
         raise ValueError("Startup requires 10 GiB free disk and 3 GiB available memory.")
 
 
+PRESS_SETTINGS = ("ATONOTA_PRESS_URL", "KC_PUBLIC_URL", "ATONOTA_PRESS_SECRET", "ATONOTA_PRESS_SERVICE_SECRET")
+
+
+def require_press_settings(environment):
+    """Name missing Press settings without printing any value."""
+    missing = [key for key in PRESS_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Press setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
 def configure_press(compose, environment):
+    require_press_settings(environment)
     settings = {
         "host_name": environment["ATONOTA_PRESS_URL"],
         "keycloak_public_url": environment["KC_PUBLIC_URL"],
@@ -396,6 +411,8 @@ def configure_press(compose, environment):
 
 
 def up(engine, compose, environment):
+    # Fail before any container work, not after a long startup.
+    require_press_settings(environment)
     check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
