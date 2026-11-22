@@ -7,6 +7,7 @@ package au.com.ais.keycloak.webhook;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.nio.file.Path;
 import java.time.Duration;
 import org.jboss.logging.Logger;
 import org.keycloak.Config;
@@ -21,6 +22,10 @@ public class WebhookEventListenerProviderFactory implements EventListenerProvide
 
     // the name you pick in Realm settings -> Events -> Event listeners
     public static final String ID = "webhook";
+
+    // Only the development image carries this file (Dockerfile, dev target). The path is fixed on purpose:
+    // no environment variable can turn plain HTTP on in the production image.
+    static final Path PLAIN_HTTP_HOSTS_FILE = Path.of("/opt/keycloak/conf/webhook-plain-http-hosts.txt");
 
     private static final int MAX_ATTEMPTS = 3;
     private static final Duration FIRST_RETRY_DELAY = Duration.ofSeconds(1);
@@ -38,7 +43,7 @@ public class WebhookEventListenerProviderFactory implements EventListenerProvide
             return;
         }
         // A wrong URL, or a missing or short secret, stops Keycloak from starting. An unsigned request is never sent.
-        URI target = WebhookUrls.check(url);
+        URI target = WebhookUrls.check(url, WebhookUrls.loadPlainHttpHosts(PLAIN_HTTP_HOSTS_FILE));
         WebhookSigner signer = new WebhookSigner(secret);
         sender = new WebhookSender(newHttpClient(), target, signer, () -> System.currentTimeMillis() / 1000L,
                 MAX_ATTEMPTS, FIRST_RETRY_DELAY, REQUEST_TIMEOUT);

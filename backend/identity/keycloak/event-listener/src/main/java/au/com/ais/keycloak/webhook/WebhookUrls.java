@@ -1,13 +1,19 @@
 package au.com.ais.keycloak.webhook;
 
-import java.net.InetAddress;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Checks the webhook URL. The rule is the same as in oidc_verify (G-13): https only. Plain http is an
- * explicit exception for a development address: localhost, a name under ".localhost" (RFC 6761) or a
- * loopback IP literal. Over plain http to another host, user ids would travel unencrypted.
+ * Checks the webhook URL (contract section 11): HTTPS, or plain HTTP to a host on a fixed list.
+ * The body carries user ids. A signature protects integrity only, so plain HTTP would let anyone on the
+ * network read it.
  *
  * <p>Added in this fork. Not part of the upstream project.
  */
@@ -16,7 +22,7 @@ final class WebhookUrls {
     private WebhookUrls() {
     }
 
-    static URI check(String url) {
+    static URI check(String url, Set<String> plainHttpHosts) {
         URI target;
         try {
             target = URI.create(url);
@@ -30,23 +36,25 @@ final class WebhookUrls {
         if ("https".equals(target.getScheme())) {
             return target;
         }
-        if ("http".equals(target.getScheme()) && isDevelopmentHost(host)) {
+        if ("http".equals(target.getScheme()) && plainHttpHosts.contains(host.toLowerCase(Locale.ROOT))) {
             return target;
         }
-        throw new IllegalArgumentException("webhook URL must use https; plain http is allowed only for localhost and loopback");
+        throw new IllegalArgumentException("webhook URL must use https; plain http only for a listed host");
     }
 
-    private static boolean isDevelopmentHost(String host) {
-        String name = host.toLowerCase(Locale.ROOT);
-        if (name.endsWith(".")) name = name.substring(0, name.length() - 1);
-        if (name.equals("localhost") || name.endsWith(".localhost")) return true;
-        String literal = name.startsWith("[") && name.endsWith("]") ? name.substring(1, name.length() - 1) : name;
-        boolean ipLiteral = literal.contains(":") || literal.matches("[0-9.]+");
-        if (!ipLiteral) return false; // never resolve a name here
+    /** Reads one host per line. A missing file means no host may use plain HTTP. */
+    static Set<String> loadPlainHttpHosts(Path file) {
+        if (!Files.isRegularFile(file)) {
+            return Set.of();
+        }
         try {
-            return InetAddress.getByName(literal).isLoopbackAddress();
-        } catch (Exception e) {
-            return false;
+            return Files.readAllLines(file, StandardCharsets.UTF_8).stream()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                    .map(line -> line.toLowerCase(Locale.ROOT))
+                    .collect(Collectors.toUnmodifiableSet());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 }

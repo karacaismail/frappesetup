@@ -22,9 +22,7 @@ services:
       KC_HTTP_PORT: ${KC_PORT:?}
       KC_HOSTNAME: ${KC_PUBLIC_URL:?}
       KC_HEALTH_ENABLED: "true"
-      # Magic link extension: no REST endpoint and no cross-device variant (security review condition 4).
-      KC_SPI_REALM_RESTAPI_EXTENSION__MAGICLINK_LOGIN__ENABLED: "false"
-      KC_SPI_AUTHENTICATOR__MAGICLINK_CONTINUATION__ENABLED: "false"
+      # Magic link side doors are off by the image's conf/keycloak.conf (merge review E1).
       # Event listener (event-listener/NOTICE). The secret is shared with identity-sync.
       KC_SPI_EVENTS_LISTENER__WEBHOOK__URL: ${IDENTITY_SYNC_EVENTS_URL:?}
       KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET: ${IDENTITY_SYNC_WEBHOOK_SECRET:?}

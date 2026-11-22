@@ -74,6 +74,23 @@ compose() {
 
 TUNEL_PID="$KLASOR/.tunel.pid"
 
+# Opens one ssh connection to the Colima VM that carries the given ports to this Mac.
+# Usage: ssh_tunel <pid file> <port>... Colima's own connection is not touched.
+ssh_tunel() {
+  local pid_dosyasi="$1"; shift
+  local lima_ad="${COLIMA_LIMA_AD:-$LIMA_VARSAYILAN}"
+  local ssh_conf="$HOME/.colima/_lima/$lima_ad/ssh.config"
+  local port anahtar yonlendirme=() p
+  port="$(awk '/^ *Port /{print $2; exit}' "$ssh_conf")"
+  anahtar="$(awk '/^ *IdentityFile /{gsub(/"/,"",$2); print $2; exit}' "$ssh_conf")"
+  for p in "$@"; do yonlendirme+=(-L "127.0.0.1:$p:127.0.0.1:$p"); done
+  ssh -F /dev/null -o IdentityFile="$anahtar" -o IdentitiesOnly=yes -o BatchMode=yes \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o NoHostAuthenticationForLocalhost=yes \
+    -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -S none -N \
+    "${yonlendirme[@]}" -p "$port" "127.0.0.1" </dev/null >/dev/null 2>&1 &
+  echo $! > "$pid_dosyasi"
+}
+
 tunel_ac() {
   # Colima'nın port yönlendirmesi bozulursa yeni portlar ana makineye açılmaz.
   # Bu komut sanal makineye ayrı bir ssh bağlantısı açar ve iki portu ana makineye taşır.
@@ -88,15 +105,7 @@ tunel_ac() {
     echo "Tünel zaten açık (pid $(cat "$TUNEL_PID"))."
     return
   fi
-  local port anahtar
-  port="$(awk '/^ *Port /{print $2; exit}' "$ssh_conf")"
-  anahtar="$(awk '/^ *IdentityFile /{gsub(/"/,"",$2); print $2; exit}' "$ssh_conf")"
-  ssh -F /dev/null -o IdentityFile="$anahtar" -o IdentitiesOnly=yes -o BatchMode=yes \
-    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o NoHostAuthenticationForLocalhost=yes \
-    -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -S none -N \
-    -L "127.0.0.1:$KC_PORT:127.0.0.1:$KC_PORT" -L "127.0.0.1:$MAILPIT_UI_PORT:127.0.0.1:$MAILPIT_UI_PORT" \
-    -p "$port" "127.0.0.1" </dev/null >/dev/null 2>&1 &
-  echo $! > "$TUNEL_PID"
+  ssh_tunel "$TUNEL_PID" "$KC_PORT" "$MAILPIT_UI_PORT"
   sleep 2
   if ! kill -0 "$(cat "$TUNEL_PID")" 2>/dev/null; then
     echo "Tünel açılamadı." >&2
@@ -131,6 +140,52 @@ case "$komut" in
   test) (cd "$KLASOR/tests" && python3 -I -m unittest discover -s . -v "$@") ;;
   tunel) tunel_ac ;;
   tunel-kapat) tunel_kapat ;;
+  prod-check)
+    # Merge review E1 and O7: start the "prod" image target the way production would, without the
+    # development compose settings. 1) A plain HTTP event address must stop Keycloak. 2) With an HTTPS
+    # address the magic link side doors are off. The containers are removed at the end.
+    prod_etiket="fs-keycloak-atonota:prod-$KC_PORT"
+    prod_port="$((PANE_PORT + 8))"
+    prod_ad="${PROJE}-prod-check"
+    docker --context "$BAGLAM" build -q --target prod -t "$prod_etiket" "$KLASOR" >/dev/null
+    prod_calistir() {
+      docker --context "$BAGLAM" run -d --name "$1" --env-file "$ENV_DOSYASI" \
+        -e KC_HTTP_ENABLED=true -e KC_HOSTNAME="http://127.0.0.1:$prod_port" -e KC_HEALTH_ENABLED=true \
+        -e KC_DB=dev-file -e ATONOTA_SITE_KIRACI1_URL -e ATONOTA_PRESS_URL \
+        -e KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET="$IDENTITY_SYNC_WEBHOOK_SECRET" \
+        -e KC_SPI_EVENTS_LISTENER__WEBHOOK__URL="$2" $3 "$prod_etiket" start --import-realm >/dev/null
+    }
+    prod_tunel_pid="$KLASOR/.tunel-prod.pid"
+    prod_temizle() {
+      docker --context "$BAGLAM" rm -f "$prod_ad-http" "$prod_ad" >/dev/null 2>&1 || true
+      if [ -f "$prod_tunel_pid" ]; then kill "$(cat "$prod_tunel_pid")" 2>/dev/null || true; rm -f "$prod_tunel_pid"; fi
+    }
+    trap prod_temizle EXIT
+    prod_temizle
+    prod_calistir "$prod_ad-http" "http://identity-sync.example.test/v1/events" ""
+    PROD_HTTP_REFUSED=no
+    for _ in $(seq 1 90); do
+      if [ "$(docker --context "$BAGLAM" inspect -f '{{.State.Running}}' "$prod_ad-http")" = "false" ]; then
+        # Read the log first: with pipefail, "grep -q" closing the pipe early would report a failure.
+        prod_gunluk="$(docker --context "$BAGLAM" logs "$prod_ad-http" 2>&1)"
+        if printf '%s' "$prod_gunluk" | grep -q "webhook URL must use https"; then
+          PROD_HTTP_REFUSED=yes
+        fi
+        break
+      fi
+      sleep 2
+    done
+    echo "Düz HTTP adresi reddedildi mi: $PROD_HTTP_REFUSED"
+    prod_calistir "$prod_ad" "https://identity-sync.example.test/v1/events" "-p 127.0.0.1:$prod_port:8080"
+    # Colima's port forwarding does not carry new ports (backend/AGENTS.md, known issue 2).
+    curl -fs -o /dev/null --max-time 2 "http://127.0.0.1:$prod_port/" 2>/dev/null || ssh_tunel "$prod_tunel_pid" "$prod_port"
+    for _ in $(seq 1 90); do
+      curl -fs -o /dev/null "http://127.0.0.1:$prod_port/realms/platform" && break
+      sleep 2
+    done
+    (cd "$KLASOR/tests" && PROD_KC_URL="http://127.0.0.1:$prod_port" PROD_HTTP_REFUSED="$PROD_HTTP_REFUSED" \
+      python3 -I -m unittest discover -s . -p 'test_production_image.py' -v "$@")
+    ;;
   realm-yenile)
     # Disk dar olduğu için imaj derlenmez (backend/AGENTS.md, "Disk dar"). Realm dosyası çalışan container'a
     # kopyalanır, realm silinir ve container yeniden başlar. --import-realm dosyayı yeniden içe alır.
@@ -179,7 +234,7 @@ case "$komut" in
     compose up -d --force-recreate --wait keycloak
     ;;
   *)
-    echo "Kullanım: $0 <config|build|up|down|restart|logs|ps|exec|test|realm-sil|realm-yenile|tunel|tunel-kapat>" >&2
+    echo "Kullanım: $0 <config|build|prod-check|up|down|restart|logs|ps|exec|test|realm-sil|realm-yenile|tunel|tunel-kapat>" >&2
     exit 2
     ;;
 esac

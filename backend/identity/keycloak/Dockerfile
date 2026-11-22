@@ -29,6 +29,8 @@ COPY --from=magiclink-build --chown=1000:0 /build/keycloak-magic-link.jar /opt/k
 ADD --checksum=sha256:4091dee2a1ec9e0771bef4bd46005197d86b0a2b1f25198c41738476b1d102bb --chown=1000:0 \
     https://github.com/klausbetz/apple-identity-provider-keycloak/releases/download/1.17.0/apple-identity-provider-1.17.0.jar \
     /opt/keycloak/providers/apple-identity-provider-1.17.0.jar
+# Default configuration: the magic link side doors are off (merge review E1).
+COPY --chown=1000:0 conf/keycloak.conf /opt/keycloak/conf/keycloak.conf
 COPY --chown=1000:0 realm/platform-realm.json /opt/keycloak/data/import/platform-realm.json
 COPY --chown=1000:0 realm/password-blacklists/yaygin-parolalar.txt /opt/keycloak/data/password-blacklists/yaygin-parolalar.txt
 # Temalar (themes/OKUBENI.md). atonota teması kimlik-tema işinindir. test klasörü .dockerignore ile dışarıda kalır.
@@ -37,6 +39,8 @@ COPY --chown=1000:0 themes/ /opt/keycloak/themes/
 # Geliştirme hedefi örnek kullanıcıları da taşır. Üretim imajı prod hedefinden alınır.
 FROM prod AS dev
 COPY --chown=1000:0 realm/dev-users/platform-users-0.json /opt/keycloak/data/import/platform-users-0.json
+# Plain HTTP for events only to the listed development hosts (contract section 11). Not in prod.
+COPY --chown=1000:0 conf/webhook-plain-http-hosts.txt /opt/keycloak/conf/webhook-plain-http-hosts.txt
 
 # Development-only receiver for the event listener tests (tests/test_event_listener.py). Not part of prod.
 FROM maven:3.9.16-eclipse-temurin-21@sha256:99e61abcff91a9b1333463bd8451fb18495d6eba9250ac66a338b518f8278320 AS event-sink

@@ -1,6 +1,8 @@
 # Yalnız realm ve tema klasörleri imaja girer.
 *
 !realm/
+!conf/
+!conf/**
 !realm/**
 !themes/
 !event-listener/

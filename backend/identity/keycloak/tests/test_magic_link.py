@@ -62,9 +62,11 @@ class MagicLinkFileTest(unittest.TestCase):
         config = {c["alias"]: c["config"] for c in self.realm["authenticatorConfig"]}[MAGIC_LINK_CONFIG]
         self.assertLessEqual(int(config["magickey.validity.duration"]), MAX_LIFETIME)
 
-    def test_rest_resource_and_continuation_are_disabled_in_compose(self):
-        self.assertIn("KC_SPI_REALM_RESTAPI_EXTENSION__MAGICLINK_LOGIN__ENABLED", self.compose)
-        self.assertIn("KC_SPI_AUTHENTICATOR__MAGICLINK_CONTINUATION__ENABLED", self.compose)
+    def test_rest_resource_and_continuation_are_disabled_by_the_image(self):
+        # Merge review E1: the setting lives in the image's conf/keycloak.conf (test_production_image).
+        conf = (KLASOR / "conf" / "keycloak.conf").read_text(encoding="utf-8")
+        self.assertIn("spi-realm-restapi-extension--magiclink-login--enabled=false", conf)
+        self.assertIn("spi-authenticator--magiclink-continuation--enabled=false", conf)
 
 
 def _magic_link_execution_id(admin_token: str) -> str:
