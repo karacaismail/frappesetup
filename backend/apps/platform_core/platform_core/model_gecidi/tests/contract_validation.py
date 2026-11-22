@@ -34,7 +34,7 @@ class GatewayContract:
 		return media, f"{CONTRACT_IRI}#/{quote(pointer)}/content/application~1json/schema"
 
 	def validate_response(self, path, method, status, payload):
-		_, schema = self.response(path, method, status)
+		_media, schema = self.response(path, method, status)
 		Draft202012Validator({"$ref": schema}, registry=self.registry).validate(payload)
 
 	def validate_completion_cost(self, payload):

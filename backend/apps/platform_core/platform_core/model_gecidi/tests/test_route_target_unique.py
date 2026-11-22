@@ -59,7 +59,7 @@ class TestRouteTargetIndexHook(unittest.TestCase):
 
 class TestRouteTargetUnique(IntegrationTestCase):
 	def test_database_rejects_only_the_repeated_pair_in_the_same_route(self):
-		parent, model, api = (str(uuid4()) for _ in range(3))
+		parent, model, api = (str(uuid4()) for _sample_index in range(3))
 
 		def insert(route, selected_model, selected_api):
 			frappe.get_doc(

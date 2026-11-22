@@ -183,7 +183,7 @@ class TestUsageMaintenance(IntegrationTestCase):
 
 	def test_purge_rejects_a_changed_batch_without_deleting_other_rows(self):
 		old = now_datetime() - timedelta(days=366)
-		changed, other = [self._usage("success", old) for _ in range(2)]
+		changed, other = [self._usage("success", old) for _sample_index in range(2)]
 		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 365}):
 			preview = maintenance.purge_usage()
 			frappe.db.set_value("AI Usage Log", changed.name, "result", "unknown")
@@ -208,7 +208,7 @@ class TestUsageMaintenance(IntegrationTestCase):
 
 	def test_ai_recovery_changes_only_the_named_reservation(self):
 		attempted = now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS + 5)
-		first, second = [self._usage("pending", attempted) for _ in range(2)]
+		first, second = [self._usage("pending", attempted) for _sample_index in range(2)]
 		preview = management_tools.preview_reconcile_pending(name=first.name)
 		self.assertEqual(preview["target_name"], first.name)
 		self.assertEqual(preview["target_version"], str(first.modified))

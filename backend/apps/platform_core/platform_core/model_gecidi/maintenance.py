@@ -152,7 +152,7 @@ def purge_usage(dry_run=True, preview_token=None):
 	}
 	rows = _purge_batch(filters, for_update=not dry_run)
 	batch = [(row.name, row.modified) for row in rows]
-	targets = [name for name, _ in batch]
+	targets = [name for name, _modified in batch]
 	eligible = frappe.db.count(USAGE_LOG, filters)
 	deleted = 0
 	if dry_run:

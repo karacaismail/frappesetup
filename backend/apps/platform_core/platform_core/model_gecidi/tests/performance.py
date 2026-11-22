@@ -29,12 +29,12 @@ def _p95(values):
 def summarize(samples, *, limit_ms):
 	if len(samples) < SAMPLES:
 		raise ValueError("O-31 needs at least 50 samples per operation.")
-	provider = _p95([provider for _, provider in samples])
+	provider = _p95([provider for _total, provider in samples])
 	gateway = _p95([max(0, total - provider) for total, provider in samples])
 	return {
 		"samples": len(samples),
 		"gateway_p95_ms": round(gateway, 3),
-		"http_server_p95_ms": round(_p95([total for total, _ in samples]), 3),
+		"http_server_p95_ms": round(_p95([total for total, _provider in samples]), 3),
 		"provider_p95_ms": round(provider, 3),
 		"limit_ms": limit_ms,
 		"pass": gateway <= limit_ms,
@@ -155,7 +155,7 @@ def _collect(fixture):
 		return body
 
 	try:
-		for _ in range(SAMPLES):
+		for _sample_index in range(SAMPLES):
 			unknown = _usage(fixture, "unknown", now_datetime())
 			expired = _usage(fixture, "success", old)
 			set_encrypted_password("AI API", fixture["clearable_api"], fixture["credential"], "api_key")
