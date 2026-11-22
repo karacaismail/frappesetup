@@ -1496,15 +1496,6 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/press_tr/tests/deletion_fixture.py",
-    "code": "\"press_service_client_secret\": \"press-test-fixture\",",
-    "statementSha256": "04b95d1d4c0121c4eefd8f138b32665db086ec5da3697d97f1f384e7945e42c2",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "press-tr",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
     "file": "backend/apps/press_tr/tests/test_account_deletion_template.py",
     "code": "for context in ({}, {\"deletion_csrf_token\": \"\", \"reauthenticated\": True}):",
     "statementSha256": "c0f01426ecaa11a10f4d9c423f21d4b367fe0754e60cf788c39ec59159ce775b",
@@ -2333,15 +2324,6 @@
   },
   {
     "rule": "B603",
-    "file": "backend/e2e/preview/fixtures.py",
-    "code": "result = subprocess.run(",
-    "statementSha256": "f105c048aa5428aa77bedaab2ed4c348fad1fd231162814f61031bd6dbeaee90",
-    "owner": "integration-e2e",
-    "reason": "The preview passes Docker arguments directly without a host shell and sends the request as JSON on stdin.",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B603",
     "file": "backend/e2e/tests/test_merge_preview.py",
     "code": "result = subprocess.run([\"bash\", str(runtime), str(worktree)], env=env, text=True, capture_output=True)",
     "statementSha256": "8776a29ad4a138dc9b0191c76b9327c6fc107e52d1c4dced66c50eaa243f6db8",
@@ -2945,6 +2927,150 @@
     "statementSha256": "2e8e315bade8d49a745e34650562ca586204719fbf7721909ea421988fd88021",
     "reason": "Runs the fixed Git write-tree command in the test-owned temporary repository without a shell. Git is resolved from the trusted release test runner PATH.",
     "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B104",
+    "file": "backend/e2e/preview/session_tls.py",
+    "code": "with PreviewTLS((\"0.0.0.0\", port), relay_handler(host, int(upstream_port), RELAY_TARGETS[target])) as server:",
+    "statementSha256": "691b6b241347615553b6b3ad2396156da8eba98f305e08a27689da8640e7a7c2",
+    "reason": "The preview relay listens inside the disposable sync container. Its TLS listener ports are not published to the host.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/deletion_fixture.py",
+    "code": "\"press_service_client_secret\": \"press-test-fixture\",",
+    "statementSha256": "6ed5d4d20fd86dfff717da06c0895dee6a29d5849b679e1c947740d0dff11af9",
+    "reason": "The deletion fixture contains only a synthetic service credential.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/test_request_guards.py",
+    "code": "token_response.json.return_value = {\"access_token\": \"fixture\"}",
+    "statementSha256": "c9175b54e17cf029107f9ffdd901f215f72fb07e54a34a5373bd4eb1ead95148",
+    "reason": "The test service configuration and mock HTTP response use synthetic credentials.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/tests/test_e2e_stack.py",
+    "code": "\"ATONOTA_PRESS_SECRET\": \"fake-press-client-value\",",
+    "statementSha256": "2c905743dde4c37877a74db16b976491a55eaa92a4900a80f01c01af8278be5d",
+    "reason": "The test environment uses synthetic Press credentials.",
+    "owner": "e2e-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/tests/test_e2e_stack.py",
+    "code": "\"ATONOTA_PRESS_SERVICE_SECRET\": \"fake-press-service-value\",",
+    "statementSha256": "2c905743dde4c37877a74db16b976491a55eaa92a4900a80f01c01af8278be5d",
+    "reason": "The test environment uses synthetic Press credentials.",
+    "owner": "e2e-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"synthetic-client\",",
+    "statementSha256": "495de8d67d756462e523d447613f2bdc19e7349d1f08c847c03ad7d5ed493893",
+    "reason": "The test supplies a synthetic Keycloak client credential.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_site_seed.py",
+    "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"synthetic-secret\",",
+    "statementSha256": "7e97e4701a70df270086a404a8e0aef1a6d8909294bbf26213aca1c9687d27cf",
+    "reason": "The seed test supplies a synthetic Keycloak client credential.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_stack_press.py",
+    "code": "\"ATONOTA_PRESS_SECRET\": \"synthetic-client-secret\",",
+    "statementSha256": "6dff3ddc2a7a208e2f78d3ae793a65aa854a7df973e98bbbcda2e2843bd1b67b",
+    "reason": "The stack fixture supplies synthetic Press credentials.",
+    "owner": "e2e-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_stack_press.py",
+    "code": "\"ATONOTA_PRESS_SERVICE_SECRET\": \"synthetic-service-secret\",",
+    "statementSha256": "6dff3ddc2a7a208e2f78d3ae793a65aa854a7df973e98bbbcda2e2843bd1b67b",
+    "reason": "The stack fixture supplies synthetic Press credentials.",
+    "owner": "e2e-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/press_tr/tests/test_account_deletion_template.py",
+    "code": "pending = self.render(translate, deletion_csrf_token=\"fixture\", deletion_status=\"pending\")",
+    "statementSha256": "e7add60ededc8f924966f778758b756c171a8132f7bc9a29569cd5831c5a5e3f",
+    "reason": "The template test uses a synthetic CSRF value to render a fixture state.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/press_tr/tests/test_account_deletion_template.py",
+    "code": "submitted = self.render(translate, deletion_csrf_token=\"fixture\", deletion_status=\"submitted\")",
+    "statementSha256": "f51523b6d0226557487e5ad819217f44976941fee4a4fe110351afa7a6d8d1a0",
+    "reason": "The template test uses a synthetic CSRF value to render a fixture state.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/press_tr/tests/test_request_guards.py",
+    "code": "identity_sync_url=\"https://sync.example.test\", press_service_client_secret=\"fixture\"",
+    "statementSha256": "8e33ff33db317c66e3aff11591a2030dd534265b71eca460098b2ee25a447edd",
+    "reason": "The test service configuration and mock HTTP response use synthetic credentials.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/bin/merge-preview",
+    "code": "with subprocess.Popen([BASH_PATH, str(runtime), str(worktree)], env=environment, start_new_session=True) as child:",
+    "statementSha256": "70d3115b4b2d94bf19b34632e76d730f0803636fc390d47f670299557612c559",
+    "reason": "Passes fixed runtime script arguments to an absolute Bash executable without shell mode; the resolved worktree is verified inside the trusted scratch root.",
+    "owner": "e2e-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/preview/fixtures.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "0c1765de32e3b5d16663fd8d82c6151f1d9e75f41975c5ea8ceaca22cfef67bf",
+    "reason": "Calls absolute Docker with fixed argument positions and a validated preview project; HTTP request data is supplied as JSON on stdin, not interpreted by a shell.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/stack",
+    "code": "return subprocess.run(command, env=environment, check=check, **kwargs)",
+    "statementSha256": "b39adb97283adbc7abcff1672f50d7e56a45966a3e9e270371f909f3587cd752",
+    "reason": "Runs internal argument lists with no shell; validates text arguments, the in-repository environment file, and Docker-returned container IDs at their input boundary.",
+    "owner": "e2e-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/identity/identity_sync/identity_sync/store.py",
+    "code": "f\"\"\"",
+    "statementSha256": "86714ae5288231353a68946f343ec637261ce7cdd772a4ea8a1e431a4158a9eb",
+    "reason": "Only a fixed count of question-mark placeholders is interpolated. All data values are passed as query parameters.",
+    "owner": "identity-sync",
     "ignoreUntil": "2027-02-22"
   }
 ]
