@@ -17,7 +17,7 @@ Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine ku
 | K7 | Kimlik: **Keycloak** tüm uygulamalar için tek giriş/kayıt sağlayıcısı | Çoklu uygulama (panel, faturalama, gelecek app'ler) için tek kimlik | Frappe ve Press Keycloak'a OIDC ile bağlanır |
 | K8 | Erişim: **Zoho/Odoo düzeyinde** rol ve yetki yönetimi (ReBAC/ABAC kayıt kuralları, hiyerarşi, alan düzeyi) | Frappe RBAC tek başına SaaS müşterisinin kendi yönettiği yetki modelini karşılamaz | Platform çekirdek app'inde erişim politikası motoru geliştirilir |
 | K9 | **AI-first**: Press ve siteler MCP ile yönetilir; Claude Agent SDK tabanlı agent servisi; panelde sağ AI paneli; AI eylemleri aynı sunucu izinlerinden geçer, yazma eylemleri önizleme + onay ister, her eylem audit'e düşer | Tek tıkla aksiyon ve kararlı orkestrasyon | Modeller: `claude-sonnet-5-5` / `claude-opus-5-5` eylem, `claude-haiku-4-5` sınıflandırma; KVKK uyumu zorunlu |
-| K10 | Ürünler ayrı Frappe app'leri olarak satılır: **HRMS (CronHR)** önce, sonra **CRM**, **Webshop**; hepsi ortak **admin shell** çerçevesine uyar; modül etkinleştirme **Press Marketplace / App Plan** üzerinden | Zoho/Odoo tarzı "etkinleştir" deneyimi | Her app bu dokümandaki app çerçevesi şablonunu karşılar |
+| K10 | Ürünler ayrı Frappe app'leri olarak satılır: **HRMS TR** önce, sonra **CRM**, **Webshop**; hepsi ortak **admin shell** çerçevesine uyar; modül etkinleştirme **Press Marketplace / App Plan** üzerinden | Zoho/Odoo tarzı "etkinleştir" deneyimi | Her app bu dokümandaki app çerçevesi şablonunu karşılar |
 
 K3 notu: Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; aktarım mekanizması hukukça belirlenir (G-90, G-116).
 

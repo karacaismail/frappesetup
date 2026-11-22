@@ -222,6 +222,11 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
+- Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.
+- Denetim yöntemin adına değil, çağrılan işleve uygulanır. Böylece başka modülün içe aktardığı aynı işlev de kapanır. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi aynı denetimden geçer.
+- Takım üyeliği yalnız Keycloak kuruluşundan gelir. Press'in kendi takım davet ve davet kabul uçları kapanır.
+- Kullanıcı Keycloak'ta kapatılınca ya da silinince Press kullanıcıyı da kapatır. Kullanıcının Press API anahtarları geçersiz olur.
+- Misafir istek sınırı istemcinin gerçek adresine bağlıdır. Üretimdeki ara sunucu `X-Forwarded-For` başlığının üzerine yazar. Ara sunucu ayarı depoda durur.
 
 ## 7. `identity_sync`
 
