@@ -1,5 +1,7 @@
 """Close legacy HRMS RPC routes that do not enforce HRMS TR leave access."""
 
+from typing import Never
+
 import frappe
 from frappe import _
 
@@ -7,7 +9,7 @@ from frappe import _
 # The route never reads a document and always raises PermissionError.
 # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
 @frappe.whitelist(methods=["GET", "POST"])
-def deny_legacy_leave_query():
+def deny_legacy_leave_query() -> Never:
 	frappe.throw(_("Read leave information through an authorized leave application."), frappe.PermissionError)
 
 

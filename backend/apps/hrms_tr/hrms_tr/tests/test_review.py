@@ -128,14 +128,17 @@ class FixtureLifecycleTest(unittest.TestCase):
 			self.assertEqual(fake.db.commit.call_count, 2)
 
 	def test_migration_refreshes_manager_profile_without_waiting_for_a_queue(self):
-		user = Mock(
-			user_type="Website User",
-			roles=[SimpleNamespace(role="HRMS TR Manager")],
-			role_profiles=[SimpleNamespace(role_profile="HRMS TR Manager")],
-		)
+		user = Mock()
+		name = "manager@example.test"
 		with patch.object(setup, "frappe") as fake:
 			fake.local = SimpleNamespace(hrms_tr_disabled_rules=[])
-			fake.get_all.return_value = ["manager@example.test"]
+			fake.get_all.side_effect = [
+				[name],
+				[SimpleNamespace(name=name, user_type="Website User")],
+				[],
+				[name],
+				[],
+			]
 			fake.get_doc.return_value = user
 			setup.after_migrate()
 		user.save.assert_called_once_with()
@@ -213,3 +216,69 @@ class LeaveReportTest(unittest.TestCase):
 		with patch.object(hrms_endpoints, "frappe") as fake:
 			fake.db.get_value.return_value = "Leave Ledger"
 			self.assertFalse(File().is_downloadable())
+
+
+class PortalRoutingTest(unittest.TestCase):
+	def test_website_user_is_denied_native_hrms_portals(self):
+		from hrms_tr import users
+
+		with (
+			patch.object(users, "frappe") as fake,
+			patch.object(users, "_", side_effect=lambda text: text),
+		):
+			fake.session.user = "employee@example.test"
+			fake.get_cached_value.return_value = "Website User"
+			fake.throw.side_effect = raise_with_message
+			for path in ("/hrms", "/hrms/leaves", "/hr/team", "/roster"):
+				with self.subTest(path=path):
+					fake.request.path = path
+					with self.assertRaisesRegex(RuntimeError, "tenant portal"):
+						users.require_tenant_portal()
+
+	def test_panel_and_system_operations_are_unaffected(self):
+		from hrms_tr import users
+
+		with patch.object(users, "frappe") as fake:
+			fake.session.user = "manager@example.test"
+			fake.request.path = "/panel"
+			users.require_tenant_portal()
+			fake.get_cached_value.assert_not_called()
+			fake.get_cached_value.return_value = "System User"
+			fake.request.path = "/hrms"
+			users.require_tenant_portal()
+			fake.throw.assert_not_called()
+
+	def test_options_request_does_not_require_a_session(self):
+		from hrms_tr import users
+
+		with patch.object(users, "frappe") as fake:
+			fake.request.path = "/hrms"
+			fake.request.method = "OPTIONS"
+			fake.session = None
+			users.require_tenant_portal()
+			fake.get_cached_value.assert_not_called()
+
+
+class PortalMigrationBatchTest(unittest.TestCase):
+	def test_batches_users_and_loads_only_accounts_requiring_a_save(self):
+		manager = Mock()
+		with patch.object(setup, "frappe") as fake:
+			fake.local = SimpleNamespace(hrms_tr_disabled_rules=[])
+			fake.get_all.side_effect = [
+				["employee@example.test", "manager@example.test"],
+				[
+					SimpleNamespace(name="employee@example.test", user_type="Website User"),
+					SimpleNamespace(name="manager@example.test", user_type="Website User"),
+				],
+				[SimpleNamespace(parent="employee@example.test", role="HRMS TR Employee")],
+				["manager@example.test"],
+				[],
+			]
+			fake.get_doc.return_value = manager
+			setup.after_migrate()
+		page, *_batch, last = fake.get_all.call_args_list
+		self.assertEqual(page.kwargs["limit_page_length"], 100)
+		self.assertEqual(page.kwargs["order_by"], "parent asc")
+		self.assertIn(["parent", ">", "manager@example.test"], last.kwargs["filters"])
+		fake.get_doc.assert_called_once_with("User", "manager@example.test")
+		manager.save.assert_called_once_with()

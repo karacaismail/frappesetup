@@ -37,3 +37,8 @@ class DeniedLegacyEndpointTest(TestCase):
 		):
 			with self.assertRaises(frappe.PermissionError):
 				frappe.is_whitelisted(hrms_endpoints.AttendanceRequestAccess.get_attendance_warnings)
+
+	def test_denial_route_declares_a_nonreturning_response(self):
+		from typing import Never, get_type_hints
+
+		self.assertIs(get_type_hints(hrms_endpoints.deny_legacy_leave_query)["return"], Never)

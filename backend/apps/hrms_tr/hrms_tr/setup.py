@@ -11,6 +11,7 @@ from hrms_tr.users import APPROVER_PROFILES, EMPLOYEE_ROLE, HRMS_TR_ROLES, NATIV
 
 RULE_FIXTURE = "03_access_rule.json"
 OWNED_POLICY_FIXTURES = (RULE_FIXTURE, "04_property_setter.json", "05_custom_docperm.json")
+USER_BATCH_SIZE = 100
 
 
 def fixture_rows(filename):
@@ -19,6 +20,7 @@ def fixture_rows(filename):
 
 
 def require_access_engine():
+	# BORC(mvp): Verify fresh install and upgrade after the access engine is available.
 	if not engine_available() or not frappe.db.exists("DocType", RULE_DOCTYPE):
 		frappe.throw(_("Install Platform Core with Access Rule before syncing HRMS TR."))
 
@@ -55,21 +57,58 @@ def after_migrate():
 			doc.is_active = 0
 			doc.save()
 
-	user_names = frappe.get_all(
-		"Has Role",
-		filters={"parenttype": "User", "role": ["in", HRMS_TR_ROLES]},
-		distinct=True,
-		pluck="parent",
+	# The administrator is synchronizing stored role profiles, not preparing a user-facing list.
+	cursor = ""
+	while True:
+		names = frappe.get_all(
+			"Has Role",
+			filters=[["parenttype", "=", "User"], ["role", "in", HRMS_TR_ROLES], ["parent", ">", cursor]],
+			distinct=True,
+			pluck="parent",
+			order_by="parent asc",
+			limit_page_length=USER_BATCH_SIZE,
+		)
+		if not names:
+			break
+		sync_portal_user_batch(names)
+		cursor = names[-1]
+
+
+def sync_portal_user_batch(names):
+	users = frappe.get_all(
+		"User",
+		filters={"name": ["in", names]},
+		fields=["name", "user_type"],
+		limit_page_length=USER_BATCH_SIZE,
 	)
-	for name in user_names:
-		if name == "Administrator":
+	roles = frappe.get_all(
+		"Has Role",
+		filters={
+			"parenttype": "User",
+			"parent": ["in", names],
+			"role": ["in", [EMPLOYEE_ROLE, NATIVE_LEAVE_APPROVER]],
+		},
+		fields=["parent", "role"],
+		distinct=True,
+		limit_page_length=2 * USER_BATCH_SIZE,
+	)
+	employee_names = {row.parent for row in roles if row.role == EMPLOYEE_ROLE}
+	legacy_approver_names = {row.parent for row in roles if row.role == NATIVE_LEAVE_APPROVER}
+	approver_names = set(
+		frappe.get_all(
+			"User Role Profile",
+			filters={"parent": ["in", names], "role_profile": ["in", APPROVER_PROFILES]},
+			pluck="parent",
+			distinct=True,
+			limit_page_length=USER_BATCH_SIZE,
+		)
+	)
+	for user in users:
+		if user.name == "Administrator":
 			continue
-		user = frappe.get_doc("User", name)
-		roles = {row.role for row in user.roles}
-		profiles = {row.role_profile for row in user.role_profiles}
-		missing_employee_role = EMPLOYEE_ROLE not in roles and profiles.intersection(APPROVER_PROFILES)
-		if user.user_type != "Website User" or NATIVE_LEAVE_APPROVER in roles or missing_employee_role:
-			user.save()
+		missing_employee_role = user.name in approver_names and user.name not in employee_names
+		if user.user_type != "Website User" or user.name in legacy_approver_names or missing_employee_role:
+			frappe.get_doc("User", user.name).save()
 
 
 def policy_fixture_keys():

@@ -141,7 +141,7 @@ class LeaveHttpTest(unittest.TestCase):
         for actor in ("employee", "manager", "hr"):
             with self.subTest(actor=actor):
                 client = self.login(actor)
-                for path in ("/app", "/desk"):
+                for path in ("/app", "/desk", "/hrms", "/hr/team", "/roster"):
                     with self.subTest(path=path):
                         code, _ = client.page(path)
                         self.assertEqual(code, 403)
@@ -490,6 +490,22 @@ class LeaveHttpTest(unittest.TestCase):
             "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
         )
         self.assertEqual(code, 403)
+
+    def test_approval_rejects_invalid_verb_version_and_client_role(self):
+        manager = self.login("manager")
+        employee = self.login("employee")
+        endpoint = "/api/method/hrms_tr.api.approve_leave"
+        before = self.document(manager, "employee")
+        body = self.approval_payload(before)
+        status, _ = manager.page(f"{endpoint}?{urlencode(body)}")
+        self.assertIn(status, (403, 405))
+        for invalid in ("", ["not a version"]):
+            with self.subTest(version=invalid):
+                status, _ = manager.send(endpoint, {**body, "version": invalid})
+                self.assertIn(status, (400, 417))
+        status, _ = employee.send(endpoint, {**body, "role": "HRMS TR Admin"})
+        self.assertIn(status, (403, 417))
+        self.assertEqual(self.document(manager, "employee"), before)
 
     def test_legacy_derived_leave_data_endpoints_are_closed(self):
         hr = Client(self, self.data["legacy_users"]["HR Manager"])

@@ -46,6 +46,12 @@ paths:
                   status: {type: string, enum: [Open, Approved, Rejected, Cancelled]}
                   docstatus: {type: integer, enum: [0, 1, 2]}
               example: {status: Open, docstatus: 0}
+        - name: order_by
+          in: query
+          description: Use this order for stable paging when modification timestamps match.
+          schema:
+            type: string
+            enum: ["modified desc, name asc"]
         - name: limit_start
           in: query
           description: Number of records to skip. The first record is at offset 0.
@@ -128,6 +134,12 @@ paths:
           $ref: "#/components/responses/PermissionDenied"
         "404":
           $ref: "#/components/responses/LeaveNotFound"
+        "429":
+          description: The authenticated user exceeded the approval request limit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
         "417":
           description: |
             The application version changed, the application is not an open draft, or HRMS validation failed.

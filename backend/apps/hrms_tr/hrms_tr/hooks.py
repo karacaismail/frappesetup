@@ -7,6 +7,8 @@ app_license = "GPL-3.0-only"
 
 required_apps = ["hrms", "platform_core"]
 
+before_request = ["hrms_tr.users.require_tenant_portal"]
+
 before_install = "hrms_tr.setup.check_install"
 before_migrate = "hrms_tr.setup.before_migrate"
 after_migrate = "hrms_tr.setup.after_migrate"
@@ -33,6 +35,7 @@ extend_doctype_class = {
 }
 
 override_whitelisted_methods = {
+	"hrms.www.hrms.get_context_for_dev": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_details": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.api.get_leave_balance_map": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",

@@ -52,3 +52,23 @@ class ApprovalEndpointTest(TestCase):
 		fake.get_doc.assert_called_once_with("Leave Application", "LEAVE-STALE-0001", for_update=True)
 		doc.submit.assert_not_called()
 		self.assertEqual(doc.status, "Open")
+
+	def test_approve_leave_throttles_by_authenticated_user(self):
+		from types import SimpleNamespace
+
+		cache = Mock()
+		cache.make_key.return_value = b"site:counter"
+		cache.get.return_value = 60
+		cache.incrby.return_value = 61
+		with (
+			patch.object(frappe, "request", SimpleNamespace(method="POST")),
+			patch.object(frappe, "session", frappe._dict(user="manager@example.test")),
+			patch.object(frappe, "cache", cache),
+			patch.object(frappe, "throw", side_effect=raise_permission_error),
+			patch("frappe.rate_limiter._", side_effect=lambda text: text),
+			patch.object(leave, "approve") as approve,
+		):
+			with self.assertRaises(frappe.RateLimitExceededError):
+				approve_leave("HR-LAP-TEST", "2026-11-22 12:00:00")
+		cache.make_key.assert_called_once_with("rl:hrms_tr.api.approve_leave:manager@example.test")
+		approve.assert_not_called()

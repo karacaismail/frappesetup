@@ -55,3 +55,6 @@ Read and edit own leave drafts.,Kendi izin taslaklarınızı okuyun ve düzenley
 Read and approve leave for the reporting team.,Ekibinizin izin taleplerini okuyun ve onaylayın.
 Manage leave applications in this site.,Bu sitedeki izin taleplerini yönetin.
 Preserve operations access to leave applications on this site.,Bu sitede işletim rollerinin izin taleplerine erişimini korur.
+Use the tenant portal to access HRMS TR.,HRMS TR için kiracı panelini kullanın.
+Use this order for stable paging when modification timestamps match.,Bu sırayı kullanırsanız değişiklik saati eşit kayıtlar sayfalar arasında yer değiştirmez.
+The authenticated user exceeded the approval request limit.,Kullanıcının onay isteği sayısı sınırı aştı.

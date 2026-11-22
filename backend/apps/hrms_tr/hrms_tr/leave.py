@@ -70,7 +70,7 @@ def pending_leave(name: str, *, expected_version: str, lock: bool = False):
 	return doc
 
 
-def approve(name: str, *, expected_version: str) -> dict:
+def approve(name: str, *, expected_version: str) -> dict[str, str]:
 	doc = pending_leave(name, lock=True, expected_version=expected_version)
 	doc.status = "Approved"
 	doc.submit()

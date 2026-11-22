@@ -110,3 +110,20 @@ Bu durumda talebin durumu değişmez.
 Yapay zekâ önizlemesi, alan farklarını `fieldname`, `old` ve `new` ile gösterir.
 Öneri ayrıntısında yalnız talebin kayıt adı bulunur.
 Çalışan adı, izin tarihleri ve gün sayısı öneri ayrıntısına yazılmaz.
+
+## Öz denetim kararları
+
+Portal kullanıcıları `/panel` yolunu kullanır.
+HRMS TR, hazır HRMS sayfalarına portal hesabıyla girişi kapatır.
+Frappe, onay isteğini oturum açmış kullanıcı başına dakikada 60 kez sınırlar.
+Bu sayı güvenlik sınırıdır.
+
+Geçiş, kullanıcıları ad sırasıyla en çok 100 kişilik gruplarda tarar.
+Yalnız düzeltme gereken kullanıcı belgesi yüklenir ve kaydedilir.
+Bu sistem sorgusu, kullanıcıya dönen bir liste üretmez.
+Liste sözleşmesi eşit değişiklik saatleri için kayıt adı sırası verir.
+
+İzin kaydı çalışana olan bağı, izin tarihlerini ve talep açıklamasını tutar.
+Öneri ayrıntısı yalnız kayıt adını tutar.
+Saklama süresi ve silme yolu MVP yayını öncesinde proje kaydında karara bağlanır.
+Tam kurulum ve yükseltme kanıtı birleşik ortamda alınır.
