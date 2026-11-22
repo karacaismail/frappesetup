@@ -21,22 +21,25 @@ if [[ "${FS_COLIMA_PROFILE:-}" != default ]]; then
     exit 2
 fi
 
-colima_bin="${COLIMA_BIN:-$HOME/.local/bin/colima}"
-available="$("$colima_bin" ssh -- free -g | awk '$1 == "Mem:" { print $7 }')"
-if [[ ! "$available" =~ ^[0-9]+$ ]] || (( available < 3 )); then
-    printf '%s\n' 'The preview requires at least 3 GB of available memory in default Colima.' >&2
+docker_default() { docker --context colima "$@"; }
+tenant_image=frappe/erpnext:v16.55.0
+if ! available="$(docker_default run --rm --pull never --network none --read-only --entrypoint cat \
+    "$tenant_image" /proc/meminfo | awk '$1 == "MemAvailable:" { print int($2 / 1048576) }')"; then
+    printf '%s\n' 'Cannot measure default Colima memory through its Docker context and local tenant image.' >&2
     exit 1
 fi
-printf 'Default Colima available memory: %s GB\n' "$available"
+if [[ ! "$available" =~ ^[0-9]+$ ]] || (( available < 3 )); then
+    printf '%s\n' 'The preview requires at least 3 GiB of available memory in default Colima.' >&2
+    exit 1
+fi
+printf 'Default Colima available memory: %s GiB\n' "$available"
 
-docker_default() { docker --context colima "$@"; }
 dev_dir="$worktree/backend/dev"
 identity_dir="$worktree/backend/identity"
-tenant_image=frappe/erpnext:v16.55.0
 tenant="$PREVIEW_PROJECT-kiraci-web-1"
 press="$PREVIEW_PROJECT-web-1"
 sync="$PREVIEW_PROJECT-identity"
-sync_host=identity-sync.localhost
+sync_host=event-sink.localhost
 provider="$PREVIEW_PROJECT-provider"
 network="${PREVIEW_PROJECT}_default"
 builder="$PREVIEW_PROJECT-builder"
@@ -87,6 +90,22 @@ cleanup() {
     if [[ -f "$PREVIEW_DIR/compose.yaml" ]]; then
         for container in "$sync" "$provider"; do
             if [[ "$(docker_default container inspect --format '{{index .Config.Labels "com.frappesetup.preview"}}' "$container" 2>/dev/null)" == "$PREVIEW_PROJECT" ]]; then
+                if [[ "$container" == "$sync" ]]; then
+                    docker_default exec -i "$sync" /home/frappe/frappe-bench/env/bin/python - \
+                        > "$PREVIEW_DIR/identity-diagnostics.log" 2>> "$PREVIEW_DIR/cleanup.log" <<'PYTHON'
+import os
+import re
+import sqlite3
+
+path = os.environ["IDENTITY_SYNC_DB"]
+with sqlite3.connect("file:" + path + "?mode=ro", uri=True) as database:
+    for (error,) in database.execute("SELECT error FROM dead_letters ORDER BY last_failed_at DESC LIMIT 20"):
+        for step in error.split("; "):
+            operation = re.match(r"^(?:keycloak|press|tenant)\.[a-z_]+", step)
+            status = re.search(r": (HTTP [1-5][0-9]{2}(?: [A-Za-z_][A-Za-z0-9_]{0,47})?)$", step)
+            print(operation[0] if operation else "unidentified_step", status[1] if status else "no_http_status")
+PYTHON
+                fi
                 docker_default rm -f "$container" >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
             fi
         done
@@ -151,13 +170,16 @@ press.write_text("".join(f"{key}={token_urlsafe(32)}\n" for key in ("PRESS_DB_PA
 PY
 
 setting() { awk -F= -v name="$1" '$1 == name { sub(/^[^=]*=/, ""); print; exit }' "$2"; }
-export E2E_ADMIN_PASSWORD="$(setting ADMIN_PASSWORD "$DEV_ENV_FILE")"
-export E2E_KEYCLOAK_ADMIN_USER="$(setting KC_BOOTSTRAP_ADMIN_USERNAME "$keycloak_env")"
-export E2E_KEYCLOAK_ADMIN_PASSWORD="$(setting KC_BOOTSTRAP_ADMIN_PASSWORD "$keycloak_env")"
-export E2E_KEYCLOAK_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SECRET "$keycloak_env")"
-export E2E_PRESS_CLIENT_SECRET="$(setting ATONOTA_PRESS_SECRET "$keycloak_env")"
-export E2E_PRESS_ADMIN_PASSWORD="$(setting PRESS_ADMIN_PASSWORD "$press_env")"
-export E2E_IDENTITY_SYNC_WEBHOOK_SECRET="$(setting IDENTITY_SYNC_WEBHOOK_SECRET "$keycloak_env")"
+E2E_ADMIN_PASSWORD="$(setting ADMIN_PASSWORD "$DEV_ENV_FILE")"
+E2E_KEYCLOAK_ADMIN_USER="$(setting KC_BOOTSTRAP_ADMIN_USERNAME "$keycloak_env")"
+E2E_KEYCLOAK_ADMIN_PASSWORD="$(setting KC_BOOTSTRAP_ADMIN_PASSWORD "$keycloak_env")"
+E2E_KEYCLOAK_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SECRET "$keycloak_env")"
+E2E_KEYCLOAK_SERVICE_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SERVICE_SECRET "$keycloak_env")"
+E2E_PRESS_CLIENT_SECRET="$(setting ATONOTA_PRESS_SECRET "$keycloak_env")"
+E2E_PRESS_ADMIN_PASSWORD="$(setting PRESS_ADMIN_PASSWORD "$press_env")"
+E2E_IDENTITY_SYNC_WEBHOOK_SECRET="$(setting IDENTITY_SYNC_WEBHOOK_SECRET "$keycloak_env")"
+export E2E_ADMIN_PASSWORD E2E_KEYCLOAK_ADMIN_USER E2E_KEYCLOAK_ADMIN_PASSWORD E2E_KEYCLOAK_CLIENT_SECRET
+export E2E_KEYCLOAK_SERVICE_CLIENT_SECRET E2E_PRESS_CLIENT_SECRET E2E_PRESS_ADMIN_PASSWORD E2E_IDENTITY_SYNC_WEBHOOK_SECRET
 export E2E_PROVIDER_HOST=e2e-provider
 
 # Include each source fragment with an isolated override. The source fragments keep their own
@@ -203,29 +225,27 @@ printf '%s\n' "Preparing a disposable stack. See $PREVIEW_DIR/runtime.log."
     "${compose[@]}" build --builder "$builder" web keycloak
     "${compose[@]}" up --no-build -d --wait --wait-timeout 120 mariadb redis
     "${compose[@]}" up --no-build -d web
-    docker_default exec -u root "$press" bash -c '
-        owner="$(id -u frappe):$(id -g frappe)"
-        chown "$owner" /home/frappe/benches
-        install -d -o "$(id -u frappe)" -g "$(id -g frappe)" /home/frappe/benches/source
-    '
+    docker_default exec -i -u root "$press" bash -s <<'BASH'
+owner="$(id -u frappe):$(id -g frappe)"
+chown "$owner" /home/frappe/benches
+install -d -o "$(id -u frappe)" -g "$(id -g frappe)" /home/frappe/benches/source
+BASH
     docker_default cp "$worktree/backend/apps/press_tr" "$press:/home/frappe/benches/source/press_tr"
-    docker_default exec -u root "$press" bash -c 'chown -R "$(id -u frappe):$(id -g frappe)" /home/frappe/benches/source/press_tr'
+    docker_default exec -u root "$press" bash -c "chown -R \"\$(id -u frappe):\$(id -g frappe)\" /home/frappe/benches/source/press_tr"
     docker_default exec -i -e GOMAXPROCS=2 -e NODE_OPTIONS=--max-old-space-size=2048 -e SENTRY_TELEMETRY=false "$press" bash -s < "$dev_dir/press/install.sh"
-    docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c 'exec bench serve --port "$PRESS_WEB_PORT" --noreload > logs/e2e-preview-web.log 2>&1'
 
     "${compose[@]}" up --no-build -d --wait --wait-timeout 120 kiraci-db kiraci-redis keycloak-db mailpit
     "${compose[@]}" up --no-build -d kiraci-web keycloak
     docker_default cp "$worktree/backend/apps/platform_core" "$tenant:/tmp/platform_core"
     docker_default cp "$worktree/backend/libs/oidc_verify" "$tenant:/tmp/oidc_verify"
     docker_default cp "$dev_dir/bootstrap.py" "$tenant:/tmp/preview-bootstrap.py"
-    docker_default exec -u root "$tenant" bash -c '
-        if [[ -d apps/platform_core ]]; then mv apps/platform_core /tmp/previous-platform-core; fi
-        mv /tmp/platform_core apps/platform_core
-        chown -R "$(id -u frappe):$(id -g frappe)" apps/platform_core /tmp/oidc_verify
-    '
+    docker_default exec -i -u root "$tenant" bash -s <<'BASH'
+if [[ -d apps/platform_core ]]; then mv apps/platform_core /tmp/previous-platform-core; fi
+mv /tmp/platform_core apps/platform_core
+chown -R "$(id -u frappe):$(id -g frappe)" apps/platform_core /tmp/oidc_verify
+BASH
     docker_default exec "$tenant" uv pip install --python env/bin/python --no-deps /tmp/oidc_verify -e apps/platform_core
     docker_default exec "$tenant" env/bin/python /tmp/preview-bootstrap.py kiraci1.localhost --app erpnext --app platform_core
-    docker_default exec -d "$tenant" bash -c 'exec bench serve --port "$KIRACI_WEB_PORT" --noreload > logs/e2e-preview-web.log 2>&1'
     "${compose[@]}" up --no-build -d kiraci-socket
 
     {
@@ -238,7 +258,7 @@ printf '%s\n' "Preparing a disposable stack. See $PREVIEW_DIR/runtime.log."
         printf 'IDENTITY_SYNC_DIGEST_KEY=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
         printf 'IDENTITY_SYNC_PORT=%s\n' "$sync_port"
         printf '%s\n' 'IDENTITY_SYNC_HOST=0.0.0.0' 'IDENTITY_SYNC_REALM=platform' 'IDENTITY_SYNC_CLIENT_ID=identity-sync' \
-            'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-kiraci1'
+            'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-kiraci1-service' 'IDENTITY_SYNC_EXECUTE_AZP=site-kiraci1-service'
     } > "$sync_env"
     docker_default create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias "$sync_host" --memory 128m \
         --env-file "$sync_env" -e PYTHONPATH=/tmp --publish "127.0.0.1:$sync_port:$sync_port" \
@@ -263,7 +283,7 @@ if [[ -n "${ports[0]-}" ]]; then
 fi
 
 wait_http() {
-    for attempt in {1..40}; do
+    for ((attempt = 0; attempt < 40; attempt++)); do
         if curl -4 -fsS --max-time 2 -o /dev/null "$1" 2>/dev/null; then return; fi
         sleep 1
     done
@@ -272,10 +292,13 @@ wait_http() {
 }
 
 wait_http "http://127.0.0.1:$KC_PORT/realms/platform/.well-known/openid-configuration"
-wait_http "$ATONOTA_SITE_KIRACI1_URL/api/method/ping"
-wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 wait_http "http://127.0.0.1:$sync_port/healthz"
 wait_http "http://127.0.0.1:$provider_port/attempts"
 
+# Frappe caches site settings on requests, including the readiness ping.
 python3 "$suite_dir/preview/fixtures.py" prepare
+docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PRESS_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+docker_default exec -d "$tenant" bash -c "exec bench serve --port \"\$KIRACI_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+wait_http "$ATONOTA_SITE_KIRACI1_URL/api/method/ping"
+wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 node "$suite_dir/preview/run-tests.mjs" "$worktree"

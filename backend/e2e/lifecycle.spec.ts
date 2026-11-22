@@ -105,7 +105,8 @@ test.describe('Press account deletion', () => {
     const mobileToken = required('E2E_DELETE_MOBILE_TOKEN');
     expect(tokenClaims(mobileToken).sub === subject).toBe(true);
     const installation = required('E2E_DELETE_INSTALLATION');
-    const readUser = (origin: string, cookie: string) => resource(request, origin, cookie, 'User', email);
+    const readUser = (origin: string, cookie: string, name = email) =>
+      resource(request, origin, cookie, 'User', name);
     const pressAccess = () => request.get(press + LOGGED_USER, {
       headers: { Authorization: pressKey }, maxRedirects: 0,
     });
@@ -161,8 +162,16 @@ test.describe('Press account deletion', () => {
     expect((await submitted.json()).message).toMatchObject({ submitted: true });
 
     await expect.poll(async () => (await keycloakUser(request, subject)).status(), { timeout: 60_000 }).toBe(404);
-    expect((await readUser(press, pressReader)).enabled).toBe(0);
-    expect((await readUser(tenant, tenantReader)).enabled).toBe(0);
+    const pressAnonymous = required('E2E_DELETE_PRESS_ANONYMOUS_USER');
+    const tenantAnonymous = required('E2E_DELETE_TENANT_ANONYMOUS_USER');
+    expect((await readUser(press, pressReader, pressAnonymous)).enabled).toBe(0);
+    expect((await readUser(tenant, tenantReader, tenantAnonymous)).enabled).toBe(0);
+    for (const [origin, cookie] of [[press, pressReader], [tenant, tenantReader]]) {
+      const previous = await request.get(origin + '/api/resource/User/' + encodeURIComponent(email), {
+        headers: { Cookie: cookie }, maxRedirects: 0,
+      });
+      expect(previous.status()).toBe(404);
+    }
     expect([401, 403]).toContain((await pressAccess()).status());
     expect([401, 403]).toContain((await mobilePull(request, mobileToken, installation)).status());
     expect(await readBusinessValue()).toEqual(anonymous);

@@ -247,11 +247,12 @@ class MergePreviewTest(unittest.TestCase):
         fake_bin.mkdir()
         stubs = {
             "nc": "exit 1\n",
-            "colima": "printf '%s\\n' 'Mem: 7 2 2 0 3 5'\n",
+            "colima": "exit 17\n",
             "docker": (
                 'if [[ "$1" == --context ]]; then [[ "$2" == colima ]] || exit 90; shift 2; fi\n'
                 'printf "%s\\n" "$*" >> "$PREVIEW_TEST_DOCKER_LOG"\n'
                 'case "$1 $2" in\n'
+                '  "run --rm") echo "MemAvailable: 5242880 kB" ;;\n'
                 '  "context inspect") echo unix:///test.sock ;;\n'
                 '  "image inspect") [[ "$3" == frappe/erpnext:v16.55.0 ]] ;;\n'
                 '  "container inspect") echo other-project ;;\n'
