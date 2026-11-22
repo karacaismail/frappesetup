@@ -1,0 +1,111 @@
+rules:
+  - id: frappe-missing-permission
+    languages: [python]
+    severity: ERROR
+    message: "Uçta kayıt iznini denetleyin."
+    patterns:
+      - pattern: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+              $DOC.check_permission(...)
+              ...
+      - pattern-not: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+              if not frappe.has_permission(...):
+                  frappe.throw(...)
+              ...
+  - id: frappe-ignore-permissions
+    languages: [python]
+    severity: ERROR
+    message: "İzin denetimini atlayan seçeneği kaldırın."
+    pattern-either:
+      - pattern: $CALL(..., ignore_permissions=True, ...)
+      - pattern: $DOC.flags.ignore_permissions = True
+      - pattern: frappe.flags.ignore_permissions = True
+  - id: frappe-built-sql
+    languages: [python]
+    severity: ERROR
+    message: "Sorgu değerlerini ayrı parametrelerle verin."
+    pattern-either:
+      - pattern: frappe.db.sql(f"...", ...)
+      - pattern: frappe.db.sql($FORMAT.format(...), ...)
+      - pattern: frappe.db.sql($LEFT + $RIGHT, ...)
+  - id: frappe-guest-without-limit
+    languages: [python]
+    severity: ERROR
+    message: "Misafir isteklerine sayı sınırı koyun."
+    patterns:
+      - pattern: |
+          @frappe.whitelist(..., allow_guest=True, ...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @frappe.whitelist(..., allow_guest=True, ...)
+          @rate_limit(...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @rate_limit(...)
+          @frappe.whitelist(..., allow_guest=True, ...)
+          def $FUNC(...):
+              ...
+  - id: frappe-missing-methods
+    languages: [python]
+    severity: ERROR
+    message: "Ucun HTTP yöntemlerini methods seçeneğinde yazın."
+    patterns:
+      - pattern: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+      - pattern-not: |
+          @frappe.whitelist(..., methods=$METHODS, ...)
+          def $FUNC(...):
+              ...
+  - id: frappe-request-commit
+    languages: [python]
+    severity: ERROR
+    message: "İstek içinde yazıları erken kesinleştirmeyin."
+    patterns:
+      - pattern-inside: |
+          @frappe.whitelist(...)
+          def $FUNC(...):
+              ...
+      - pattern-either:
+          - pattern: frappe.db.commit()
+          - pattern: $DOC.db_set(..., commit=True, ...)
+  - id: python-dynamic-execution
+    languages: [python]
+    severity: ERROR
+    message: "Dinamik kod ve kabuk çalıştırmayı kaldırın."
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+      - pattern: $CALL(..., shell=True, ...)
+  - id: http-missing-timeout
+    languages: [python]
+    severity: ERROR
+    message: "Dış isteğe açık bir süre sınırı verin."
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: requests.$METHOD(...)
+                  - pattern: httpx.$METHOD(...)
+              - metavariable-regex:
+                  metavariable: $METHOD
+                  regex: ^(request|get|post|put|patch|delete|head|options|stream)$
+          - pattern: urllib.request.urlopen(...)
+      - pattern-not: $CALL(..., timeout=$TIMEOUT, ...)
+  - id: ai-provider-sdk
+    languages: [python]
+    severity: ERROR
+    message: "Model sağlayıcısına ortak geçit üzerinden bağlanın."
+    pattern-regex: '^\s*(?:from|import)\s+(?:openai|anthropic|google\.generativeai|google\.genai|mistralai|cohere|groq|ollama|litellm)\b'
