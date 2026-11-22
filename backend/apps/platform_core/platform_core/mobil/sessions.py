@@ -54,7 +54,7 @@ def revoke_after_commit(sessions, *, remote=True):
 	targets = sorted({(sid, subject or "") for sid, subject in sessions if valid_keycloak_id(sid)})
 	if not targets:
 		return
-	keys = {sid: _session_key(sid) for sid, _ in targets}
+	keys = {sid: _session_key(sid) for sid, _unused in targets}
 	rows = frappe.db.get_values(
 		REVOKED_SESSION,
 		{"name": ["in", list(keys.values())]},
@@ -107,15 +107,15 @@ def revoke_after_commit(sessions, *, remote=True):
 
 
 def _deliver_committed(sessions):
-	failed = set(send_session_revocations(sessions))
-	confirmed = [_session_key(sid) for sid, subject in sessions if (sid, subject) not in failed]
-	if not confirmed:
+	retryable = set(send_session_revocations(sessions))
+	completed = [_session_key(sid) for sid, subject in sessions if (sid, subject) not in retryable]
+	if not completed:
 		return
 	# In the requestless path, the parent commit may still have callbacks to run.
 	# The separate acknowledgment transaction must not drain or clear them.
 	original_callbacks = frappe.db.after_commit.cut(0)
 	try:
-		frappe.db.set_value(REVOKED_SESSION, {"name": ["in", confirmed]}, "delivery_pending", 0)
+		frappe.db.set_value(REVOKED_SESSION, {"name": ["in", completed]}, "delivery_pending", 0)
 		frappe.db.commit()  # nosemgrep: acknowledge after the revocation transaction committed
 	except (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
 		# The pending marker is already durable. Retry the same installation if acknowledgement fails.
