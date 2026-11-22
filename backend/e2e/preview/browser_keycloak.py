@@ -7,6 +7,7 @@ import secrets
 ENGINES = ("chromium", "webkit")
 MOBILE_CLIENT = "mobile-app"
 EXPIRED_CLIENT = "e2e-expired-mobile"
+SSO_PROBE_CLIENT = "e2e-sso-probe"
 MOBILE_SCOPE = "openid mobile aud-site-tenant1"
 SCENARIOS = ("delete", "revoke", "employee", "mobile", "magic", "magic-otp")
 MAGIC_TTL = 45
@@ -72,6 +73,13 @@ def configure_browser_clients(call, redirect):
     config = call(f"/authentication/config/{config_id}")
     config["config"]["magickey.validity.duration"] = str(MAGIC_TTL)
     call(f"/authentication/config/{config['id']}", method="PUT", data=config)
+
+    call("/clients", data={
+        "clientId": SSO_PROBE_CLIENT, "protocol": "openid-connect", "enabled": True,
+        "publicClient": True, "standardFlowEnabled": True, "directAccessGrantsEnabled": False,
+        "implicitFlowEnabled": False, "fullScopeAllowed": False, "redirectUris": [redirect],
+        "attributes": {"pkce.code.challenge.method": "S256"},
+    })
 
     reader_id = "e2e-browser-reader"
     reader_secret = secrets.token_urlsafe(32)

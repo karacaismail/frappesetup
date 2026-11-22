@@ -185,6 +185,11 @@ class PreviewFixturesTest(unittest.TestCase):
 
         redirect = "http://127.0.0.1:43828/callback"
         reader, secret = fixtures.browser_keycloak.configure_browser_clients(call, redirect)
+        probe, = (values["data"] for path, values in calls if path == "/clients"
+                  and values.get("data", {}).get("clientId") == "e2e-sso-probe")
+        self.assertEqual(probe["redirectUris"], [redirect])
+        self.assertEqual(probe["attributes"], {"pkce.code.challenge.method": "S256"})
+        self.assertFalse(probe["directAccessGrantsEnabled"])
         self.assertEqual(reader, "e2e-browser-reader")
         self.assertTrue(secret)
         self.assertIn(("/clients/mobile/default-client-scopes/roles-scope", {"method": "DELETE"}), calls)

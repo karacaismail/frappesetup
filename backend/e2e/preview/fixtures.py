@@ -161,6 +161,7 @@ def seed_keycloak(port, password, *, browser_fixtures=None):
             E2E_MOBILE_AUDIENCE="site-tenant1",
             E2E_MOBILE_SCOPE=browser_keycloak.MOBILE_SCOPE,
             E2E_MOBILE_EXPIRED_CLIENT_ID=browser_keycloak.EXPIRED_CLIENT,
+            E2E_SSO_PROBE_CLIENT=browser_keycloak.SSO_PROBE_CLIENT,
             E2E_MOBILE_ORIGIN=f"http://127.0.0.1:{port + 8}",
             E2E_MAGIC_TTL_SECONDS=str(browser_keycloak.MAGIC_TTL),
             E2E_LIFECYCLE_READER_CLIENT=reader,

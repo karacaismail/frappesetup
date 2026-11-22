@@ -260,19 +260,21 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
 
 async function keycloakStillSignedIn(page: Page) {
   const { identity, tenant } = sites();
+  const redirect = fullPreview ? new URL(required('E2E_MOBILE_REDIRECT_URI')) : new URL(tenant + CALLBACK);
+  const client = fullPreview ? required('E2E_SSO_PROBE_CLIENT') : 'site-tenant1';
   const state = randomUUID();
   const challenge = createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url');
   const url = new URL(identity + '/realms/platform/protocol/openid-connect/auth');
   url.search = new URLSearchParams({
-    client_id: 'site-tenant1', response_type: 'code', scope: 'openid', state, prompt: 'none',
-    redirect_uri: tenant + CALLBACK, code_challenge: challenge, code_challenge_method: 'S256',
+    client_id: client, response_type: 'code', scope: 'openid', state, prompt: 'none',
+    redirect_uri: redirect.href, code_challenge: challenge, code_challenge_method: 'S256',
   }).toString();
   const response = await page.request.get(url.href, { maxRedirects: 0 });
   const location = response.headers().location;
   if (!location) return false;
   const callback = new URL(location, identity);
   // Do not follow the callback. The Keycloak probe must not touch the tenant session.
-  return callback.origin === tenant && callback.pathname === CALLBACK
+  return callback.origin === redirect.origin && callback.pathname === redirect.pathname
     && callback.searchParams.get('state') === state && callback.searchParams.has('code');
 }
 
