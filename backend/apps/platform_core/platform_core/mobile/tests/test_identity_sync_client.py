@@ -28,6 +28,8 @@ class IdentitySyncClientTest(TestCase):
 		self.logger = patch.object(client.frappe, "logger").start().return_value
 		self.open = patch.object(client._OPENER, "open").start()
 		patch.object(service_client._OPENER, "open", self.open).start()
+		self.local_open = patch.object(client._LOCAL_OPENER, "open").start()
+		patch.object(service_client._LOCAL_OPENER, "open", self.local_open).start()
 
 	@staticmethod
 	def response(body=b"", status=200):
@@ -177,6 +179,44 @@ class IdentitySyncClientTest(TestCase):
 					(("session", "keycloak-fixture"),),
 				)
 		self.open.assert_not_called()
+
+	def test_development_stack_can_revoke_over_local_http(self):
+		self.conf.update(
+			developer_mode=1,
+			mobile_identity_sync_url="http://identity-sync.localhost:6115",
+			keycloak_internal_url="http://identity.localhost:3850",
+		)
+		self.local_open.side_effect = [self.response(b'{"access_token":"fixture-bearer"}'), self.response()]
+		self.assertEqual(client.send_session_revocations([("session", "subject")]), ())
+		self.assertEqual(
+			[call.args[0].full_url for call in self.local_open.call_args_list],
+			[
+				"http://identity.localhost:3850/realms/platform/protocol/openid-connect/token",
+				"http://identity-sync.localhost:6115/v1/sessions/revoke",
+			],
+		)
+
+	def test_plaintext_is_rejected_outside_the_expected_development_hosts(self):
+		for key, address, development in (
+			("mobile_identity_sync_url", "http://identity-sync.localhost:6115", 0),
+			("keycloak_internal_url", "http://identity.localhost:3850", 0),
+			("mobile_identity_sync_url", "http://identity-sync.localhost:6115", "0"),
+			("mobile_identity_sync_url", "http://identity-sync.localhost.example.test", 1),
+			("mobile_identity_sync_url", "http://identity.localhost:3850", 1),
+			("mobile_identity_sync_url", "http://user:secret@identity-sync.localhost:6115", 1),
+			("mobile_identity_sync_url", "http://identity-sync.localhost:bad", 1),
+			("keycloak_internal_url", "http://identity-sync.localhost:6115", 1),
+			("mobile_identity_sync_url", "http://192.168.1.99:6115", 1),
+		):
+			with (
+				self.subTest(key=key, address=address, development=development),
+				patch.dict(self.conf, {key: address, "developer_mode": development}),
+			):
+				self.assertEqual(
+					client.send_session_revocations([("session", "subject")]), (("session", "subject"),)
+				)
+		self.open.assert_not_called()
+		self.local_open.assert_not_called()
 
 	def test_browser_client_cannot_request_a_service_bearer(self):
 		self.conf["keycloak_service_client_id"] = self.conf["keycloak_client_id"]

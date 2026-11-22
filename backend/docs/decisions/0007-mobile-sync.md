@@ -297,9 +297,14 @@ Servis adresi `mobile_identity_sync_url` ayarında bulunur.
 Mobil modül belirteci kimlik modülünün servis istemcisinden alır.
 Kimlik modülü Keycloak adresini ve realm adını site ayarından alır.
 İç adres varsa kimlik modülü o adresi kullanır. Yoksa genel adresi kullanır.
-Servis belirteci almak için seçilen adres HTTPS olmalıdır.
-Geliştirme sitesi HTTP kullanırsa uzak kapatma isteği gitmez.
-Uzak kapatma beklemede kalır. Sistem bu durumu `delivery_pending` alanında saklar.
+Üretimde iki adres de HTTPS olmalıdır.
+Geliştirme sitesi `developer_mode` ayarını açarsa yerel HTTP adreslerini kullanabilir.
+Keycloak için `identity.localhost` adı kabul edilir.
+Kimlik servisi için `identity-sync.localhost` adı kabul edilir.
+İki servis için `localhost` ve yerel döngü IP adresleri de kabul edilir.
+Yerel döngü adresi, isteği aynı makineye gönderir.
+HTTP istekleri doğrudan gider. Bu istekler vekil sunucu üzerinden geçmez.
+Adres uygun olmazsa uzak kapatma beklemede kalır. Sistem bu durumu `delivery_pending` alanında saklar.
 Yerel oturum reddi geçerli kalır.
 Servis hesabı `keycloak_service_client_id` ve `keycloak_service_client_secret` kullanır.
 Kiracı servis istemcisinin adı, tarayıcı istemcisinin adına `-service` eklenerek oluşturulur.

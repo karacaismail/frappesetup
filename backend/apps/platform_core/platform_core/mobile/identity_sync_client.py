@@ -4,11 +4,15 @@ import json
 from http.client import HTTPException
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 import frappe
 
-from platform_core.identity.service_client import identity_sync_bearer, invalidate_identity_sync_bearer
+from platform_core.identity.service_client import (
+	development_http_allowed,
+	identity_sync_bearer,
+	invalidate_identity_sync_bearer,
+)
 
 _TIMEOUT_SECONDS = 3
 _DELIVERY_ERRORS = (HTTPException, OSError, ValueError, RecursionError)
@@ -21,6 +25,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 _OPENER = build_opener(_NoRedirect())
+_LOCAL_OPENER = build_opener(ProxyHandler({}), _NoRedirect())
 
 
 def _identity_sync_origin():
@@ -29,7 +34,7 @@ def _identity_sync_origin():
 		raise ValueError("Invalid identity-sync URL")
 	address = urlsplit(value)
 	if (
-		address.scheme != "https"
+		(address.scheme != "https" and not development_http_allowed(address, "identity-sync.localhost"))
 		or not address.hostname
 		or address.username is not None
 		or address.query
@@ -52,6 +57,7 @@ def send_session_revocations(sessions):
 	except _DELIVERY_ERRORS:
 		failed = sessions
 	else:
+		opener = _LOCAL_OPENER if urlsplit(endpoint).scheme == "http" else _OPENER
 		failed = []
 		for sid, subject in sessions:
 			req = Request(
@@ -61,7 +67,7 @@ def send_session_revocations(sessions):
 				method="POST",
 			)
 			try:
-				with _OPENER.open(req, timeout=_TIMEOUT_SECONDS) as response:
+				with opener.open(req, timeout=_TIMEOUT_SECONDS) as response:
 					status = response.status
 			except HTTPError as error:
 				with error:

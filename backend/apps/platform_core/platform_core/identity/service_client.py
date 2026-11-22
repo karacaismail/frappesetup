@@ -2,11 +2,12 @@
 
 import json
 import re
+from ipaddress import ip_address
 from threading import Lock
 from time import monotonic
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 import frappe
 
@@ -24,8 +25,27 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 _OPENER = build_opener(_NoRedirect())
+_LOCAL_OPENER = build_opener(ProxyHandler({}), _NoRedirect())
 _cached_bearer = None
 _cache_lock = Lock()
+
+
+def development_http_allowed(address, local_service_host: str) -> bool:
+	"""Permit direct development HTTP to loopback or the named Compose service."""
+	if address.scheme != "http" or frappe.conf.get("developer_mode") not in (1, "1"):
+		return False
+	host = address.hostname
+	if not host:
+		return False
+	# Validate the port before any credential or request is created.
+	if address.port == 0:
+		return False
+	if host in ("localhost", local_service_host):
+		return True
+	try:
+		return ip_address(host).is_loopback
+	except ValueError:
+		return False
 
 
 def _token_url() -> str:
@@ -40,7 +60,7 @@ def _token_url() -> str:
 		raise ValueError("Invalid Keycloak service URL")
 	address = urlsplit(base)
 	if (
-		address.scheme != "https"
+		(address.scheme != "https" and not development_http_allowed(address, "identity.localhost"))
 		or not address.hostname
 		or address.username is not None
 		or address.query
@@ -85,7 +105,8 @@ def identity_sync_bearer() -> str:
 		method="POST",
 	)
 	try:
-		with _OPENER.open(req, timeout=_TIMEOUT_SECONDS) as response:
+		opener = _LOCAL_OPENER if urlsplit(url).scheme == "http" else _OPENER
+		with opener.open(req, timeout=_TIMEOUT_SECONDS) as response:
 			if response.status != 200:
 				raise ValueError("Identity-sync token request failed")
 			body = response.read(_MAX_TOKEN_RESPONSE_BYTES + 1)
