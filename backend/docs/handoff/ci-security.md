@@ -83,6 +83,7 @@ Yazan istekler varsayılan olarak gönderilmez. `--allow-writes` seçeneği bu i
 Başarısız tarama birleştirmeyi durdurur.
 CI kipinde zorunlu adım çalışmazsa komut 1 ile çıkar.
 ZAP, yerel siteden alınan ilk yanıtı pasif olarak inceler. Yanıt yeniden gönderilmez.
+Komut her uyarı için kimliği, risk düzeyini ve yerel adresi gösterir.
 Yerel hedef yoksa sözleşme adımı `not_run` döner.
 Sözleşme denetimi varsayılan olarak GET işlemlerini kapsar.
 Özet, sınanan işlem sayısını gösterir. Erişim izni ayrı rol testiyle doğrulanır.

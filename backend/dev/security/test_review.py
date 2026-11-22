@@ -158,20 +158,25 @@ class ReviewTests(unittest.TestCase):
 
 
     def test_zap_import_runs_without_network_or_replay(self):
-        with patch.object(scans, "run") as runner, patch.dict(os.environ, {"FS_COLIMA_PROFILE": "factory"}):
-            scans.scan_zap("http://dev.localhost:8080/", 302, "Found",
-                           [("Location", "https://example.invalid/")], b"")
-        name, version, command = runner.call_args.args
-        self.assertEqual(name, "ZAP passive scan")
+        with patch.object(scans.subprocess, "run", return_value=subprocess.CompletedProcess(
+                [], 0, stdout=b'{"site": []}'
+        )) as runner, patch.dict(os.environ, {"FS_COLIMA_PROFILE": "factory"}):
+            result = scans.scan_zap("http://dev.localhost:8080/", 302, "Found",
+                                    [("Location", "https://example.invalid/")], b"")
+        self.assertEqual(result.status, "pass")
+        self.assertEqual(result.findings, ())
+        command, = runner.call_args.args
+        version = scans.VERSIONS["ZAP_VERSION"]
         self.assertEqual(command[:3], ["docker", "--context", "colima-factory"])
         self.assertEqual(command[command.index("--network") + 1], "none")
         self.assertIn("--pull", command)
         self.assertTrue(any(x.startswith(f"ghcr.io/zaproxy/zaproxy:{version}@sha256:") for x in command))
-        with tarfile.open(fileobj=io.BytesIO(runner.call_args.kwargs["input_data"])) as archive:
+        with tarfile.open(fileobj=io.BytesIO(runner.call_args.kwargs["input"])) as archive:
             plan = json.load(archive.extractfile("plan.yaml"))
             har = json.load(archive.extractfile("response.har"))
-        self.assertEqual([job["type"] for job in plan["jobs"]], ["import", "passiveScan-wait", "exitStatus"])
+        self.assertEqual([job["type"] for job in plan["jobs"]], ["import", "passiveScan-wait", "report", "exitStatus"])
         self.assertIs(plan["jobs"][0]["parameters"]["sendRequests"], False)
+        self.assertEqual(plan["jobs"][2]["parameters"]["template"], "traditional-json")
         self.assertEqual(har["log"]["entries"][0]["request"]["url"], "http://dev.localhost:8080/")
 
     def test_runtime_inventory_requires_exactly_one_image_id(self):
@@ -237,3 +242,31 @@ class ReviewTests(unittest.TestCase):
                 result = scans.scan_dependencies()
             self.assertEqual(result.status, "pass")
             self.assertEqual(result.findings, (f"not_run · {lock} · pypika · Git dependency outside offline OSV scan",))
+
+    def test_zap_reports_only_alert_id_risk_and_local_address(self):
+        url = "http://dev.localhost:8080/"
+        alert = {"pluginid": "10020", "alertRef": "10020-1", "riskcode": "2",
+                 "instances": [
+                     {"uri": url, "evidence": "sid=fake-cookie"},
+                     {"uri": url + "?secret=ignore-this"},
+                     {"uri": "http://other.localhost:8080/"},
+                     {"uri": url},
+                 ]}
+        report = {"site": [{"alerts": [alert]}]}
+        process = subprocess.CompletedProcess([], 1, stdout=json.dumps(report), stderr="raw diagnostics")
+        with patch.object(scans.subprocess, "run", return_value=process), patch("sys.stdout", new_callable=io.StringIO) as output:
+            result = scans.scan_zap(url, 200, "OK", [], b"")
+        self.assertEqual(result.status, "fail")
+        self.assertEqual(result.findings, (f"10020-1 · Medium · {url}",))
+        self.assertIn(f"ZAP: 10020-1 · Medium · {url}", output.getvalue())
+        for unwanted in ("fake-cookie", "ignore-this", "other.localhost", "raw diagnostics"):
+            self.assertNotIn(unwanted, output.getvalue())
+
+    def test_zap_rejects_missing_or_invalid_json_report(self):
+        for stdout in ("", "raw response", '{"site": null}', "{}"):
+            with self.subTest(stdout=stdout), patch.object(scans.subprocess, "run", return_value=
+                    subprocess.CompletedProcess([], 0, stdout=stdout, stderr="sid=fake-cookie")), \
+                    patch("sys.stdout", new_callable=io.StringIO) as output:
+                result = scans.scan_zap("http://127.0.0.1:8080/", 200, "OK", [], b"")
+                self.assertEqual(result.status, "fail")
+                self.assertNotIn("fake-cookie", output.getvalue())

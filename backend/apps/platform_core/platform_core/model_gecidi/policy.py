@@ -183,7 +183,7 @@ def connection_policy(base, oauth_url):
 
 def outbound(base, oauth_url, route, request):
 	"""Use deployment-approved destinations and mask all external requests."""
-	kind, _, _ = connection_policy(base, oauth_url)
+	kind = connection_policy(base, oauth_url)[0]
 	if kind == "local":
 		return request
 	if route is not None and route.data_policy != "masked":

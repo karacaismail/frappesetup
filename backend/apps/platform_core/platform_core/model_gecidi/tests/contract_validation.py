@@ -1,4 +1,4 @@
-"""Read and validate model gateway API responses against the tracked OpenAPI contract."""
+"""Read and validate model gateway requests and responses against OpenAPI."""
 
 from pathlib import Path
 from urllib.parse import quote
@@ -34,10 +34,10 @@ class GatewayContract:
 		return media, f"{CONTRACT_IRI}#/{quote(pointer)}/content/application~1json/schema"
 
 	def validate_response(self, path, method, status, payload):
-		_, schema = self.response(path, method, status)
+		_media, schema = self.response(path, method, status)
 		Draft202012Validator({"$ref": schema}, registry=self.registry).validate(payload)
 
-	def validate_completion_cost(self, payload):
-		path = "/api/method/platform_core.api.model.resolve_usage".replace("/", "~1")
-		schema = f"{CONTRACT_IRI}#/paths/{path}/post/requestBody/content/application~1json/schema"
+	def validate_request(self, path, method, payload):
+		path_pointer = quote(path.replace("~", "~0").replace("/", "~1"))
+		schema = f"{CONTRACT_IRI}#/paths/{path_pointer}/{method.lower()}/requestBody/content/application~1json/schema"
 		Draft202012Validator({"$ref": schema}, registry=self.registry).validate(payload)

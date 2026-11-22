@@ -11,6 +11,7 @@ from frappe.utils import get_test_client
 from frappe.utils.password import update_password
 from platform_core.api import mobile
 from platform_core.mobil.store import MobileStore
+from platform_core.mobil.tests.http_diagnostics import http_diagnostic, safe_http_error_code
 from platform_core.mobil.tests.test_service import RECORD, SampleCommand
 
 from .fixture import SERVICE_TARGET, WEBSITE
@@ -103,9 +104,13 @@ class WebsiteMobileTest(IntegrationTestCase):
         return {CLEANUP: "fixture-cleanup", SERVICE: "fixture-service"}.get(endpoint, "fixture-website")
 
     def assert_status(self, response, expected, *, code=None):
-        self.assertEqual(response.status_code, expected, response.get_data(as_text=True))
+        self.assertEqual(
+            response.status_code,
+            expected,
+            http_diagnostic(response.status_code, response.get_json(silent=True)),
+        )
         if code:
-            self.assertEqual(response.json.get("code"), code)
+            self.assertEqual(safe_http_error_code(response.get_json(silent=True)), code)
 
     def test_matrix_covers_every_whitelisted_mobile_method(self):
         methods = {
@@ -210,7 +215,9 @@ class WebsiteMobileTest(IntegrationTestCase):
 
     def expect_success(self, endpoint, body, sid, caller=None):
         response = self.post(endpoint, body, sid, caller)
-        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        self.assertEqual(
+            response.status_code, 200, http_diagnostic(response.status_code, response.get_json(silent=True))
+        )
         return response.json["message"]
 
     def test_website_user_can_call_all_seven_mobile_methods(self):
@@ -243,5 +250,7 @@ class WebsiteMobileTest(IntegrationTestCase):
 
     def test_website_user_cannot_call_mobile_cleanup(self):
         response = self.post("v1_cleanup", {"dry_run": True}, str(uuid4()))
-        self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
-        self.assertNotEqual(response.json.get("code"), "cleanup_forbidden")
+        self.assertEqual(
+            response.status_code, 403, http_diagnostic(response.status_code, response.get_json(silent=True))
+        )
+        self.assertNotEqual(safe_http_error_code(response.get_json(silent=True)), "cleanup_forbidden")

@@ -45,11 +45,20 @@ class TestGatewayManagementTools(IntegrationTestCase):
 	def test_tools_are_approval_writes_and_updates_are_versioned(self):
 		tools = {tool["name"]: tool for tool in management_tools.declare()}
 		self.assertEqual(
-			set(tools), {"create_ai_api", "update_ai_api", "create_ai_account", "update_ai_account"}
+			set(tools),
+			{
+				"create_ai_api",
+				"update_ai_api",
+				"create_ai_account",
+				"update_ai_account",
+				"reconcile_stale_pending",
+			},
 		)
 		self.assertTrue(all(tool["kind"] == "write" and tool["preview"] for tool in tools.values()))
-		self.assertTrue(tools["update_ai_api"]["versioned"])
-		self.assertTrue(tools["update_ai_account"]["versioned"])
+		self.assertEqual(
+			{name for name, tool in tools.items() if tool["versioned"]},
+			{"update_ai_api", "update_ai_account", "reconcile_stale_pending"},
+		)
 
 	def test_api_tool_rejects_credential_and_disallows_reassignment(self):
 		for extra in ({"api_key": "fixture-key"}, {"account": self.account.name}, {"enabled": True}):
