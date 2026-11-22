@@ -116,8 +116,12 @@ Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_id
 | `site` | metin | İsteğin geldiği site |
 | `installation` | metin | Telefon kurulumunun kimliği |
 | `sid` | metin | Keycloak oturum kimliği |
+| `auth_time` | tamsayı | Belirteçteki son kimlik doğrulama zamanı (Unix saniyesi) |
 
 Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
+
+- Kiracı sitesinde ve telefon paketinde bütün kullanıcılar çalışan süresini alır: 1 saat boşta kalma, 24 saat toplam süre. Realm bu istemcilerde `employee` düzeyini ister. Müşteri süreleri yalnız Press'e uygulanır.
+- Sunucu boşta kalma sayacını `auth_time` değeri sayaç başlangıcından yeni olunca sıfırlar. Böylece aynı `sid` ile yeniden giriş de telefonu açar.
 
 ### Kitaplığın arayüzü
 
