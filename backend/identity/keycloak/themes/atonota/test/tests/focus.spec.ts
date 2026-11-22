@@ -13,7 +13,7 @@ const activeName = (page: Page) =>
     if (element.id) return element.id;
     const href = element.getAttribute('href') ?? '';
     if (href.includes('reset-credentials')) return 'forgot-password';
-    if (href.includes('registration')) return 'hesap-ac';
+    if (href.includes('registration')) return 'register-account';
     // Kimliksiz öğeler sıra numarasıyla ayrılır. Böylece iki kimliksiz öğe aynı adı almaz.
     const index = [...document.querySelectorAll(element.tagName)].indexOf(element);
     return `${element.tagName.toLowerCase()}[${index}]`;
@@ -31,7 +31,7 @@ test('giriş ekranında Tab ve Shift+Tab sırası görsel sırayı izler', async
     'forgot-password',
     'kc-login',
     'authenticateWebAuthnButton',
-    'hesap-ac',
+    'register-account',
     'at-locale-tr',
     'at-locale-en',
   ];

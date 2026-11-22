@@ -237,7 +237,7 @@ npx playwright test
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
 | `tests/delete-account.spec.ts` | Hesap silme bağlantısı: müşteri görür, çalışan görmez, adres ayardan gelir |
-| `tests/realm-settings.spec.ts` | Keycloak'ın silme eylemi yanlışlıkla açılsa da konsol onu sunmaz. Bu test realm ayarını değiştirir, bu yüzden öteki testlerden önce tek başına koşar. |
+| `tests/realm-settings.spec.ts` | Keycloak'ın silme eylemi yanlışlıkla açılsa da konsol onu sunmaz. Test bu yanlış ayarı ayrı bir realm'de kurar. Adı `theme-test-delete-action-on` olur. Asıl deneme realm'inin ayarını hiçbir test değiştirmez. |
 | `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
 | `tests/visual.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |

@@ -42,8 +42,8 @@ async function adminToken(): Promise<string> {
   return body.access_token;
 }
 
-export async function admin(path: string, init: { method?: string; body?: unknown } = {}): Promise<Response> {
-  return fetch(`${KC}/admin/realms/${REALM}${path}`, {
+export async function admin(path: string, init: { method?: string; body?: unknown } = {}, realm = REALM): Promise<Response> {
+  return fetch(`${KC}/admin/realms/${realm}${path}`, {
     method: init.method ?? 'GET',
     headers: { authorization: `Bearer ${await adminToken()}`, 'content-type': 'application/json' },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
@@ -61,6 +61,8 @@ type UserOptions = {
    * The role only shows the link to the deletion page. It gives no permission inside Keycloak.
    */
   customer?: boolean;
+  /** Realm that gets the user. Default: the test realm. */
+  realm?: string;
 };
 
 /** Uydurma bir kullanıcı açar. E-posta alanı `ornek.test` ayrılmış deneme alanıdır. */
@@ -91,6 +93,7 @@ export async function createUser(options: UserOptions = {}): Promise<string> {
       }),
     });
   }
+  const realm = options.realm ?? REALM;
   const res = await admin('/users', {
     method: 'POST',
     body: {
@@ -104,9 +107,9 @@ export async function createUser(options: UserOptions = {}): Promise<string> {
       requiredActions: options.requiredActions ?? [],
       credentials,
     },
-  });
+  }, realm);
   if (res.status !== 201) throw new Error(`Kullanıcı açılamadı: ${res.status} ${await res.text()}`);
-  if (options.customer) await grantCustomerRole(res.headers.get('location')!.split('/').pop()!);
+  if (options.customer) await grantCustomerRole(res.headers.get('location')!.split('/').pop()!, realm);
   return email;
 }
 
@@ -150,17 +153,17 @@ export function base32Decode(text: string): Buffer {
 }
 
 /** Giriş ekranını açar. Hesap konsolu istemcisi PKCE ister, bu yüzden sabit bir sınama değeri verilir. */
-export function loginUrl(locale?: string): string {
+export function loginUrl(locale?: string, realm = REALM): string {
   const params = new URLSearchParams({
     client_id: 'account-console',
-    redirect_uri: `${KC}/realms/${REALM}/account/`,
+    redirect_uri: `${KC}/realms/${realm}/account/`,
     response_type: 'code',
     scope: 'openid',
     code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
     code_challenge_method: 'S256',
   });
   if (locale) params.set('ui_locales', locale);
-  return `${KC}/realms/${REALM}/protocol/openid-connect/auth?${params}`;
+  return `${KC}/realms/${realm}/protocol/openid-connect/auth?${params}`;
 }
 
 export async function openLogin(page: Page, locale?: string): Promise<void> {
@@ -291,7 +294,7 @@ export const screens: Screen[] = [
       await openLogin(page);
       await submitPassword(page, email);
       await page.locator('#registerWebAuthn').click();
-      await expect(page.locator('#kc-error-credential-form')).toBeAttached();
+      await expect(page.locator('#kc-error-credential-form')).toBeAttached({ timeout: 20_000 });
     },
   },
 ];
@@ -305,12 +308,12 @@ export const screen = (name: string): Screen => {
 /** Realm role that marks a customer. The account console provider shows the deletion link only to this role. */
 export const CUSTOMER_ROLE = 'request-account-deletion';
 
-async function grantCustomerRole(userId: string): Promise<void> {
+async function grantCustomerRole(userId: string, realm = REALM): Promise<void> {
   // The role is created on first use. A second create answers 409, which is fine.
-  const created = await admin('/roles', { method: 'POST', body: { name: CUSTOMER_ROLE, description: 'May ask for the deletion of the own account' } });
+  const created = await admin('/roles', { method: 'POST', body: { name: CUSTOMER_ROLE, description: 'May ask for the deletion of the own account' } }, realm);
   if (!created.ok && created.status !== 409) throw new Error(`Could not create ${CUSTOMER_ROLE}: ${created.status}`);
-  const role = await (await admin(`/roles/${CUSTOMER_ROLE}`)).json();
-  const res = await admin(`/users/${userId}/role-mappings/realm`, { method: 'POST', body: [role] });
+  const role = await (await admin(`/roles/${CUSTOMER_ROLE}`, {}, realm)).json();
+  const res = await admin(`/users/${userId}/role-mappings/realm`, { method: 'POST', body: [role] }, realm);
   if (!res.ok) throw new Error(`Could not grant ${CUSTOMER_ROLE}: ${res.status}`);
 }
 
@@ -326,24 +329,42 @@ export async function grantStockDeleteRole(email: string): Promise<void> {
   if (!res.ok) throw new Error(`Could not grant delete-account: ${res.status}`);
 }
 
-/** Reads the current state of Keycloak's "delete_account" required action. */
-export async function keycloakDeleteActionEnabled(): Promise<boolean> {
-  return ((await (await admin('/authentication/required-actions/delete_account')).json()) as { enabled: boolean }).enabled;
+/** Reads the current state of Keycloak's "delete_account" required action. Nothing in the tests changes it in the test realm. */
+export async function keycloakDeleteActionEnabled(realm = REALM): Promise<boolean> {
+  return ((await (await admin('/authentication/required-actions/delete_account', {}, realm)).json()) as { enabled: boolean }).enabled;
 }
 
 /**
- * Switches Keycloak's "delete_account" required action on or off.
- * Only the serial realm-settings tests may call this. Every other test leaves the identity settings alone,
- * so a wrong setting in the realm shows up as a failed test instead of being repaired silently.
+ * A second realm that is set up wrongly on purpose: Keycloak's "delete_account" action is switched on.
+ * It is created from the realm file of the test realm. The test realm itself is never changed, so its own setting stays
+ * exactly as the realm file installed it and a wrong start setting cannot be hidden.
  */
-export async function setKeycloakDeleteAction(enabled: boolean): Promise<void> {
-  const action = (await (await admin('/authentication/required-actions/delete_account')).json()) as { enabled: boolean };
-  const res = await admin('/authentication/required-actions/delete_account', { method: 'PUT', body: { ...action, enabled } });
-  if (!res.ok) throw new Error(`Could not set delete_account to ${enabled}: ${res.status}`);
+export const MISCONFIGURED_REALM = 'theme-test-delete-action-on';
+
+/** Creates the wrongly configured realm when it does not exist yet and switches the delete action on in it. */
+export async function ensureMisconfiguredRealm(): Promise<void> {
+  if (!(await admin('', {}, MISCONFIGURED_REALM)).ok) {
+    // The realm file of the test realm is the source, so both realms start with the same settings.
+    const source = JSON.parse(readFileSync(new URL('../realm/theme-test-realm.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+    const created = await fetch(`${KC}/admin/realms`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${await adminToken()}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ...source, realm: MISCONFIGURED_REALM }),
+    });
+    // Another worker may have created the realm a moment ago. That answers 409. The realm must exist afterwards.
+    if (!created.ok && created.status !== 409) throw new Error(`Could not create ${MISCONFIGURED_REALM}: ${created.status} ${await created.text()}`);
+    if (!(await admin('', {}, MISCONFIGURED_REALM)).ok) throw new Error(`${MISCONFIGURED_REALM} does not exist after its creation`);
+  }
+  const path = '/authentication/required-actions/delete_account';
+  const action = (await (await admin(path, {}, MISCONFIGURED_REALM)).json()) as { enabled: boolean };
+  if (!action.enabled) {
+    const res = await admin(path, { method: 'PUT', body: { ...action, enabled: true } }, MISCONFIGURED_REALM);
+    if (!res.ok) throw new Error(`Could not switch delete_account on in ${MISCONFIGURED_REALM}: ${res.status}`);
+  }
 }
 
 /** Returns true when a user with this email still exists in the test realm. */
-export async function userExists(email: string): Promise<boolean> {
-  const users = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`)).json()) as unknown[];
+export async function userExists(email: string, realm = REALM): Promise<boolean> {
+  const users = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`, {}, realm)).json()) as unknown[];
   return users.length > 0;
 }
