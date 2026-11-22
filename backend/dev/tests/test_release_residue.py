@@ -156,9 +156,19 @@ class ScannerSelfTest(unittest.TestCase):
         self.assertEqual(self.kinds("/" + "Users/someone/x"), {"home-path"})
         self.assertEqual(self.kinds("~/" + "Documents/notes"), {"home-path"})
         self.assertEqual(self.kinds("kisi@" + "gercek-alan.com.tr"), {"email"})
-        self.assertEqual(self.kinds("+90 " + "532 481 27 36"), {"phone"})
+        # A plainly artificial mobile number: 5 followed by the digits 1 to 9 in order.
+        mobile = "5" + "".join(str(digit) for digit in range(1, 10))
+        sample = "+90 {} {} {} {}".format(mobile[:3], mobile[3:6], mobile[6:8], mobile[8:])
+        self.assertEqual(self.kinds(sample), {"phone"})
         self.assertEqual(self.kinds("AKIA" + "A" * 16), {"secret"})
         self.assertEqual(self.kinds("key=sk-" + "a" * 40), {"secret"})
+
+    def test_own_source_has_no_mobile_number_literal(self):
+        """Samples are built at run time, so the release gate never sees a real-looking number."""
+        mobile = re.compile(r"(?<!\d)5\d{2}[ .-]?\d{3}[ .-]?\d{2}[ .-]?\d{2}(?!\d)")
+        lines = Path(__file__).read_text(encoding="utf-8").splitlines()
+        hits = [number for number, line in enumerate(lines, 1) if mobile.search(line)]
+        self.assertEqual(hits, [])
 
     def test_reserved_and_fake_values_pass(self):
         clean = (
