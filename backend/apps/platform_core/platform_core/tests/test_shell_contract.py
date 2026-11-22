@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from platform_core.kabuk.bootstrap import project_sidebar
+from platform_core.kabuk.contract_tests.contract_json import parse_json
 from platform_core.kabuk.serialization import project_meta
 
 SCHEMA_FILE = Path(__file__).with_name("shell_contract_components.json")
@@ -83,13 +84,13 @@ class TestShellProjectionContract(unittest.TestCase):
 		contract_path = os.environ.get("SHELL_TEST_OPENAPI")
 		if not contract_path:
 			self.skipTest("Canonical contract is mounted by the repository test runner.")
-		contract = json.loads(Path(contract_path).read_text(encoding="utf-8"))
+		contract = parse_json(Path(contract_path).read_bytes())
 		schemas = contract["components"]["schemas"]
-		snapshot = json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
+		snapshot = parse_json(SCHEMA_FILE.read_bytes())
 		self.assertEqual(snapshot, {name: schemas[name] for name in snapshot})
 
 	def check(self, component, payload):
-		components = json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
+		components = parse_json(SCHEMA_FILE.read_bytes())
 		self.assertTrue(matches(payload, components[component], components), (component, payload))
 
 	def test_field_condition_and_choices_match_the_contract(self):

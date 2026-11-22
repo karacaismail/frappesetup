@@ -40,6 +40,19 @@
           },
           "403": {
             "description": "System Manager permission required."
+          },
+          "417": {
+            "description": "The request supplied an unsupported query parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "ValidationError"
+                }
+              }
+            }
           }
         }
       }

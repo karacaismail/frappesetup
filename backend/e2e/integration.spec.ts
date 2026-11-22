@@ -112,6 +112,7 @@ test('agent token lists permitted records only', async ({ request }) => {
   expect(result.structuredContent.documents).toEqual([{ name: visible }]);
   const denied = await mcp(token, 'get_document', { doctype, name: hidden });
   expect(denied.isError).toBe(true);
+  expect(denied.structuredContent?.error?.code).toBe('permission');
 });
 
 test('MCP rejects an agent token sent with a session cookie', async ({ request }) => {
@@ -222,5 +223,5 @@ test('access rule applies equally to list and detail', async ({ request }) => {
   expect(names).toContain(visible);
   expect(names).not.toContain(hidden);
   expect((await resource(request, doctype, visible)).status()).toBe(200);
-  expect([403, 404]).toContain((await resource(request, doctype, hidden)).status());
+  expect((await resource(request, doctype, hidden)).status()).toBe(403);
 });

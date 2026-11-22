@@ -37,6 +37,15 @@ def keycloak_request(port, path, *, token=None, data=None, form=False):
         connection.close()
 
 
+def created_identifier(location, fixture_kind):
+    if not isinstance(location, str) or not location:
+        raise RuntimeError(f"Keycloak fixture response is missing a Location header for the test {fixture_kind}.")
+    identifier = location.rsplit("/", 1)[-1]
+    if not identifier:
+        raise RuntimeError(f"Keycloak fixture response is missing an identifier for the test {fixture_kind}.")
+    return identifier
+
+
 def seed_keycloak(port, password):
     token = keycloak_request(
         port,
@@ -60,11 +69,12 @@ def seed_keycloak(port, password):
             },
         )
         if email == SYNC_EMAIL:
-            subject = location.rsplit("/", 1)[-1]
-    organization = keycloak_request(
+            subject = created_identifier(location, "user")
+    location = keycloak_request(
         port, realm + "/organizations", token=token,
         data={"name": "Preview Integration Tenant", "alias": "kiraci1", "enabled": True},
-    ).rsplit("/", 1)[-1]
+    )
+    organization = created_identifier(location, "organization")
     keycloak_request(
         port, realm + "/organizations/" + quote(organization, safe="") + "/members",
         token=token, data=subject,
@@ -95,7 +105,13 @@ def main():
     if not 1000 <= port <= 65526:
         raise SystemExit("PANE_PORT is out of range.")
     address = ipaddress.ip_address(os.environ["E2E_PROVIDER_IP"])
-    if not address.is_private or address.is_unspecified or address.is_multicast or address.is_link_local:
+    if (
+        not address.is_private
+        or address.is_unspecified
+        or address.is_multicast
+        or address.is_link_local
+        or address.is_loopback
+    ):
         raise SystemExit("The fake provider must use a private address on the preview network.")
 
     password = "Aa9!" + secrets.token_urlsafe(24)
