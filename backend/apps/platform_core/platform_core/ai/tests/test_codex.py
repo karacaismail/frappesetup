@@ -569,7 +569,7 @@ class TestHumanCallLog(AiTestCase):
 		token = self.issue_token(client)
 		anonymous = self.anonymous()
 
-		for _ in range(20):
+		for _iteration in range(20):
 			self.rpc(anonymous, "tools/call", {"name": "olmayan_arac", "arguments": {}}, token=token)
 		response = self.rpc(
 			anonymous, "tools/call", {"name": "plt_search_doctypes", "arguments": {}}, token=token

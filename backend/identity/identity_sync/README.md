@@ -118,11 +118,12 @@ python3 -m identity_sync resolve-operation <kimlik> --resolution completed
 
 `serve` komutu günlüğü standart hata akışına yazar. İşlem günlüğü satırı `execute operation=` ile başlar.
 
-Servis dört istemci listesi tutar:
+Servis beş istemci listesi tutar. O-38 kararı yetkileri şöyle ayırır:
 
-- `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
+- `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız davetleri önizler.
 - `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-tenant1-service`.
 - `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
+- `IDENTITY_SYNC_OPERATOR_AZP` listesi platform işlemlerini açar. Bu istemci mutabakatı ve kuyruk yeniden işletmesini yürütür. Kuyruk ve işlem listelerini yalnız bu istemci okuyabilir.
 - `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 
 İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
@@ -130,7 +131,12 @@ Servis dört istemci listesi tutar:
 - Yürütme listesi ile oturum listesi aynı istemcileri taşımalıdır. Listeler farklıysa servis açılmaz.
 - Bu iki listedeki her istemci, `IDENTITY_SYNC_TENANTS` ayarındaki bir kiracının servis istemcisi olmalıdır. Örneğin `kiraci1` kiracısının istemcisi `site-tenant1-service` adını taşır. Kayıtsız bir kiracının istemcisi listeye yazılırsa servis açılmaz.
 - Servis çalışırken de aynı kuralı uygular. Kiracıya bağlı olmayan istemci yürütme isterse 403 alır.
-- Önizleme ya da silme listesindeki istemci başka bir listede olamaz.
+- Operatör, önizleme ve silme listeleri birbirinden ve kiracı listelerinden ayrıdır.
+- Bu üç listede `site-` ile başlayan istemci bulunamaz. Kural, kayıtlı olmayan kiracı adlarını da kapsar.
+- Operatör listesi boş olabilir. Bu durumda platform uçları bütün istemcileri reddeder.
+- Kiracı yalnız kendi kuruluşuna davet gönderir. Başka kuruluşa davet 403 alır.
+- Kiracı yalnız kendi kuruluşunun işlemini sonuçlandırır. Servis kuruluşu işlem kaydından okur.
+- Gövdedeki kuruluş değeri işlem kaydındaki kuruluşu değiştiremez.
 - Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 
 Aracı belirteci yürütme listesine girmez. Önizleme listesindeki istemci yürütme isterse 403 alır.
@@ -325,13 +331,13 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 
 | Uç | Belirteçsiz | Listede olmayan istemci | Yanlış `azp` | Yanlış `aud` | Süresi dolmuş | Başka kiracının istemcisi | Doğru istemci |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `POST /v1/reconcile`, önizleme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/reconcile`, yürütme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
-| `GET /v1/dead-letters` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/dead-letters/replay`, önizleme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/dead-letters/replay`, yürütme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
-| `GET /v1/operations` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/operations/{kimlik}/resolve` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
+| `POST /v1/reconcile`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/reconcile`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
+| `GET /v1/dead-letters` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/dead-letters/replay`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/dead-letters/replay`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
+| `GET /v1/operations` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/operations/{kimlik}/resolve` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/invitations`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/invitations`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
 | `POST /v1/sessions/revoke` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
@@ -339,13 +345,13 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 | `POST /v1/events` | 401 | 401 | 401 | 401 | 401 | 401 | 202, imzayla |
 | `GET /healthz` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
 
-- “Kabul” şu demektir: istek yetki denetimini geçer ve işleyiciye ulaşır. Testte bu satırlar eski bir özet gönderir ve 409 alır. Çözme ucu olmayan bir işlem için 404 alır.
+- “Kabul” şu demektir: istek yetki denetimini geçer ve işleyiciye ulaşır. Testte bu satırlar eski bir özet gönderir ve 409 alır. Sonuçlandırma testi kendi kuruluşuna ait kayıt için 200 alır. Olmayan kayıt ayrıca 404 alır.
 - Tarayıcı istemcisi (`site-kiraci1`) hiçbir listede değildir. Bu yüzden “Listede olmayan istemci” sütunundaki gibi her belirteçli uçta 401 alır. Test bunu ayrı bir sütun olarak sınar.
 - “Yanlış `azp`” listede olan ama bu uç için yetkisi olmayan istemcidir. Örneğin önizleme istemcisi yürütme isterse 403 alır.
 - Yanlış `aud` ve süresi dolmuş belirteç sütunları gerçek `oidc_verify` kitaplığını ister. Kitaplık yoksa bu iki sütunun testi atlanır.
 - Olay ucu belirteç kabul etmez. Yalnız imzayı kabul eder. Bozuk imza, eski zaman damgası ve ikinci kez kullanılan imza 401 alır.
 - Sağlık ucu kimlik istemez. Yanıt yalnız servisin ayakta olduğunu söyler.
-- Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu yüzden tek kiracıya bağlı değildir. Yürütme listesindeki her kiracı istemcisi bu uçları çağırabilir.
+- Mutabakat, kuyruk yeniden işletme ve işlem listesi bütün platformu kapsar. Bu yüzden tek kiracıya bağlı değildir. Bu uçlar yalnız operatör listesindeki istemciye açıktır. Kiracı ve önizleme istemcileri 403 alır.
 
 ## İstek sınırı
 
@@ -428,6 +434,11 @@ docker --context colima-factory build -f identity/identity_sync/Dockerfile -t fs
 Bu imaj 22 Kasım 2026 Pazar günü `colima-factory` profilinde derlendi ve ağsız denendi. Deneme imajı ve container'ı sonra silindi.
 
 ## Performans ölçümü
+Sunucu işleri sırayla yürütür. Bağlantı kuyruğunun sınırı 128 olarak ayarlanır.
+Bu kuyruk, aynı anda gelen 20 bağlantıya yer bırakır.
+Python sunucusunun varsayılan sınırı 5 olduğunda bağlantılar yanıt gelmeden kopabilir.
+`tests.test_connection_queue` testi, sunucu beklerken 20 bağlantı açar. Sonra her bağlantıda 200 yanıtını doğrular.
+Bu test, performans testinin hata ve süre sınırlarını değiştirmez.
 
 Proje kaydının O-31 kararı iki sınır koyar. Okuma ucunda p95 en çok 500 milisaniyedir. Yazma ucunda p95 en çok 1 saniyedir. p95, çağrıların yüzde 95'inin altında kaldığı süredir.
 
@@ -466,10 +477,42 @@ Sonucu okurken şunları bilin:
 - Mutabakat ve yeniden işletme uçları aynı anda tek onaylı planı yürütür. Aynı önizleme için verilen 20 onaydan biri çalışır. Ötekiler 409 alır ve hiçbir şey yazmaz. Rapor bunları hata saymaz, `concurrent_conflicts` alanında verir.
 - Sunucu istekleri tek tek işler. 20 istek aynı anda gelirse sonuncusu öncekileri bekler. Rapor bu bekleme süresini `concurrent_wait_p95_ms` alanında verir. Bu alan sınırla karşılaştırılmaz.
 
+## Container doğrulaması
+
+22 Kasım 2026 Pazar günü mevcut `Dockerfile` yeniden derlendi.
+Çalışma dizini `backend` oldu. Komut şuydu:
+
+```bash
+docker --context colima-factory build -f identity/identity_sync/Dockerfile -t fs-identity-sync:handoff .
+```
+
+İmaj Python 3.14.10 ve `oidc_verify` 0.1.0 ile açıldı.
+İmajda PyJWT 2.15.1 ve cryptography 50.0.2 vardı.
+Ağ erişimi kapalı deneme container'ında `/healthz` isteği 200 döndü.
+Deneme container'ı, geçici birimi ve imaj etiketi iş bitince silindi.
+Bu kontrol, canlı Press ve kiracı uyumunu doğrulamaz.
+
+## Canlı olay alıcısı doğrulaması
+
+22 Kasım 2026 Pazar günü ayrı bir Keycloak örneği açıldı.
+Deneme, `fs-keycloak-atonota:dev-5070` imajındaki gerçek olay eklentisini kullandı.
+Keycloak, deneme kullanıcısının oluşturulma olayını çalışan identity-sync sunucusuna gönderdi.
+Sunucu gerçek imzayı ve realm kimliğini kabul etti. Yanıt 202 oldu.
+
+Aynı gerçek olayla iki ret denemesi yapıldı:
+
+1. İmza bozulunca sunucu 401 döndü.
+2. Sunucu saati 601 saniye ilerletilince sunucu 401 döndü.
+
+Deneme ayrı, dış erişimi kapalı bir ağda çalıştı. Bilgisayara port açılmadı.
+Deneme bitince iki container, geçici birimler ve deneme ağı silindi.
+Press ve kiracı hedefleri bu denemede sahtedir.
+Bu sonuç bütün servislerin birlikte canlı çalıştığını göstermez.
+
 ## Bilinen eksikler
 
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
 
-- `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracı ile denenmedi. Olay eklentisinin yalnız imza kodu denendi. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
+- `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracıyla birlikte denenmedi. Gerçek Keycloak eklentisinin olay gönderimi ayrıca doğrulandı. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
 - `BORC(mvp)`: `list_identities` satırı e-posta ve takım taşımaz. Etki: Mutabakat, var olan kaydın e-posta farkını ve fazla takım üyeliğini göremez. Sorumlu: orkestratör. Kapanma koşulu: Bu iki farkın nasıl bulunacağı sözleşmeye yazılır ya da farklar kapsam dışı sayılır.
 - `BORC(mvp)`: Bu servisin testleri ve biçim denetimi CI'da koşmaz. Etki: Bozulma yalnız elle çalıştırılan testte görülür. Sorumlu: DevOps sorumlusu. Kapanma koşulu: CI bu klasörün testlerini her değişiklikte koşar.

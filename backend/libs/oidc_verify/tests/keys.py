@@ -24,9 +24,9 @@ class Anahtar:
         )
 
     def jwk(self) -> dict:
-        veri = RSAAlgorithm.to_jwk(self.private.public_key(), as_dict=True)
-        veri.update({"kid": self.kid, "alg": "RS256", "use": "sig"})
-        return veri
+        jwks_payload = RSAAlgorithm.to_jwk(self.private.public_key(), as_dict=True)
+        jwks_payload.update({"kid": self.kid, "alg": "RS256", "use": "sig"})
+        return jwks_payload
 
     def sign(self, payload: dict, alg: str = "RS256", kid: str | None = None) -> str:
         headers = {"kid": kid or self.kid}
@@ -101,12 +101,12 @@ class FakeJwks:
         self.keys = list(keys)
         self.ham: list[dict] = []
         self.error: Exception | None = None
-        self.cagri = 0
+        self.call_count = 0
 
     def __call__(self) -> dict:
-        self.cagri += 1
+        self.call_count += 1
         if self.error is not None:
             raise self.error
-        veri = jwks(*self.keys)
-        veri["keys"] = list(self.ham) + veri["keys"]
-        return veri
+        jwks_payload = jwks(*self.keys)
+        jwks_payload["keys"] = list(self.ham) + jwks_payload["keys"]
+        return jwks_payload

@@ -89,7 +89,7 @@ class EnvironmentCleanupTest(unittest.TestCase):
     def test_cleanup_reports_image_removal_failure_after_closing_tunnel(self):
         result, calls = self.down("default", PROJECT, remove_status=1)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("tunnel kapat", calls)
+        self.assertIn("tunnel close", calls)
 
 
 if __name__ == "__main__":

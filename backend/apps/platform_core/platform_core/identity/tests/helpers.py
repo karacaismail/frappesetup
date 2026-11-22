@@ -63,7 +63,7 @@ class SiteSettings:
 			frappe.local.conf[key] = value
 		return self
 
-	def __exit__(self, *_):
+	def __exit__(self, *_exception_details):
 		for key, old in self.old.items():
 			# update_site_config removes a key only for the literal "None" (frappe/installer.py:716).
 			update_site_config(key, "None" if old is None else old, validate=False)
@@ -396,7 +396,7 @@ class single_value:
 		refresh()
 		return self
 
-	def __exit__(self, *_):
+	def __exit__(self, *_exception_details):
 		frappe.db.set_single_value(self.doctype, self.field, self.old)
 		refresh()
 

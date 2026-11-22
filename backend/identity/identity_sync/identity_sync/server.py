@@ -209,7 +209,7 @@ class _Api:
     # --- okuma uçları ---
 
     def post_reconcile(self, body: bytes, azp: str) -> Reply:
-        """Reconcile: the report is open to preview clients, the repair only to the approval layer."""
+        """Reconcile: only operators may preview or execute an approved repair."""
         payload = _json_object(body)
         if _flag(payload, "dry_run"):
             return 200, self._app.reconcile_plan().report()
@@ -242,9 +242,11 @@ class _Api:
 
     def _approved_digest(self, operation: str, payload: Mapping[str, object], azp: str) -> str:
         """Check who asks and the shape of the approval. Consumes nothing."""
-        if azp not in self._settings.execute_azp or self._tenant_of(azp) is None:
-            # An execute client is the service client of a configured tenant. The settings
-            # check that at start. A client bound to no tenant is refused here as well.
+        platform_operation = operation in {"reconcile", "replay_dead_letters"}
+        allowed = self._settings.operator_azp if platform_operation else self._settings.execute_azp
+        wrong_domain = azp.startswith("site-") if platform_operation else self._tenant_of(azp) is None
+        if azp not in allowed or wrong_domain:
+            # Check the operation's trust domain even with directly constructed Settings.
             _LOG.warning("execute operation=%s azp=%s outcome=forbidden", operation, azp)
             raise _Forbidden
         digest = _text(payload, "preview_digest", required=True, max_length=64)
@@ -503,6 +505,10 @@ class _Api:
         resolution = _text(payload, "resolution", required=True, max_length=20)
         if resolution not in RESOLUTIONS:
             raise _BadRequest
+        organization_id = self._app.store.operation_organization(operation_id)
+        if organization_id is None:
+            return 404, {"error": "not_found"}
+        self._require_own_organization(azp, organization_id)
         if not self._app.store.operation_resolve(operation_id, resolution):
             return 404, {"error": "not_found"}
         _LOG.info(
@@ -512,6 +518,12 @@ class _Api:
             resolution,
         )
         return 200, {"operation_id": operation_id, "state": "resolved", "resolution": resolution}
+
+
+class _SerialHTTPServer(HTTPServer):
+    # Keep mutations serial, but admit the supported burst of twenty clients.
+    # TCPServer's backlog of five can drop connections before HTTP dispatch.
+    request_queue_size = 128
 
 
 def make_server(
@@ -545,6 +557,7 @@ def make_server(
     limiter = _RateLimiter(settings.rate_limit)
     # Each of these routes has its own caller list. A client is in one list only.
     special_routes = {"/v1/sessions/revoke": settings.session_azp, "/v1/account-deletions": settings.deletion_azp}
+    operator_routes = {"/v1/reconcile", "/v1/dead-letters/replay", "/v1/dead-letters", "/v1/operations"}
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
     methods.update(dict.fromkeys(list_routes, "GET"))
 
@@ -635,8 +648,9 @@ def make_server(
             azp = self._caller()
             if azp is None:
                 return 401, {"error": "unauthorized"}
-            allowed = special_routes.get(path, settings.staff_azp)
-            if azp not in allowed:
+            allowed = settings.operator_azp if path in operator_routes else special_routes.get(path, settings.staff_azp)
+            if azp not in allowed or (path in operator_routes and azp.startswith("site-")):
+                _LOG.warning("access route=%s azp=%s outcome=forbidden", route_name(path), azp)
                 return 403, {"error": "forbidden"}
             if resolve is not None:
                 return api.post_resolve_operation(resolve.group(1), body, azp)
@@ -708,4 +722,4 @@ def make_server(
             route = route_name(urlsplit(getattr(self, "path", "")).path)
             _LOG.info("%s %s", route, status if status.isdigit() else "-")
 
-    return HTTPServer((host, port), RequestHandler)
+    return _SerialHTTPServer((host, port), RequestHandler)

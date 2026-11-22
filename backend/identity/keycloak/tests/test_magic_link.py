@@ -15,7 +15,7 @@ import time
 import unittest
 import urllib.parse
 
-from test_extensions import AKIS, _open, _cookie_opener, _form_hedefi, _keycloak_icinde_izle
+from test_extensions import AKIS, _open, _cookie_opener, _form_action, _follow_keycloak_redirect
 from test_second_factor import TOTP_USER, fresh_totp_code
 from helpers import DIRECTORY, admin, live_available, request, get_environment_value, read_realm, tenant_authorize_url, admin_token
 
@@ -112,11 +112,11 @@ class MagicLinkLiveTest(unittest.TestCase):
         status, _, html = _open(opener, tenant_authorize_url())
         self.assertEqual(status, 200)
         self.assertTrue("tryAnotherWay" in html, "login page must offer another way")
-        status, _, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"tryAnotherWay": "on"}).encode())
-        status, _, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"authenticationExecution": self.execution_id}).encode())
+        status, _, html = _open(opener, _form_action(html), urllib.parse.urlencode({"tryAnotherWay": "on"}).encode())
+        status, _, html = _open(opener, _form_action(html), urllib.parse.urlencode({"authenticationExecution": self.execution_id}).encode())
         self.assertEqual(status, 200)
         self.assertTrue('name="username"' in html and 'name="password"' not in html, "e-mail form expected")
-        status, _, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"username": email}).encode())
+        status, _, html = _open(opener, _form_action(html), urllib.parse.urlencode({"username": email}).encode())
         self.assertEqual(status, 200)
         return opener, self.mailpit.latest_link(email)
 
@@ -124,29 +124,29 @@ class MagicLinkLiveTest(unittest.TestCase):
         opener, link = self._request_link(PLAIN_USER)
         # MT-7: a preview or scanner without the browser session must not consume the link.
         stranger = _cookie_opener()
-        status, headers, _ = _keycloak_icinde_izle(stranger, link, self.kc)
+        status, headers, _ = _follow_keycloak_redirect(stranger, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         # The requesting browser still completes the login.
-        status, headers, _ = _keycloak_icinde_izle(opener, link, self.kc)
+        status, headers, _ = _follow_keycloak_redirect(opener, link, self.kc)
         location = headers.get("Location", "")
         self.assertEqual(status, 302, "first click in the requesting browser must finish the login")
         self.assertTrue(location.startswith(get_environment_value("ATONOTA_SITE_TENANT1_URL")), f"HTTP {status}")
         self.assertTrue("code=" in location, f"HTTP {status}")
         # Single use: the same link does not work twice.
-        status, headers, _ = _keycloak_icinde_izle(opener, link, self.kc)
+        status, headers, _ = _follow_keycloak_redirect(opener, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_link_does_not_skip_totp(self):
         opener, link = self._request_link(TOTP_USER)
-        status, headers, html = _keycloak_icinde_izle(opener, link, self.kc)
+        status, headers, html = _follow_keycloak_redirect(opener, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "the OTP form must follow the magic link")
         time.sleep(1.2)
-        status, headers, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
+        status, headers, html = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": "000000"}).encode())
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "wrong code must keep the OTP form")
         time.sleep(1.2)
-        status, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        status, headers, _ = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         self.assertEqual(status, 302)
         self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
 
@@ -172,5 +172,5 @@ class MagicLinkLiveTest(unittest.TestCase):
         opener, link = self._request_link(OTHER_USER)
         other = _cookie_opener()
         _open(other, tenant_authorize_url())
-        status, headers, _ = _keycloak_icinde_izle(other, link, self.kc)
+        status, headers, _ = _follow_keycloak_redirect(other, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")

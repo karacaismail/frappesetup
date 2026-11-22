@@ -34,7 +34,7 @@ def authorize_identity_sync() -> None:
 	if frappe.form_dict.keys() - SERVICE_PARAMETERS[method] or has_user_session:
 		reject()
 
-	scheme, _, token = frappe.get_request_header("Authorization", "").partition(" ")
+	scheme, _separator, token = frappe.get_request_header("Authorization", "").partition(" ")
 	if scheme.lower() != "bearer" or not token or any(character.isspace() for character in token):
 		reject()
 

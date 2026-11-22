@@ -1,4 +1,4 @@
-"""Endpoints of the AI access layer. The business rules live in the `platform_core.yapay_zeka` module.
+"""Endpoints of the AI access layer. The business rules live in the `platform_core.ai` module.
 
 Contract: contracts/platform_core-yapay-zeka.openapi.yaml
 

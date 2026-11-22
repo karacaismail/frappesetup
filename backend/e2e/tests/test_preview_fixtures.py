@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,19 @@ from backend.e2e.preview import fixtures
 
 
 class PreviewFixturesTest(unittest.TestCase):
+    def test_container_fixture_reaches_keycloak_without_a_host_tunnel(self):
+        project = "fs-e2e-preview-browser-test"
+        settings = {"E2E_BROWSER_RUNTIME": "container", "FS_COLIMA_PROFILE": "factory", "PREVIEW_PROJECT": project}
+        response = subprocess.CompletedProcess([], 0, json.dumps([200, None, json.dumps({"ready": True})]))
+        with patch.dict(os.environ, settings), patch.object(
+            fixtures.subprocess, "run", return_value=response,
+        ) as run:
+            self.assertEqual(fixtures.keycloak_request(43820, "/health", token="test-only-token"), {"ready": True})
+        args, kwargs = run.call_args
+        self.assertEqual(args[0][:6], ["docker", "--context", "colima-factory", "exec", "-i", project + "-tenant-web-1"])
+        self.assertNotIn("test-only-token", str(args))
+        self.assertEqual(json.loads(kwargs["input"])["headers"]["Authorization"], "Bearer test-only-token")
+
     def test_live_credentials_are_split_between_tenant_clients(self):
         claims = base64.urlsafe_b64encode(json.dumps({
             "aud": "identity-sync", "azp": "site-tenant1-service",

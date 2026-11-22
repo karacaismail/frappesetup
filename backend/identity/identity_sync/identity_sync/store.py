@@ -368,6 +368,13 @@ class Store:
             )
         return result
 
+    def operation_organization(self, operation_id: str) -> str | None:
+        """Return the immutable organization binding before authorizing a resolution."""
+        row = self._db.execute(
+            "SELECT organization_id FROM operations WHERE operation_id = ?", (operation_id,)
+        ).fetchone()
+        return row[0] if row is not None else None
+
     def operation_resolve(self, operation_id: str, resolution: str) -> bool:
         """Close an unfinished operation after a human settled it on the target. False if there is none."""
         with self._transaction():
