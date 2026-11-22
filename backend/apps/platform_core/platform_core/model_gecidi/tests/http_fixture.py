@@ -182,7 +182,7 @@ def _remove_usage(api):
 def _session(base, user=None, password=None):
 	session = requests.Session()
 	session.trust_env = False
-	session.headers["Host"] = TEST_SITE
+	session.headers["Host"] = frappe.local.site
 	if user:
 		login = session.post(
 			base + "/api/method/login",
@@ -263,6 +263,13 @@ def _fixture_webserver(wrap_app=None):
 def _configured_fixture(wrap_app=None):
 	if frappe.local.site != TEST_SITE or not frappe.conf.get("allow_tests"):
 		raise RuntimeError("The HTTP fixture requires the isolated test site")
+
+	with _gateway_fixture(wrap_app) as fixture:
+		yield fixture
+
+
+@contextmanager
+def _gateway_fixture(wrap_app=None):
 	if any(
 		frappe.conf.get("model_gateway_endpoints", {}).get(url)
 		!= {"kind": "local", "addresses": ["127.0.0.1"]}

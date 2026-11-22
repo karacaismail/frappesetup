@@ -455,7 +455,9 @@ paths:
     post:
       summary: List your mobile installations
       operationId: mobileV1ListInstallations
-      description: Lists installations for the verified account, ordered by installation ID.
+      description: |
+        Lists installations for the verified account, ordered by installation ID.
+        The calling phone installation must be active and within its idle limit.
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }

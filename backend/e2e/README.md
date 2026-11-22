@@ -18,7 +18,8 @@ Birleşen `hooks.py` dosyasında aynı üst düzey ad yeniden atanırsa komut du
 Rapor, Git çakışması olmasa bile adı ve satırları gösterir.
 
 Canlı koşu, `PANE_PORT`, kurulu Playwright ve varsayılan Colima'yı ister.
-Ağır ortam için en az 3 GB kullanılabilir bellek gerekir.
+Ağır ortam için en az 3 GiB kullanılabilir bellek gerekir.
+Komut belleği varsayılan Colima’nın Docker bağlamında ölçer.
 Komut varsayılan Colima'da örnek ortamı açar ve senaryoları koşar.
 Model sağlayıcısı yalnız kendi sabit yerel adres listesiyle kaydedilir.
 Testten sonra geçici birimler, imajlar, derleme alanı ve worktree kaldırılır.
@@ -31,6 +32,13 @@ backend/e2e/bin/merge-preview --merge-only
 python3 -m unittest discover -s backend/e2e/tests -v
 node --experimental-strip-types --test backend/e2e/tests/*.test.*
 ```
+
+Hata kalırsa API denemesi, geçidin hata kodunu ve sahte sağlayıcı yanıtlarını gösterir.
+Önizleme, kimlik eşitleme kuyruğundan işlem adını ve HTTP kodunu saklar.
+
+Tarayıcı girişi `site-kiraci1` istemcisini kullanır. Canlı önizleme bu istemcinin servis belirteci isteğini reddettiğini doğrular.
+`site-kiraci1-service` ayrı bir sır kullanır. Önizleme, bu istemcinin yalnız `identity-sync` hedefli belirteç aldığını doğrular.
+Önizleme bu sırrı her koşuda yeniden üretir. Keycloak ve Frappe süreçleri sırrı ortam değişkeninden alır.
 
 ## Sonuçlar
 
@@ -116,6 +124,11 @@ Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
 | Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
 
 Bu senaryoları yalnız ayrı bir yerel test ortamında açın.
+Birleştirme önizlemesi her senaryo için ayrı bir örnek hesap hazırlar.
+Önizleme hesapları kiracıya bağlar. Silme hesabını Press’e de bağlar.
+Silme testi, kiracıda kalacak örnek iş kaydını kullanır.
+Telefon ve okuma oturumları hazır olmadan ilgili testleri açmayın.
+Çalışan testi için tarayıcı ve bir saatlik koşu süresi gerekir.
 Silme ve iptal için her koşuda yeni örnek veri hazırlayın.
 Önkoşullar eksikse ilgili ayarı kapalı bırakın. Playwright nedeni test kaydına yazar.
 

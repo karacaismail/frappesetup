@@ -192,13 +192,19 @@ test('model gateway falls back after the first provider returns 429', async ({ r
     { headers: sessionHeaders('operator'), maxRedirects: 0,
       data: { route: required('E2E_MODEL_ROUTE'), messages: [{ role: 'user', content: 'Integration test' }] } },
   );
-  expect(response.status()).toBe(200);
-  const result = (await response.json()).message;
-  expect(result.api).toBe(required('E2E_FALLBACK_API'));
-  expect(result.text).toBe('Local fallback response');
   const evidence = await request.get(attemptsUrl, { maxRedirects: 0 });
   expect(evidence.status()).toBe(200);
-  expect(await evidence.json()).toEqual([429, 200]);
+  const attempts = await evidence.json();
+  const recordedStatuses = Array.isArray(attempts)
+    ? attempts.filter((value) => Number.isInteger(value) && value >= 100 && value <= 599).slice(0, 10)
+    : [];
+  const result = (await response.json()).message;
+  const code = typeof result?.error === 'string' && /^[a-z_]{1,48}$/.test(result.error)
+    ? result.error : 'unavailable';
+  expect(response.status(), `Gateway error: ${code}. Local provider attempts: ${JSON.stringify(recordedStatuses)}`).toBe(200);
+  expect(result.api).toBe(required('E2E_FALLBACK_API'));
+  expect(result.text).toBe('Local fallback response');
+  expect(attempts).toEqual([429, 200]);
 });
 
 test('access rule applies equally to list and detail', async ({ request }) => {

@@ -48,6 +48,7 @@ Kurallar şunlardır:
 5. `patch-py314.sh` yalnız geliştirme imajında çalışsın (O-18). Üretim imajında çalışmadığını bir testle gösterin.
 6. Press giriş akışı PKCE S256 kullansın.
 7. Press kimlik bağı DocType'ı `ai_write_closed_doctypes` kancasına girsin.
+8. Press, `anonymize_user` ucunda kullanıcıyı kapatsın. API anahtarlarını iptal etsin, kişi alanlarını anonim yapsın ve iş kayıtlarını korusun (sözleşme 6. bölüm).
 
 ## platform-core-kabuk
 

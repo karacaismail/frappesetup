@@ -64,6 +64,31 @@ class EndpointInventoryTest(unittest.TestCase):
         self.assertIn("POST", output)
         self.assertEqual(output.count("/api/method/demo.api.begin"), 2)
 
+    def test_reviewed_logout_still_requires_exact_route_and_line(self):
+        self.package = self.backend / "apps" / "press_tr" / "press_tr"
+        self.write(
+            "api/__init__.py",
+            "import frappe\n@frappe.whitelist(allow_guest=True, methods=['POST'])\n"
+            "def keycloak_backchannel_logout(): pass\n"
+            "@frappe.whitelist(allow_guest=True, methods=['POST'])\ndef other(): pass\n",
+        )
+        self.write(
+            "api/test___init__.py",
+            "def test_keycloak_backchannel_logout_guest_denied(): pass\n"
+            "def test_keycloak_backchannel_logout_foreign_data_denied(): pass\n"
+            "def test_other_guest_denied(): pass\ndef test_other_foreign_data_denied(): pass\n",
+        )
+        path = "backend/apps/press_tr/press_tr/api/__init__.py"
+        rule = "frappe-guest-without-limit"
+        with patch("endpoints.approved_keys", return_value={(rule, path, 2), (rule, path, 4)}):
+            status, _, errors = self.check()
+        self.assertEqual(status, 1)
+        self.assertEqual(errors.count("rate_limit"), 1)
+        self.assertIn(":5 rate_limit", errors)
+        with patch("endpoints.approved_keys", return_value={(rule, path, 4)}):
+            _, _, errors = self.check()
+        self.assertEqual(errors.count("rate_limit"), 2)
+
     def test_tests_in_another_module_do_not_count(self):
         for module in ("first", "second"):
             self.write(

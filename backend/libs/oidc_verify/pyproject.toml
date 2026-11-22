@@ -1,0 +1,37 @@
+[build-system]
+# PEP 639 lisans dizesi (`license = "MIT"`) setuptools 77 ve sonrasını ister.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oidc_verify"
+version = "0.1.0"
+description = "Keycloak belirteçlerini doğrulayan ortak kitaplık. Frappe'ye bağlı değildir."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+# Sürüm aralığı Frappe 16 kurulumlarından doğrulandı (22 Kasım 2026):
+# frappe/erpnext:v16.55.0 imajı: Frappe 16.56.0, Python 3.14.10, PyJWT 2.15.1, cryptography 50.0.2
+# press-local bench: Frappe 16.50.0, Python 3.14.8, PyJWT 2.13.0, cryptography 50.0.2
+# Frappe'nin kendi aralığı: PyJWT~=2.13.0 (16.50) ve PyJWT~=2.15.0 (16.56), cryptography~=50.0.0 (ikisi de)
+dependencies = [
+    "PyJWT>=2.13.0,<3",
+    "cryptography>=50.0.0,<51",
+]
+
+[project.urls]
+Repository = "https://github.com/karacaismail/frappesetup"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]
