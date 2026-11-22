@@ -60,6 +60,10 @@ class _Forbidden(Exception):
     pass
 
 
+class _ApprovalUsed(Exception):
+    pass
+
+
 class _DeadlineReader(io.RawIOBase):
     """Soketten okur ve isteğin toplam süresini sınırlar.
 
@@ -166,6 +170,11 @@ class _Api:
         approval_id = _text(payload, "approval_id", required=True, max_length=128)
         if not _DIGEST.fullmatch(digest) or not RESOURCE_ID.fullmatch(approval_id):
             raise _BadRequest
+        # An approval works once. It is consumed here, before any external write, and stays
+        # bound to this digest. A changed plan needs a new preview and a new approval anyway.
+        if not self._app.store.claim_approval(approval_id, digest, operation):
+            self._audit(operation, payload, azp, "approval_used")
+            raise _ApprovalUsed
         return digest
 
     @staticmethod
@@ -299,6 +308,8 @@ def make_server(
                 return 400, {"error": "bad_request"}
             except _Forbidden:
                 return 403, {"error": "forbidden"}
+            except _ApprovalUsed:
+                return 409, {"error": "approval_used"}
             except Busy:
                 # Başka bir süreç bir olayı işliyor. Çağıran yeniden denemelidir.
                 return 503, {"error": "busy"}

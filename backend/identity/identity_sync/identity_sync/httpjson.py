@@ -8,6 +8,7 @@ Hata metni yanıt gövdesini taşımaz. Gövde kişisel veri içerebilir.
 from __future__ import annotations
 
 import json
+import re
 import socket
 import urllib.error
 import urllib.parse
@@ -18,12 +19,22 @@ from dataclasses import dataclass, field
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
-class HttpError(Exception):
-    """Sunucu 2xx dışında yanıt verdi."""
+_ERROR_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
+_MAX_ERROR_BYTES = 65536
 
-    def __init__(self, status: int) -> None:
-        super().__init__(f"HTTP {status}")
+
+class HttpError(Exception):
+    """Sunucu 2xx dışında yanıt verdi.
+
+    `code` is the target's machine-readable error name (Frappe's `exc_type`), when the error
+    body carries one. Only a plain identifier is kept. The rest of the body is dropped because
+    it may hold personal data.
+    """
+
+    def __init__(self, status: int, code: str | None = None) -> None:
+        super().__init__(f"HTTP {status} {code}" if code else f"HTTP {status}")
         self.status = status
+        self.code = code
 
     @property
     def transient(self) -> bool:
@@ -52,6 +63,16 @@ class Response:
     status: int
     body: object = None
     headers: Mapping[str, str] = field(default_factory=dict)
+
+
+def _error_code(error: urllib.error.HTTPError) -> str | None:
+    """Read `exc_type` from a JSON error body. Returns None when there is no usable name."""
+    try:
+        body = json.loads(error.read(_MAX_ERROR_BYTES).decode("utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError):
+        return None
+    code = body.get("exc_type") if isinstance(body, dict) else None
+    return code if isinstance(code, str) and _ERROR_CODE.fullmatch(code) else None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -96,8 +117,9 @@ def request_json(
             response_headers = {name.lower(): value for name, value in raw.headers.items()}
             status = raw.status
     except urllib.error.HTTPError as error:
+        code = _error_code(error)
         error.close()
-        raise HttpError(error.code) from None
+        raise HttpError(error.code, code) from None
     except urllib.error.URLError as error:
         if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
             raise ConnectFailed("connection failed") from None

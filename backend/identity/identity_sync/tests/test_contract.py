@@ -95,19 +95,89 @@ class DocumentationTest(unittest.TestCase):
             with self.subTest(example=name):
                 self.assertEqual(schema_errors(example["value"], media["schema"], CONTRACT), [])
 
-    def test_target_success_schema_accepts_only_done(self) -> None:
-        schema = CONTRACT["components"]["schemas"]["TargetWriteResult"]
-        self.assertEqual(schema_errors(fakes.DONE[1], schema, CONTRACT), [])
-        for unclear in ({"message": {"status": "queued"}}, {"message": None}, {"exc": "x"}, {}, None):
-            with self.subTest(unclear=unclear):
-                self.assertNotEqual(schema_errors(unclear, schema, CONTRACT), [])
 
-    def test_ensure_team_success_schema(self) -> None:
-        schema = CONTRACT["components"]["schemas"]["EnsureTeamResult"]
-        self.assertEqual(schema_errors(fakes.TEAM_READY[1], schema, CONTRACT), [])
-        for unclear in (fakes.DONE[1], {"message": {"team": "", "created": True}}, {"message": {"team": "t"}}):
-            with self.subTest(unclear=unclear):
-                self.assertNotEqual(schema_errors(unclear, schema, CONTRACT), [])
+
+class TargetReplyTest(unittest.TestCase):
+    """The fake targets follow the real target contracts. Their replies match the Target schemas.
+
+    Sources: contracts/press_tr.openapi.yaml (0.1.0) and contracts/platform_core-kimlik.openapi.yaml (0.2.0).
+    """
+
+    ISSUER = "http://kimlik.localhost:6110/realms/platform"
+
+    def setUp(self) -> None:
+        self.press, self.tenant = fakes.FakePress(), fakes.FakeTenant()
+        self.addCleanup(self.press.close)
+        self.addCleanup(self.tenant.close)
+
+    def post(self, site: fakes.FakeServer, path: str, body: dict) -> tuple[int, object]:
+        import urllib.error
+        import urllib.request
+
+        request = urllib.request.Request(
+            site.url + path, data=json.dumps(body).encode(), method="POST", headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            with error:
+                return error.code, json.loads(error.read())
+
+    def assert_matches(self, reply: tuple[int, object], schema_name: str) -> None:
+        self.assertEqual(reply[0], 200)
+        schema = CONTRACT["components"]["schemas"][schema_name]
+        self.assertEqual(schema_errors(reply[1], schema, CONTRACT), [])
+
+    def identity(self, **extra: object) -> dict:
+        return {"issuer": self.ISSUER, "subject": SUBJECT, **extra}
+
+    def test_press_replies(self) -> None:
+        team = self.identity(email="ayse@example.test", email_verified=True, organization_id=ORG_ID)
+        self.assert_matches(self.post(self.press, fakes.PRESS_ENSURE_TEAM, team), "TargetEnsureTeamResult")
+        one = self.identity(organization_id=ORG_ID)
+        self.assert_matches(self.post(self.press, fakes.PRESS_REMOVE_MEMBER, one), "TargetRemoveTeamMemberResult")
+        every = self.identity(all_organizations=True)
+        self.assert_matches(self.post(self.press, fakes.PRESS_REMOVE_MEMBER, every), "TargetRemoveTeamMemberResult")
+
+    def test_press_rejects_requests_outside_its_contract(self) -> None:
+        bad_requests = (
+            (fakes.PRESS_ENSURE_TEAM, self.identity(email="ayse@example.test", organization_id=ORG_ID)),
+            (fakes.PRESS_REMOVE_MEMBER, self.identity()),
+            (fakes.PRESS_REMOVE_MEMBER, self.identity(organization_id=ORG_ID, all_organizations=True)),
+            (fakes.PRESS_REMOVE_MEMBER, self.identity(organization_id="")),
+            (fakes.PRESS_REMOVE_MEMBER, self.identity(organization_id=None)),
+            (fakes.PRESS_REMOVE_MEMBER, self.identity(all_organizations=False)),
+        )
+        for path, body in bad_requests:
+            with self.subTest(body=body):
+                self.assertEqual(self.post(self.press, path, body)[0], 400)
+
+    def test_tenant_replies(self) -> None:
+        user = self.identity(email="ayse@example.test", email_verified=True, enabled=True)
+        self.assert_matches(self.post(self.tenant, fakes.TENANT_PROVISION, user), "TargetProvisionResult")
+        disable = self.identity(enabled=False)
+        self.assert_matches(self.post(self.tenant, fakes.TENANT_SET_ENABLED, disable), "TargetSetEnabledResult")
+        rename = self.identity(new_email="yeni@example.test")
+        self.assert_matches(self.post(self.tenant, fakes.TENANT_CHANGE_EMAIL, rename), "TargetChangeEmailResult")
+
+    def test_tenant_error_names(self) -> None:
+        unknown = self.identity(enabled=False)
+        self.assertEqual(self.post(self.tenant, fakes.TENANT_SET_ENABLED, unknown), fakes.frappe_error(404, "IdentityNotFound"))
+        self.post(self.tenant, fakes.TENANT_PROVISION, self.identity(email="ayse@example.test", email_verified=True, enabled=True))
+        other_email = self.identity(email="yeni@example.test", email_verified=True, enabled=True)
+        self.assertEqual(self.post(self.tenant, fakes.TENANT_PROVISION, other_email), fakes.frappe_error(409, "EmailMismatch"))
+        extra_field = self.identity(enabled=False, tenant="kiraci1")
+        self.assertEqual(self.post(self.tenant, fakes.TENANT_SET_ENABLED, extra_field)[0], 400)
+
+    def test_unclear_replies_do_not_match_any_target_schema(self) -> None:
+        unclear = ({"message": {"status": "queued"}}, {"message": None}, {"exc": "x"}, {}, None)
+        for name, schema in CONTRACT["components"]["schemas"].items():
+            if not name.startswith("Target"):
+                continue
+            for body in unclear:
+                with self.subTest(schema=name, body=body):
+                    self.assertNotEqual(schema_errors(body, schema, CONTRACT), [])
 
 
 class ImplementationTest(ServerCase):
@@ -197,8 +267,12 @@ class SchemaTest(ServerCase):
         execute_request = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-1"}
         self.assert_request(execute_request, "POST", path)
         self.assert_response(self.post_json(path, execute_request, PREVIEW_TOKEN), "POST", path, 403)
-        self.assert_response(self.post_json(path, {**execute_request, "preview_digest": "0" * 64}), "POST", path, 409)
+        stale = {**execute_request, "preview_digest": "0" * 64, "approval_id": "onay-0"}
+        self.assert_response(self.post_json(path, stale), "POST", path, 409)
         self.assert_response(self.post_json(path, execute_request, EXECUTE_TOKEN), "POST", path, 200)
+        # The same approval a second time: 409 approval_used.
+        used = self.assert_response(self.post_json(path, execute_request, EXECUTE_TOKEN), "POST", path, 409)
+        self.assertEqual(used, {"error": "approval_used"})
         self.assert_response(self.post_json(path, {}), "POST", path, 400)
         # Sunucunun reddettiği gövde şemaya da uymaz.
         for rejected in ({}, {"dry_run": False}, {"dry_run": False, "approval_id": "onay-1"}, {"dry_run": "true"}):

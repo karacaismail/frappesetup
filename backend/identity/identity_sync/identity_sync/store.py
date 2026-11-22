@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS used_signatures (
     signature TEXT PRIMARY KEY,
     expires_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS used_approvals (
+    approval_id TEXT PRIMARY KEY,
+    preview_digest TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    used_at REAL NOT NULL
+);
 """
 
 STATES = ("failed", "unknown")
@@ -161,6 +167,51 @@ class Store:
         """Olay bekleme kuyruğundaysa durumunu döner. Değilse `None` döner."""
         row = self._db.execute("SELECT state FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
         return row[0] if row else None
+
+    def begin(self, event: Event) -> None:
+        """Record an accepted event before any work starts.
+
+        If the process dies before the outcome is recorded, the event stays in the queue and
+        can be replayed by hand. An event that is already in the queue keeps its record.
+        The row counts no attempt yet.
+        """
+        now = self._clock()
+        with self._transaction():
+            self._db.execute(
+                """
+                INSERT OR IGNORE INTO dead_letters
+                    (event_id, event, error, state, attempts, first_failed_at, last_failed_at)
+                VALUES (?, ?, 'accepted; outcome not recorded', 'failed', 0, ?, ?)
+                """,
+                (event.id, json.dumps(event.to_dict()), now, now),
+            )
+
+    def mark_writing(self, event_id: str) -> None:
+        """Mark the event `unknown` right before its first external write.
+
+        From here on a crash leaves the outcome unknown: a target may have done the write.
+        The record is corrected once the outcome is known.
+        """
+        with self._transaction():
+            self._db.execute(
+                "UPDATE dead_letters SET state = 'unknown', error = 'interrupted after a write was started' "
+                "WHERE event_id = ?",
+                (event_id,),
+            )
+
+    def claim_approval(self, approval_id: str, preview_digest: str, operation: str) -> bool:
+        """Consume a human approval. Returns False when the approval was used before.
+
+        An approval works once and belongs to the preview digest it was first used with.
+        The claim is written before any external write starts.
+        """
+        with self._transaction():
+            cursor = self._db.execute(
+                "INSERT OR IGNORE INTO used_approvals (approval_id, preview_digest, operation, used_at) "
+                "VALUES (?, ?, ?, ?)",
+                (approval_id, preview_digest, operation, self._clock()),
+            )
+            return cursor.rowcount == 1
 
     def mark_processed(self, event_id: str, status: str) -> None:
         """Olayı işlenmiş sayar ve bekleme kuyruğundan çıkarır. İki yazı tek işlemdedir."""

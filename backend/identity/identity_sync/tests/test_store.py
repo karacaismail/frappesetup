@@ -133,6 +133,34 @@ class StoreTest(unittest.TestCase):
             self.assertTrue(second.claim_signature("abc", now=1.0, expires_at=301.0))
             self.assertEqual(second.dead_letters(), [])
 
+    def test_approval_can_be_claimed_once(self) -> None:
+        store = self.open()
+        self.assertTrue(store.claim_approval("approval-1", "a" * 64, "replay_dead_letters"))
+        # A second use is refused, with the same digest or with another one.
+        self.assertFalse(store.claim_approval("approval-1", "a" * 64, "replay_dead_letters"))
+        self.assertFalse(store.claim_approval("approval-1", "b" * 64, "invite_user"))
+        store.close()
+        self.assertFalse(self.open().claim_approval("approval-1", "a" * 64, "replay_dead_letters"))
+        self.assertTrue(self.open().claim_approval("approval-2", "a" * 64, "replay_dead_letters"))
+
+    def test_begin_keeps_an_accepted_event_without_counting_an_attempt(self) -> None:
+        store = self.open()
+        store.begin(EVENT)
+        (letter,) = store.dead_letters()
+        self.assertEqual((letter.state, letter.attempts), ("failed", 0))
+
+        store.mark_writing(EVENT.id)
+        self.assertEqual(store.dead_letters()[0].state, "unknown")
+
+        store.add_dead_letter(EVENT, "x")
+        self.assertEqual((store.dead_letters()[0].state, store.dead_letters()[0].attempts), ("failed", 1))
+
+    def test_begin_does_not_reset_an_unknown_event(self) -> None:
+        store = self.open()
+        store.add_dead_letter(EVENT, "x", state="unknown")
+        store.begin(EVENT)
+        self.assertEqual((store.dead_letters()[0].state, store.dead_letters()[0].attempts), ("unknown", 1))
+
     def test_old_database_file_gets_the_state_column(self) -> None:
         import sqlite3
 

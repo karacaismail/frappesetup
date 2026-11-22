@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import TypeVar
 
 from identity_sync.events import MEMBERSHIP_TYPES, Event, is_handled
@@ -50,12 +50,28 @@ class EventResult:
     status: str
     actions: tuple[str, ...] = ()
     previews: tuple[Preview, ...] = ()
+    plan_digest: str = ""
 
     def to_dict(self) -> dict[str, object]:
         body: dict[str, object] = {"status": self.status, "actions": list(self.actions)}
         if self.status == "preview":
             body["previews"] = [preview.to_dict() for preview in self.previews]
+            body["plan_digest"] = self.plan_digest
         return body
+
+
+def plan_digest(actions: Sequence[Action]) -> str:
+    """Digest of everything a plan would write: each operation, its target and every field value.
+
+    The preview text names no e-mail or person name, so two plans can read the same and still
+    write different values. The digest covers those values. It is a hash, so it exposes none.
+    """
+    return digest_of(
+        [
+            {"operation": action.preview().operation, "target": action.preview().target, "fields": asdict(action)}
+            for action in actions
+        ]
+    )
 
 
 ReplayResults = list[tuple[str, EventResult]]
@@ -107,21 +123,25 @@ class Processor:
         *,
         dry_run: bool = False,
         allow_unknown: bool = False,
-        approved: tuple[Preview, ...] | None = None,
+        approved: str | None = None,
     ) -> EventResult:
         """Olayı işler.
 
         `dry_run` doğruysa yalnız okur ve önizleme döner.
         `allow_unknown`: sonucu bilinmeyen olayı yeniden çalıştırma izni. Bu, insanın açık kararıdır.
-        `approved`: insanın onayladığı plan. Güncel plan bundan farklıysa servis hiçbir şey yazmaz.
+        `approved`: the `plan_digest` the human approved. If the current plan differs in any
+        operation, target or field value, nothing is written.
         """
         if not is_handled(event) or event.realm != self._realm:
             return EventResult("ignored")
         if dry_run:
             try:
-                return EventResult("preview", previews=tuple(a.preview() for a in self._plan(event)))
+                actions = self._plan(event)
             except _Failed:
                 return EventResult("failed")
+            return EventResult(
+                "preview", previews=tuple(a.preview() for a in actions), plan_digest=plan_digest(actions)
+            )
         # Denetim, dış yazmalar ve kayıt tek iş kilidi altındadır.
         with self._store.work_lock():
             if self._store.is_processed(event.id):
@@ -131,6 +151,8 @@ class Processor:
             if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
                 # Olay yeniden geldi ama önceki sonucu bilinmiyor. Aynı hedefe kör tekrar yapılmaz.
                 return EventResult("unknown")
+            # Keep the accepted event on record before any work. A crash must not lose it.
+            self._store.begin(event)
             try:
                 names = self._run(event, approved)
             except PreviewChanged:
@@ -176,7 +198,7 @@ class Processor:
                 if preview.status != "preview":
                     results.append((letter.event.id, preview))  # planı görülmeyen olay yürütülmez
                     continue
-                result = self.handle(letter.event, allow_unknown=include_unknown, approved=preview.previews)
+                result = self.handle(letter.event, allow_unknown=include_unknown, approved=preview.plan_digest)
                 results.append((letter.event.id, result))
             return self._ordered(results + skipped)
         results = [(letter.event.id, self.handle(letter.event, allow_unknown=include_unknown)) for letter in letters]
@@ -191,23 +213,29 @@ class Processor:
         subject = event.user_id or ""
         snapshot = self._retry("keycloak.read", lambda: self._keycloak.get_user_snapshot(subject))
         organization = None
-        if event.type in MEMBERSHIP_TYPES and event.organization_id:
+        # A deleted or disabled account is closed everywhere. That plan does not use the
+        # organization, so a failing organization read must not stop it.
+        needs_organization = snapshot is not None and snapshot.enabled
+        if needs_organization and event.type in MEMBERSHIP_TYPES and event.organization_id:
             org_id = event.organization_id
             organization = self._retry("keycloak.read", lambda: self._keycloak.get_organization(org_id))
         return plan_actions(
             event, snapshot, issuer=self._issuer, tenants=self._tenants, organization=organization
         )
 
-    def _run(self, event: Event, approved: tuple[Preview, ...] | None) -> list[str]:
+    def _run(self, event: Event, approved: str | None) -> list[str]:
         names: list[str] = []
         for pass_number in range(1, _MAX_PASSES + 1):
             actions = self._plan(event)
             if approved is not None:
                 if pass_number > 1:
-                    # Sonraki işler önizlemede yoktu. İnsan onları görmedi.
+                    # The follow-up actions were not in the preview. The human did not see them.
                     raise _Failed("follow-up actions need a new preview")
-                if tuple(action.preview() for action in actions) != approved:
+                if plan_digest(actions) != approved:
                     raise PreviewChanged
+            if actions and pass_number == 1:
+                # From the first external write on, a crash leaves the outcome unknown.
+                self._store.mark_writing(event.id)
             failures: list[str] = []
             unknown = False
             for action in actions:

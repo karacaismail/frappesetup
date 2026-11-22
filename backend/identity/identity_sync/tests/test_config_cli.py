@@ -13,7 +13,7 @@ from identity_sync import cli
 from identity_sync.config import ConfigError, load_settings
 
 from . import fakes
-from .fakes import ORG_ID, SUBJECT, FakeKeycloak, FakeSite, keycloak_user
+from .fakes import ORG_ID, SUBJECT, FakeKeycloak, FakePress, FakeTenant, keycloak_user
 
 
 def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, str]:
@@ -114,7 +114,7 @@ class LoggingTest(unittest.TestCase):
 
 class CliTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.keycloak, self.press, self.tenant = FakeKeycloak(), FakeSite(), FakeSite()
+        self.keycloak, self.press, self.tenant = FakeKeycloak(), FakePress(), FakeTenant()
         for server in (self.keycloak, self.press, self.tenant):
             self.addCleanup(server.close)
         self.dir = tempfile.TemporaryDirectory()

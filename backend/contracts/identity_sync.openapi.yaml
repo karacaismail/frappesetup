@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.2.0
+  version: 0.3.0
   summary: Kullanıcı eşitleme servisinin uçları
   description: |
     Bu servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
@@ -40,15 +40,25 @@ info:
     3. Onay katmanı işleri insana gösterir. Onay bu özete bağlanır.
     4. İnsan onaylar. Onay katmanı ucu `dry_run: false` ile çağırır.
     5. İstek `preview_digest` ve `approval_id` alanlarını taşır.
-    6. Servis planı yeniden hesaplar. Özet tutmazsa 409 ve `preview_changed` döner.
-    7. Servis çağıranı, onay kimliğini ve özeti günlüğe yazar. Sonra işi yürütür.
+    6. Servis onay kimliğini tek kullanımlık olarak kaydeder. Bu kayıt ilk dış yazmadan önce yazılır.
+       Aynı `approval_id` ikinci kez gelirse servis 409 ve `approval_used` döner.
+    7. Servis planı yeniden hesaplar. Özet tutmazsa 409 ve `preview_changed` döner.
+    8. Servis çağıranı, onay kimliğini, özeti ve sonucu günlüğe yazar.
+
+    Özet yazılacak her şeyi kapsar: her işin adını, hedefini ve bütün alan değerlerini.
+    Örneğin e-posta ya da ad önizlemeden sonra değişirse özet tutmaz.
+    Özet bir karma değerdir. E-posta ve ad özetten okunamaz. Önizleme metni de bu değerleri taşımaz.
+    Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değilse iş yürümez.
 
     Servis iki istemci listesi tutar.
     `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
     `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir.
     Yürütme listesine yalnız güvenilir servis istemcisi girer.
     Aracı belirteci ve model kimliği bu listeye girmez.
-    Onayın tek kullanımını ve süresini onay katmanı denetler. Bu servis onay vermez.
+    Güven sınırı şudur: yürütmeyi yalnız onay katmanının istemcisi çağırabilir.
+    Bu servis onay vermez. Onayın süresini onay katmanı denetler.
+    Onay kimliği ilk kullanıldığı özete bağlıdır ve bir daha kullanılamaz.
+    Plan değiştiği için reddedilen istek de onayı tüketir. Yeni plan yeni onay ister.
 
     ## Bütün uçların ortak hataları
 
@@ -67,12 +77,22 @@ info:
 
     Servis Press'in ve kiracının yazma uçlarını çağırır.
     Bu uçlar `press_tr.api.identity.*` ve `platform_core.api.identity.*` adlarını taşır.
-    Servis yalnız şu yanıtı başarı sayar: HTTP 200 ve aşağıdaki şemalardan birine uyan gövde.
-    `ensure_team` ucunun yanıtı `EnsureTeamResult` şemasına uymalıdır.
-    Bu yanıt ortak sözleşmenin “Kuruluş ile takım eşlemesi” bölümünde tanımlıdır.
-    Öteki yazma uçlarının yanıtı `TargetWriteResult` şemasına uymalıdır.
+    Bu uçların sözleşmeleri `contracts/press_tr.openapi.yaml` (0.1.0) ve
+    `contracts/platform_core-kimlik.openapi.yaml` (0.2.0) dosyalarındadır.
+    Servis yalnız şu yanıtı başarı sayar: HTTP 200 ve o ucun sonuç şemasına uyan gövde.
+    Şemalar bu dosyanın sonundadır ve `Target` ile başlar.
+    Servis yanıttaki son durumu istediği durumla da karşılaştırır.
+    Örneğin kullanıcıyı kapattıysa yanıtta `enabled` yanlış olmalıdır.
     Hedef işi yanıt vermeden önce bitirmiş olmalıdır.
-    202, boş gövde ya da başka `status` değeri başarı değildir.
+    202, boş gövde ya da şemaya uymayan gövde başarı değildir.
+
+    Kiracı bağı olmayan kullanıcı için 404 ve `IdentityNotFound` döner.
+    Servis bu yanıtı iki işte başarı sayar: kullanıcıyı kapatma ve e-postayı değiştirme.
+    Çünkü bağ yoksa kapatılacak ya da adı değişecek kayıt yoktur.
+    `exc_type` alanı `IdentityNotFound` değilse 404 bir hatadır. Yanlış adres de 404 döner.
+
+    Servis kiracıda önce `change_email`, sonra `provision` çağırır.
+    Çünkü kiracı, bağ eski e-postayı gösterirken `provision` isteğini `EmailMismatch` ile reddeder.
     Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
     Servis bu olayı işlenmiş saymaz ve kendiliğinden yeniden denemez.
     Aynı olay yeniden gelirse servis yazmayı tekrarlamaz ve yine `unknown` döner.
@@ -80,6 +100,24 @@ info:
     İstek hedefe gitti ama yanıt okunamadıysa sonuç yine `unknown` olur.
     502 ve 504 yanıtları da `unknown` sayılır. Çünkü aradaki sunucu isteği iletmiş olabilir.
     Bağlantı hiç kurulamadıysa sonuç `unknown` değildir. Servis bu durumda yeniden dener.
+
+    ## Yarıda kalan iş
+
+    Servis kabul ettiği olayı işe başlamadan önce bekleme kuyruğuna yazar.
+    Bu kayıt `failed` durumundadır ve deneme sayısı 0 olur.
+    Servis ilk dış yazmadan hemen önce kaydı `unknown` yapar.
+    Süreç yarıda durursa kayıt kuyrukta kalır.
+    Yazma başlamadıysa olay elle yeniden işlenir.
+    Yazma başladıysa sonuç bilinmez. İnsan hedefi denetler ve `include_unknown` ile yeniden işletir.
+    Olay başarıyla bitince kayıt kuyruktan çıkar.
+
+    ## Kapalı ve silinen hesap
+
+    Keycloak'ta kapatılan ya da silinen kullanıcı her yerde kapanır.
+    Bu plan üyelik listesine ve Organization kaydına bağlı değildir.
+    O okumalar başarısız olsa da servis kapatma isteklerini gönderir.
+    Servis Press'e tek bir `all_organizations: true` isteği gönderir.
+    Press o zaman kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
   license:
     name: MIT
     identifier: MIT
@@ -492,8 +530,9 @@ components:
             $ref: "#/components/schemas/Error"
     PreviewChanged:
       description: |
-        Plan önizlemeden sonra değişti. Hata kodu `preview_changed` olur.
-        Servis hiçbir işi yürütmedi. Yeni önizleme ve yeni onay gerekir.
+        Servis hiçbir işi yürütmedi. Yeni önizleme ve yeni onay gerekir. İki neden olabilir.
+        Hata kodu `preview_changed` ise plan önizlemeden sonra değişti.
+        Hata kodu `approval_used` ise bu `approval_id` daha önce kullanıldı.
       content:
         application/json:
           schema:
@@ -636,6 +675,15 @@ components:
           description: Yalnız `preview` durumunda döner.
           items:
             $ref: "#/components/schemas/Preview"
+        plan_digest:
+          $ref: "#/components/schemas/PlanDigest"
+    PlanDigest:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+      description: |
+        Yalnız `preview` durumunda döner. Bu olayın planının SHA-256 özetidir.
+        Özet her işin adını, hedefini ve bütün alan değerlerini kapsar.
+        Değer bir karmadır. E-posta ve ad bu değerden okunamaz.
     Preview:
       type: object
       description: Bir yazma işinin önizlemesi. E-posta ve sır taşımaz.
@@ -698,7 +746,9 @@ components:
           enum: [failed, unknown]
           description: |
             `failed` değeri hedefin işi reddettiğini ya da ulaşılamadığını gösterir.
+            Deneme sayısı 0 ise servis olayı kabul etti ama işe başlayamadan durdu.
             `unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
+            Süreç bir yazmadan sonra durduysa durum yine `unknown` olur.
         attempts:
           type: integer
           description: Olayın kaç kez başarısız olduğu.
@@ -776,6 +826,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Preview"
+        plan_digest:
+          $ref: "#/components/schemas/PlanDigest"
     InvitationRequest:
       description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
       oneOf:
@@ -870,12 +922,12 @@ components:
             `unexpected` değeri hedefte açık ama Keycloak'a göre beklenmeyen kaydı gösterir.
             `email_mismatch` değeri e-postanın farklı olduğunu gösterir.
             `disabled` değeri beklenen kullanıcının hedefte kapalı olduğunu gösterir.
-    EnsureTeamResult:
+    TargetEnsureTeamResult:
       type: object
       description: |
         `press_tr.api.identity.ensure_team` ucundan beklenen kesin başarı yanıtı.
         Bu şema bu servisin ucu değildir. Servisin Press'ten beklediği yanıttır.
-        Kaynak: ortak sözleşmenin “Kuruluş ile takım eşlemesi” bölümü.
+        Kaynak `contracts/press_tr.openapi.yaml` dosyasıdır.
       required: [message]
       properties:
         message:
@@ -890,21 +942,80 @@ components:
               type: boolean
               description: Takım bu istekte açıldıysa doğrudur.
           additionalProperties: true
-    TargetWriteResult:
+    TargetRemoveTeamMemberResult:
       type: object
       description: |
-        `remove_team_member`, `provision`, `set_enabled` ve `change_email` uçlarından beklenen yanıt.
-        Hedef bu yanıtı işi bitirdikten sonra HTTP 200 ile döner.
-        Bu şema bu servisin ucu değildir. Servisin hedeften beklediği yanıttır.
+        `press_tr.api.identity.remove_team_member` ucundan beklenen kesin başarı yanıtı.
+        Kaynak `contracts/press_tr.openapi.yaml` dosyasıdır.
       required: [message]
       properties:
         message:
           type: object
-          required: [status]
+          required: [team, member]
           properties:
-            status:
+            team:
+              type: [string, "null"]
+              description: Takımın adı. Bütün takımlar için istekte ya da takım yoksa boştur.
+            member:
+              type: boolean
+              const: false
+              description: Kullanıcı artık üye değil.
+          additionalProperties: true
+    TargetProvisionResult:
+      type: object
+      description: |
+        `platform_core.api.identity.provision` ucundan beklenen kesin başarı yanıtı.
+        Kaynak `contracts/platform_core-kimlik.openapi.yaml` dosyasıdır.
+        Servis `enabled` değerini istediği değerle de karşılaştırır.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [user, enabled, linked]
+          properties:
+            user:
               type: string
-              const: done
+              minLength: 1
+              description: Kullanıcının kiracıdaki adı. Bu ad e-postadır.
+            enabled:
+              type: boolean
+            linked:
+              type: boolean
+              const: true
+          additionalProperties: true
+    TargetSetEnabledResult:
+      type: object
+      description: |
+        `platform_core.api.identity.set_enabled` ucundan beklenen kesin başarı yanıtı.
+        Kaynak `contracts/platform_core-kimlik.openapi.yaml` dosyasıdır.
+        Servis `enabled` değerini istediği değerle de karşılaştırır.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [user, enabled]
+          properties:
+            user:
+              type: string
+              minLength: 1
+            enabled:
+              type: boolean
+          additionalProperties: true
+    TargetChangeEmailResult:
+      type: object
+      description: |
+        `platform_core.api.identity.change_email` ucundan beklenen kesin başarı yanıtı.
+        Kaynak `contracts/platform_core-kimlik.openapi.yaml` dosyasıdır.
+        Servis `user` değerini gönderdiği yeni e-postayla da karşılaştırır.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [user]
+          properties:
+            user:
+              type: string
+              minLength: 1
           additionalProperties: true
     Error:
       type: object
@@ -918,6 +1029,7 @@ components:
             - unauthorized
             - forbidden
             - preview_changed
+            - approval_used
             - too_large
             - busy
             - not_found

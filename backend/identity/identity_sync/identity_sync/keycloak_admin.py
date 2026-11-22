@@ -181,6 +181,10 @@ class KeycloakAdmin:
         user = self.get_user(subject)
         if user is None:
             return None
+        if user.get("enabled") is not True:
+            # A disabled account is closed everywhere. That plan needs no membership list,
+            # so a failing membership read must not stop it.
+            return snapshot_from_user(user, ())
         return snapshot_from_user(user, self.list_user_organizations(subject))
 
     def get_organization(self, organization_id: str) -> Organization | None:

@@ -34,7 +34,7 @@ class ProvisionTest(PipelineCase):
         result = self.stack.app.processor.handle(event())
 
         self.assertEqual(result.status, "processed")
-        self.assertEqual(result.actions, ("press.ensure_team", "tenant.provision", "tenant.change_email"))
+        self.assertEqual(result.actions, ("press.ensure_team", "tenant.change_email", "tenant.provision"))
         (team,) = self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)
         self.assertEqual(
             team.json(),
@@ -42,6 +42,7 @@ class ProvisionTest(PipelineCase):
                 "issuer": self.stack.issuer,
                 "subject": SUBJECT,
                 "email": "ayse@example.test",
+                "email_verified": True,
                 "organization_id": ORG_ID,
                 "organization_name": "kiraci1",
             },
@@ -137,18 +138,41 @@ class ProvisionTest(PipelineCase):
         (disabled,) = self.stack.tenant.calls("POST", fakes.TENANT_SET_ENABLED)
         self.assertEqual(disabled.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "enabled": False})
 
-    def test_email_change_calls_change_email(self) -> None:
+    def test_email_change_renames_the_tenant_user_before_provision(self) -> None:
+        # The tenant already knows the user under the old e-mail. Keycloak now has a new one.
+        self.stack.tenant.seed_user(self.stack.issuer, SUBJECT, "eski@example.test")
         self.add_member(email="yeni@example.test")
 
-        self.stack.app.processor.handle(event("UPDATE_EMAIL"))
+        result = self.stack.app.processor.handle(event("UPDATE_EMAIL"))
 
+        self.assertEqual(result.status, "processed")
         (changed,) = self.stack.tenant.calls("POST", fakes.TENANT_CHANGE_EMAIL)
         self.assertEqual(
             changed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "new_email": "yeni@example.test"}
         )
-        # Önce kayıt hazırlanır, sonra ad değişir. Yeni kullanıcıda `change_email` iş yapmaz.
-        order = [r.path for r in self.stack.tenant.writes()]
-        self.assertEqual(order, [fakes.TENANT_PROVISION, fakes.TENANT_CHANGE_EMAIL])
+        # Rename first: the tenant rejects provision with 409 EmailMismatch while the old e-mail is linked.
+        self.assertEqual([r.path for r in self.stack.tenant.writes()], [fakes.TENANT_CHANGE_EMAIL, fakes.TENANT_PROVISION])
+        self.assertEqual(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["email"], "yeni@example.test")
+
+    def test_new_user_without_link_is_provisioned(self) -> None:
+        # No link yet: change_email answers 404 IdentityNotFound. That is not a failure. Provision creates the link.
+        self.add_member()
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "processed")
+        user = self.stack.tenant.user_of(self.stack.issuer, SUBJECT)
+        self.assertEqual((user["email"], user["enabled"]), ("ayse@example.test", True))
+
+    def test_404_without_identity_not_found_is_a_failure(self) -> None:
+        # A wrong address also answers 404. Only the tenant's own IdentityNotFound means "no link".
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_CHANGE_EMAIL, (404, {"exc_type": "DoesNotExistError"}))
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertIn("tenant.change_email kiraci1: HTTP 404", self.stack.app.store.dead_letters()[0].error)
 
     def test_membership_delete_resolves_organization(self) -> None:
         self.stack.keycloak.add_user(keycloak_user(), [])
@@ -296,6 +320,112 @@ class FanOutTest(unittest.TestCase):
         (letter,) = self.stack.app.store.dead_letters()
         self.assertEqual(letter.error, "press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404")
         self.assertEqual(len(self.stack.tenant2.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
+
+
+class TargetContractTest(PipelineCase):
+    """The fake targets follow the real contracts. These tests check the effect on the targets.
+
+    Sources: contracts/press_tr.openapi.yaml, contracts/platform_core-kimlik.openapi.yaml and
+    docs/sozlesmeler.md, section 6.
+    """
+
+    def seed_everywhere(self) -> None:
+        self.stack.press.seed_member(self.stack.issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=2)
+        self.stack.press.seed_member(self.stack.issuer, SUBJECT, "ayse@example.test", "o-other")
+        self.stack.press.users["ayse@example.test"]["api_keys"] = ["key-0", "key-1"]
+        self.stack.tenant.seed_user(self.stack.issuer, SUBJECT, "ayse@example.test")
+
+    def assert_closed_everywhere(self) -> None:
+        press_user = self.stack.press.user_of(self.stack.issuer, SUBJECT)
+        self.assertEqual(self.stack.press.teams_of(self.stack.issuer, SUBJECT), [])
+        self.assertFalse(press_user["enabled"])
+        self.assertEqual(press_user["api_keys"], [])
+        self.assertFalse(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+
+    def test_disabled_user_is_closed_on_press_and_keys_are_revoked(self) -> None:
+        self.seed_everywhere()
+        self.add_member(enabled=False)
+
+        result = self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
+
+        self.assertEqual(result.status, "processed")
+        self.assert_closed_everywhere()
+
+    def test_deleted_user_is_closed_on_press_and_keys_are_revoked(self) -> None:
+        self.seed_everywhere()
+        self.stack.keycloak.remove_user(SUBJECT)
+
+        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        self.assertEqual(result.status, "processed")
+        self.assert_closed_everywhere()
+
+    def test_user_unknown_to_a_tenant_does_not_block_the_event(self) -> None:
+        # The tenant answers 404 IdentityNotFound to set_enabled for a user it never had.
+        self.stack.keycloak.remove_user(SUBJECT)
+
+        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_leaving_one_organization_keeps_the_press_user_and_keys(self) -> None:
+        self.seed_everywhere()
+        self.stack.keycloak.add_user(keycloak_user(), [])
+        self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+
+        result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
+
+        self.assertEqual(result.status, "processed")
+        press_user = self.stack.press.user_of(self.stack.issuer, SUBJECT)
+        self.assertEqual(self.stack.press.teams_of(self.stack.issuer, SUBJECT), ["o-other"])
+        self.assertTrue(press_user["enabled"])
+        self.assertEqual(press_user["api_keys"], ["key-0", "key-1"])
+        self.assertFalse(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+
+    def test_verified_member_ends_up_in_team_and_tenant(self) -> None:
+        self.add_member()
+
+        self.stack.app.processor.handle(event())
+
+        self.assertEqual(self.stack.press.teams_of(self.stack.issuer, SUBJECT), [ORG_ID])
+        self.assertTrue(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+
+    def test_same_event_content_twice_leaves_one_user_and_one_membership(self) -> None:
+        self.add_member()
+
+        self.stack.app.processor.handle(event(id_="e-1"))
+        self.stack.app.processor.handle(event(id_="e-2"))
+
+        self.assertEqual(len(self.stack.tenant.users), 1)
+        self.assertEqual(len(self.stack.press.teams[ORG_ID]["members"]), 1)
+
+    def test_success_body_of_another_shape_is_unknown(self) -> None:
+        # Exact success bodies come from the target contracts. Anything else is not a success.
+        self.add_member()
+        wrong = {
+            fakes.TENANT_PROVISION: {"message": {"user": "ayse@example.test", "enabled": False, "linked": True}},
+            fakes.TENANT_CHANGE_EMAIL: {"message": {"user": "baska@example.test"}},
+        }
+        for index, (path, body) in enumerate(wrong.items()):
+            with self.subTest(path=path):
+                self.stack.tenant.on("POST", path, (200, body))
+                result = self.stack.app.processor.handle(event(id_=f"w-{index}"))
+                self.assertEqual(result.status, "unknown")
+                self.stack.tenant.on("POST", path, fakes.DONE)
+
+    def test_remove_reply_that_still_reports_membership_is_unknown(self) -> None:
+        self.stack.keycloak.remove_user(SUBJECT)
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (200, {"message": {"team": None, "member": True}}))
+
+        self.assertEqual(self.stack.app.processor.handle(event("DELETE_ACCOUNT")).status, "unknown")
+
+    def test_disable_reply_that_reports_enabled_is_unknown(self) -> None:
+        self.stack.keycloak.remove_user(SUBJECT)
+        reply = (200, {"message": {"user": "ayse@example.test", "enabled": True}})
+        self.stack.tenant.on("POST", fakes.TENANT_SET_ENABLED, reply)
+
+        self.assertEqual(self.stack.app.processor.handle(event("DELETE_ACCOUNT")).status, "unknown")
 
 
 class IdempotencyTest(PipelineCase):
@@ -494,7 +624,7 @@ class UnknownOutcomeTest(PipelineCase):
         from identity_sync.app import build_app
         from identity_sync.mapping import Tenant
 
-        closed = fakes.FakeSite()
+        closed = fakes.FakeTenant()
         url = closed.url
         closed.close()
         self.add_member()
@@ -627,6 +757,64 @@ class ApprovedPlanTest(PipelineCase):
         self.assertEqual([r.status for _i, r in second], ["processed"])
         self.assertEqual(len(self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)), 1)
 
+    def test_changed_field_values_invalidate_the_approval(self) -> None:
+        # The preview text stays the same when only the e-mail or the name changes.
+        # The digest must still change, because those values are what gets written.
+        changes = {"email": "yeni@example.test", "firstName": "Zeynep", "lastName": "Yeni"}
+        for index, (field, value) in enumerate(changes.items()):
+            with self.subTest(field=field):
+                stack = Stack()
+                self.addCleanup(stack.close)
+                stack.keycloak.add_user(keycloak_user(), [self.org])
+                stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+                stack.app.processor.handle(event(id_=f"f-{index}"))
+                stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
+                from identity_sync.mapping import digest_of
+                from identity_sync.pipeline import PreviewChanged, replay_report
+
+                preview = replay_report(stack.app.processor.replay_dead_letters(dry_run=True))
+                digest = digest_of(preview)
+                stack.keycloak.add_user({**keycloak_user(), field: value}, [self.org])
+                writes = len(stack.press.writes() + stack.tenant.writes())
+
+                with self.assertRaises(PreviewChanged):
+                    stack.app.processor.replay_dead_letters(expected_digest=digest)
+                self.assertEqual(len(stack.press.writes() + stack.tenant.writes()), writes)
+
+    def test_field_changed_right_before_execution_is_not_written(self) -> None:
+        # The global digest check passed. The e-mail changed before this event's turn.
+        self.add_member()
+        self.queue_failed()
+        digest = self.digest()
+        keycloak = self.stack.keycloak
+        reads = {"count": 0}
+
+        def user_route(_req: fakes.Recorded) -> fakes.Reply:
+            reads["count"] += 1
+            return 200, keycloak_user(email="ayse@example.test" if reads["count"] < 2 else "yeni@example.test")
+
+        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", user_route)
+        writes = len(self.stack.press.writes() + self.stack.tenant.writes())
+
+        results = self.stack.app.processor.replay_dead_letters(expected_digest=digest)
+
+        self.assertEqual([r.status for _i, r in results], ["preview_changed"])
+        self.assertEqual(len(self.stack.press.writes() + self.stack.tenant.writes()), writes)
+
+    def test_preview_report_carries_no_personal_data(self) -> None:
+        import json
+
+        from identity_sync.pipeline import replay_report
+
+        self.add_member()
+        self.queue_failed()
+
+        report = json.dumps(replay_report(self.stack.app.processor.replay_dead_letters(dry_run=True)), ensure_ascii=False)
+
+        self.assertRegex(report, r'"plan_digest": "[0-9a-f]{64}"')
+        for personal in ("example.test", "Ayşe", "Örnek"):
+            self.assertNotIn(personal, report)
+
     def test_approved_replay_runs_the_previewed_plan(self) -> None:
         self.add_member()
         self.queue_failed()
@@ -634,6 +822,109 @@ class ApprovedPlanTest(PipelineCase):
         results = self.stack.app.processor.replay_dead_letters(expected_digest=self.digest())
 
         self.assertEqual([r.status for _i, r in results], ["processed"])
+
+
+class DisableDoesNotNeedMembershipTest(PipelineCase):
+    """Closing a disabled account must not depend on the membership or organization reads."""
+
+    def test_disabled_user_is_closed_when_membership_read_fails(self) -> None:
+        keycloak = self.stack.keycloak
+        self.stack.tenant.seed_user(self.stack.issuer, SUBJECT, "ayse@example.test")
+        keycloak.add_user(keycloak_user(enabled=False), [self.org])
+        keycloak.on("GET", f"{keycloak.admin}/organizations/members/{SUBJECT}/organizations", (500, None))
+
+        result = self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
+
+        self.assertEqual(result.status, "processed")
+        self.assertFalse(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+        self.assertEqual(len(self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)), 1)
+
+    def test_disabled_user_is_closed_when_organization_read_fails(self) -> None:
+        keycloak = self.stack.keycloak
+        self.stack.tenant.seed_user(self.stack.issuer, SUBJECT, "ayse@example.test")
+        keycloak.add_user(keycloak_user(enabled=False), [self.org])
+        keycloak.on("GET", f"{keycloak.admin}/organizations/{ORG_ID}", (500, None))
+
+        result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
+
+        self.assertEqual(result.status, "processed")
+        self.assertFalse(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+
+    def test_deleted_user_is_closed_when_organization_read_fails(self) -> None:
+        keycloak = self.stack.keycloak
+        keycloak.remove_user(SUBJECT)
+        keycloak.on("GET", f"{keycloak.admin}/organizations/{ORG_ID}", (500, None))
+
+        result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(len(self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)), 1)
+
+
+class InterruptedWorkTest(PipelineCase):
+    """The process can die at any point. The event record must not be lost or silently repeated."""
+
+    def test_death_after_a_write_leaves_the_event_unknown(self) -> None:
+        # A target finished the write. The process died before it recorded the outcome.
+        self.add_member()
+        processor = self.stack.app.processor
+        original = processor._execute
+
+        def execute_then_die(action) -> None:
+            original(action)
+            raise KeyboardInterrupt
+
+        processor._execute = execute_then_die
+        with self.assertRaises(KeyboardInterrupt):
+            processor.handle(event())
+        processor._execute = original
+        writes = len(self.stack.press.writes() + self.stack.tenant.writes())
+        self.assertGreater(writes, 0)
+
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.state, "unknown")
+        # The same event arrives again. The service does not repeat the write blindly.
+        self.assertEqual(processor.handle(event()).status, "unknown")
+        self.assertEqual(len(self.stack.press.writes() + self.stack.tenant.writes()), writes)
+        # A human checks the target and replays it on purpose.
+        replayed = processor.replay_dead_letters(include_unknown=True)
+        self.assertEqual([r.status for _i, r in replayed], ["processed"])
+
+    def test_death_before_any_write_keeps_the_event_for_replay(self) -> None:
+        # The event was accepted. The process died while it read Keycloak. Nothing was written.
+        self.add_member()
+        keycloak = self.stack.app.keycloak
+        original = keycloak.get_user_snapshot
+
+        def die(_subject: str):
+            raise KeyboardInterrupt
+
+        keycloak.get_user_snapshot = die
+        with self.assertRaises(KeyboardInterrupt):
+            self.stack.app.processor.handle(event())
+        keycloak.get_user_snapshot = original
+
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual((letter.state, letter.attempts), ("failed", 0))
+        self.assertEqual(self.stack.press.writes() + self.stack.tenant.writes(), [])
+        replayed = self.stack.app.processor.replay_dead_letters()
+        self.assertEqual([r.status for _i, r in replayed], ["processed"])
+
+    def test_failed_event_counts_one_attempt(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+
+        self.stack.app.processor.handle(event())
+
+        self.assertEqual(self.stack.app.store.dead_letters()[0].attempts, 1)
+
+    def test_ignored_and_previewed_events_leave_no_record(self) -> None:
+        self.add_member()
+
+        self.stack.app.processor.handle(event("LOGIN"))
+        self.stack.app.processor.handle(event(), dry_run=True)
+
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
 
 
 class OrganizationPassTest(PipelineCase):

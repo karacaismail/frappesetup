@@ -21,11 +21,15 @@ Servis eylemi olayın içeriğinden seçmez. Kullanıcının güncel durumundan 
 | Kullanıcı silindi ya da kapatıldı. | Servis kullanıcıyı bütün kiracılarda kapatır. Servis Press'e tek bir `all_organizations` isteği gönderir. Press kullanıcıyı bütün takımlardan çıkarır, kapatır ve API anahtarlarını geçersiz yapar. |
 | Kullanıcının e-postası doğrulanmadı. | Servis iş yapmaz. İlk bağ yalnız doğrulanmış e-postayla kurulur. |
 | Kullanıcı kendi kaydoldu ve Organization üyesi değil. | Servis bir Organization açar ve kullanıcıyı ekler. Sonra Press'te takımı hazırlar. |
-| Kullanıcı Organization üyesi. | Servis Press'te takımı hazırlar. Servis kullanıcıyı ilgili kiracıda açar ya da günceller. Sonra kiracıda `change_email` ucunu çağırır. |
+| Kullanıcı Organization üyesi. | Servis Press'te takımı hazırlar. Servis kiracıda önce `change_email` ucunu çağırır. Sonra kullanıcıyı açar ya da günceller. |
 | Kullanıcı bir Organization'dan çıktı. | Servis o Organization'ın takım üyeliğini kaldırır. Servis kullanıcıyı o kiracıda kapatır. |
 | Keycloak belirsiz yanıt verdi. | Servis hiçbir kaydı değiştirmez. Olay bekleme kuyruğuna girer. |
 
-Servis `change_email` ucunu her eşitlemede çağırır. Çünkü olayın adı e-postanın değiştiğini söylemez. E-posta aynıysa kiracı iş yapmaz.
+Servis `change_email` ucunu her eşitlemede çağırır. Çünkü olayın adı e-postanın değiştiğini söylemez. E-posta aynıysa kiracı iş yapmaz. Kiracıda bağ yoksa kiracı 404 ve `IdentityNotFound` döner. Servis bu yanıtı hata saymaz.
+
+Servis önce `change_email`, sonra `provision` çağırır. Çünkü kiracı, bağ eski e-postayı gösterirken `provision` isteğini reddeder.
+
+Kapalı ya da silinen hesabın planı üyelik listesine bağlı değildir. Üyelik okunamasa da servis kapatma isteklerini gönderir.
 
 Servis silinmeyi iki adımda doğrular. Keycloak önce kullanıcı için 404 dönmelidir. Sonra realm kullanıcı sayısını vermelidir. Yanlış adres de 404 döner. Bu yüzden tek 404 yanıtı kullanıcıyı kapatmaz.
 
@@ -69,9 +73,12 @@ Yapay zekâ bu servisin yazma uçlarını doğrudan yürütemez. Kural ortak sö
 3. Onay katmanı işleri insana gösterir. Onay katmanı `platform_core` içindedir.
 4. İnsan onaylar. Onay katmanı ucu `dry_run: false` ile çağırır.
 5. İstek `preview_digest` ve `approval_id` alanlarını taşır.
-6. Servis planı yeniden hesaplar. Plan değiştiyse servis 409 döner ve iş yapmaz.
-7. Servis yalnız onaylanan planı yürütür. Servis her olaydan hemen önce planı bir kez daha denetler.
-8. Servis çağıranı, onay kimliğini, özeti ve sonucu günlüğe yazar.
+6. Servis onay kimliğini tek kullanımlık olarak kaydeder. Aynı onay ikinci kez gelirse servis 409 ve `approval_used` döner.
+7. Servis planı yeniden hesaplar. Plan değiştiyse servis 409 ve `preview_changed` döner ve iş yapmaz.
+8. Servis yalnız onaylanan planı yürütür. Servis her olaydan hemen önce planı bir kez daha denetler.
+9. Servis çağıranı, onay kimliğini, özeti ve sonucu günlüğe yazar.
+
+Özet yazılacak her şeyi kapsar: her işin adını, hedefini ve bütün alan değerlerini. Örneğin e-posta önizlemeden sonra değişirse özet tutmaz. Özet bir karma değerdir. E-posta özetten okunamaz.
 
 `serve` komutu günlüğü standart hata akışına yazar. İşlem günlüğü satırı `execute operation=` ile başlar.
 
@@ -86,7 +93,9 @@ Olay ucu bu akışın dışındadır. Olay Keycloak'ta zaten olmuş bir değişi
 
 ## Sonucu bilinmeyen iş
 
-Servis hedefin yalnız kesin başarı yanıtını başarı sayar. Yanıtların biçimi OpenAPI dosyasındadır.
+Servis hedefin yalnız kesin başarı yanıtını başarı sayar. Yanıtların biçimi OpenAPI dosyasındaki `Target` şemalarındadır. Bu şemalar Press'in ve kiracının kendi sözleşmelerinden gelir.
+
+Servis yanıttaki son durumu istediği durumla da karşılaştırır. Örneğin kullanıcıyı kapattıysa yanıtta `enabled` yanlış olmalıdır.
 
 - Hedef 202 dönerse iş bitmemiş olabilir. Boş yanıt da aynı durumdadır.
 - Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
@@ -94,6 +103,16 @@ Servis hedefin yalnız kesin başarı yanıtını başarı sayar. Yanıtların b
 - Servis bu olayı işlenmiş saymaz. Servis olayı kendiliğinden yeniden denemez.
 - Aynı olay yeniden gelirse servis yazmayı tekrarlamaz.
 - İnsan hedefi denetler. Sonra olayı `--include-unknown` seçeneğiyle yeniden işletir.
+
+## Yarıda kalan iş
+
+Süreç her an durabilir. Servis olayı kaybetmez ve yazmayı körlemesine tekrarlamaz.
+
+1. Servis kabul ettiği olayı işe başlamadan önce bekleme kuyruğuna yazar.
+2. Servis ilk dış yazmadan hemen önce kaydı `unknown` yapar.
+3. Olay başarıyla bitince kayıt kuyruktan çıkar.
+
+Süreç yazmadan önce durduysa olay elle yeniden işlenir. Süreç bir yazmadan sonra durduysa sonuç bilinmez. İnsan hedefi denetler ve olayı `--include-unknown` ile yeniden işletir.
 
 ## Süreçler arası sıra
 
@@ -154,4 +173,5 @@ Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üret
 - Mutabakat, Press'te ve kiracıda `list_identities` ucunu ister. Bu uçlar ortak sözleşmede henüz yok.
 - Servis belirteci için `aud-identity-sync` kapsamı ortak sözleşmede henüz yok.
 - Onay katmanının istemci adı ortak sözleşmede henüz yok.
-- `provision` gibi kiracı uçlarının başarı yanıtı ortak sözleşmede henüz yok. Bu servis `{"message": {"status": "done"}}` bekler.
+- Bu dalda Press'in ve kiracının sözleşme dosyaları yok. Testler o dosyalara göre yazılmış sahte hedefler kullanır. Gerçek bütünleşme testi `integration-e2e` işindedir.
+- Olayı gönderen yol olayı göndermezse servis değişikliği öğrenmez. Mutabakat komutu bu farkı gösterir. Farkı düzelten akış sıradaki iştir.

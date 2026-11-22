@@ -25,7 +25,7 @@ NOW = 1_795_000_000
 PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
 EXECUTE_TOKEN = "execute-token"  # onay katmanının belirteci: yürütebilir
 EVENT = {"id": "e-1", "kind": "user", "type": "VERIFY_EMAIL", "realm": "platform", "time": 1, "user_id": SUBJECT}
-ALL_ACTIONS = ["press.ensure_team", "tenant.provision", "tenant.change_email"]
+ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 
 
 def fake_verifier(token: str) -> dict[str, object]:
@@ -449,6 +449,11 @@ class ApprovalLayerTest(ServerCase):
         self.post_event()
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, DONE)
 
+    def fail_twice_more(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.post_event({**EVENT, "id": "e-2"})
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, DONE)
+
     def preview_replay(self, token: str = PREVIEW_TOKEN) -> dict[str, object]:
         status, body = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, token)
         self.assertEqual(status, 200)
@@ -495,6 +500,70 @@ class ApprovalLayerTest(ServerCase):
         self.assertIn("onay-1", audit)
         self.assertIn(digest, audit)
         self.assertIn("outcome=executed", audit)
+
+    def test_approval_id_works_only_once(self) -> None:
+        # An existing user's invitation plan stays the same after the first run.
+        # Without single use, the same approval would send the invitation e-mail again.
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users", (200, [keycloak_user(email="davetli@example.test")]))
+        kc.on("POST", f"{kc.admin}/organizations/{ORG_ID}/members", (201, None))
+        email_path = f"{kc.admin}/users/{SUBJECT}/execute-actions-email"
+        kc.on("PUT", email_path, (204, None))
+        invitation = {"email": "davetli@example.test", "organization_id": ORG_ID}
+        _status, preview = self.post_json("/v1/invitations", {**invitation, "dry_run": True})
+        execute = {**invitation, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-9"}
+
+        self.assertEqual(self.post_json("/v1/invitations", execute)[0], 200)
+        second = self.post_json("/v1/invitations", execute)
+
+        self.assertEqual(second, (409, {"error": "approval_used"}))
+        self.assertEqual(len(kc.calls("PUT", email_path)), 1)
+
+    def test_used_approval_cannot_authorise_another_operation(self) -> None:
+        self.fail_once()
+        digest = self.preview_replay()["preview_digest"]
+        self.assertEqual(self.execute_replay(digest, approval_id="onay-7")[0], 200)
+        self.fail_twice_more()
+        other_digest = self.preview_replay()["preview_digest"]
+        writes = len(self.downstream_writes())
+
+        status, reply = self.execute_replay(other_digest, approval_id="onay-7")
+
+        self.assertEqual((status, reply), (409, {"error": "approval_used"}))
+        self.assertEqual(len(self.downstream_writes()), writes)
+
+    def test_approval_is_consumed_even_when_the_plan_changed(self) -> None:
+        # A changed plan needs a new preview and a new approval. The old approval is spent.
+        self.fail_once()
+        digest = self.preview_replay()["preview_digest"]
+        self.stack.keycloak.add_user(keycloak_user(enabled=False), [])
+        self.assertEqual(self.execute_replay(digest, approval_id="onay-8")[0], 409)
+        fresh = self.preview_replay()["preview_digest"]
+
+        self.assertEqual(self.execute_replay(fresh, approval_id="onay-8"), (409, {"error": "approval_used"}))
+        self.assertEqual(self.execute_replay(fresh, approval_id="onay-8b")[0], 200)
+
+    def test_refused_client_does_not_consume_the_approval(self) -> None:
+        self.fail_once()
+        digest = self.preview_replay()["preview_digest"]
+        self.assertEqual(self.execute_replay(digest, token=PREVIEW_TOKEN, approval_id="onay-6")[0], 403)
+
+        self.assertEqual(self.execute_replay(digest, approval_id="onay-6")[0], 200)
+
+    def test_changed_email_after_preview_is_refused(self) -> None:
+        # Same operations, other field values. The digest covers the values that get written.
+        self.fail_once()
+        preview = self.preview_replay()
+        self.stack.keycloak.add_user(
+            keycloak_user(email="yeni@example.test"), [{"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}]
+        )
+        writes = len(self.downstream_writes())
+
+        status, reply = self.execute_replay(preview["preview_digest"])
+
+        self.assertEqual((status, reply), (409, {"error": "preview_changed"}))
+        self.assertEqual(len(self.downstream_writes()), writes)
+        self.assertNotIn("example.test", json.dumps(preview))
 
     def test_refused_execution_is_logged_as_refused(self) -> None:
         self.fail_once()

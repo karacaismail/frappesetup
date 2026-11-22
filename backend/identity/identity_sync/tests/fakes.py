@@ -62,6 +62,9 @@ class FakeServer:
                 owner.requests.append(recorded)
                 route = owner.routes.get((self.command, parts.path))
                 reply = route(recorded) if route else (404, {"error": "no route"})
+                if reply is DONE:
+                    # A test route asked for the site's own contract behaviour.
+                    reply = owner._defaults[(self.command, parts.path)](recorded)
                 status, body = reply[0], reply[1]
                 if status == 0:
                     self.close_connection = True
@@ -183,30 +186,189 @@ TENANT_SET_ENABLED = "/api/method/platform_core.api.identity.set_enabled"
 TENANT_CHANGE_EMAIL = "/api/method/platform_core.api.identity.change_email"
 TENANT_LIST = "/api/method/platform_core.api.identity.list_identities"
 WEBHOOK_SECRET = "test-webhook-secret"
-# Hedef uçların kesin başarı yanıtı (`contracts/identity_sync.openapi.yaml`, TargetWriteResult).
-DONE = (200, {"message": {"status": "done"}})
-# `ensure_team` yanıtı (`docs/sozlesmeler.md`, "Kuruluş ile takım eşlemesi").
-TEAM_READY = (200, {"message": {"team": "team-0001", "created": True}})
-# Sunucu isteği okur, sonra yanıt vermeden bağlantıyı kapatır.
+# Sentinel: passing DONE to FakeSite.on() restores the site's own contract behaviour for that path.
+DONE = (-1, None)
+# The server reads the request, then closes the connection without answering.
 DROP = (0, None)
+WEBSITE_USER = "Website User"
+
+
+def frappe_error(status: int, exc_type: str) -> Reply:
+    """Frappe's usual error body. The client recognises the error by `exc_type`."""
+    return status, {"exc_type": exc_type, "exception": f"{exc_type}: rejected"}
+
+
+def _has_only(body: object, required: set[str], optional: set[str]) -> bool:
+    """`additionalProperties: false` plus `required`, as both target contracts demand."""
+    return isinstance(body, dict) and required <= set(body) <= required | optional
 
 
 class FakeSite(FakeServer):
-    """Press ya da kiracı sitesi. Bilinen bütün yazma uçlarına başarı döner."""
+    """Base for the two fake targets. A test may override a path and later restore it with DONE."""
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        for path in (
-            PRESS_ENSURE_TEAM,
-            PRESS_REMOVE_MEMBER,
-            TENANT_PROVISION,
-            TENANT_SET_ENABLED,
-            TENANT_CHANGE_EMAIL,
-        ):
-            self.on("POST", path, TEAM_READY if path == PRESS_ENSURE_TEAM else DONE)
+        self._defaults: dict[tuple[str, str], Route] = {}
+
+    def default(self, method: str, path: str, route: Route) -> None:
+        self._defaults[(method, path)] = route
+        self.routes[(method, path)] = route
+
+    def on(self, method: str, path: str, reply: Reply | Route) -> None:
+        if reply is DONE:
+            self.routes[(method, path)] = self._defaults[(method, path)]
+        else:
+            super().on(method, path, reply)
 
     def writes(self) -> list[Recorded]:
         return [r for r in self.requests if r.method != "GET"]
+
+
+class FakeTenant(FakeSite):
+    """A tenant site that behaves like `contracts/platform_core-kimlik.openapi.yaml` (0.2.0).
+
+    Source of the behaviour: that contract and `platform_core/kimlik/provisioning.py`.
+    State: identity links `(issuer, subject) -> user` and users keyed by e-mail.
+    """
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.links: dict[tuple[str, str], str] = {}
+        self.users: dict[str, dict[str, object]] = {}
+        self.default("POST", TENANT_PROVISION, self._provision)
+        self.default("POST", TENANT_SET_ENABLED, self._set_enabled)
+        self.default("POST", TENANT_CHANGE_EMAIL, self._change_email)
+
+    def seed_user(self, issuer: str, subject: str, email: str, *, enabled: bool = True) -> None:
+        self.links[(issuer, subject)] = email
+        self.users[email] = {"enabled": enabled, "first_name": "", "last_name": ""}
+
+    def user_of(self, issuer: str, subject: str) -> dict[str, object] | None:
+        email = self.links.get((issuer, subject))
+        return None if email is None else {"email": email, **self.users[email]}
+
+    def _provision(self, req: Recorded) -> Reply:
+        body = req.json()
+        required = {"issuer", "subject", "email", "email_verified", "enabled"}
+        if not _has_only(body, required, {"first_name", "last_name", "role_profiles"}):
+            return frappe_error(400, "InvalidInput")
+        if not isinstance(body["email_verified"], bool) or not isinstance(body["enabled"], bool):
+            return frappe_error(400, "InvalidInput")
+        key = (body["issuer"], body["subject"])
+        user = self.links.get(key)
+        if user is not None:
+            if user != body["email"]:
+                return frappe_error(409, "EmailMismatch")
+        else:
+            if not body["email_verified"]:
+                return frappe_error(409, "EmailNotVerified")
+            if body["email"] in self.links.values():
+                return frappe_error(409, "IdentityConflict")
+            user = body["email"]
+            self.links[key] = user
+            self.users[user] = {}
+        self.users[user].update(
+            enabled=body["enabled"], first_name=body.get("first_name", ""), last_name=body.get("last_name", "")
+        )
+        message = {"user": user, "enabled": body["enabled"], "linked": True, "user_type": WEBSITE_USER}
+        return 200, {"message": message}
+
+    def _set_enabled(self, req: Recorded) -> Reply:
+        body = req.json()
+        if not _has_only(body, {"issuer", "subject", "enabled"}, set()) or not isinstance(body["enabled"], bool):
+            return frappe_error(400, "InvalidInput")
+        user = self.links.get((body["issuer"], body["subject"]))
+        if user is None:
+            return frappe_error(404, "IdentityNotFound")
+        self.users[user]["enabled"] = body["enabled"]
+        return 200, {"message": {"user": user, "enabled": body["enabled"]}}
+
+    def _change_email(self, req: Recorded) -> Reply:
+        body = req.json()
+        if not _has_only(body, {"issuer", "subject", "new_email"}, set()):
+            return frappe_error(400, "InvalidInput")
+        key = (body["issuer"], body["subject"])
+        user = self.links.get(key)
+        if user is None:
+            return frappe_error(404, "IdentityNotFound")
+        new_email = body["new_email"]
+        if user != new_email:
+            if new_email in self.users:
+                return frappe_error(409, "EmailInUse")
+            self.users[new_email] = self.users.pop(user)
+            self.links[key] = new_email
+        return 200, {"message": {"user": new_email}}
+
+
+class FakePress(FakeSite):
+    """A Press site that behaves like `contracts/press_tr.openapi.yaml` (0.1.0).
+
+    Source of the behaviour: that contract and docs/sozlesmeler.md, section 6.
+    State: identity links, users with an `enabled` flag and API keys, and one team per organization.
+    """
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.links: dict[tuple[str, str], str] = {}
+        self.users: dict[str, dict[str, object]] = {}
+        self.teams: dict[str, dict[str, object]] = {}
+        self.default("POST", PRESS_ENSURE_TEAM, self._ensure_team)
+        self.default("POST", PRESS_REMOVE_MEMBER, self._remove_team_member)
+
+    def seed_member(self, issuer: str, subject: str, email: str, organization_id: str, *, api_keys: int = 0) -> None:
+        self.links[(issuer, subject)] = email
+        self.users[email] = {"enabled": True, "api_keys": [f"key-{n}" for n in range(api_keys)]}
+        team = self.teams.setdefault(organization_id, {"name": f"team-{len(self.teams) + 1:04d}", "members": set()})
+        team["members"].add(email)
+
+    def user_of(self, issuer: str, subject: str) -> dict[str, object] | None:
+        email = self.links.get((issuer, subject))
+        return None if email is None else {"email": email, **self.users[email]}
+
+    def teams_of(self, issuer: str, subject: str) -> list[str]:
+        email = self.links.get((issuer, subject))
+        return sorted(org for org, team in self.teams.items() if email in team["members"])
+
+    def _ensure_team(self, req: Recorded) -> Reply:
+        body = req.json()
+        required = {"issuer", "subject", "email", "email_verified", "organization_id"}
+        if not _has_only(body, required, {"organization_name"}) or not isinstance(body["email_verified"], bool):
+            return frappe_error(400, "ValidationError")
+        key = (body["issuer"], body["subject"])
+        if key not in self.links:
+            if not body["email_verified"]:
+                return frappe_error(403, "PermissionError")
+            self.links[key] = body["email"]
+            self.users[body["email"]] = {"enabled": True, "api_keys": []}
+        created = body["organization_id"] not in self.teams
+        team = self.teams.setdefault(
+            body["organization_id"], {"name": f"team-{len(self.teams) + 1:04d}", "members": set()}
+        )
+        team["members"].add(self.links[key])
+        return 200, {"message": {"team": team["name"], "created": created}}
+
+    def _remove_team_member(self, req: Recorded) -> Reply:
+        body = req.json()
+        if not _has_only(body, {"issuer", "subject"}, {"organization_id", "all_organizations"}):
+            return frappe_error(400, "InvalidTeamSelector")
+        has_org, has_all = "organization_id" in body, "all_organizations" in body
+        org = body.get("organization_id")
+        if has_org == has_all or (has_all and body["all_organizations"] is not True):
+            return frappe_error(400, "InvalidTeamSelector")
+        if has_org and (not isinstance(org, str) or not org.strip() or len(org) > 255):
+            return frappe_error(400, "InvalidTeamSelector")
+        email = self.links.get((body["issuer"], body["subject"]))
+        if has_all:
+            # Bulk removal also disables the linked user and revokes the API credentials.
+            if email is not None:
+                for team in self.teams.values():
+                    team["members"].discard(email)
+                self.users[email].update(enabled=False, api_keys=[])
+            return 200, {"message": {"team": None, "member": False}}
+        team = self.teams.get(org)
+        if team is not None and email is not None:
+            team["members"].discard(email)
+        return 200, {"message": {"team": team["name"] if team else None, "member": False}}
 
 
 def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, db_path: str, tenant2=None):
@@ -240,9 +402,9 @@ class Stack:
         from identity_sync.app import build_app
 
         self.keycloak = FakeKeycloak()
-        self.press = FakeSite()
-        self.tenant = FakeSite()
-        self.tenant2 = FakeSite() if two_tenants else None
+        self.press = FakePress()
+        self.tenant = FakeTenant()
+        self.tenant2 = FakeTenant() if two_tenants else None
         self.settings = make_settings(self.keycloak, self.press, self.tenant, db_path, self.tenant2)
         self.sleeps: list[float] = []
         self.app = build_app(self.settings, sleep=self.sleeps.append)

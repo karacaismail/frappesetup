@@ -93,14 +93,15 @@ class EnsureOrganization:
 
 @dataclass(frozen=True)
 class PressEnsureTeam:
-    """Alanlar `docs/sozlesmeler.md` dosyasının "Kuruluş ile takım eşlemesi" bölümünden gelir.
+    """Fields come from the ensure_team request in contracts/press_tr.openapi.yaml.
 
-    Takım adı gönderilmez. Takım adını Press üretir. `organization_name` boşsa gönderilmez.
+    No team name is sent. Press generates it. `organization_name` is left out when empty.
     """
 
     issuer: str
     subject: str
     email: str
+    email_verified: bool
     organization_id: str
     organization_name: str = ""
 
@@ -286,17 +287,21 @@ def _team(snapshot: UserSnapshot, issuer: str, organization: Organization) -> Pr
         issuer=issuer,
         subject=snapshot.subject,
         email=snapshot.email,
+        email_verified=snapshot.email_verified,
         organization_id=organization.id,
         organization_name=organization.name,
     )
 
 
 def _sync_on_tenant(snapshot: UserSnapshot, issuer: str, tenant: str) -> list[Action]:
-    """Kiracıda kaydı hazırlar, sonra e-postayı güncel değere getirir.
+    """Bring the tenant user's e-mail up to date, then create or update the user.
 
-    Kiracı e-postayı yalnız `change_email` ile değiştirir (G-57). E-postanın değişip
-    değişmediğini olayın adı söylemez. Bu yüzden `change_email` her eşitlemede çağrılır.
-    E-posta aynıysa kiracı iş yapmaz.
+    The tenant changes an e-mail only through `change_email` (G-57). The event name does not
+    say whether the e-mail changed, so the rename is planned on every sync. The tenant does
+    nothing when the e-mail is the same and answers IdentityNotFound when there is no link yet.
+
+    The rename comes first: the tenant rejects `provision` with EmailMismatch while the link
+    still points to the old e-mail (contracts/platform_core-kimlik.openapi.yaml).
     """
     provision = TenantProvision(
         tenant=tenant,
@@ -309,5 +314,4 @@ def _sync_on_tenant(snapshot: UserSnapshot, issuer: str, tenant: str) -> list[Ac
         enabled=True,
     )
     rename = TenantChangeEmail(tenant=tenant, issuer=issuer, subject=snapshot.subject, new_email=snapshot.email)
-    return [provision, rename]
-
+    return [rename, provision]

@@ -61,8 +61,14 @@ def plan(ev: Event, snapshot: UserSnapshot | None, organization: Organization | 
 
 
 # Alanlar `docs/sozlesmeler.md` dosyasının "Kuruluş ile takım eşlemesi" bölümünden gelir.
+# `email_verified` is required by contracts/press_tr.openapi.yaml (ensure_team request).
 TEAM = PressEnsureTeam(
-    issuer=ISSUER, subject=SUB, email="ayse@example.test", organization_id=ORG.id, organization_name="Kiracı 1"
+    issuer=ISSUER,
+    subject=SUB,
+    email="ayse@example.test",
+    email_verified=True,
+    organization_id=ORG.id,
+    organization_name="Kiracı 1",
 )
 PROVISION = TenantProvision(
     tenant="kiraci1",
@@ -97,11 +103,16 @@ class RegistrationTest(unittest.TestCase):
         )
 
     def test_verified_member_gets_team_and_tenant_user(self) -> None:
-        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
+        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user()), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_member_of_unknown_organization_gets_only_a_team(self) -> None:
         team = PressEnsureTeam(
-            issuer=ISSUER, subject=SUB, email="ayse@example.test", organization_id=OTHER_ORG.id, organization_name=""
+            issuer=ISSUER,
+            subject=SUB,
+            email="ayse@example.test",
+            email_verified=True,
+            organization_id=OTHER_ORG.id,
+            organization_name="",
         )
         self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(orgs=(OTHER_ORG,))), (team,))
 
@@ -113,7 +124,7 @@ class RegistrationTest(unittest.TestCase):
 class EmailChangeTest(unittest.TestCase):
     def test_update_email_renames_user_on_tenant(self) -> None:
         # E-posta değişikliği kiracıda `change_email` ile uygulanır (G-57).
-        self.assertEqual(plan(event("user", "UPDATE_EMAIL"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
+        self.assertEqual(plan(event("user", "UPDATE_EMAIL"), user()), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_unverified_new_email_is_not_applied(self) -> None:
         self.assertEqual(plan(event("user", "UPDATE_EMAIL"), user(verified=False)), ())
@@ -152,16 +163,16 @@ class RemovalTest(unittest.TestCase):
 
 class AdminUpdateTest(unittest.TestCase):
     def test_admin_update_resyncs_user(self) -> None:
-        self.assertEqual(plan(event("admin", "USER_UPDATE"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
+        self.assertEqual(plan(event("admin", "USER_UPDATE"), user()), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_admin_create_of_verified_member_provisions(self) -> None:
-        self.assertEqual(plan(event("admin", "USER_CREATE"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
+        self.assertEqual(plan(event("admin", "USER_CREATE"), user()), (TEAM, CHANGE_EMAIL, PROVISION))
 
 
 class MembershipTest(unittest.TestCase):
     def test_new_membership_provisions_that_organization(self) -> None:
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_CREATE", ORG.id)
-        self.assertEqual(plan(ev, user(), ORG), (TEAM, PROVISION, CHANGE_EMAIL))
+        self.assertEqual(plan(ev, user(), ORG), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_removed_membership_deprovisions_only_that_organization(self) -> None:
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
@@ -176,7 +187,7 @@ class MembershipTest(unittest.TestCase):
     def test_late_delete_event_does_not_remove_current_member(self) -> None:
         # Olay geç geldi. Kullanıcı yeniden üye. Güncel durum geçerlidir.
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
-        self.assertEqual(plan(ev, user(), ORG), (TEAM, PROVISION, CHANGE_EMAIL))
+        self.assertEqual(plan(ev, user(), ORG), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_membership_of_deleted_organization_disables_non_member_tenants(self) -> None:
         # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
@@ -189,6 +200,12 @@ class MembershipTest(unittest.TestCase):
                 TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
             ),
         )
+
+    def test_rename_comes_before_provision(self) -> None:
+        # The tenant answers 409 EmailMismatch to provision when the linked user has another
+        # e-mail (contracts/platform_core-kimlik.openapi.yaml). So the rename must run first.
+        actions = plan(event("user", "UPDATE_EMAIL"), user())
+        self.assertLess(actions.index(CHANGE_EMAIL), actions.index(PROVISION))
 
     def test_verify_after_admin_email_change_still_renames(self) -> None:
         # Yönetici e-postayı değiştirdi. Kullanıcı sonra doğruladı. Kiracıda ad yine değişmelidir (G-57).

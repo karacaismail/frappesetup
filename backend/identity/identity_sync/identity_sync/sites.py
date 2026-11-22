@@ -32,6 +32,10 @@ def tenant_scope(tenant: str) -> str:
     return f"aud-site-{tenant}"
 
 
+Success = Callable[[object], bool]
+IDENTITY_NOT_FOUND = "IdentityNotFound"
+
+
 def _call_method(
     base_url: str,
     method_path: str,
@@ -40,9 +44,19 @@ def _call_method(
     *,
     timeout: float,
     body: Mapping[str, object] | None = None,
-    is_success: Callable[[int, object], bool] | None = None,
+    is_success: Success | None = None,
+    missing_identity_is_success: bool = False,
 ) -> object:
-    """Frappe ucunu çağırır ve yanıttaki `message` değerini döner."""
+    """Call a Frappe method and return the `message` value of the reply.
+
+    A write (`body` given) counts as done only on HTTP 200 with a body that `is_success`
+    accepts. The exact success bodies come from the target contracts. Being queued is not
+    success: any other 2xx reply raises `UnknownOutcome`.
+
+    `missing_identity_is_success`: the tenant answers 404 `IdentityNotFound` when it has no
+    link for the user. For "disable" and "rename" that means there is nothing to do.
+    A 404 without that error name is a failure: a wrong address answers 404 too.
+    """
 
     def send(token: str) -> Response:
         try:
@@ -54,40 +68,43 @@ def _call_method(
                 json_body=body,
             )
         except ConnectFailed:
-            raise  # istek gitmedi: belirsizlik yok
+            raise  # the request was never sent: nothing is uncertain
         except TransportError:
             if body is None:
                 raise
-            # Yazma isteği gitti ama yanıt okunamadı. İşin bitip bitmediği bilinmiyor.
+            # The write was sent but the reply could not be read. Nobody knows if it happened.
             raise UnknownOutcome from None
         except HttpError as error:
-            # Aradaki vekil sunucu hata verdi. Hedef işi yapmış olabilir.
+            # A gateway in between failed. The target may still have done the work.
             if body is not None and error.status in _AMBIGUOUS_GATEWAY_STATUSES:
                 raise UnknownOutcome from None
             raise
 
-    response = tokens.with_token(scope, send)
+    try:
+        response = tokens.with_token(scope, send)
+    except HttpError as error:
+        if missing_identity_is_success and error.status == 404 and error.code == IDENTITY_NOT_FOUND:
+            return None
+        raise
     message = response.body.get("message") if isinstance(response.body, Mapping) else None
-    if body is not None and not (is_success or _is_done)(response.status, message):
-        # Yazma işinin kesin başarı yanıtı gelmedi. Kuyruğa alınma başarı sayılmaz.
+    if body is not None and not (response.status == 200 and is_success is not None and is_success(message)):
         raise UnknownOutcome
     return message
 
 
-def _is_team(status: int, message: object) -> bool:
-    """`ensure_team` ucunun kesin başarı yanıtı: 200, dolu `team` adı ve `created` bayrağı."""
-    return (
-        status == 200
-        and isinstance(message, Mapping)
-        and isinstance(message.get("team"), str)
-        and bool(message.get("team"))
-        and isinstance(message.get("created"), bool)
-    )
+def _text(message: object, name: str) -> str | None:
+    value = message.get(name) if isinstance(message, Mapping) else None
+    return value if isinstance(value, str) and value else None
 
 
-def _is_done(status: int, message: object) -> bool:
-    """Yazma ucunun kesin başarı yanıtı: 200 ve `{"message": {"status": "done"}}`."""
-    return status == 200 and isinstance(message, Mapping) and message.get("status") == "done"
+def _is_team(message: object) -> bool:
+    """ensure_team (press_tr contract): a team name and a `created` flag."""
+    return _text(message, "team") is not None and isinstance(message.get("created"), bool)  # type: ignore[union-attr]
+
+
+def _is_removed(message: object) -> bool:
+    """remove_team_member (press_tr contract): `member` is false. `team` is a name or null."""
+    return isinstance(message, Mapping) and message.get("member") is False and "team" in message
 
 
 def _identities(message: object) -> list[Identity]:
@@ -115,10 +132,7 @@ class PressClient:
         self._timeout = timeout
 
     def _call(
-        self,
-        method_path: str,
-        body: Mapping[str, object] | None = None,
-        is_success: Callable[[int, object], bool] | None = None,
+        self, method_path: str, body: Mapping[str, object] | None = None, is_success: Success | None = None
     ) -> object:
         return _call_method(
             self._base_url, method_path, self._tokens, PRESS_SCOPE, timeout=self._timeout, body=body, is_success=is_success
@@ -127,7 +141,7 @@ class PressClient:
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
         if not action.organization_name:
-            del body["organization_name"]  # isteğe bağlı alan
+            del body["organization_name"]  # optional field
         self._call("press_tr.api.identity.ensure_team", body, _is_team)
 
     def remove_team_member(self, action: PressRemoveTeamMember) -> None:
@@ -145,22 +159,39 @@ class PressClient:
             body["organization_id"] = action.organization_id
         else:
             raise ValueError("organization_id must not be empty")
-        self._call("press_tr.api.identity.remove_team_member", body)
+        self._call("press_tr.api.identity.remove_team_member", body, _is_removed)
 
     def list_identities(self) -> list[Identity]:
         return _identities(self._call("press_tr.api.identity.list_identities"))
 
 
 class TenantClient:
+    """Calls the tenant identity endpoints (contracts/platform_core-kimlik.openapi.yaml)."""
+
     def __init__(self, tenants: Sequence[Tenant], tokens: TokenProvider, *, timeout: float) -> None:
         self._tenants = {tenant.name: tenant for tenant in tenants}
         self._tokens = tokens
         self._timeout = timeout
 
-    def _call(self, tenant: str, method_path: str, body: Mapping[str, object] | None = None) -> object:
-        # Hedef adres yalnız ayardaki kiracı listesinden gelir (G-13).
-        base_url = self._tenants[tenant].base_url
-        return _call_method(base_url, method_path, self._tokens, tenant_scope(tenant), timeout=self._timeout, body=body)
+    def _call(
+        self,
+        tenant: str,
+        method_path: str,
+        body: Mapping[str, object] | None = None,
+        is_success: Success | None = None,
+        missing_identity_is_success: bool = False,
+    ) -> object:
+        # The target address comes only from the configured tenant list (G-13).
+        return _call_method(
+            self._tenants[tenant].base_url,
+            method_path,
+            self._tokens,
+            tenant_scope(tenant),
+            timeout=self._timeout,
+            body=body,
+            is_success=is_success,
+            missing_identity_is_success=missing_identity_is_success,
+        )
 
     @staticmethod
     def _body(action: object) -> dict[str, object]:
@@ -169,13 +200,44 @@ class TenantClient:
         return body
 
     def provision(self, action: TenantProvision) -> None:
-        self._call(action.tenant, "platform_core.api.identity.provision", self._body(action))
+        """Success: the linked user, with the requested `enabled` state."""
+
+        def done(message: object) -> bool:
+            return (
+                _text(message, "user") is not None
+                and message.get("linked") is True  # type: ignore[union-attr]
+                and message.get("enabled") is action.enabled  # type: ignore[union-attr]
+            )
+
+        self._call(action.tenant, "platform_core.api.identity.provision", self._body(action), done)
 
     def set_enabled(self, action: TenantSetEnabled) -> None:
-        self._call(action.tenant, "platform_core.api.identity.set_enabled", self._body(action))
+        """Success: the user's final state equals the requested one.
+
+        A tenant that has no link for the user has nothing to disable, so that counts as done.
+        Enabling a user the tenant does not know stays a failure.
+        """
+
+        def done(message: object) -> bool:
+            return _text(message, "user") is not None and message.get("enabled") is action.enabled  # type: ignore[union-attr]
+
+        self._call(
+            action.tenant,
+            "platform_core.api.identity.set_enabled",
+            self._body(action),
+            done,
+            missing_identity_is_success=not action.enabled,
+        )
 
     def change_email(self, action: TenantChangeEmail) -> None:
-        self._call(action.tenant, "platform_core.api.identity.change_email", self._body(action))
+        """Success: the user's name is the new e-mail. No link yet means there is nothing to rename."""
+        self._call(
+            action.tenant,
+            "platform_core.api.identity.change_email",
+            self._body(action),
+            lambda message: _text(message, "user") == action.new_email,
+            missing_identity_is_success=True,
+        )
 
     def list_identities(self, tenant: str) -> list[Identity]:
         return _identities(self._call(tenant, "platform_core.api.identity.list_identities"))
