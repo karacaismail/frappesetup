@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+"$DEV_DIR/bin/tunel" kapat
+# Named volumes survive; never remove other projects or shared images.
+"$DEV_DIR/bin/compose" down
