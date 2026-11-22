@@ -46,6 +46,19 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
 - Döngü yasaktır. MVP'de bu yönler otomatik denetlenir (B-10).
 
+## HRMS TR ortak kayıtları
+
+HRMS TR, erişim kurallarını `platform_core.erisim` ile uygular.
+Uygulama, `ai_tools` kancasıyla izin onay aracını bildirir.
+İnsan onay ucu, önizleme alanları ve yanıtlar [OpenAPI sözleşmesinde](contracts/hrms_tr.openapi.yaml) yer alır.
+
+`Leave Application` türünün `validate` ve `before_cancel` olayları izin akışını denetler.
+`DocShare.validate` izin taleplerinin paylaşımını engeller.
+`User.before_save` portal rollerine sahip kullanıcıların hesap türünü korur.
+`modified` alanı kaydın sürümünü belirler.
+`leave_balance` alanı izin bakiyesini tutar ve alan iznine bağlıdır.
+[0008 numaralı karar](docs/kararlar/0008-hrms-tr-first-vertical-slice.md) ayrıntıları açıklar.
+
 ## Denetim komutları
 
 Ortam komutları Pane'in verdiği `PANE_PORT` değerini kullanır.

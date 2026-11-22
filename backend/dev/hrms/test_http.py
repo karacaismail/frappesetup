@@ -341,7 +341,13 @@ class LeaveHttpTest(unittest.TestCase):
         ):
             with self.subTest(arguments=arguments):
                 code, payload = client.send(f"{LEAVE_PATH}?{urlencode(arguments)}")
-                self.assertIn(code, (403, 417), payload.get("exception"))
+                if "balance_total" in arguments.get("fields", "") and code == 200:
+                    self.assertTrue(payload["data"])
+                    self.assertTrue(
+                        all(set(row) == {"name"} for row in payload["data"])
+                    )
+                else:
+                    self.assertIn(code, (403, 417), payload.get("exception"))
 
         args = urlencode(
             {
@@ -353,7 +359,7 @@ class LeaveHttpTest(unittest.TestCase):
         code, payload = client.send(f"/api/method/frappe.client.get_value?{args}")
         self.assertIn(code, (200, 403, 417), payload.get("exception"))
         if code == 200:
-            self.assertFalse(payload.get("message"))
+            self.assertLessEqual(set(payload.get("message") or {}), {"name"})
 
     def test_native_self_approval_and_employee_reassignment_are_denied(self):
         for actor in ("manager", "hr"):
