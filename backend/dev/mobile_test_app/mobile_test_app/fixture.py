@@ -2,8 +2,10 @@
 
 import json
 import time
+from functools import partial
 
 import frappe
+from platform_core.api.mobile import _pull, _push
 from platform_core.mobil.protocol import (
 	UUID_PATTERN,
 	Command,
@@ -12,6 +14,7 @@ from platform_core.mobil.protocol import (
 	unavailable_record,
 	uuid4_id,
 )
+from platform_core.mobil.request import endpoint_response
 
 from .load_accounts import LOAD_ACCOUNTS
 
@@ -166,15 +169,28 @@ def authenticate():
 	if mismatch in {"site", "scope", "account"}:
 		frappe.local.mobile_identity[mismatch] = "invalid-fixture-value"
 
-	frappe.local.mobile_commands = {
-		f"fixture.{action}": FixtureCommand(action)
-		for action in ("create", "create_bad_scope", "update", "delete", "transfer")
-	}
-	frappe.local.mobile_projections = {"fixture": projection}
-	frappe.local.mobile_inventories = {"fixture": scan_inventory}
 	writer = request.headers.get("X-Mobile-Test-Writer")
 	if writer:
 		_signal(writer, "entered")
+
+
+# The production request guard and the action check the bound installation and command access.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def fixture_push():
+	_require_test_site()
+	commands = {
+		f"fixture.{action}": FixtureCommand(action)
+		for action in ("create", "create_bad_scope", "update", "delete", "transfer")
+	}
+	return endpoint_response("v1_push", partial(_push, commands=commands))
+
+
+# The production request guard and the action check the bound installation and command access.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def fixture_pull():
+	_require_test_site()
+	action = partial(_pull, projections={"fixture": projection}, inventories={"fixture": scan_inventory})
+	return endpoint_response("v1_pull", action)
 
 
 @frappe.whitelist(methods=["POST"])
