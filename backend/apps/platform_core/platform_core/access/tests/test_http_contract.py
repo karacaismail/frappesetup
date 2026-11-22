@@ -1,9 +1,11 @@
-"""Check GET authentication responses over HTTP against the access contract."""
+"""Check authentication responses over HTTP against the access contract."""
 
 import http.client
 import json
+import time
 from pathlib import Path
 from threading import Thread
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 import frappe
@@ -35,17 +37,86 @@ class TestGetAuthenticationContract(AccessRuleTestCase):
 		cls.addClassCleanup(cls.server.shutdown)
 
 	def request_get(self, path, query, sid=None):
+		return self.request_http(path, query, sid)
+
+	def request_http(self, path, query, sid=None, *, method="GET", csrf_token=None):
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)
 		headers = {"Host": self.site, "Accept": "application/json"}
 		if sid is not None:
 			headers["Cookie"] = f"sid={sid}"
+		if csrf_token:
+			headers["X-Frappe-CSRF-Token"] = csrf_token
+		body = None
+		url = f"/api/method{path}"
+		if method == "GET":
+			url += f"?{urlencode(query)}"
+		else:
+			headers["Content-Type"] = "application/x-www-form-urlencoded"
+			body = urlencode(query)
 		try:
-			connection.request("GET", f"/api/method{path}?{urlencode(query)}", headers=headers)
+			connection.request(method, url, body=body, headers=headers)
 			response = connection.getresponse()
 			return response.status, response.headers.get_content_type(), json.loads(response.read())
 		finally:
 			connection.close()
+
+	def assert_session_expired_contract(self, path, method, response):
+		status, content_type, payload = response
+		self.assertEqual(status, 401)
+		self.assertEqual(content_type, "application/json")
+		self.assertEqual(payload["exc_type"], "SessionExpired")
+		responses = self.contract["paths"][path][method.lower()]["responses"]
+		self.assertIn("401", responses)
+		definition = responses["401"]
+		if "$ref" in definition:
+			definition = self.contract["components"]["responses"][definition["$ref"].split("/")[-1]]
+		Draft202012Validator(definition["content"]["application/json"]["schema"]).validate(payload)
+
+	def test_missing_session_matches_both_post_contracts(self):
+		for endpoint in ("set_field_level", "set_level_access"):
+			path = f"/platform_core.api.access.{endpoint}"
+			with self.subTest(path=path):
+				response = self.request_http(path, {}, "missing-access-contract-session", method="POST")
+				self.assertEqual(response[2]["session_expired"], 1)
+				self.assert_session_expired_contract(path, "POST", response)
+
+	def test_idle_session_matches_every_endpoint_contract(self):
+		# O-25 expires real activity after one hour even when the Frappe session is fresh.
+		for path, operations in self.contract["paths"].items():
+			for method in ("GET", "POST"):
+				if method.lower() not in operations:
+					continue
+				with self.subTest(path=path, method=method):
+					client = self.login(ADMIN)
+					sid = client.get_cookie("sid").value
+					if method == "POST":
+						# Opening the real panel creates the session's CSRF token, as in a browser.
+						# Frappe skips persisting that token in test mode (sessions.py:211).
+						with patch.object(frappe, "in_test", False):
+							self.assertEqual(self.send(client, "GET", "/panel").status_code, 200)
+					sessions = frappe.qb.DocType("Sessions")
+					stored = (
+						frappe.qb.from_(sessions)
+						.select(sessions.sessiondata)
+						.where(sessions.sid == sid)
+						.run()
+					)
+					self.assertTrue(stored, "The idle test must start with a real, live session.")
+					csrf_token = frappe.parse_json(stored[0][0]).get("csrf_token")
+					if method == "POST":
+						self.assertTrue(csrf_token, "The idle POST must carry the real session's CSRF token.")
+					# Identity's activity fixture. The 3600-second limit comes from O-25.
+					frappe.cache.set_value(
+						f"kimlik_activity:sid:{sid}", int(time.time()) - 3601, expires_in_sec=3600
+					)
+					response = self.request_http(
+						path, {"doctype": DOCTYPE}, sid, method=method, csrf_token=csrf_token
+					)
+					self.assertNotIn("session_expired", response[2])
+					frappe.db.rollback()
+					self.assertFalse(frappe.db.exists("Sessions", {"sid": sid}))
+					self.assert_session_expired_contract(path, method, response)
 
 	def test_guest_expired_session_and_unauthorized_user_match_get_contract(self):
 		client = self.login(DESK_ONLY)

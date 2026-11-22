@@ -15,7 +15,9 @@ info:
 
     Identity: the Frappe session cookie. A POST request needs the `X-Frappe-CSRF-Token` header.
     A guest without a session receives 403. A missing or expired session referenced by a cookie
-    receives 401 with `session_expired: 1` and `exc_type: SessionExpired` (shared contract SZ-8).
+    receives 401 with `exc_type: SessionExpired` (shared contract SZ-8).
+    Frappe adds `session_expired: 1` for a missing session. The identity idle-timeout hook
+    returns the same exception type without that optional field (O-25).
 
     The error response has Frappe's usual format. A permission error returns 403.
     Invalid input returns 417. A record that is not found returns 404.
@@ -247,6 +249,8 @@ paths:
                       fieldname: {type: string}
                       permlevel: {type: integer, minimum: 0, maximum: 9}
                       previous_permlevel: {type: integer, minimum: 0, maximum: 9}
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: The user is not “System Manager” or is a guest.
         "404":
@@ -329,6 +333,8 @@ paths:
                       permlevel: {type: integer, minimum: 1, maximum: 9}
                       read: {type: boolean}
                       write: {type: boolean}
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: The user is not “System Manager” or is a guest.
         "404":
@@ -642,7 +648,7 @@ x-hooks:
     - name: ai_write_closed_doctypes
       shape: '["PLT Access Rule"]'
       description: |
-        The AI layer reads this hook. The engine lists the “Access Rule” document type in it (O-28).
+        The AI layer reads this hook. The engine lists the “PLT Access Rule” document type in it (O-28).
         The generic write tools cannot change this type. For example `create_document` and `update_document` are refused.
         A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
     - name: ai_tools
@@ -693,9 +699,9 @@ x-report-rules:
 x-ai-tools:
   description: |
     The engine declares four AI tools through the `ai_tools` hook.
-    The declaration format is in the `x-ai-tools-hook` section of the file `platform_core-yapay-zeka.openapi.yaml`.
+    The declaration format is in the `x-ai-tools-hook` section of the file `platform_core-ai.openapi.yaml`.
     The layer adds the app name to the start of the tool name. For example it becomes `platform_core_list_access_rules`.
-    The declaration function is `platform_core.erisim.ai_tools.declare`.
+    The declaration function is `platform_core.access.ai_tools.declare`.
 
     The tools take only structured fields. No tool takes SQL text or a raw condition.
     The input models reject an unknown field. The filter rows pass the same validation as the rule record.
@@ -745,17 +751,23 @@ components:
         application/json:
           schema:
             type: object
-            required: [session_expired, exc_type]
+            required: [exc_type]
             properties:
               session_expired:
                 type: integer
                 const: 1
+                description: Present when Frappe cannot restore the session. Absent for the identity idle timeout.
               exc_type:
                 type: string
                 const: SessionExpired
-          example:
-            session_expired: 1
-            exc_type: SessionExpired
+          examples:
+            missingSession:
+              value:
+                session_expired: 1
+                exc_type: SessionExpired
+            idleTimeout:
+              value:
+                exc_type: SessionExpired
   securitySchemes:
     frappeSession:
       type: apiKey
