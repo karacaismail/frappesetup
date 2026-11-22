@@ -1192,6 +1192,14 @@
     "type": "reference"
   },
   {
+    "old": "test_eklentiler",
+    "new": "test_extensions",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*.py"
+    ]
+  },
+  {
     "old": "test_keycloak_canli.py",
     "new": "test_live_keycloak.py",
     "type": "reference"
@@ -3938,7 +3946,8 @@
     "new": "shell",
     "type": "module",
     "paths": [
-      "backend/dev/tests/test_boundaries.py"
+      "backend/dev/tests/test_boundaries.py",
+      "backend/apps/platform_core/platform_core/kabuk/test_boundaries.py"
     ]
   },
   {
@@ -4470,5 +4479,61 @@
     "old": "dockerfile: dev/Dockerfile.kiraci",
     "new": "dockerfile: dev/Dockerfile.tenant",
     "type": "reference"
+  },
+  {
+    "old": "from oidc_verify.dogrulama import verify_access_token, verify_id_token, verify_logout_token\nfrom oidc_verify.hatalar import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache",
+    "new": "from oidc_verify.errors import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache\nfrom oidc_verify.validation import verify_access_token, verify_id_token, verify_logout_token",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/__init__.py"
+    ]
+  },
+  {
+    "old": "from anahtarlar import ISSUER, LOGOUT_EVENT, Anahtar, SahteJwks, cikis_govdesi, erisim_govdesi, kimlik_govdesi",
+    "new": "from keys import ISSUER, LOGOUT_EVENT, Anahtar, FakeJwks, access_payload, identity_payload, logout_payload",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "from anahtarlar import ISSUER, LOGOUT_EVENT, Anahtar, SahteJwks, cikis_govdesi, erisim_govdesi, kimlik_govdesi\nfrom jwt.algorithms import RSAAlgorithm",
+    "new": "from jwt.algorithms import RSAAlgorithm\nfrom keys import ISSUER, LOGOUT_EVENT, Anahtar, FakeJwks, access_payload, identity_payload, logout_payload",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "self.assertEqual(self.error_code(self.identity, self.key.imzala(kimlik_govdesi(typ=1))), \"malformed\")",
+    "new": "self.assertEqual(\n            self.error_code(self.identity, self.key.imzala(identity_payload(typ=1))), \"malformed\"\n        )",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "self.assertEqual(self.error_code(self.logout, self.key.imzala(cikis_govdesi(jti=[\"j\"]))), \"malformed\")",
+    "new": "self.assertEqual(\n            self.error_code(self.logout, self.key.imzala(logout_payload(jti=[\"j\"]))), \"malformed\"\n        )",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "self.error_code(self.logout, self.key.imzala(cikis_govdesi(sid=None, sub=\"\"))), \"not_logout_token\"",
+    "new": "self.error_code(self.logout, self.key.imzala(logout_payload(sid=None, sub=\"\"))),\n            \"not_logout_token\",",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify",
+    "new": "from press_tr.press_identity.oidc import (\n\tcallback_url,\n\tclaim,\n\tclient_id,\n\tissuer,\n\treject,\n\tserver_endpoint,\n\tverify,\n)",
+    "type": "reference",
+    "paths": [
+      "backend/apps/press_tr/press_tr/api/auth.py"
+    ]
   }
 ]
