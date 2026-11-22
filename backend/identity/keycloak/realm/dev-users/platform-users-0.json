@@ -8,6 +8,7 @@
       "enabled": true,
       "firstName": "Ayşe",
       "lastName": "Örnek",
+      "realmRoles": ["default-roles-platform"],
       "credentials": [
         {
           "type": "password",
@@ -23,6 +24,7 @@
       "enabled": true,
       "firstName": "Mehmet",
       "lastName": "Örnek",
+      "realmRoles": ["default-roles-platform"],
       "credentials": [
         {
           "type": "password",
@@ -38,6 +40,7 @@
       "enabled": true,
       "firstName": "Doğrulanmamış",
       "lastName": "Örnek",
+      "realmRoles": ["default-roles-platform"],
       "credentials": [
         {
           "type": "password",
@@ -53,6 +56,7 @@
       "enabled": true,
       "firstName": "Totp",
       "lastName": "Örnek",
+      "realmRoles": ["default-roles-platform"],
       "credentials": [
         {
           "type": "password",

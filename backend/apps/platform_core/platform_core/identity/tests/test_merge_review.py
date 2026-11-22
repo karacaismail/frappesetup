@@ -174,6 +174,56 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(response.status_code, 403, response.data[:300])
 		self.assertEqual(h.logged_user(client), "Guest")
 
+	def test_sign_in_retries_a_stale_snapshot_and_refuses_the_disabled_account(self):
+		site = frappe.local.site
+		sign_in_locks = 0
+		deadlocks = 0
+		deletion_result = {}
+
+		def disable_in_separate_connection():
+			frappe.init(site=site)
+			try:
+				frappe.connect()
+				frappe.db.sql("SET SESSION innodb_lock_wait_timeout = 5")
+				frappe.set_user("Administrator")
+				record = anonymization.disable_step(h.ISSUER, FAKE_SUBJECT)
+				frappe.db.commit()
+				deletion_result["record"] = record
+			except Exception as error:
+				deletion_result["error"] = error
+				frappe.db.rollback()
+			finally:
+				frappe.destroy()
+
+		def lock_after_deletion(*args, **kwargs):
+			nonlocal sign_in_locks, deadlocks
+			if kwargs.get("require_key") is not False:
+				return _REAL_LOCK(*args, **kwargs)
+			sign_in_locks += 1
+			if sign_in_locks == 2:
+				# Establish the snapshot before the other connection commits the deletion step.
+				frappe.db.get_value(LINK, self.link.name, "user")
+				worker = threading.Thread(target=disable_in_separate_connection)
+				worker.start()
+				worker.join(timeout=30)
+				self.assertFalse(worker.is_alive(), "The deletion step did not finish before the second lock")
+				self.assertIsInstance(deletion_result.get("record"), dict, deletion_result)
+			try:
+				return _REAL_LOCK(*args, **kwargs)
+			except frappe.QueryDeadlockError:
+				deadlocks += 1
+				raise
+
+		client = h.new_client()
+		with patch.object(anonymization, "lock_identity", side_effect=lock_after_deletion):
+			response = h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
+		self.assertEqual(response.status_code, 403, response.data[:300])
+		self.assertEqual(deadlocks, 1)
+		self.assertEqual(sign_in_locks, 3)
+		self.assertEqual(h.logged_user(client), "Guest")
+		h.refresh()
+		self.assertEqual(h.session_count(FAKE_EMAIL), 0)
+
 	# --- E2 -----------------------------------------------------------------------------------------
 
 	def _assert_no_personal_data(self, response, token, since):

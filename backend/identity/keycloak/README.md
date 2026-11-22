@@ -143,6 +143,9 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 Üç eklenti imaja eklenir. Seçim gerekçesi `backend/docs/decisions/0003-keycloak-extensions.md` notundadır.
 
 - Olay dinleyiciyi `keycloak-webhook-listener` çatalı sağlar. Kaynak `event-listener/` klasöründedir. İmaj derlemesinde JUnit testleriyle derlenir. Olayları identity-sync servisine imzalı gönderir. Adres HTTPS olmalıdır. Düz HTTP yalnız `conf/webhook-plain-http-hosts.txt` listesindeki adrese izinlidir. Bu liste yalnız geliştirme imajına girer.
+- Hesap ekranı `account-deletion-link-provider` eklentisini kullanır. Keycloak imajı eklentiyi `themes/atonota/account-provider/build.sh` ile derler. Geliştirme örnekleri, yeni kullanıcılarla aynı varsayılan rolü alır.
+- İlk kurulumda Keycloak, yerleşik `account-console` istemcisine `roles` kapsamını ekler. Kapsam, hesap rollerini belirtece yazar.
+- Önceden kurulmuş `platform` alanında `account-console` istemcisini açın. “Client scopes” sekmesinde `roles` kapsamını “Default” olarak ekleyin. “Full scope allowed” ayarı kapalı kalsın.
 
 - Sihirli bağlantıyı `cloudflightio/keycloak-magic-link` eklentisi sağlar. Jar adı `keycloak-magic-link` olur. Eklenti imaj derlemesinde sabit bir commit'ten derlenir. Bağlantı akışın adımıdır. Tıklamadan sonra ikinci adım sorulur. Bağlantı yalnız isteyen tarayıcıda, 300 saniye ve tek kullanım geçerlidir. REST ucu ve çapraz cihaz yolu `conf/keycloak.conf` ayarıyla kapalıdır.
 - Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Jar adı `apple-identity-provider` olur. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.
