@@ -12,7 +12,7 @@ from frappe.app import application
 from jsonschema import Draft202012Validator
 from werkzeug.serving import make_server
 
-from platform_core.access.tests.base import DESK_ONLY, DOCTYPE, AccessRuleTestCase
+from platform_core.access.tests.base import ADMIN, DESK_ONLY, DOCTYPE, AccessRuleTestCase
 
 
 class TestGetAuthenticationContract(AccessRuleTestCase):
@@ -86,3 +86,29 @@ class TestGetAuthenticationContract(AccessRuleTestCase):
 						)
 					for name in self.records.values():
 						self.assertNotIn(name, json.dumps(payload))
+
+	def test_missing_document_type_is_denied_without_disclosing_existence(self):
+		# The access contract treats missing and unreadable document types alike.
+		for user in (DESK_ONLY, ADMIN):
+			sid = self.login(user).get_cookie("sid").value
+			for doctype in ("", "Access Contract Missing DocType"):
+				self.assertFalse(frappe.db.exists("DocType", doctype))
+				for path, query in (
+					("/platform_core.api.access.get_access_summary", {}),
+					("/platform_core.api.access.explain_permission", {"name": "missing-record"}),
+					("/platform_core.access.link_search.search_link", {"txt": ""}),
+					("/platform_core.access.link_search.search_widget", {"txt": ""}),
+					(
+						"/platform_core.access.link_search.validate_link_and_fetch",
+						{"docname": "missing-record"},
+					),
+				):
+					with self.subTest(user=user, doctype=doctype, path=path):
+						status, content_type, payload = self.request_get(
+							path, {"doctype": doctype, **query}, sid
+						)
+						self.assertEqual(status, 403)
+						self.assertEqual(content_type, "application/json")
+						self.assertEqual(payload["exc_type"], "PermissionError")
+						self.assertIn("403", self.contract["paths"][path]["get"]["responses"])
+						self.assertNotIn("DoesNotExistError", json.dumps(payload))

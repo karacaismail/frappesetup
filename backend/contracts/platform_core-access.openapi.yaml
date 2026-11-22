@@ -52,7 +52,7 @@ paths:
         This role sees the rules one by one. It gets 404 when the record does not exist.
 
         The endpoint first checks the caller's read permission on the document type. It returns 403 when there is no permission.
-        It also returns 403 when the document type does not exist.
+        It also returns 403 when the document type is empty or does not exist.
 
         In a denial response to an ordinary user, `layers.access_rule` and `layers.share`
         return false. These two values return with their real state only to the “System Manager” role.
@@ -145,7 +145,7 @@ paths:
         When the document type is governed, an empty list shows that there is no access for that operation.
 
         The endpoint returns 403 when the user has no read permission on the document type.
-        It also returns 403 when the document type does not exist. This way the endpoint does not reveal that a type exists.
+        It also returns 403 when the document type is empty or does not exist. This way the endpoint does not reveal that a type exists.
       security:
         - frappeSession: []
       parameters:
@@ -427,8 +427,8 @@ paths:
           $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
-            Guest request, no `select` or `read` permission on the document type, or a custom
-            search function that is not allowed on a governed document type.
+            Guest request, an empty or missing document type, no `select` or `read` permission
+            on the document type, or a custom search function that is not allowed on a governed document type.
         "417":
           description: Invalid input.
 
@@ -539,8 +539,8 @@ paths:
           $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
-            Guest request, no `select` or `read` permission on the document type, or a custom
-            search function that is not allowed on a governed document type.
+            Guest request, an empty or missing document type, no `select` or `read` permission
+            on the document type, or a custom search function that is not allowed on a governed document type.
         "417":
           description: Invalid input.
 
@@ -604,8 +604,8 @@ paths:
           $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
-            Guest request, no `select` or `read` permission on the document type, or a custom
-            search function on a governed document type.
+            Guest request, an empty or missing document type, no `select` or `read` permission
+            on the document type, or a custom search function on a governed document type.
         "417":
           description: Invalid input.
 
