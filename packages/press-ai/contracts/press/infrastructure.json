@@ -287,7 +287,7 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
           "Doğru sunucuda df -h, df -i, docker system df okumalarını al.",
           "Sonuçları build kimliği ve zamanla birlikte aktar."
@@ -386,7 +386,7 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
           "Yalnız build cache için açık onay al.",
           "docker builder prune --all --force çalıştır; çıkış kodunu kaydet.",
@@ -473,7 +473,7 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
           "Yalnız gereken süreci (boşta build worker'ları veya Press web) yeniden başlat; Redis ve müşteri bench'lerine dokunma.",
           "Etki ve geri dönüş planını önceden yaz."
@@ -543,7 +543,7 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
           "Hesap, bölge ve namespace eşleşmesini secret yazdırmadan kontrol et.",
           "describe_repository; yalnız RepositoryNotFoundException ise depoyu oluştur.",
@@ -637,17 +637,17 @@
       "title": "Site/sunucu için DNS kaydı (GoDaddy)",
       "kind": "external",
       "status": "unsupported",
-      "status_reason": "DNS Press dışındadır; GoDaddy hesabı alan adı sorumlusunda, teknik gereksinim ve doğrulama DevOps sorumlusundadır.",
+      "status_reason": "DNS Press dışındadır; GoDaddy hesabı Asistan Hüseyin'de, teknik gereksinim ve doğrulama Hüseyin Cengiz'dedir.",
       "authority": [
         "dns_owner"
       ],
       "owner_handoff": {
         "role": "dns_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
-          "DevOps sorumlusu kayıt türü/adı/değerini hazırlar.",
-          "Alan adı sorumlusu GoDaddy'de uygular.",
-          "DevOps sorumlusu HTTPS ve sertifika sonucunu doğrular."
+          "Hüseyin Cengiz kayıt türü/adı/değerini hazırlar.",
+          "Asistan Hüseyin GoDaddy'de uygular.",
+          "Hüseyin Cengiz HTTPS ve sertifika sonucunu doğrular."
         ],
         "acceptance": "Kayıt yayıldı; site.https_check TLS doğrulamalı başarılı."
       },
@@ -801,7 +801,7 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
           "Özgün dosyanın yedeğini ve SHA'sını al.",
           "Önce başarısız regresyon testi, sonra hedefli düzeltme; bağımsız inceleme.",

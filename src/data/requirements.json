@@ -7,17 +7,17 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-2",
   "title": "Root Domain, Route 53 ve NS delegasyonu",
-  "detail": "Kiracı kök alanı `app.<marka>.com.tr`'dir; kiracı siteleri `<kiracı>.app.<marka>.com.tr` adresini alır (alt bölge delegasyonu kardeş host'ları kapsamaz; `panel.`, `press.`, `operator.`, `id.`, `ops.`, `agent.` GoDaddy'deki ana bölgede kalır). Bu alan için Press Root Domain kaydı dns_provider='AWS Route 53' ile açılır; DevOps sorumlusu hosted zone ve IAM politikasını hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını Route 53'e delege eder, DevOps sorumlusu wildcard sertifikanın alındığını doğrular. Press wildcard TLS için yalnızca certbot `--dns-route53` çağırır (doğrulandı).",
+  "detail": "Kiracı kök alanı `app.<marka>.com.tr`'dir; kiracı siteleri `<kiracı>.app.<marka>.com.tr` adresini alır (alt bölge delegasyonu kardeş host'ları kapsamaz; `panel.`, `press.`, `operator.`, `id.`, `ops.`, `agent.` GoDaddy'deki ana bölgede kalır). Bu alan için Press Root Domain kaydı dns_provider='AWS Route 53' ile açılır; Hüseyin Cengiz hosted zone ve IAM politikasını hazırlar, Asistan Hüseyin GoDaddy'de NS kayıtlarını Route 53'e delege eder, Hüseyin Cengiz wildcard sertifikanın alındığını doğrular. Press wildcard TLS için yalnızca certbot `--dns-route53` çağırır (doğrulandı).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "Alan adı sorumlusu (GoDaddy NS), DevOps sorumlusu (Route 53/IAM)"
+  "owner": "Asistan Hüseyin (GoDaddy NS), Hüseyin Cengiz (Route 53/IAM)"
  },
  {
   "id": "G-3",
@@ -27,7 +27,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-4",
@@ -37,7 +37,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-5",
@@ -47,7 +47,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "develop",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-6",
@@ -57,7 +57,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "native",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-7",
@@ -327,7 +327,7 @@
   "priority": "MAY",
   "phase": "P5",
   "source": "native",
-  "owner": "DevOps sorumlusu (migration/upgrade runbook)"
+  "owner": "Hüseyin Cengiz (migration/upgrade runbook)"
  },
  {
   "id": "G-34",
@@ -337,7 +337,7 @@
   "priority": "SHOULD",
   "phase": "P2",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-35",
@@ -357,7 +357,7 @@
   "priority": "SHOULD",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-37",
@@ -367,7 +367,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-38",
@@ -467,7 +467,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "configure",
-  "owner": "DevOps sorumlusu (SMTP relay, DNS kayıt değerleri; alan adı sorumlusu GoDaddy'de uygular)"
+  "owner": "Hüseyin Cengiz (SMTP relay, DNS kayıt değerleri; Asistan Hüseyin GoDaddy'de uygular)"
  },
  {
   "id": "G-48",
@@ -487,7 +487,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-50",
@@ -497,7 +497,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-51",
@@ -537,7 +537,7 @@
   "priority": "SHOULD",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-55",
@@ -547,7 +547,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-56",
@@ -572,7 +572,7 @@
  {
   "id": "G-58",
   "title": "Keycloak tekli oturum kapatma (RP-initiated + back-channel)",
-  "detail": "Frappe oauth2_logins yalnızca login_via_* içerir, logout yoktur (doğrulandı). platform_core: `on_session_creation` ile id_token saklanır; `on_logout` Keycloak `/protocol/openid-connect/logout?id_token_hint&post_logout_redirect_uri` yönlendirmesi; `allow_guest` whitelisted `platform_core.api.keycloak_backchannel_logout` logout_token JWT'sini realm JWKS ile doğrular ve `frappe.sessions.clear_sessions(user, force=True)` çağırır; Keycloak client'ta Backchannel logout URL ve 'session required' açık. Kabul: panel çıkışı sonrası Keycloak account console oturum göstermez; Keycloak 'Sign out all sessions' sonrası Frappe `frappe.auth.get_logged_user` 60 sn içinde 401. press_tr aynı mekanizmayı Press için uygular. `ops-bff` de back-channel logout alır: `logout_token` ya da yenileme hatasında BFF oturumu ile elindeki Keycloak ve değiştirilmiş belirteçler hemen düşer, Press anahtarı o oturumda kullanılmaz; kabul: çıkıştan 60 sn içinde BFF çağrısı 401; staging'de Keycloak düğümünden `operator.` back-channel logout yoluna erişim (Tailscale ACL Keycloak düğümlerinden yalnız `operator.` HTTPS servisine izin verir, yol kısıtı ters vekil/BFF yol izin listesindedir; ağ sahibi DevOps sorumlusu).",
+  "detail": "Frappe oauth2_logins yalnızca login_via_* içerir, logout yoktur (doğrulandı). platform_core: `on_session_creation` ile id_token saklanır; `on_logout` Keycloak `/protocol/openid-connect/logout?id_token_hint&post_logout_redirect_uri` yönlendirmesi; `allow_guest` whitelisted `platform_core.api.keycloak_backchannel_logout` logout_token JWT'sini realm JWKS ile doğrular ve `frappe.sessions.clear_sessions(user, force=True)` çağırır; Keycloak client'ta Backchannel logout URL ve 'session required' açık. Kabul: panel çıkışı sonrası Keycloak account console oturum göstermez; Keycloak 'Sign out all sessions' sonrası Frappe `frappe.auth.get_logged_user` 60 sn içinde 401. press_tr aynı mekanizmayı Press için uygular. `ops-bff` de back-channel logout alır: `logout_token` ya da yenileme hatasında BFF oturumu ile elindeki Keycloak ve değiştirilmiş belirteçler hemen düşer, Press anahtarı o oturumda kullanılmaz; kabul: çıkıştan 60 sn içinde BFF çağrısı 401; staging'de Keycloak düğümünden `operator.` back-channel logout yoluna erişim (Tailscale ACL Keycloak düğümlerinden yalnız `operator.` HTTPS servisine izin verir, yol kısıtı ters vekil/BFF yol izin listesindedir; ağ sahibi Hüseyin Cengiz).",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -757,7 +757,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-77",
@@ -827,7 +827,7 @@
   "priority": "MUST",
   "phase": "P3",
   "source": "develop",
-  "owner": "DevOps sorumlusu (konteyner, DB, TLS, ağ)"
+  "owner": "Hüseyin Cengiz (konteyner, DB, TLS, ağ)"
  },
  {
   "id": "G-84",
@@ -1097,7 +1097,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-111",
@@ -1107,7 +1107,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-112",
@@ -1117,7 +1117,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-113",
@@ -1127,7 +1127,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-114",
@@ -1137,7 +1137,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-115",
@@ -1147,7 +1147,7 @@
   "priority": "MUST",
   "phase": "P2",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "G-116",
@@ -1167,7 +1167,7 @@
   "priority": "MUST",
   "phase": "P2",
   "source": "configure",
-  "owner": "DevOps sorumlusu (log saklama/ILM)"
+  "owner": "Hüseyin Cengiz (log saklama/ILM)"
  },
  {
   "id": "G-118",
@@ -1187,7 +1187,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Platform ekibi + DevOps sorumlusu (nginx/CORS yapılandırması)"
+  "owner": "Platform ekibi + Hüseyin Cengiz (nginx/CORS yapılandırması)"
  },
  {
   "id": "G-120",
@@ -1237,7 +1237,7 @@
   "priority": "MUST",
   "phase": "P2",
   "source": "develop",
-  "owner": "Platform ekibi; TLS DevOps sorumlusu"
+  "owner": "Platform ekibi; TLS Hüseyin Cengiz"
  },
  {
   "id": "G-125",
@@ -1357,7 +1357,7 @@
   "priority": "MUST",
   "phase": "P6",
   "source": "integrate",
-  "owner": "DevOps sorumlusu (kurulum) + Platform ekibi + Finans/Muhasebe"
+  "owner": "Hüseyin Cengiz (kurulum) + Platform ekibi + Finans/Muhasebe"
  },
  {
   "id": "G-137",
@@ -1417,7 +1417,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu + Platform ekibi"
+  "owner": "Hüseyin Cengiz + Platform ekibi"
  },
  {
   "id": "G-143",
@@ -1427,7 +1427,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Platform ekibi + DevOps sorumlusu (nginx)"
+  "owner": "Platform ekibi + Hüseyin Cengiz (nginx)"
  },
  {
   "id": "G-144",
@@ -1437,7 +1437,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu + Platform ekibi"
+  "owner": "Hüseyin Cengiz + Platform ekibi"
  },
  {
   "id": "G-145",
@@ -1447,7 +1447,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Frontend ekibi + DevOps sorumlusu (başlıklar)"
+  "owner": "Frontend ekibi + Hüseyin Cengiz (başlıklar)"
  },
  {
   "id": "G-146",
@@ -1457,7 +1457,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Platform ekibi + DevOps sorumlusu"
+  "owner": "Platform ekibi + Hüseyin Cengiz"
  },
  {
   "id": "G-147",
@@ -1467,7 +1467,7 @@
   "priority": "SHOULD",
   "phase": "P5",
   "source": "configure",
-  "owner": "DevOps sorumlusu + Ürün sahibi"
+  "owner": "Hüseyin Cengiz + Ürün sahibi"
  },
  {
   "id": "G-148",
@@ -1487,7 +1487,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Platform ekibi + Frontend ekibi + DevOps sorumlusu"
+  "owner": "Platform ekibi + Frontend ekibi + Hüseyin Cengiz"
  },
  {
   "id": "G-150",
@@ -1507,7 +1507,7 @@
   "priority": "MUST",
   "phase": "P0",
   "source": "configure",
-  "owner": "DevOps sorumlusu + Ürün sahibi"
+  "owner": "Hüseyin Cengiz + Ürün sahibi"
  },
  {
   "id": "G-152",
@@ -1517,7 +1517,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Platform ekibi + DevOps sorumlusu"
+  "owner": "Platform ekibi + Hüseyin Cengiz"
  },
  {
   "id": "G-153",
@@ -1547,7 +1547,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "integrate",
-  "owner": "Platform ekibi (backend) + DevOps sorumlusu (secret yönetimi)"
+  "owner": "Platform ekibi (backend) + Hüseyin Cengiz (secret yönetimi)"
  },
  {
   "id": "SA-2",
@@ -1657,7 +1657,7 @@
   "priority": "MUST",
   "phase": "P2",
   "source": "configure",
-  "owner": "DevOps sorumlusu"
+  "owner": "Hüseyin Cengiz"
  },
  {
   "id": "SA-13",
@@ -1702,12 +1702,12 @@
  {
   "id": "SA-17",
   "title": "Operasyon sitesinin Press tarafından dağıtımı",
-  "detail": "Sahibin kendi Team'inde ayrı Release Group 'ops' ile ERPNext v16.50 sitesi kurulur. P2 finans çekirdeği: erpnext@version-16, platform core, `press_tr_finance` (create-fc-invoice alıcısı, e-belge köprüsü); P6'da aynı gruba crm@main (frappe >=15,<17), helpdesk@main (frappe >=15.116.1,<17) + telephony eklenir. DevOps sorumlusu bench/server ve günlük yedek + offsite kopya (RPO/RTO belgelenir); alan adı sorumlusu ops.<domain> DNS kaydını GoDaddy'de uygular; DevOps sorumlusu TLS ve site erişimini doğrular.",
+  "detail": "Sahibin kendi Team'inde ayrı Release Group 'ops' ile ERPNext v16.50 sitesi kurulur. P2 finans çekirdeği: erpnext@version-16, platform core, `press_tr_finance` (create-fc-invoice alıcısı, e-belge köprüsü); P6'da aynı gruba crm@main (frappe >=15,<17), helpdesk@main (frappe >=15.116.1,<17) + telephony eklenir. Hüseyin Cengiz bench/server ve günlük yedek + offsite kopya (RPO/RTO belgelenir); Asistan Hüseyin ops.<domain> DNS kaydını GoDaddy'de uygular; Hüseyin Cengiz TLS ve site erişimini doğrular.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
   "source": "configure",
-  "owner": "DevOps sorumlusu (server/bench) + alan adı sorumlusu (DNS) + Platform ekibi (apps)"
+  "owner": "Hüseyin Cengiz (server/bench) + Asistan Hüseyin (DNS) + Platform ekibi (apps)"
  },
  {
   "id": "SA-18",
@@ -1827,7 +1827,7 @@
   "priority": "MUST",
   "phase": "P6",
   "source": "integrate",
-  "owner": "DevOps sorumlusu (deploy) + Frontend ekibi (Yjs/awareness UI)"
+  "owner": "Hüseyin Cengiz (deploy) + Frontend ekibi (Yjs/awareness UI)"
  },
  {
   "id": "SA-30",
@@ -1922,12 +1922,12 @@
  {
   "id": "SA-39",
   "title": "Press MCP'nin operasyon için sınırlı etkinleştirilmesi",
-  "detail": "Press Settings.enable_mcp yalnız System Manager ops-admin hesapları ve DevOps sorumlusu için açılır; MCP doküman allow-list'i infra doctype'larıyla sınırlı kaldığı için ticari doctype'lar (Team, Invoice, Balance Transaction) ancak redaction guardrail'i genişletildikten sonra salt okunur araç olarak eklenir.",
+  "detail": "Press Settings.enable_mcp yalnız System Manager ops-admin hesapları ve Hüseyin Cengiz için açılır; MCP doküman allow-list'i infra doctype'larıyla sınırlı kaldığı için ticari doctype'lar (Team, Invoice, Balance Transaction) ancak redaction guardrail'i genişletildikten sonra salt okunur araç olarak eklenir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MAY",
   "phase": "P3",
   "source": "develop",
-  "owner": "AI ekibi + DevOps sorumlusu"
+  "owner": "AI ekibi + Hüseyin Cengiz"
  },
  {
   "id": "SA-40",
@@ -1937,7 +1937,7 @@
   "priority": "MUST",
   "phase": "P1",
   "source": "develop",
-  "owner": "Platform ekibi + Frontend ekibi; staging Hocuspocus DevOps sorumlusu"
+  "owner": "Platform ekibi + Frontend ekibi; staging Hocuspocus Hüseyin Cengiz"
  },
  {
   "id": "SA-41",
@@ -1957,7 +1957,7 @@
   "priority": "MUST",
   "phase": "P6",
   "source": "develop",
-  "owner": "Platform ekibi + Frontend ekibi; Hocuspocus DevOps sorumlusu"
+  "owner": "Platform ekibi + Frontend ekibi; Hocuspocus Hüseyin Cengiz"
  },
  {
   "id": "SA-43",

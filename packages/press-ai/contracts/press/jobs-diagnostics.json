@@ -972,7 +972,7 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "DevOps sorumlusu",
+        "person": "Hüseyin Cengiz",
         "steps": [
           "Doğru uygulama sunucusunda Nginx error.log satırlarını build kimliği ve /agent/builder/upload ile eşleştir (UTC ↔ TSİ +3).",
           "redis-cli INFO persistence ile yazım durumunu oku.",

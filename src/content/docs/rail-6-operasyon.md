@@ -25,7 +25,7 @@ order: 9
 | Temsil (impersonation) | Press + tenant sitesi | Ayrı kapsam ve rıza: belirli kullanıcının rızasıyla `user.impersonate` veya kapsamı daraltılmış destek kullanıcısı; Administrator yalnız ayrı yükseltme rızasıyla (SA-44, K-19) |
 | Co-browsing / uzaktan yardım | Tenant sitesi + Hocuspocus | Paylaşılan ekran durumu (rota, filtre, kaydırma, seçim, maskeli satır özeti, form taslağı) + imleç/presence; kontrol önerileri müşteri onayıyla, müşterinin oturumunda çalışır (SA-42..SA-44) |
 | Operatör kimliği | Keycloak → Press + ops sitesi | Operatör realm rolleri → Press System User hesapları + ops sitesi rolleri; operatör başına API key |
-| Infra ve AI destekli operasyon | Press Desk + Press MCP | `enable_mcp`, System Manager; yalnız ops-admin ve DevOps sorumlusu |
+| Infra ve AI destekli operasyon | Press Desk + Press MCP | `enable_mcp`, System Manager; yalnız ops-admin ve Hüseyin Cengiz |
 
 ## Superadmin paneli (operatör modu)
 
@@ -83,7 +83,7 @@ Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi y
 - **İptal:** Revoke veya süre dolumu Hocuspocus bağlantılarını sunucudan kapatır, yeniden kimlik doğrulamayı reddeder, temsil oturumunu sonlandırır, bekleyen önerileri düşürür ve biletleri iptal listesine alır. Kabul: 2 sn içinde WebSocket kapanır, temsil oturumundaki API çağrısı 401/403.
 - **Maskeleme:** permlevel ile gizli alanlar, uygulamanın `support_mask_fields` listesi ve kişisel veri sınıfları (TCKN, IBAN, kart, maaş) ağa hiç çıkmaz.
 
-**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: DevOps sorumlusu): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin (`platform_core`) bastığı tek kullanımlık bileti (G-148), aktif Support Session'ı ve kapsamı doğrular. Biletleri tek yayıncı basar: müşteri kendi site oturumuyla, operatör ise operatör BFF'inin (`ops-bff`) kendi belirtecinden token exchange ile aldığı `aud=site-<kiracı>` belirteciyle (`sub` = operatör; G-59, G-82) aynı siteden alır; operatörün kiracı API oturumu yoktur; Origin denetimi bilet türüne bağlıdır: müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden, operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok; G-119); oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
+**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: Hüseyin Cengiz): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin (`platform_core`) bastığı tek kullanımlık bileti (G-148), aktif Support Session'ı ve kapsamı doğrular. Biletleri tek yayıncı basar: müşteri kendi site oturumuyla, operatör ise operatör BFF'inin (`ops-bff`) kendi belirtecinden token exchange ile aldığı `aud=site-<kiracı>` belirteciyle (`sub` = operatör; G-59, G-82) aynı siteden alır; operatörün kiracı API oturumu yoktur; Origin denetimi bilet türüne bağlıdır: müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden, operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok; G-119); oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
 
 ```mermaid
 sequenceDiagram

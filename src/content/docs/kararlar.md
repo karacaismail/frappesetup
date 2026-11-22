@@ -10,7 +10,7 @@ Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine ku
 | --- | --- | --- | --- |
 | K1 | Kontrol düzlemi: **Press v0.154.x** (`master` dalı, semantic-release) + **Frappe v15** + Python 3.11 | Press'in test edildiği ve Ansible dahil tüm işlevlerinin çalıştığı hat; v15 güvenlik yamaları sürüyor (v15.122.0, 6 Ekim 2026) | Press kendi sunucusunda/VM'inde çalışır; müşteri sitelerinin sürümünden bağımsızdır |
 | K2 | Müşteri siteleri: **ERPNext v16.50 + Frappe v16**, müşteri başına bir Frappe sitesi | En güncel kararlı ürün hattı; Press v16 siteleri yönetiyor | Siteler Press'in kurduğu Docker bench'lerinde çalışır (n/f/m sunucuları) |
-| K3 | Altyapı: **Hetzner bare-metal, self-host** | Maliyet ve veri egemenliği; KVKK için AB içi veri yerleşimi | Press'in ihtiyaç duyduğu tüm sunucu rolleri Hetzner'de kurulur; sahibi DevOps sorumlusu |
+| K3 | Altyapı: **Hetzner bare-metal, self-host** | Maliyet ve veri egemenliği; KVKK için AB içi veri yerleşimi | Press'in ihtiyaç duyduğu tüm sunucu rolleri Hetzner'de kurulur; sahibi Hüseyin Cengiz |
 | K4 | Frontend: **%100 headless React SPA**; **Ant Design** tek tasarım sistemi; **`@ant-design/x`** AI arayüzlerinde birinci sınıf; **TanStack** (Query, Router, Table) | Tek görsel dil, AI-first bileşenler hazır, veri katmanı olgun | Tasarım kimliği AntD token'larının üstündeki semantik token katmanında kurulur |
 | K5 | Frontend **metadata-driven** çalışır; DocType meta'sı çalışma zamanında API'den okunur | Doctype değişikliği frontend'e otomatik yansımalı; tenant'a özel Custom Field'lar siteden siteye farklı meta üretir | Alan tipi → bileşen eşleme motoru + doctype bazlı açık override mekanizması |
 | K6 | Sidebar ve navigasyon **Workspace + kurulu app + izin** verisinden türetilir | Modül etkinleşince sidebar kendiliğinden güncellenmeli | Hiçbir menü elle kodlanmaz |
@@ -32,7 +32,7 @@ K3 notu: Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek b
 | Kişi | Sorumluluk |
 | --- | --- |
 | Ürün sahibi | Mimari ve ürün kararları, bu dokümandaki açık kararların kapatılması |
-| DevOps sorumlusu (kıdemli DevOps mühendisi) | Hetzner sunucuları, Press kurulumu, Keycloak, CI/CD, deploy ve rollback |
-| Alan adı sorumlusu | GoDaddy hesabı, domain ve DNS değişiklikleri (teknik gereksinimi DevOps sorumlusu hazırlar) |
+| Hüseyin Cengiz (kıdemli DevOps) | Hetzner sunucuları, Press kurulumu, Keycloak, CI/CD, deploy ve rollback |
+| Asistan Hüseyin | GoDaddy hesabı, domain ve DNS değişiklikleri (teknik gereksinimi Hüseyin Cengiz hazırlar) |
 | Finans/Muhasebe ve mali müşavir | Vergi ve belge zamanlaması, finans olay–belge matrisi (K-13, SA-41) |
 | Hukuk | KVKK, rıza ve aktarım mekanizması, lisans değerlendirmesi (K-1, K-27, K-28) |

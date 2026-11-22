@@ -137,4 +137,4 @@ Durumlar: pass, fail, not\_run. Her satır kontrolün koşulduğu commit'i yazar
 | Dar ekran + büyük kök yazı (kabul matrisi dışı) | 320 ve 360 px'te %200 kök yazıda ana sayfa eylem düğmesi etiketi kahraman kutusunda kırpılır; kabul profilleri (%125 320 px, %200 390 ve 1366 px) etkilenmez | Etiket tam görünür, belge taşmaz | Depo sahibi |
 | Gerçek cihaz doğrulaması | WebKit ve iPhone 13 emülasyondur | Gerçek macOS/iOS Safari ve Android'de odak, dokunma, kaydırma ve tema senaryoları `pass/fail` kaydıyla | Depo sahibi |
 | Görsel referans kapsamı | Referanslar yedi görünüm içindir; mobil gezinme çekmecesi ve Teslim grubu gezinmesi görüntüde yok (davranış testleri var) | Gerekirse ek referans, bağımsız onayla | Depo sahibi |
-| Action güncellemeleri | Action'lar commit SHA'sına sabittir; otomatik güncelleme işi kurulmadı (zamanlanmış iş kurma kararı kullanıcıdadır) | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | DevOps sorumlusu |
+| Action güncellemeleri | Action'lar commit SHA'sına sabittir; otomatik güncelleme işi kurulmadı (zamanlanmış iş kurma kararı kullanıcıdadır) | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | Hüseyin Cengiz |

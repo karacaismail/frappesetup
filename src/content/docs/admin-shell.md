@@ -24,7 +24,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 | --- | --- | --- | --- |
 | Keycloak SSO girişi; her site kendi OIDC dönüşüyle (kod sunucuda), tarayıcıya belirteç verilmez (K-25) | Social Login Key provider 'Keycloak' (Press v15, kiracı v16) | configure | G-12, G-44, G-77 |
 | Tekli çıkış: RP-initiated + back-channel | `on_logout`, `keycloak_backchannel_logout`; press\_tr aynı mekanizma | develop (platform\_core, press\_tr) | G-58 |
-| Host'a bağlı oturum çerezi, CSRF token enjeksiyonu; CORS yok (G-119) | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (DevOps sorumlusu) | develop + configure | G-13, G-45, G-75 |
+| Host'a bağlı oturum çerezi, CSRF token enjeksiyonu; CORS yok (G-119) | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (Hüseyin Cengiz) | develop + configure | G-13, G-45, G-75 |
 | Profil (ad, avatar, dil, saat dilimi); parola/MFA/passkey/oturumlar Keycloak Account Console'a markalı yönlendirme (doğrulanacak: v3 tema desteği) | Frappe User, Keycloak Account Console | native | G-78, G-99 |
 | "Hesabımı sil" → KVKK talebi | Personal Data Deletion Request, Team Deletion Request | native | G-52, G-116 |
 
@@ -57,7 +57,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
 | System Settings güvenli alt kümesi (dil, saat dilimi, biçimler, oturum süresi), uygulama ayar doctype'ları meta-driven form | System Settings whitelisted sarmalayıcı | develop (platform\_core) | G-41, G-97 |
-| Kiracı e-posta domaini/hesabı (relay: DevOps sorumlusu; DNS kayıtları GoDaddy'de: alan adı sorumlusu) | Email Domain, Email Account | configure | G-47 |
+| Kiracı e-posta domaini/hesabı (relay: Hüseyin Cengiz; DNS kayıtları GoDaddy'de: Asistan Hüseyin) | Email Domain, Email Account | configure | G-47 |
 | Tenant Branding (logo, birincil renk) token katmanında | Tenant Branding doctype → AntD ConfigProvider | develop (platform\_core, `@platform/design-tokens`) | G-67, G-97 |
 | Alan ekleme/gizleme/yeniden adlandırma, Workspace düzenleme | Customize Form, Custom Field, Property Setter, Custom Workspace | native (API) + develop (UI) | G-40, G-97 |
 | Veri içe/dışa aktarma, göç şablonları | Data Import, `reportview.export_query` | native | G-97, X-15 |

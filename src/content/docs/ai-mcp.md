@@ -8,7 +8,7 @@ Bu sayfa iki kararı verir: hangi hazır MCP sunucusu neye kullanılır ve paket
 
 ## Kararlar
 
-- **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır; açmadan önce etkisini DevOps sorumlusu inceler.
+- **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır; açmadan önce etkisini Hüseyin Cengiz inceler.
 - **Press kurulum ve dağıtımı:** hazır sunucu yok; paketin `press-ai` sunucusu yazılır (taslak).
 - **Site içi veri araçları:** kullanıcı kimliğiyle çalışan ve yazmayı kodda onaylayan model (vyogotech) ya da `frappe/mcp` çatısıyla yazılan araçlar (G-84). Paylaşılan anahtarlı proxy'ler kullanılmaz.
 - **Ağa açılmaz:** kimliksiz uç açan ya da keyfi komut çalıştıran sunucular.
@@ -56,4 +56,4 @@ Kurulum ve onay komutları [geliştirme planındadır](/frappesetup/ai-gelistirm
 | Site oluşturma | yok | `site_create` (yerel bench) | var, onaysız | insanda (plan, bölge, yasal kutu) |
 | Siteye app, migrate, yedek | işletim araçları (`restart_bench` gibi) | `app_install`, `migrate`, `backup_create` | var, onaysız | öneri ve insan onayı |
 | Teşhis (log, telemetri, disk) | güçlü | sınırlı | yok | build adımları, Error Log, Agent Job; sunucu logu yok |
-| SSH, disk temizliği, DNS | bazı komutlar `confirm` ile | SSH | yok | devir (DevOps sorumlusu, alan adı sorumlusu) |
+| SSH, disk temizliği, DNS | bazı komutlar `confirm` ile | SSH | yok | devir (Hüseyin Cengiz, Asistan Hüseyin) |

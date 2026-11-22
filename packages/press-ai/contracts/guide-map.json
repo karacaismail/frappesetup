@@ -23,7 +23,7 @@
         "release_group.add_server",
         "server.get"
       ],
-      "note": "Sunucu hazırlığı DevOps sorumlusunda; Add Row sunucu kurmaz."
+      "note": "Sunucu hazırlığı Hüseyin Cengiz'de; Add Row sunucu kurmaz."
     },
     {
       "id": "apps",
@@ -524,7 +524,7 @@
         "registry.repository_check",
         "deploy.status"
       ],
-      "note": "Adım adım teşhis zinciri; SSH ölçümleri, temizlik ve registry işleri DevOps sorumlusuna devredilir."
+      "note": "Adım adım teşhis zinciri; SSH ölçümleri, temizlik ve registry işleri Hüseyin Cengiz'e devredilir."
     },
     {
       "id": "live-agent-jobs",

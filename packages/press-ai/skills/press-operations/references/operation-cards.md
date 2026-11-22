@@ -64,7 +64,7 @@ ya da sonucu yazılmamış tüketilmiş öneri) insan onay CLI'sindeki `resolve`
   `deploy_candidate.no_active_build`, `proposal.no_unknown_outcome`.
 - İzleme: Draft, Scheduled, Pending, Preparing, Running ara durumdur; terminal Success veya Failure.
 - Başarı: Status Success ve son adım Upload Docker Image dahil tüm Build Steps Success.
-- Hata: ilk Failure satırı → press-build-triage. Uzun Preparing → kanıtla DevOps sorumlusuna devir; yeni build açılmaz.
+- Hata: ilk Failure satırı → press-build-triage. Uzun Preparing → kanıtla Hüseyin Cengiz'e devir; yeni build açılmaz.
 - Zaman aşımı: `unknown`; ikinci build yok.
 - Geri alma: build çalışan bench'leri değiştirmez; geri alınacak durum yoktur.
 
@@ -84,7 +84,7 @@ ya da sonucu yazılmamış tüketilmiş öneri) insan onay CLI'sindeki `resolve`
 - Başarı: Deploy kaydı; grubun her beklenen sunucusunda Deploy Bench, New Bench Queue ve Bench zinciri izlenir: yeni bench
   Installing'den Active'e geçer ve New Bench işi Success (`bench.list`, `agent_job.list`). Bench'in build'i onaylanan
   build'den farklıysa sonuç `failed`. Yalnız var olan bench'lere bakılarak başarı verilmez. HTTP yanıtı başarı değildir.
-- Hata: bench Broken ya da New Bench Failure → iş adımları ve kimliklerle DevOps sorumlusuna devir.
+- Hata: bench Broken ya da New Bench Failure → iş adımları ve kimliklerle Hüseyin Cengiz'e devir.
 - Zaman aşımı: `unknown`; ikinci deploy yok (Press tekilleştirmesi güvenilir değil).
 - Geri alma: eski bench çalışmaya devam eder. Kendiliğinden güncellenen siteler için geri dönüş yedekten geri yüklemedir
   (insan kararı). Yeni bench'i arşivlemek, siteleri taşımak ya da geri taşımak insan ve altyapı kararıdır; bu paket yapmaz.
@@ -124,7 +124,7 @@ ya da sonucu yazılmamış tüketilmiş öneri) insan onay CLI'sindeki `resolve`
 | İşlem | Neden | Ne yapılır |
 | --- | --- | --- |
 | `app.create`, `app_source.create` | Statü kontrattan; kimlik kararı insanda | Alan kontrol listesi: App adı paket adıyla aynı; repo, branch, Versions, Team; Frappe kutusu yalnız framework |
-| `release_group.add_server` | Sunucu hazırlığı | DevOps sorumlusu |
+| `release_group.add_server` | Sunucu hazırlığı | Hüseyin Cengiz |
 | `build_and_deploy.schedule` | Build ile deploy'u birleştirir | Kullanılmaz |
 | `site.create`, `site.legal_acceptance`, `payment.method`, `site.setup_wizard` | Hesap ve site sahibi | Grubun kendi Sites sayfasından insan; kişisel alanları sahibi girer |
 | `site.update` | Statü kontrattan | Otomatik güncellemesi açık sitelerde Press deploy sonrası kendiliğinden açar; elle güncelleme insan Dashboard'dan, öncesinde yedek |

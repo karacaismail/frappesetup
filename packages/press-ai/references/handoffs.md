@@ -7,8 +7,8 @@ insan iletir. Hiçbir devir mesajı otomatik gönderilmez. Erişim bilgisine sah
 
 | Rol | Kişi | İşler | Kontrat işlemleri |
 | --- | --- | --- | --- |
-| `infrastructure_owner` | DevOps sorumlusu | Sunucu hazırlığı ve gruba bağlama, disk ölçümü, onaylı build cache temizliği, registry deposu, ajan ve worker, servis yeniden başlatma, SSH ile log okuma, Press kod düzeltmesinin canlıya kurulumu, katalog etiketi | `release_group.add_server`, `server.disk_check`, `server.build_cache_cleanup`, `server.restart_services`, `registry.repository_check`, `logs.read`, `server.ping_agent`, `server.agent_version`, `press.code_fix`, `cluster.catalog_label` |
-| `dns_owner` | DevOps sorumlusu kaydı hazırlar ve doğrular; alan adı sorumlusu GoDaddy'de uygular | Alan adı kaydı | `dns.record` |
+| `infrastructure_owner` | Hüseyin Cengiz | Sunucu hazırlığı ve gruba bağlama, disk ölçümü, onaylı build cache temizliği, registry deposu, ajan ve worker, servis yeniden başlatma, SSH ile log okuma, Press kod düzeltmesinin canlıya kurulumu, katalog etiketi | `release_group.add_server`, `server.disk_check`, `server.build_cache_cleanup`, `server.restart_services`, `registry.repository_check`, `logs.read`, `server.ping_agent`, `server.agent_version`, `press.code_fix`, `cluster.catalog_label` |
+| `dns_owner` | Hüseyin Cengiz kaydı hazırlar ve doğrular; Asistan Hüseyin GoDaddy'de uygular | Alan adı kaydı | `dns.record` |
 | `account_holder` | Hesap ya da site sahibi | Bölgesel yasal kutu, ödeme yöntemi, plan ve ücretli Marketplace planı, site oluşturma formu, kurulum sihirbazındaki kişisel alanlar | `site.create`, `site.legal_acceptance`, `payment.method`, `site.setup_wizard` |
 | `app_developer` | Uygulama geliştiricisi | Yerel bench komutları, git commit ve push, Press kod düzeltmesinin yazımı (bağımsız incelemeyle) | `app.install_local`, `app.migrate_local`, `app.run_tests_local` |
 
@@ -37,7 +37,7 @@ Her devir şu alanları taşır; boş alan "bilinmiyor" diye yazılır.
 | Press kod düzeltmesi | Özgün dosya yedeği ve SHA, hedefli değişiklik, önce kırmızı sonra yeşil regresyon testi, bağımsız inceleme; doğrulama kapatılmaz, sahte veri eklenmez | Testler ve canlı okuma; yalnız gereken sürecin yeniden başlatılması |
 | Sunucu ekleme | Önce Press'te hazır Server kaydı (kapasite, ajan erişimi, roller, güvenli ağ); tabloya satır eklemek sunucu kurmaz | Sunucu kaydı hazır; deploy sonucu ayrıca doğrulanır |
 | Katalog etiketi | Yalnız etiket alanları, önceki değer yedeklenir; altyapı konumu doğrulanmış sayılmaz | Yasal metinde doğru bölge adı |
-| DNS | DevOps sorumlusu kayıt türü, adı, değeri ve TTL'i yazar; alan adı sorumlusu GoDaddy'de uygular | DevOps sorumlusu çözümlemeyi ve TLS doğrulaması açık HTTPS sonucunu doğrular |
+| DNS | Hüseyin Cengiz kayıt türü, adı, değeri ve TTL'i yazar; Asistan Hüseyin GoDaddy'de uygular | Hüseyin Cengiz çözümlemeyi ve TLS doğrulaması açık HTTPS sonucunu doğrular |
 | Yasal kutu, ödeme, plan | Kullanıcı metni okuyup kendisi işaretler; isteğe bağlı kutular kapalı kalır | İnsanın kendi işlemi |
 
 Press Settings'teki Branch alanı, Update Agent ve Ansible düğmeleri rastgele kullanılmaz; servis etkisi ve geri dönüş planı

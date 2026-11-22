@@ -37,7 +37,7 @@ Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`
 
 ## Giden e-posta (G-47)
 
-Release Group `common_site_config`: mail\_server, mail\_port=587, use\_tls=1, mail\_login, mail\_password (Password), auto\_email\_id `bildirim@<marka>`, always\_use\_account\_email\_id\_as\_sender=1, always\_use\_account\_name\_as\_sender\_name=1, email\_sender\_name=&lt;marka&gt;. System Settings: `welcome/reset_password` şablonları platform Email Template'lerine bağlı, `email_footer_address` dolu, disable\_standard\_email\_footer=1, email\_retry\_limit=3. Relay Hetzner'de Postfix veya AB bölgeli sağlayıcı (KVKK envanterine girer): DevOps sorumlusu relay'i kurar ve SPF/DKIM/DMARC/PTR değerlerini hazırlar, alan adı sorumlusu GoDaddy'de kayıtları uygular, DevOps sorumlusu teslimatı doğrular. Kiracı kendi gönderici domainini Email Domain + Email Account ile panelden tanımlar; kota App Plan features'a bağlıdır.
+Release Group `common_site_config`: mail\_server, mail\_port=587, use\_tls=1, mail\_login, mail\_password (Password), auto\_email\_id `bildirim@<marka>`, always\_use\_account\_email\_id\_as\_sender=1, always\_use\_account\_name\_as\_sender\_name=1, email\_sender\_name=&lt;marka&gt;. System Settings: `welcome/reset_password` şablonları platform Email Template'lerine bağlı, `email_footer_address` dolu, disable\_standard\_email\_footer=1, email\_retry\_limit=3. Relay Hetzner'de Postfix veya AB bölgeli sağlayıcı (KVKK envanterine girer): Hüseyin Cengiz relay'i kurar ve SPF/DKIM/DMARC/PTR değerlerini hazırlar, Asistan Hüseyin GoDaddy'de kayıtları uygular, Hüseyin Cengiz teslimatı doğrular. Kiracı kendi gönderici domainini Email Domain + Email Account ile panelden tanımlar; kota App Plan features'a bağlıdır.
 
 ## Dosya depolama (G-48)
 
@@ -45,7 +45,7 @@ P1'de dosyalar bench yerel diskinde ('with files' yedekleri kapsar); System Sett
 
 ## Yedek, şifreleme, veritabanı ve işçiler (G-49, G-50, G-55, G-5, G-37)
 
-Bu bölümün sahibi DevOps sorumlusudur.
+Bu bölümün sahibi Hüseyin Cengiz'dir.
 
 - Her sitede System Settings.encrypt\_backup=1 (gpg); `backup_encryption_key` ve Fernet encryption\_key Site.configuration'da Password tipli; anahtar biçimi press\_tr Site validate kancasında doğrulanır (Press'in Fernet doğrulaması ölü kod, doğrulandı). Press DB yedeği ayrı, age/KMS şifreli, iki konumda.
 - Database Server doctype'ı: `innodb_buffer_pool_size` ≈ RAM %60-70, max\_connections ≥ Σ worker×thread + background + marj, is\_performance\_schema\_enabled=1, `enable_physical_backup`, `binlog_retention_days` + `enable_binlog_indexing` (point-in-time), `is_replication_setup` DR replikası, is\_database\_audit\_log\_enabled=1, audit\_log\_retention\_days=365. Kabul: binlog'dan 1 saatlik geri kazanım tatbikatı pass.
@@ -59,7 +59,7 @@ Bu bölümün sahibi DevOps sorumlusudur.
 | Türkiye temel çizgisi | country='Türkiye' (v16 anahtarı, doğrulandı), language='tr', time\_zone='Europe/Istanbul', currency='TRY', number\_format '#.###,##', date\_format 'dd.mm.yyyy', time\_format 'HH:mm', first\_day\_of\_the\_week Monday, float\_precision=2, currency\_precision=2. Setup wizard float\_precision=3 yazdığı için (doğrulandı) değerler platform\_core `setup_wizard_complete` + idempotent `after_migrate` ile |
 | Başsız setup wizard | press\_tr `override_doctype_class Site` → `Agent.complete_setup_wizard`; args: language 'tr', country 'Türkiye', timezone, currency 'TRY', company\_name/abbr, chart\_of\_accounts 'Turkey - Chart of Accounts', fy 01-01/12-31, enable\_telemetry 0. Kabul: Agent Job Success, setup\_complete=1, G-41 değerleri korunmuş |
 | KDV ve TR verisi | `tr_localization`: KDV %20/%10/%1 Taxes and Charges Template, Item Tax Template, Tax Category 'İstisna', il/ilçe, Address VKN/TCKN/vergi dairesi, TCMB today.xml kur işi; `erpnext` Marketplace App'inde Marketplace Localisation App country='Türkiye' |
-| Sürüm sabitleri | Bench Dependency Version 'Version 16': PYTHON 3.14, NODE 24.12.0, WKHTMLTOPDF 0.12.6, BENCH 5.31.0; environment\_variables TZ=Europe/Istanbul, LANG=tr\_TR.UTF-8; Frappe Version 'Version 16' default=1 (press\_tr.after\_migrate). Kabul: `node -v` 24.x. Sahip: DevOps sorumlusu |
+| Sürüm sabitleri | Bench Dependency Version 'Version 16': PYTHON 3.14, NODE 24.12.0, WKHTMLTOPDF 0.12.6, BENCH 5.31.0; environment\_variables TZ=Europe/Istanbul, LANG=tr\_TR.UTF-8; Frappe Version 'Version 16' default=1 (press\_tr.after\_migrate). Kabul: `node -v` 24.x. Sahip: Hüseyin Cengiz |
 | PDF | Print Settings.pdf\_generator='chrome'; headless\_shell imajda hazır (doğrulandı), chromium\_max\_concurrent=2, Noto Sans + fonts-liberation. Kabul: PDF logunda 'downloading' yok |
 
 ## Fixture stratejisi (G-8, G-39, G-40, G-107)
