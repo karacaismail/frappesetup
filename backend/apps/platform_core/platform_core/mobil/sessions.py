@@ -54,7 +54,7 @@ def revoke_after_commit(sessions, *, remote=True):
 	targets = sorted({(sid, subject or "") for sid, subject in sessions if valid_keycloak_id(sid)})
 	if not targets:
 		return
-	keys = {sid: _session_key(sid) for sid, _ in targets}
+	keys = {sid: _session_key(sid) for sid, _unused in targets}
 	rows = frappe.db.get_values(
 		REVOKED_SESSION,
 		{"name": ["in", list(keys.values())]},

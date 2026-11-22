@@ -44,7 +44,7 @@ class MobileSessionTest(IntegrationTestCase):
 		from platform_core.mobil.sessions import is_session_revoked
 
 		previous = None
-		for _ in range(21):
+		for _unused in range(21):
 			current = str(uuid4())
 			identity = SimpleNamespace(**{**vars(self.identity), "sid": current})
 			_register(identity, self.body)

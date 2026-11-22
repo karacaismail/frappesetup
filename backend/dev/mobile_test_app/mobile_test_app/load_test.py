@@ -71,7 +71,7 @@ def run_group(name, requests, send):
 
 	with ThreadPoolExecutor(max_workers=len(requests)) as pool:
 		results = list(pool.map(synchronized, requests))
-	counts = Counter(status for status, _ in results)
+	counts = Counter(status for status, _unused in results)
 	print(
 		json.dumps({"workload": name, "requests": len(requests), "503": counts[503], "statuses": counts}),
 		flush=True,
@@ -93,18 +93,18 @@ def main(port):
 
 	writes = run_group(
 		"concurrent_writes",
-		[(token, installation_id, str(uuid4())) for token, installation_id, _ in installations],
+		[(token, installation_id, str(uuid4())) for token, installation_id, _unused in installations],
 		lambda token, installation_id, record_id: write(port, token, installation_id, record_id),
 	)
 	pulls = run_group(
 		"concurrent_initial_pulls",
-		[(token, installation_id) for token, installation_id, _ in installations],
+		[(token, installation_id) for token, installation_id, _unused in installations],
 		lambda token, installation_id: call(port, token, "pull", {"installation_id": installation_id}),
 	)
-	for (_, _, seed_id), (status, result) in zip(installations, pulls, strict=True):
+	for (_unused, _unused, seed_id), (status, result) in zip(installations, pulls, strict=True):
 		if status == 200 and seed_id not in {change["record_id"] for change in result["message"]["changes"]}:
 			raise SystemExit("An initial pull omitted a seeded record")
-	return int(any(status != 200 for status, _ in (*writes, *pulls)))
+	return int(any(status != 200 for status, _unused in (*writes, *pulls)))
 
 
 if __name__ == "__main__":

@@ -129,7 +129,7 @@ def measure_base(url, phones):
 
 
 def measure_backlog(url, phone, sample_count):
-    baseline, _ = call(url, phone, "v1_pull")
+    baseline, _unused = call(url, phone, "v1_pull")
     if baseline["has_more"] or len(baseline["changes"]) != LEAVE_PER_EMPLOYEE:
         raise RuntimeError("The backlog phone needs a completed initial pull.")
     seed_backlog(phone)
@@ -139,7 +139,7 @@ def measure_backlog(url, phone, sample_count):
         cursor = baseline["cursor"]
         seen = set()
         elapsed = 0.0
-        for _ in range(ceil(BACKLOG / PAGE_SIZE)):
+        for _unused in range(ceil(BACKLOG / PAGE_SIZE)):
             message, timing = call(url, phone, "v1_pull", {"cursor": cursor})
             measured.append(timing)
             elapsed += timing[0]

@@ -163,7 +163,7 @@ def seed_site(samples):
 
 def seed_backlog(phone):
     with test_database():
-        records = [str(uuid4()) for _ in range(BACKLOG)]
+        records = [str(uuid4()) for _unused in range(BACKLOG)]
         timestamp = now_datetime()
         _insert_rows(
             fixture.RECORD,

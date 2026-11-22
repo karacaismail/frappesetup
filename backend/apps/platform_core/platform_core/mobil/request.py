@@ -83,7 +83,7 @@ def _limit_and_count(principal, app_version, contract_version):
 	with frappe.cache.pipeline() as pipe:
 		pipe.incr(rate_key)
 		pipe.expire(rate_key, 120)
-		count, _ = pipe.execute()
+		count, _unused = pipe.execute()
 	if count > REQUESTS_PER_MINUTE:
 		frappe.local.response_headers["Retry-After"] = str(60 - now % 60)
 		raise MobileError("rate_limit", 429)

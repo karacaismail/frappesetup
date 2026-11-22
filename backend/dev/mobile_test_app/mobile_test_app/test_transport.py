@@ -45,7 +45,7 @@ class TestMobileHttpTransport(unittest.TestCase):
 
     def test_http_suite_client_rejects_redirect(self):
         with patch.object(test_mobile, "BASE", f"http://127.0.0.1:{self.server.server_port}"):
-            status, result, _ = test_mobile.MobileHTTPTest().post_method("fixture", {}, "synthetic")
+            status, result, _unused = test_mobile.MobileHTTPTest().post_method("fixture", {}, "synthetic")
         self.assertEqual((status, result), (302, {"code": "redirect_rejected"}))
         self.assertEqual(self.server.redirect_count, 0)
 
