@@ -874,30 +874,33 @@ bench --site <site> execute platform_core.erisim.tests.performance.measure
 ```
 
 - Komut 200 çalışan ve 2.000 kayıt kurar. Sonra her ucu 50 kez çağırır. Sonunda örnek veriyi siler.
-- Komut oluşturduğu kayıtların adlarını saklar ve yalnız onları siler. Ölçüm yarıda kalsa da sitedeki eski kurallar, kayıtlar ve çalışanlar yerinde kalır. Üç test bunu sınar.
+- Komut oluşturduğu çalışan ve kural adlarını saklar ve yalnız onları siler. Ölçüm yarıda kalsa da sitedeki eski kurallar, kayıtlar, çalışanlar ve izinler yerinde kalır. Beş test bunu sınar.
 - Komut yalnız `allow_tests` ayarı açık sitede çalışır. Örnek veri yazdığı için HTTP ucu yoktur.
 - İstekler Frappe'nin WSGI uygulamasından geçer. Süre isteğin tamamıdır. Ağ süresi sayılmaz.
-- Örnek kayıt türü test türüdür (“ER Test Talep”). HRMS TR'nin izin kaydı türü başka işin klasöründedir.
+- Komut kendi kayıt türünde çalışır. Türün adı “AR Measurement Request” olur. Komut türü ilk çalışmada kurar ve türü yalnız ölçüm kullanır. Başka hiçbir türün kaydına, kuralına ve izin satırına dokunmaz.
+- Komut yarıda kalırsa oluşturduğu bütün kayıtları yine siler. İstekle açılan kayıt da buna dahildir, çünkü her kayıt çalışmanın işaretini başlığında taşır.
+- Uydurma test rolleri, kullanıcıları ve şirketi sitede yoksa komut onları kurar ve bırakır.
+- HRMS TR'nin izin kaydı türü başka işin klasöründedir. Bu yüzden ölçüm o türle yapılmadı.
 
 Ölçüm 22 Kasım 2026 Pazar günü geliştirme sitesinde yapıldı.
 
 | Tür | Uç | Ortanca (ms) | p95 (ms) | Sınır (ms) | Sonuç |
 | --- | --- | --- | --- | --- | --- |
-| Okuma | Liste, `own` kapsamı | 4,2 | 6,7 | 500 | `pass` |
-| Okuma | Liste, `team` kapsamı | 3,9 | 4,6 | 500 | `pass` |
-| Okuma | Liste, `all` kapsamı | 3,1 | 5,2 | 500 | `pass` |
-| Okuma | Tek kayıt | 2,9 | 3,1 | 500 | `pass` |
-| Okuma | Sayım, `team` kapsamı | 4,5 | 7,3 | 500 | `pass` |
-| Okuma | Rapor görünümü, `team` kapsamı | 5,4 | 7,6 | 500 | `pass` |
-| Okuma | Bağlantı araması | 5,4 | 7,2 | 500 | `pass` |
-| Okuma | Bağlantı doğrulama | 5,5 | 6,2 | 500 | `pass` |
-| Okuma | `explain_permission` | 4,9 | 7,6 | 500 | `pass` |
-| Okuma | `get_access_summary` | 2,7 | 3,3 | 500 | `pass` |
-| Yazma | Kayıt oluşturma | 5,8 | 10,0 | 1.000 | `pass` |
-| Yazma | Kayıt güncelleme | 6,1 | 8,5 | 1.000 | `pass` |
-| Yazma | Kayıt silme | 19,3 | 23,9 | 1.000 | `pass` |
-| Yazma | “Access Rule” değiştirme | 6,3 | 7,4 | 1.000 | `pass` |
-| Yazma | `set_level_access` | 198,5 | 401,1 | 1.000 | `pass` |
+| Okuma | Liste, `own` kapsamı | 10,3 | 15,7 | 500 | `pass` |
+| Okuma | Liste, `team` kapsamı | 11,5 | 33,1 | 500 | `pass` |
+| Okuma | Liste, `all` kapsamı | 10,8 | 16,2 | 500 | `pass` |
+| Okuma | Tek kayıt | 10,9 | 14,6 | 500 | `pass` |
+| Okuma | Sayım, `team` kapsamı | 12,1 | 32,2 | 500 | `pass` |
+| Okuma | Rapor görünümü, `team` kapsamı | 10,3 | 14,0 | 500 | `pass` |
+| Okuma | Bağlantı araması | 10,2 | 14,3 | 500 | `pass` |
+| Okuma | Bağlantı doğrulama | 11,1 | 18,1 | 500 | `pass` |
+| Okuma | `explain_permission` | 11,6 | 18,4 | 500 | `pass` |
+| Okuma | `get_access_summary` | 5,4 | 8,6 | 500 | `pass` |
+| Yazma | Kayıt oluşturma | 15,1 | 26,1 | 1.000 | `pass` |
+| Yazma | Kayıt güncelleme | 14,8 | 18,8 | 1.000 | `pass` |
+| Yazma | Kayıt silme | 51,5 | 63,5 | 1.000 | `pass` |
+| Yazma | “Access Rule” değiştirme | 16,1 | 19,8 | 1.000 | `pass` |
+| Yazma | `set_level_access` | 269,5 | 383,2 | 1.000 | `pass` |
 
 ### Kuralın liste sorgusuna eklediği süre
 
@@ -905,14 +908,14 @@ Komut aynı liste okumasını iki kez ölçer: kurallar açıkken ve kurallar ka
 
 | Kapsam | Sayfa | Kurallı ortanca (ms) | Kuralsız ortanca (ms) | Eklenen (ms) | Kurallı p95 (ms) |
 | --- | --- | --- | --- | --- | --- |
-| `own` | 20 | 4,94 | 1,01 | 3,93 | 13,82 |
-| `team` | 20 | 2,95 | 0,95 | 2,00 | 4,55 |
-| `all` | 20 | 2,50 | 1,21 | 1,29 | 3,73 |
-| `own` | 500 | 3,40 | 1,58 | 1,82 | 4,65 |
-| `team` | 500 | 4,21 | 1,43 | 2,78 | 5,46 |
-| `all` | 500 | 2,44 | 0,95 | 1,50 | 3,67 |
+| `own` | 20 | 3,85 | 0,77 | 3,08 | 4,59 |
+| `team` | 20 | 3,12 | 0,91 | 2,22 | 4,30 |
+| `all` | 20 | 2,76 | 1,17 | 1,59 | 3,98 |
+| `own` | 500 | 3,96 | 1,84 | 2,13 | 5,26 |
+| `team` | 500 | 5,64 | 1,88 | 3,75 | 6,58 |
+| `all` | 500 | 3,19 | 1,91 | 1,28 | 3,91 |
 
-Kural bir liste okumasına en çok 3,93 milisaniye ekler. İki ölçümde bu değer 3,5 ile 4 milisaniye arasında kaldı. Sürenin çoğu kural tablosunun ve öznenin okunmasıdır.
+Kural bir liste okumasına birkaç milisaniye ekler. Beş ölçümde eklenen ortanca süre 4 milisaniyeyi geçmedi.
 
 ### Sınırı aşan uç ve düzeltmesi
 
@@ -921,7 +924,7 @@ Kural bir liste okumasına en çok 3,93 milisaniye ekler. İki ölçümde bu de�
 1. Geliştirme sitemde arka plan işçisi yoktu ve kuyrukta 551 iş birikmişti. Bu ortamın sorunuydu. Kuyruk boşalınca p95 926 milisaniye oldu.
 2. Uç izin satırını silerken Frappe o satıra bağlı kayıtları arıyordu. Bu arama isteğin 685 milisaniyesini alıyordu.
 
-İzin satırına hiçbir kayıt bağlanmaz. Frappe'nin kendi izin yöneticisi de satırı bu aramayı atlayarak siler (`core/page/permission_manager/permission_manager.py:170`). Uç artık aynı yolu kullanır. p95 değeri düzeltmeden sonraki iki ölçümde 226 ve 401 milisaniye oldu.
+İzin satırına hiçbir kayıt bağlanmaz. Frappe'nin kendi izin yöneticisi de satırı bu aramayı atlayarak siler (`core/page/permission_manager/permission_manager.py:170`). Uç artık aynı yolu kullanır. Düzeltmeden sonraki beş ölçümde p95 değeri 226 ile 807 milisaniye arasında kaldı. Fark ortak geliştirme makinesinin yükünden gelir.
 
 Bu ölçüm tek istekle ve küçük bir sitede yapıldı. Eşzamanlı yük ve gerçek kullanıcı ölçümü P1 işidir (G-149).
 

@@ -16,6 +16,10 @@ from pathlib import Path
 import yaml
 
 HERE = Path(__file__).resolve()
+# The engine's folder and module path, taken from where this file lives. Nothing here spells
+# the name out, so the checks keep working when the package is renamed.
+ENGINE_FOLDER = HERE.parents[1].name
+ENGINE_MODULE = f"{HERE.parents[2].name}.{ENGINE_FOLDER}"
 CONTRACT_NAME = "platform_core-erisim.openapi.yaml"
 # The longest sentence the plain-language rule allows in an explanation.
 MAX_WORDS = 15
@@ -97,8 +101,8 @@ class TestTranslationRows(unittest.TestCase):
 		app = next(parent for parent in HERE.parents if (parent / "translations" / "tr.csv").is_file())
 		code = ""
 		files = [
-			*(app / "erisim").rglob("*.py"),
-			*(app / "erisim").rglob("*.json"),
+			*(app / ENGINE_FOLDER).rglob("*.py"),
+			*(app / ENGINE_FOLDER).rglob("*.json"),
 			app / "api" / "access.py",
 		]
 		for path in files:
@@ -129,7 +133,7 @@ SEMGREP_RULE = re.compile(r"#\s*nosemgrep: [a-z][a-z0-9.-]*-[a-z0-9-]+(\s|$)")
 
 
 def engine_files(tests: bool) -> list[Path]:
-	files = [*(APP / "erisim").rglob("*.py"), APP / "api" / "access.py", APP / "api" / "test_access.py"]
+	files = [*(APP / ENGINE_FOLDER).rglob("*.py"), APP / "api" / "access.py", APP / "api" / "test_access.py"]
 	return [path for path in files if ("tests" in path.parts or path.name.startswith("test_")) == tests]
 
 
@@ -185,26 +189,26 @@ class TestEngineCode(unittest.TestCase):
 # A change to one of these paths must be checked against the file next to it.
 KNOWN_INTERNAL_USERS = {
 	# The shell allows a Website User to call the guarded search and must name the replacement.
-	("kabuk/native_metadata.py", "platform_core.erisim.link_search.search_link"),
+	("kabuk/native_metadata.py", f"{ENGINE_MODULE}.link_search.search_link"),
 }
-ENGINE_PATH = re.compile(r"platform_core\.erisim(?:\.\w+)+")
+ENGINE_PATH = re.compile(re.escape(ENGINE_MODULE) + r"(?:\.\w+)+")
 
 
 class TestWhoUsesTheEngine(unittest.TestCase):
 	def test_other_modules_use_only_the_public_module(self):
-		"""Other modules call `platform_core.erisim.api`. Anything else must be listed above."""
+		"""Other modules call only the engine's `api` module. Anything else must be listed above."""
 		found = set()
 		for path in APP.rglob("*.py"):
 			relative = path.relative_to(APP).as_posix()
 			# `hooks.py` binds the engine to Frappe; `api/access.py` holds the engine's own endpoints.
-			if relative.startswith("erisim/") or relative in (
+			if relative.startswith(f"{ENGINE_FOLDER}/") or relative in (
 				"hooks.py",
 				"api/access.py",
 				"api/test_access.py",
 			):
 				continue
 			for reference in ENGINE_PATH.findall(path.read_text(encoding="utf-8")):
-				if not reference.startswith("platform_core.erisim.api"):
+				if not reference.startswith(f"{ENGINE_MODULE}.api"):
 					found.add((relative, reference))
 
 		self.assertEqual(found, KNOWN_INTERNAL_USERS)

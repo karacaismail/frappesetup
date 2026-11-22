@@ -38,6 +38,8 @@ ROLE_HR = "ER IK"
 ROLE_NO_RULE = "ER Kuralsiz"
 # A role without desk access. Its only member is a Website User, as the panel's users are.
 ROLE_PORTAL = "ER Portal"
+# A desk role that has no permission on the test types: a desk user with nothing to do there.
+ROLE_DESK_ONLY = "ER Masa"
 
 EMPLOYEE_1 = "er.calisan1@example.test"
 EMPLOYEE_2 = "er.calisan2@example.test"
@@ -49,6 +51,7 @@ HR = "er.ik@example.test"
 NO_RULE = "er.kuralsiz@example.test"
 ADMIN = "er.admin@example.test"
 PORTAL = "er.portal@example.test"
+DESK_ONLY = "er.masa@example.test"
 
 # The user, the roles and the manager the user reports to. `None` shows that there is no employee record.
 PEOPLE = (
@@ -62,6 +65,7 @@ PEOPLE = (
 	(NO_RULE, [ROLE_NO_RULE], None),
 	(ADMIN, ["System Manager"], None),
 	(PORTAL, [ROLE_PORTAL], None),
+	(DESK_ONLY, [ROLE_DESK_ONLY], None),
 )
 RECORD_OWNERS = (MANAGER_1, MANAGER_2, EMPLOYEE_1, EMPLOYEE_2, EMPLOYEE_3, EMPLOYEE_4)
 
@@ -83,7 +87,7 @@ LEVEL_0 = {"read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export
 def ensure_roles() -> None:
 	if not frappe.db.exists("Role", ROLE_PORTAL):
 		frappe.get_doc(doctype="Role", role_name=ROLE_PORTAL, desk_access=0).insert()
-	for role in (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE):
+	for role in (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE, ROLE_DESK_ONLY):
 		# Desk users: the shell lets a Website User call only its own short list of methods
 		# (`kabuk/native_metadata.py`). The engine's surfaces under test are desk surfaces.
 		if not frappe.db.exists("Role", role):
@@ -92,60 +96,69 @@ def ensure_roles() -> None:
 			frappe.db.set_value("Role", role, "desk_access", 1)
 
 
+REQUEST_ROLES = (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE, ROLE_PORTAL, "System Manager")
+
+
+def request_doctype(name: str) -> dict:
+	"""The definition of a made-up request type: an employee link and one field at level 1."""
+	roles = REQUEST_ROLES
+	return {
+		"doctype": "DocType",
+		"name": name,
+		"module": "Custom",
+		"custom": 1,
+		"autoname": "hash",
+		"fields": [
+			{"fieldname": "title", "fieldtype": "Data", "label": "Title", "description": "Short title."},
+			{
+				"fieldname": "employee",
+				"fieldtype": "Link",
+				"options": "Employee",
+				"label": "Employee",
+				"description": "Employee the request belongs to.",
+			},
+			{
+				"fieldname": "department",
+				"fieldtype": "Link",
+				"options": "Department",
+				"label": "Department",
+				"description": "Department of the request.",
+			},
+			{
+				"fieldname": "company",
+				"fieldtype": "Link",
+				"options": "Company",
+				"label": "Company",
+				"description": "Company of the request.",
+			},
+			{
+				"fieldname": "status",
+				"fieldtype": "Select",
+				"options": "Open\nClosed",
+				"default": "Open",
+				"label": "Status",
+				"description": "Open or closed.",
+			},
+			{
+				"fieldname": "salary_amount",
+				"fieldtype": "Currency",
+				"label": "Salary Amount",
+				"permlevel": 1,
+				"description": "Sensitive amount. Only HR may read it.",
+			},
+		],
+		"permissions": [{"role": role, **LEVEL_0} for role in roles]
+		+ [
+			{"role": ROLE_HR, "permlevel": 1, "read": 1, "write": 1},
+			{"role": "System Manager", "permlevel": 1, "read": 1, "write": 1},
+		],
+	}
+
+
 def ensure_doctypes() -> None:
-	roles = (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE, ROLE_PORTAL, "System Manager")
+	roles = REQUEST_ROLES
 	if not frappe.db.exists("DocType", DOCTYPE):
-		frappe.get_doc(
-			doctype="DocType",
-			name=DOCTYPE,
-			module="Custom",
-			custom=1,
-			autoname="hash",
-			fields=[
-				{"fieldname": "title", "fieldtype": "Data", "label": "Title", "description": "Short title."},
-				{
-					"fieldname": "employee",
-					"fieldtype": "Link",
-					"options": "Employee",
-					"label": "Employee",
-					"description": "Employee the request belongs to.",
-				},
-				{
-					"fieldname": "department",
-					"fieldtype": "Link",
-					"options": "Department",
-					"label": "Department",
-					"description": "Department of the request.",
-				},
-				{
-					"fieldname": "company",
-					"fieldtype": "Link",
-					"options": "Company",
-					"label": "Company",
-					"description": "Company of the request.",
-				},
-				{
-					"fieldname": "status",
-					"fieldtype": "Select",
-					"options": "Open\nClosed",
-					"default": "Open",
-					"label": "Status",
-					"description": "Open or closed.",
-				},
-				{
-					"fieldname": "salary_amount",
-					"fieldtype": "Currency",
-					"label": "Salary Amount",
-					"permlevel": 1,
-					"description": "Sensitive amount. Only HR may read it.",
-				},
-			],
-			permissions=[{"role": role, **LEVEL_0} for role in roles]
-			+ [
-				{"role": ROLE_HR, "permlevel": 1, "read": 1, "write": 1},
-				{"role": "System Manager", "permlevel": 1, "read": 1, "write": 1},
-			],
-		).insert()
+		frappe.get_doc(request_doctype(DOCTYPE)).insert()
 	if not frappe.db.exists("DocType", FREE_DOCTYPE):
 		frappe.get_doc(
 			doctype="DocType",
