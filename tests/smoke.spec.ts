@@ -568,7 +568,7 @@ test.describe('documents without JavaScript', () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
     const links = page.locator('#site-nav a[href*="/ai-"]');
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(DOC_SLUGS.filter((slug) => slug.startsWith('ai-')).length);
     await expect(links.first()).toBeVisible();
     await links.first().click();
     await expect(page).toHaveURL(/\/ai-bakis\/$/);
