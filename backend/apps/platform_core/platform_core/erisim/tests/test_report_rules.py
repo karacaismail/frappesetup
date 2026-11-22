@@ -204,6 +204,9 @@ class TestWhichReportRuns(ReportRulesTestCase):
 	LOOP_A = "AR Test Loop A Report"
 	LOOP_B = "AR Test Loop B Report"
 	ALL = (STALE, CUSTOM, CUSTOM_OF_CUSTOM, BROKEN, LOOP_A, LOOP_B)
+	# A loop too long for any "loaded too often" count: Python gives up long before that.
+	RING_SIZE = 200
+	RING = tuple(f"AR Test Ring {number:03d} Report" for number in range(RING_SIZE))
 
 	@classmethod
 	def setUpClass(cls):
@@ -223,6 +226,11 @@ class TestWhichReportRuns(ReportRulesTestCase):
 			(cls.LOOP_B, cls.LOOP_A),
 		):
 			frappe.db.set_value("Report", name, "reference_report", reference)
+		for name in cls.RING:
+			ensure_report(name, FREE_DOCTYPE, "Custom Report", reference_report=NAME_REPORT)
+		for position, name in enumerate(cls.RING):
+			following = cls.RING[(position + 1) % cls.RING_SIZE]
+			frappe.db.set_value("Report", name, "reference_report", following, update_modified=False)
 		# Committed on purpose: the request uses another connection.
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
@@ -295,6 +303,37 @@ class TestWhichReportRuns(ReportRulesTestCase):
 					client = self.login(user)
 					self.assert_refused(self.run_report(client, report))
 					self.assert_refused(self.export_report(client, report))
+
+	def test_a_long_reference_loop_is_refused_on_every_path(self):
+		"""Review finding: 200 reports in a ring. The answer must still be the refusal, not a server error."""
+		script = "/api/method/frappe.desk.query_report.get_script"
+		for user in (HR, ADMIN):
+			client = self.login(user)
+			for report in (self.RING[0], self.RING[137]):
+				with self.subTest(user=user, report=report):
+					self.assert_refused(self.run_report(client, report))
+					self.assert_refused(self.export_report(client, report))
+					self.assert_refused(self.send(client, "POST", script, body={"report_name": report}))
+
+	def test_the_gate_itself_refuses_a_long_loop(self):
+		self.assertTrue(self.denied(self.RING[0], ADMIN))
+		self.assertTrue(reports.touches_governed(self.RING[0]))
+
+	def test_a_report_in_a_long_loop_can_still_be_opened(self):
+		opened = self.send(self.login(ADMIN), "GET", f"/api/v2/document/Report/{self.RING[0]}")
+
+		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
+
+	def test_a_report_that_refers_to_itself_is_refused_and_can_be_opened(self):
+		frappe.db.set_value("Report", self.LOOP_A, "reference_report", self.LOOP_A)
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
+		self.addCleanup(self.restore_loop)
+		client = self.login(ADMIN)
+
+		self.assert_refused(self.run_report(client, self.LOOP_A))
+		opened = self.send(client, "GET", f"/api/v2/document/Report/{self.LOOP_A}")
+		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
 
 	def test_script_of_a_reference_loop_is_refused_too(self):
 		response = self.send(

@@ -14,11 +14,13 @@ Example tree:
 """
 
 import json
+import subprocess
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.tests.test_api import make_request
-from frappe.utils import get_test_client
+from frappe.utils import get_bench_path, get_test_client
+from frappe.utils.background_jobs import get_queues
 from frappe.utils.password import update_password
 
 API = "/api/method/platform_core.api.access."
@@ -34,6 +36,8 @@ ROLE_EMPLOYEE = "ER Calisan"
 ROLE_MANAGER = "ER Yonetici"
 ROLE_HR = "ER IK"
 ROLE_NO_RULE = "ER Kuralsiz"
+# A role without desk access. Its only member is a Website User, as the panel's users are.
+ROLE_PORTAL = "ER Portal"
 
 EMPLOYEE_1 = "er.calisan1@example.test"
 EMPLOYEE_2 = "er.calisan2@example.test"
@@ -44,6 +48,7 @@ MANAGER_2 = "er.yonetici2@example.test"
 HR = "er.ik@example.test"
 NO_RULE = "er.kuralsiz@example.test"
 ADMIN = "er.admin@example.test"
+PORTAL = "er.portal@example.test"
 
 # The user, the roles and the manager the user reports to. `None` shows that there is no employee record.
 PEOPLE = (
@@ -56,6 +61,7 @@ PEOPLE = (
 	(HR, [ROLE_HR], None),
 	(NO_RULE, [ROLE_NO_RULE], None),
 	(ADMIN, ["System Manager"], None),
+	(PORTAL, [ROLE_PORTAL], None),
 )
 RECORD_OWNERS = (MANAGER_1, MANAGER_2, EMPLOYEE_1, EMPLOYEE_2, EMPLOYEE_3, EMPLOYEE_4)
 
@@ -75,6 +81,8 @@ LEVEL_0 = {"read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export
 
 
 def ensure_roles() -> None:
+	if not frappe.db.exists("Role", ROLE_PORTAL):
+		frappe.get_doc(doctype="Role", role_name=ROLE_PORTAL, desk_access=0).insert()
 	for role in (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE):
 		# Desk users: the shell lets a Website User call only its own short list of methods
 		# (`kabuk/native_metadata.py`). The engine's surfaces under test are desk surfaces.
@@ -85,7 +93,7 @@ def ensure_roles() -> None:
 
 
 def ensure_doctypes() -> None:
-	roles = (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE, "System Manager")
+	roles = (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE, ROLE_PORTAL, "System Manager")
 	if not frappe.db.exists("DocType", DOCTYPE):
 		frappe.get_doc(
 			doctype="DocType",
@@ -152,6 +160,41 @@ def ensure_doctypes() -> None:
 		).insert()
 
 
+def ensure_portal_permission() -> None:
+	"""A site made before the portal role existed gets the role's permission row here.
+
+	The row is added to the document type itself. `add_permission` would copy every row to
+	"Custom DocPerm", and the field level tests start from a type without such copies.
+	"""
+	doc = frappe.get_doc("DocType", DOCTYPE)
+	if not any(row.role == ROLE_PORTAL for row in doc.permissions):
+		doc.append("permissions", {"role": ROLE_PORTAL, **LEVEL_0})
+		doc.save()
+
+
+QUEUE_ROOM = 100
+
+
+def run_queued_jobs(room: int = QUEUE_ROOM) -> int:
+	"""Run the background jobs the test requests left behind, once enough of them wait.
+
+	A test site has no worker. Requests still queue jobs, for example after a delete. Frappe
+	refuses a new job once too many wait (`frappe/utils/background_jobs.py:729`), and then
+	deletes and renames fail for a reason that has nothing to do with the test. A worker in
+	burst mode runs what waits and stops. Returns the number of jobs that waited.
+	"""
+	waiting = sum(queue.count for queue in get_queues())
+	if waiting >= room:
+		subprocess.run(
+			["bench", "worker", "--burst", "--quiet"],
+			cwd=get_bench_path(),
+			check=True,
+			capture_output=True,
+			timeout=600,
+		)
+	return waiting
+
+
 def ensure_company() -> None:
 	if not frappe.db.exists("Gender", GENDER):
 		frappe.get_doc(doctype="Gender", gender=GENDER).insert()
@@ -210,6 +253,7 @@ def ensure_fixtures() -> None:
 		raise RuntimeError("These tests need the Employee document type of ERPNext.")
 	ensure_roles()
 	ensure_doctypes()
+	ensure_portal_permission()
 	ensure_company()
 	ensure_people()
 	# Committed on purpose: the request uses another connection.
@@ -256,6 +300,7 @@ class ErisimTestCase(IntegrationTestCase):
 		super().setUpClass()
 		frappe.set_user("Administrator")
 		ensure_fixtures()
+		run_queued_jobs()
 		cls.site = frappe.local.site
 		cls.rules = {}
 		for rule in cls.RULES:

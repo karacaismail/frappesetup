@@ -9,6 +9,9 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     "pydantic~=2.12.5",
+    # The access rule engine builds its conditions with pypika. Frappe installs its own fork
+    # of the package from a fixed commit, so no version is set here.
+    "PyPika",
     "urllib3>=2.2.0,<3",
     "Werkzeug>=3.1.9,<4",
 ]

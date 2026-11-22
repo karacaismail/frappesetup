@@ -386,7 +386,18 @@ Frappe başvuruları kapıya sormadan önce izler (`desk/query_report.py:37`). B
 | Başvurulan rapor yok | 404 | Frappe. Olmayan raporu arar ve bulamaz. Veri okunmaz. |
 | Başvurular döngü kuruyor | 403 | Motor. |
 
-Döngüde Frappe aynı kayıtları Python çağrı sınırına kadar yükler ve sunucu hatası verir. Birleşme öncesi inceleme bunu buldu ve bir test doğruladı. Motor bu yüzden bir istekte aynı özel raporun kaç kez yüklendiğini sayar. Sayı 10'u geçerse motor başvuruları denetler. Başvuru çözülemiyorsa motor isteği reddeder.
+Döngüde Frappe aynı kayıtları Python çağrı sınırına kadar yükler ve sunucu hatası verir. Birleşme öncesi inceleme bunu buldu ve bir test doğruladı.
+
+Motor bu yüzden zinciri Frappe'den önce kendisi izler. İşleyiş şöyledir:
+
+1. Frappe bir özel raporu yükler. Motor raporun adını ve başvurusunu istek boyunca saklar.
+2. Frappe hemen ardından o raporun başvurduğu özel raporu yükler. Bu, Frappe'nin zinciri izlemeye başladığını gösterir.
+3. Motor o anda bütün zinciri kendi sorgularıyla okur. Gördüğü adları bir kümede tutar.
+4. Bir ad ikinci kez görülürse zincir döngüdür. Motor isteği hemen reddeder.
+
+Döngünün uzunluğu sonucu değiştirmez. İki raporluk döngü de 200 raporluk döngü de ikinci yüklemede reddedilir. Bir test 200 raporluk döngüyü çalıştırma, dışa aktarma ve betik okuma yollarında sınar.
+
+İlk çözüm yükleme sayısına bakıyordu ve 10 yüklemeden sonra reddediyordu. İkinci inceleme bunun uzun döngüde yetmediğini gösterdi: Python çağrı sınırı daha önce doluyor. Sayım bugün yalnız kendine başvuran rapor için kullanılır. O durumda formu açmak ile zinciri izlemek aynı görünür.
 
 Çözülen bir rapor burada hiç reddedilmez. Bozuk bir rapor da açılabilir ve kaydedilebilir. Böylece yönetici bozuk başvuruyu düzeltebilir. Bir test bunu sınar.
 
@@ -761,7 +772,7 @@ Bu yüzden bir koşul zorunludur. Uygulama çalışana kendi “Employee” kayd
 - Kanban panosu sütun sayısını izin uygulamadan sayar (`desk/doctype/kanban_board/kanban_board.py:531`). Kural dışı kayıtların sayısı görünebilir. Son kullanıcı yönetim ekranını görmez (D-5).
 - `frappe.client.get` ucu süzgeçle çağrılınca iki ayrı hata döner. Kural dışı kayıt izin hatası verir. Olmayan kayıt bulunamadı hatası verir. Bu fark bir alanın değerini sınamaya yarayabilir.
 
-İki davranış da inceleyenin kod okumasına dayanır. Bu tur ikisini de sınamadı.
+İki davranış da inceleyenin kod okumasına dayanır. Bu tur ikisini de sınamadı. İkisi 18. bölümdeki tabloda kapanma koşuluyla yazılıdır.
 
 ## 16. Görünen metnin dili
 
@@ -815,16 +826,22 @@ Bilinen bir taviz vardır. `reports.py` dört sınıf ekini ve kapı işlevlerin
 
 ## 18. Ertelenen işler
 
-| İş | Neden ertelendi | Nerede |
-| --- | --- | --- |
-| Uygulamaya özel kural şablonları ve `app` alanı | Görev belgesi kapsam dışı sayar. | Sonraki tur, G-104 |
-| Paylaşım, takım ve proje üyeliği ilişkileri | Karar sitesi P5 fazına koyar. | G-122 |
-| Rol ve rol izni yönetim uçları | Bu işin sahibi belli değil. | G-62 |
-| Süzgeçte `>`, `<` ve `like` işleçleri | Şimdilik ihtiyaç yok (A-5). | İhtiyaç doğunca |
-| Kiracı yöneticisi rolü (“Tenant Admin”) | Rol henüz tanımlı değil. Uçlar şimdilik “System Manager” ister. | G-62 |
-| Dosya, arka plan işi ve anlık bildirim yüzeyleri | Bu tur liste, kayıt, rapor ve dışa aktarmayı kapsar. | G-121 |
-| “Address” türünde `address_query` yolundaki arama | Yol yalnız türe kural ve `standard_queries` işlevi birlikte yazılırsa açılır. Bugün ikisi de yok. | “Address” türüne kural yazılmadan önce |
-| Seçenek değerlerinin Türkçesi (`own`, `team` gibi) | Çeviri dosyası ortaktır. Bağlamsız `all` satırı bütün uygulamayı etkiler. | Çeviri sahibinin kararı |
+Bu bölüm bilerek bırakılan eksikleri sayar (O-3). Orkestratör bu tabloyu proje kaydının ortak borç listesine taşır. Bu işlerin sorumlusu erişim motoru işidir.
+
+| İş | Etki | Neden ertelendi | Kapanma koşulu |
+| --- | --- | --- | --- |
+| Uygulamaya özel kural şablonları ve `app` alanı | Her kiracı kuralları elle yazar. | Görev belgesi kapsam dışı sayar. | Sonraki turda G-104 yapılır. |
+| Paylaşım, takım ve proje üyeliği ilişkileri | Kural yalnız sahip, ekip, bölüm ve şirket kapsamını bilir. | Karar sitesi P5 fazına koyar. | G-122 yapılır. |
+| Rol ve rol izni yönetim uçları | Rol izni yönetim ekranından verilir. | Bu işin sahibi belli değil. | G-62 için sahip atanır ve uçlar yazılır. |
+| Süzgeçte `>`, `<` ve `like` işleçleri | Kural aralık koşulu yazamaz. | Şimdilik ihtiyaç yok (A-5). | İlk gerçek ihtiyaç doğar ve işleç testiyle eklenir. |
+| Kiracı yöneticisi rolü (“Tenant Admin”) | Yönetim uçları “System Manager” ister. | Rol henüz tanımlı değil. | G-62 rolü tanımlar ve uçlar o rolü kabul eder. |
+| Dosya, arka plan işi, anlık bildirim ve genel arama yüzeyleri | Bu yüzeylerde kuralın etkisi sınanmadı. | Bu tur liste, kayıt, rapor ve dışa aktarmayı kapsar. | G-121 her yüzey için gerçek istekli test ekler. |
+| “Address” türünde `address_query` yolundaki arama | Özel arama işlevi kapıdan geçmeden çalışabilir. Yol yalnız türe kural ve `standard_queries` işlevi birlikte yazılırsa açılır. | Bugün ikisi de yok. Kodda `BORC(scale)` ile işaretli. | “Address” türüne ilk kural yazılmadan önce uç sarılır. |
+| Seçenek değerlerinin Türkçesi (`own`, `team` gibi) | Yönetim ekranında beş seçenek İngilizce görünebilir. | Çeviri dosyası ortaktır. Bağlamsız `all` satırı bütün uygulamayı etkiler. | Çeviri sahibi bağlamlı satır yolunu belirler. |
+| Kanban panosunun sütun sayısı | Kural dışı kayıtların sayısı görünebilir. | Frappe'nin davranışıdır ve bu tur sınamadı. | Bir test davranışı doğrular. Doğruysa pano kurallı türde kapatılır. |
+| `frappe.client.get` ucunun iki ayrı hatası | Fark bir alanın değerini sınamaya yarayabilir. | Frappe'nin davranışıdır ve bu tur sınamadı. | Bir test davranışı doğrular. Doğruysa uç tek hata dönecek biçimde sarılır. |
+| Semantik ad düzeltmesi: `erisim` klasörü ve test dosyalarının Türkçe adları | Kod adları İngilizce kuralına uymaz (H-10). | Var olan adları ortak betik değiştirir. | naming-history-fix betiği bu dalda çalıştırılır. |
+| Eşzamanlı yük altında performans | Ölçüm tek istekle yapıldı (O-31). | Araç P1 işidir. | G-149 kurulur ve ölçüm yük altında yinelenir. |
 
 ## 19. Geri dönüş
 
@@ -844,7 +861,7 @@ Geri dönüşün iki yolu vardır.
 
 İki yolda da “Access Rule” kayıtları veritabanında kalır. Veri geçişi gerekmez.
 
-Motorun kapattığı e-posta raporları kendiliğinden açılmaz. Yönetici onları elle açar. Kapatılan kayıtların adları `migrate` sırasında günlüğe yazılır.
+Motorun kapattığı e-posta raporları kendiliğinden açılmaz. Yönetici onları elle açar. Motor `migrate` sırasında kaç kaydı kapattığını günlüğe yazar. Kayıt adını yazmaz, çünkü ad rapor başlığından gelir ve başlıkta kişi adı olabilir. Yönetici kapalı kayıtları e-posta raporu listesinde görür.
 
 ## 20. Performans sınırı (O-31)
 
@@ -857,6 +874,7 @@ bench --site <site> execute platform_core.erisim.tests.performance.measure
 ```
 
 - Komut 200 çalışan ve 2.000 kayıt kurar. Sonra her ucu 50 kez çağırır. Sonunda örnek veriyi siler.
+- Komut oluşturduğu kayıtların adlarını saklar ve yalnız onları siler. Ölçüm yarıda kalsa da sitedeki eski kurallar, kayıtlar ve çalışanlar yerinde kalır. Üç test bunu sınar.
 - Komut yalnız `allow_tests` ayarı açık sitede çalışır. Örnek veri yazdığı için HTTP ucu yoktur.
 - İstekler Frappe'nin WSGI uygulamasından geçer. Süre isteğin tamamıdır. Ağ süresi sayılmaz.
 - Örnek kayıt türü test türüdür (“ER Test Talep”). HRMS TR'nin izin kaydı türü başka işin klasöründedir.
@@ -865,21 +883,21 @@ bench --site <site> execute platform_core.erisim.tests.performance.measure
 
 | Tür | Uç | Ortanca (ms) | p95 (ms) | Sınır (ms) | Sonuç |
 | --- | --- | --- | --- | --- | --- |
-| Okuma | Liste, `own` kapsamı | 7,1 | 11,8 | 500 | `pass` |
-| Okuma | Liste, `team` kapsamı | 8,2 | 23,3 | 500 | `pass` |
-| Okuma | Liste, `all` kapsamı | 11,3 | 16,9 | 500 | `pass` |
-| Okuma | Tek kayıt | 10,2 | 14,5 | 500 | `pass` |
-| Okuma | Sayım, `team` kapsamı | 7,8 | 9,9 | 500 | `pass` |
-| Okuma | Rapor görünümü, `team` kapsamı | 7,4 | 12,4 | 500 | `pass` |
-| Okuma | Bağlantı araması | 7,6 | 9,9 | 500 | `pass` |
-| Okuma | Bağlantı doğrulama | 5,8 | 8,8 | 500 | `pass` |
-| Okuma | `explain_permission` | 6,4 | 7,2 | 500 | `pass` |
-| Okuma | `get_access_summary` | 3,5 | 4,9 | 500 | `pass` |
-| Yazma | Kayıt oluşturma | 9,1 | 12,3 | 1.000 | `pass` |
-| Yazma | Kayıt güncelleme | 8,9 | 16,6 | 1.000 | `pass` |
-| Yazma | Kayıt silme | 31,4 | 42,2 | 1.000 | `pass` |
-| Yazma | “Access Rule” değiştirme | 9,2 | 11,8 | 1.000 | `pass` |
-| Yazma | `set_level_access` | 162,6 | 225,9 | 1.000 | `pass` |
+| Okuma | Liste, `own` kapsamı | 4,2 | 6,7 | 500 | `pass` |
+| Okuma | Liste, `team` kapsamı | 3,9 | 4,6 | 500 | `pass` |
+| Okuma | Liste, `all` kapsamı | 3,1 | 5,2 | 500 | `pass` |
+| Okuma | Tek kayıt | 2,9 | 3,1 | 500 | `pass` |
+| Okuma | Sayım, `team` kapsamı | 4,5 | 7,3 | 500 | `pass` |
+| Okuma | Rapor görünümü, `team` kapsamı | 5,4 | 7,6 | 500 | `pass` |
+| Okuma | Bağlantı araması | 5,4 | 7,2 | 500 | `pass` |
+| Okuma | Bağlantı doğrulama | 5,5 | 6,2 | 500 | `pass` |
+| Okuma | `explain_permission` | 4,9 | 7,6 | 500 | `pass` |
+| Okuma | `get_access_summary` | 2,7 | 3,3 | 500 | `pass` |
+| Yazma | Kayıt oluşturma | 5,8 | 10,0 | 1.000 | `pass` |
+| Yazma | Kayıt güncelleme | 6,1 | 8,5 | 1.000 | `pass` |
+| Yazma | Kayıt silme | 19,3 | 23,9 | 1.000 | `pass` |
+| Yazma | “Access Rule” değiştirme | 6,3 | 7,4 | 1.000 | `pass` |
+| Yazma | `set_level_access` | 198,5 | 401,1 | 1.000 | `pass` |
 
 ### Kuralın liste sorgusuna eklediği süre
 
@@ -887,14 +905,14 @@ Komut aynı liste okumasını iki kez ölçer: kurallar açıkken ve kurallar ka
 
 | Kapsam | Sayfa | Kurallı ortanca (ms) | Kuralsız ortanca (ms) | Eklenen (ms) | Kurallı p95 (ms) |
 | --- | --- | --- | --- | --- | --- |
-| `own` | 20 | 2,39 | 0,61 | 1,78 | 3,13 |
-| `team` | 20 | 2,34 | 0,64 | 1,71 | 3,63 |
-| `all` | 20 | 1,81 | 0,85 | 0,96 | 3,36 |
-| `own` | 500 | 3,11 | 1,36 | 1,75 | 4,02 |
-| `team` | 500 | 4,94 | 1,49 | 3,45 | 6,09 |
-| `all` | 500 | 2,80 | 1,70 | 1,10 | 3,78 |
+| `own` | 20 | 4,94 | 1,01 | 3,93 | 13,82 |
+| `team` | 20 | 2,95 | 0,95 | 2,00 | 4,55 |
+| `all` | 20 | 2,50 | 1,21 | 1,29 | 3,73 |
+| `own` | 500 | 3,40 | 1,58 | 1,82 | 4,65 |
+| `team` | 500 | 4,21 | 1,43 | 2,78 | 5,46 |
+| `all` | 500 | 2,44 | 0,95 | 1,50 | 3,67 |
 
-Kural bir liste okumasına en çok 3,5 milisaniye ekler. Sürenin çoğu kural tablosunun ve öznenin okunmasıdır.
+Kural bir liste okumasına en çok 3,93 milisaniye ekler. İki ölçümde bu değer 3,5 ile 4 milisaniye arasında kaldı. Sürenin çoğu kural tablosunun ve öznenin okunmasıdır.
 
 ### Sınırı aşan uç ve düzeltmesi
 
@@ -903,6 +921,61 @@ Kural bir liste okumasına en çok 3,5 milisaniye ekler. Sürenin çoğu kural t
 1. Geliştirme sitemde arka plan işçisi yoktu ve kuyrukta 551 iş birikmişti. Bu ortamın sorunuydu. Kuyruk boşalınca p95 926 milisaniye oldu.
 2. Uç izin satırını silerken Frappe o satıra bağlı kayıtları arıyordu. Bu arama isteğin 685 milisaniyesini alıyordu.
 
-İzin satırına hiçbir kayıt bağlanmaz. Frappe'nin kendi izin yöneticisi de satırı bu aramayı atlayarak siler (`core/page/permission_manager/permission_manager.py:170`). Uç artık aynı yolu kullanır. p95 değeri 226 milisaniyeye indi.
+İzin satırına hiçbir kayıt bağlanmaz. Frappe'nin kendi izin yöneticisi de satırı bu aramayı atlayarak siler (`core/page/permission_manager/permission_manager.py:170`). Uç artık aynı yolu kullanır. p95 değeri düzeltmeden sonraki iki ölçümde 226 ve 401 milisaniye oldu.
 
 Bu ölçüm tek istekle ve küçük bir sitede yapıldı. Eşzamanlı yük ve gerçek kullanıcı ölçümü P1 işidir (G-149).
+
+## 21. Modül arayüzü
+
+Bu bölüm motorun öteki modüllere ve Frappe'ye açtığı her bağı sayar (B-3). Orkestratör bu tabloyu proje kaydının ortak listesine taşır.
+
+### Öteki modüllerin çağırdığı işlevler
+
+Öteki modüller yalnız `platform_core.erisim.api` modülünü içe aktarır.
+
+| İşlev | Ne yapar | Kim çağırır |
+| --- | --- | --- |
+| `report_guard(report_name, user=None)` | Rapor çalışamazsa izin hatası verir. | Rapor çalıştıran modüller. Örneğin yapay zekâ katmanı. |
+| `link_search_guard(doctype, query=None)` | Özel arama işlevi kurallı türde izin hatası verir. | Özel arama işlevi çalıştıracak kod. |
+| `search_link(doctype, txt, query=None, ...)` | Bağlantı aramasını kapıdan geçirerek yapar. | Python'dan bağlantı araması yapan kod. |
+
+### HTTP uçları
+
+| Uç | Yöntem | Kim çağırabilir |
+| --- | --- | --- |
+| `platform_core.api.access.explain_permission` | GET | Masa kullanıcısı. Website User çağıramaz. |
+| `platform_core.api.access.get_access_summary` | GET | Masa kullanıcısı ve Website User. Herkes yalnız kendi özetini görür. |
+| `platform_core.api.access.set_field_level` | POST | “System Manager” |
+| `platform_core.api.access.set_level_access` | POST | “System Manager” |
+
+### Frappe kancaları
+
+| Kanca | Motorun değeri | Etkisi |
+| --- | --- | --- |
+| `permission_query_conditions` | `erisim.hooks.query_conditions`, bütün türler için | Liste sorgusuna kural koşulunu ekler. |
+| `has_permission` | `erisim.hooks.has_permission`, bütün türler için | Tek kayıtta kuralı uygular. |
+| `override_whitelisted_methods` | `frappe.desk.search.search_link`, `frappe.desk.search.search_widget`, `frappe.client.validate_link_and_fetch` | Üç Frappe ucunun yerine motorun sarmalayıcısı çalışır. |
+| `extend_doctype_class` | “Report”, “Prepared Report”, “Auto Email Report”, “File” | Rapor kapısını kayıt sınıflarına ekler. Her yöntem `super()` çağırır. |
+| `doc_events` | “Role” ve “DocType” için `on_trash` ve `after_rename` | İstekte okunan kural listesini unutur. |
+| `after_install`, `after_migrate` | `erisim.reports.switch_off_governed_auto_email_reports` | Kurallı veriye dokunan e-posta raporlarını kapatır. |
+| `before_job` | `erisim.reports.refuse_prepared_report_job` | Sıradaki hazır rapor işini reddeder. |
+| `website_user_allowed_methods` | `platform_core.api.access.get_access_summary` | Website User özet ucunu çağırabilir. |
+
+### Platform kancaları
+
+| Kanca | Motorun değeri | Kim okur |
+| --- | --- | --- |
+| `ai_tools` | `erisim.ai_tools.declare` | Yapay zekâ katmanı. Dört aracı bildirir. |
+| `ai_write_closed_doctypes` | “Access Rule” | Yapay zekâ katmanı. Genel yazma araçlarını bu türe kapatır. |
+
+### Motorun dinlediği başka modül
+
+Kabuk modülü “Access Rule” kaydının `on_update` ve `on_trash` olaylarını dinler. Böylece kural değişince kabuğun izin sürümü yenilenir. Bu satırların sahibi kabuk işidir.
+
+### Kayıt türü
+
+Motorun tek kayıt türü “Access Rule” türüdür. Alanları 3. bölümdedir. Türü yalnız “System Manager” okur ve yazar.
+
+### Paket
+
+Motor `pypika` paketini doğrudan içe aktarır. Paket `pyproject.toml` dosyasında bildirilir (T-3). Frappe paketi kendi çatalından sabit bir commit ile kurar. Bu yüzden sürüm yazılmadı.

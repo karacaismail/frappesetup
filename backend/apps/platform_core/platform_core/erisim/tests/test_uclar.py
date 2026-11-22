@@ -1,5 +1,9 @@
 """The `explain_permission` and `get_access_summary` endpoints (contract)."""
 
+import frappe
+from frappe.utils.background_jobs import get_queues
+
+from platform_core.erisim.tests import base
 from platform_core.erisim.tests.base import (
 	ADMIN,
 	DOCTYPE,
@@ -199,3 +203,71 @@ class TestAccessSummary(ErisimTestCase):
 		response = self.summary(self.anonymous())
 
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+
+
+class TestWebsiteUser(ErisimTestCase):
+	"""A Website User reaches only the methods the shell allows (`website_user_allowed_methods`).
+
+	The summary shows the user's own scopes and is open to them. The explanation shows rule
+	detail and stays with desk users.
+	"""
+
+	RULES = (
+		*ErisimTestCase.RULES,
+		{
+			"title": "Portal own records",
+			"role": base.ROLE_PORTAL,
+			"scope": "own",
+			"match_field": "owner",
+			"allow_read": 1,
+			"priority": 40,
+		},
+	)
+
+	def test_the_fixture_user_is_a_website_user(self):
+		self.assertEqual(frappe.db.get_value("User", base.PORTAL, "user_type"), "Website User")
+
+	def test_website_user_gets_their_own_summary(self):
+		response = self.api(self.login(base.PORTAL), "GET", "get_access_summary", query={"doctype": DOCTYPE})
+
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		message = response.json["message"]
+		self.assertTrue(message["governed"])
+		self.assertEqual(message["operations"]["read"], ["own"])
+		self.assertEqual(message["operations"]["write"], [])
+		# Nothing about other roles, rule names or rule fields.
+		self.assertEqual(set(message), {"doctype", "governed", "operations"})
+
+	def test_website_user_cannot_ask_for_an_explanation(self):
+		record = self.records[EMPLOYEE_1]
+		query = {"doctype": DOCTYPE, "name": record}
+
+		response = self.api(self.login(base.PORTAL), "GET", "explain_permission", query=query)
+
+		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertNotIn("Calisan kendi kaydi", response.get_data(as_text=True))
+
+	def test_website_user_cannot_change_levels(self):
+		body = {"doctype": DOCTYPE, "role": base.ROLE_PORTAL, "permlevel": 1, "read": True, "write": False}
+
+		response = self.api(self.login(base.PORTAL), "POST", "set_level_access", body=body)
+
+		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+
+	def test_summary_is_on_the_shell_allow_list_and_the_explanation_is_not(self):
+		allowed = frappe.get_hooks("website_user_allowed_methods")
+
+		self.assertIn("platform_core.api.access.get_access_summary", allowed)
+		self.assertNotIn("platform_core.api.access.explain_permission", allowed)
+
+
+class TestQueuedJobs(ErisimTestCase):
+	def test_waiting_jobs_are_run_before_the_queue_is_full(self):
+		"""A site without a worker must not fail a test because old jobs fill the queue."""
+		for _number in range(5):
+			frappe.enqueue("frappe.ping", queue="default")
+
+		waited = base.run_queued_jobs(room=5)
+
+		self.assertGreaterEqual(waited, 5)
+		self.assertEqual(sum(queue.count for queue in get_queues()), 0)

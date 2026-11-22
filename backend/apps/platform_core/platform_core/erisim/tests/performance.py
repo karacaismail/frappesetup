@@ -9,7 +9,10 @@ Start it by hand on a development or test site:
     bench --site <site> execute platform_core.erisim.tests.performance.measure
 
 It refuses to run unless the site has `allow_tests` set, because it writes made-up employees,
-records and rules and deletes them again. There is no HTTP endpoint for it for the same reason.
+records and rules. There is no HTTP endpoint for it for the same reason.
+
+It keeps the names of everything it creates and deletes only those, also when it fails half
+way. Rules, records and employees that were on the site before stay as they were.
 
 The requests go through the WSGI application of Frappe, like the tests do (D-6). The time is the
 whole request in this process: session, permission hooks, query and response. Network time is
@@ -21,10 +24,11 @@ import statistics
 import time
 
 import frappe
+from frappe.permissions import reset_perms
 from frappe.tests.test_api import make_request
 from frappe.utils import get_test_client, now
 
-from platform_core.erisim import field_level, rules
+from platform_core.erisim import rules
 from platform_core.erisim.tests import base
 
 READ_LIMIT_MS = 500
@@ -60,20 +64,23 @@ def login(user: str):
 	return client
 
 
-def seed() -> dict:
-	"""Create the sample data: 200 employees in a tree and 2,000 records, ten for each employee."""
+def new_sample() -> dict:
+	"""The names of everything this run creates. `clean` deletes these and nothing else."""
+	return {"employees": [], "records": [], "rules": [], "reset_custom_permissions": False}
+
+
+def seed(sample: dict, employees: int, records: int) -> None:
+	"""Create the sample: employees in a tree, records spread over them, and the rules."""
 	base.ensure_fixtures()
 	people = {email: base.employee_of(email) for email in base.RECORD_OWNERS}
 	managers = [people[base.MANAGER_1], people[base.MANAGER_2]]
-	for index in range(EMPLOYEES - len(people)):
-		first_name = f"{MARK} {index:03d}"
-		if frappe.db.exists("Employee", {"first_name": first_name}):
-			continue
+	run = frappe.generate_hash(length=6)
+	for index in range(max(employees - len(people), 0)):
 		# The first seven have no manager and lead a team each. The others are spread over all nine.
 		reports_to = None if index < 7 else managers[index % len(managers)]
 		doc = frappe.get_doc(
 			doctype="Employee",
-			first_name=first_name,
+			first_name=f"{MARK} {run} {index:03d}",
 			company=base.COMPANY,
 			status="Active",
 			gender=base.GENDER,
@@ -82,12 +89,10 @@ def seed() -> dict:
 			create_user_permission=0,
 			reports_to=reports_to,
 		).insert()
+		sample["employees"].append(doc.name)
 		if index < 7:
 			managers.append(doc.name)
-	# Every employee of the sample, read as the system to build the sample itself.
-	employees = frappe.get_all(
-		"Employee", filters={"company": base.COMPANY}, pluck="name", order_by="name asc", limit=0
-	)
+	owners = [*people.values(), *sample["employees"]]
 	stamp = now()
 	fields = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx"]
 	fields += ["title", "employee", "company", "status", "salary_amount"]
@@ -101,44 +106,45 @@ def seed() -> dict:
 			0,
 			0,
 			f"{MARK} {number:04d}",
-			employees[number % len(employees)],
+			owners[number % len(owners)],
 			base.COMPANY,
 			"Open",
 			1234,
 		)
-		for number in range(RECORDS)
+		for number in range(records)
 	]
-	frappe.db.delete(base.DOCTYPE)
+	sample["records"] += [row[0] for row in rows]
 	frappe.db.bulk_insert(base.DOCTYPE, fields, rows)
-	rule_names = []
 	for rule in base.ErisimTestCase.RULES:
 		doc = frappe.get_doc(
 			{"doctype": base.RULE_DOCTYPE, "document_type": base.DOCTYPE, "is_active": 1, **rule}
 		)
-		rule_names.append(doc.insert().name)
+		sample["rules"].append(doc.insert().name)
 	# Committed on purpose: the requests use another connection.
 	frappe.db.commit()  # nosemgrep: frappe-request-commit
-	own = {email: record_of(employee) for email, employee in people.items()}
-	return {"employees": len(employees), "records": len(rows), "rules": rule_names, "own": own}
+	sample["total_employees"] = len(owners)
+	sample["own"] = {
+		email: next(row[0] for row in rows if row[8] == employee) for email, employee in people.items()
+	}
 
 
-def record_of(employee: str) -> str:
-	# The sample's own lookup of one record of the employee.
-	return frappe.db.get_value(base.DOCTYPE, {"employee": employee}, "name")
-
-
-def clean() -> None:
+def clean(sample: dict) -> None:
+	"""Delete what this run created, by name. Nothing else on the site is touched."""
 	frappe.set_user("Administrator")
 	frappe.db.rollback()
-	frappe.db.delete(base.DOCTYPE)
-	# Every rule and sample employee of the measurement, read as the system to delete them.
-	for name in frappe.get_all(base.RULE_DOCTYPE, pluck="name", limit=0):
-		frappe.delete_doc(base.RULE_DOCTYPE, name, force=True)
-	sample = frappe.get_all(
-		"Employee", filters={"first_name": ("like", f"{MARK} %")}, pluck="name", order_by="lft desc", limit=0
-	)
-	for name in sample:
-		frappe.delete_doc("Employee", name, force=True)
+	if sample["records"]:
+		frappe.db.delete(base.DOCTYPE, {"name": ("in", sample["records"])})
+	for name in sample["rules"]:
+		if frappe.db.exists(base.RULE_DOCTYPE, name):
+			frappe.delete_doc(base.RULE_DOCTYPE, name, force=True)
+	# Team members were created after their managers, so the reverse order deletes them first.
+	for name in reversed(sample["employees"]):
+		if frappe.db.exists("Employee", name):
+			frappe.delete_doc("Employee", name, force=True)
+	if sample["reset_custom_permissions"]:
+		# The level access case made Frappe copy the permission rows. The type had no copies before.
+		reset_perms(base.DOCTYPE)
+		frappe.clear_cache(doctype=base.DOCTYPE)
 	# Committed on purpose: the sample must be gone for every connection.
 	frappe.db.commit()  # nosemgrep: frappe-request-commit
 
@@ -291,7 +297,11 @@ def set_rules_active(names: list[str], active: int) -> None:
 
 
 def measure_rule_cost(sample: dict, calls: int) -> list[dict]:
-	"""Time the same list read with the rules active and with the rules switched off."""
+	"""Time the same list read with the rules active and with the rules switched off.
+
+	Only the rules of this run are switched. A site that has other active rules on the test
+	type keeps them, and the "without rules" column then still includes their cost.
+	"""
 	results = []
 	# The requests above changed a rule on another connection. Start from a fresh snapshot.
 	frappe.db.rollback()
@@ -345,26 +355,28 @@ def as_markdown(report: dict) -> str:
 	return "\n".join(lines)
 
 
-def measure(calls: int = 50, keep: int = 0) -> dict:
+def measure(calls: int = 50, keep: int = 0, employees: int = EMPLOYEES, records: int = RECORDS) -> dict:
 	"""Seed the sample, measure every endpoint and the rule cost, print the result and clean up."""
 	if not frappe.conf.allow_tests:
 		raise RuntimeError("The measurement writes sample data. Run it on a site with allow_tests set.")
 	calls = max(int(calls), 50)
-	clean()
+	# A full queue slows every write and fails deletes. Start with room in it.
+	base.run_queued_jobs()
+	sample = new_sample()
+	# The level access case makes Frappe copy the permission rows of the type. Put that back
+	# afterwards, but only when the type had no copies before.
+	sample["reset_custom_permissions"] = not frappe.db.exists("Custom DocPerm", {"parent": base.DOCTYPE})
 	try:
-		sample = seed()
+		seed(sample, int(employees), int(records))
 		report = {
-			"employees": sample["employees"],
-			"records": sample["records"],
+			"employees": sample["total_employees"],
+			"records": len(sample["records"]),
 			"calls": calls,
 			"endpoints": measure_endpoints(sample, calls),
 			"rule_cost": measure_rule_cost(sample, calls),
 		}
 	finally:
-		frappe.set_user("Administrator")
-		# Put back the level access that the last write case toggled.
-		field_level.set_level_access(base.DOCTYPE, base.ROLE_MANAGER, 1, False, False)
 		if not int(keep):
-			clean()
+			clean(sample)
 	print(as_markdown(report))
 	return report

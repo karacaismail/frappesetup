@@ -9,6 +9,7 @@ import ast
 import csv
 import os
 import re
+import sys
 import unittest
 from pathlib import Path
 
@@ -207,3 +208,25 @@ class TestWhoUsesTheEngine(unittest.TestCase):
 					found.add((relative, reference))
 
 		self.assertEqual(found, KNOWN_INTERNAL_USERS)
+
+
+class TestDeclaredPackages(unittest.TestCase):
+	def test_every_third_party_import_is_declared(self):
+		"""T-3: a package the code imports is declared, also when Frappe installs it anyway."""
+		project = (APP.parent / "pyproject.toml").read_text(encoding="utf-8")
+		block = project[
+			project.index("dependencies = [") : project.index("]", project.index("dependencies = ["))
+		]
+		declared = {name.lower() for name in re.findall(r'"([A-Za-z0-9_.-]+)', block)}
+		ours = {"frappe", "platform_core", "erpnext"}
+		imported = set()
+		for path in engine_files(tests=False):
+			for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+				names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else []
+				if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+					names = [node.module]
+				imported |= {name.split(".")[0] for name in names}
+		third_party = {name for name in imported if name not in sys.stdlib_module_names and name not in ours}
+
+		self.assertGreater(len(third_party), 0)
+		self.assertEqual({name for name in third_party if name.lower() not in declared}, set())

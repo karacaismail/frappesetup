@@ -269,10 +269,15 @@ class TestSwitchOffOnInstallAndMigrate(AutoEmailReportTestCase):
 
 		self.assertEqual([self.enabled(name) for name in governed], [0, 0, 0])
 		self.assertEqual(self.enabled(free), 1)
-		# An administrator must be able to find out later which records were switched off.
-		for name in governed:
-			self.assertTrue(any(name in line for line in logged.output), name)
-		self.assertFalse(any(free in line for line in logged.output))
+		# The log says how many were switched off. A record name comes from the report title
+		# (`frappe/email/doctype/auto_email_report/auto_email_report.py:70`) and a title can hold
+		# the name of a person, so no name is logged.
+		text = "\n".join(logged.output)
+		self.assertIn("3", text)
+		for name in (*governed, free):
+			self.assertNotIn(name, text)
+		for report, _report_type in GOVERNED_REPORTS:
+			self.assertNotIn(report, text)
 
 
 class TestUngovernedData(AutoEmailReportTestCase):

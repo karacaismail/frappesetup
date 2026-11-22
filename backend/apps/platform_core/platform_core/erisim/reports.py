@@ -42,28 +42,45 @@ def any_governed() -> bool:
 CUSTOM_REPORT = "Custom Report"
 
 
-def report_record(report_name: str | None):
-	"""The Report row Frappe will really run, and whether it could be found.
+RESOLVED, UNKNOWN, MISSING, LOOP = "resolved", "unknown", "missing", "loop"
+
+
+def resolve_report(report_name: str | None):
+	"""Follow the references the way Frappe does, with a list of the reports already seen.
 
 	Frappe follows `reference_report` only for a report of type "Custom Report"
 	(`frappe/desk/query_report.py:240`). A report of another type runs itself, also when the
-	field still holds an old value. Returns `(row, True)` for the report that runs,
-	`(None, True)` when the named report does not exist, and `(None, False)` when a custom
-	report refers to a missing report or the references form a loop.
+	field still holds an old value. Returns the row of the report that runs and one of four
+	states: resolved, unknown (the named report does not exist), missing (a custom report
+	refers to a report that does not exist) or loop. Each report is read once, one after the
+	other, so a loop of any length ends at its first repeat.
 	"""
 	seen: set[str] = set()
 	name = report_name
-	while name and name not in seen:
+	while name:
+		if name in seen:
+			return None, LOOP
 		seen.add(name)
 		# The own read of the gate: report type and reference only, never returned to the user.
 		record = frappe.db.get_value("Report", name, REPORT_FIELDS, as_dict=True)
 		if not record:
 			# The first name being unknown is Frappe's business. A broken reference is ours.
-			return None, len(seen) == 1
+			return None, UNKNOWN if len(seen) == 1 else MISSING
 		if record.report_type != CUSTOM_REPORT:
-			return record, True
+			return record, RESOLVED
 		name = record.reference_report
-	return None, not seen
+	# A custom report with an empty reference, or no name at all.
+	return None, MISSING if seen else UNKNOWN
+
+
+def report_record(report_name: str | None):
+	"""The Report row Frappe will really run, and whether it could be found.
+
+	Returns `(row, True)` for the report that runs, `(None, True)` when the named report does
+	not exist, and `(None, False)` when a reference is missing or the references form a loop.
+	"""
+	record, state = resolve_report(report_name)
+	return record, state in (RESOLVED, UNKNOWN)
 
 
 def touches_governed(report_name: str | None, governed: set[str] | None = None) -> bool:
@@ -189,28 +206,35 @@ def refuse_inside_prepared_report_job(report_name: str) -> None:
 
 
 LOADED_IN_REQUEST = "platform_core.erisim.reports.custom_reports_loaded"
-# Opening or saving a report loads it a few times. Following a loop loads it without end.
+# Opening or saving a report loads it a few times. Only a report that refers to itself needs
+# this count: nothing else tells its form apart from Frappe following the reference.
 MAX_LOADS_IN_REQUEST = 10
 
 
-def refuse_reference_loop(report_name: str) -> None:
-	"""Stop Frappe from following a loop of custom reports.
+def refuse_reference_loop(report_name: str, reference: str | None) -> None:
+	"""Stop Frappe before it follows a loop of custom reports.
 
 	Frappe resolves `reference_report` before the gate is asked
-	(`frappe/desk/query_report.py:37`): it loads each custom report in the chain, one after the
-	other, and in a loop it does so until Python gives up. The request then ends in a server
-	error. So the loads of one custom report are counted for the request. Past the limit the
-	references are checked, and a report that cannot be resolved is refused.
+	(`frappe/desk/query_report.py:37`): it loads each custom report in the chain with nested
+	calls, and in a loop it does so until Python gives up. The request then ends in a server
+	error.
 
-	A report that resolves is never refused here, however often it is loaded. A broken one can
-	still be opened and saved, so an administrator can repair it.
+	Frappe following a reference shows in the loads of one request: a custom report is loaded
+	right after another custom report that refers to it. At that moment the engine walks the
+	whole chain itself, with its own list of seen reports, and refuses a loop at once. A loop
+	of two reports and a loop of two hundred are refused at the same point, the second load.
+
+	Opening a report loads that report only, so a report in a loop can still be opened and
+	repaired. A missing reference is left to Frappe, which answers "not found".
 	"""
-	loads = frappe.local.request_cache.setdefault(LOADED_IN_REQUEST, {})
-	loads[report_name] = loads.get(report_name, 0) + 1
-	if loads[report_name] <= MAX_LOADS_IN_REQUEST:
-		return
-	_record, resolved = report_record(report_name)
-	if not resolved:
+	loaded = frappe.local.request_cache.setdefault(LOADED_IN_REQUEST, {})
+	references, counts = loaded.setdefault("references", {}), loaded.setdefault("counts", {})
+	followed = any(target == report_name for source, target in references.items() if source != report_name)
+	references[report_name] = reference
+	counts[report_name] = counts.get(report_name, 0) + 1
+	if reference == report_name and counts[report_name] > MAX_LOADS_IN_REQUEST:
+		followed = True
+	if followed and resolve_report(report_name)[1] == LOOP:
 		frappe.throw(
 			_("Report {0} refers to a report that cannot be found.").format(frappe.bold(report_name)),
 			frappe.PermissionError,
@@ -223,7 +247,7 @@ class GuardedReport:
 	def load_from_db(self, *args, **kwargs):
 		loaded = super().load_from_db(*args, **kwargs)
 		if self.get("report_type") == CUSTOM_REPORT:
-			refuse_reference_loop(self.name)
+			refuse_reference_loop(self.name, self.get("reference_report"))
 		return loaded
 
 	def execute_query_report(self, filters):
@@ -278,10 +302,11 @@ def switch_off_governed_auto_email_reports() -> None:
 		# fields of an old record must not be judged here.
 		frappe.db.set_value(AUTO_EMAIL_REPORT, name, "enabled", 0)
 	if switched_off:
-		# The names are the only trace of what was switched off. They hold no personal data.
+		# Only the number is logged. A record name comes from the report title, and a title can
+		# hold the name of a person.
 		logging.getLogger("platform_core.erisim").info(
-			"Auto Email Reports switched off, they read data governed by Access Rules: %s",
-			", ".join(switched_off),
+			"Auto Email Reports switched off because they read data governed by Access Rules: %d",
+			len(switched_off),
 		)
 
 

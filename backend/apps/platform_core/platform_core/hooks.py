@@ -115,6 +115,8 @@ website_user_allowed_methods = [
 	"platform_core.api.mobile_pwa.v1_register",
 	"platform_core.api.mobile_pwa.v1_revoke",
 	"platform_core.api.mobile_pwa.v1_revoke_installation",
+	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
+	"platform_core.api.access.get_access_summary",
 ]
 
 after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]

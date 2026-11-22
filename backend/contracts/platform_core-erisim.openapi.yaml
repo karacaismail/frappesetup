@@ -43,6 +43,10 @@ paths:
         The same value returns when the record does not exist. This way the endpoint does not reveal that a record exists.
         The `rules` list is empty in the response to an ordinary user.
 
+        A Website User cannot call this endpoint: it is not on the shell's allow-list
+        (`website_user_allowed_methods`), because the answer can carry rule detail. Such a
+        request returns 403.
+
         The “System Manager” role can also ask about another user.
         This role sees the rules one by one. It gets 404 when the record does not exist.
 
@@ -124,6 +128,9 @@ paths:
       summary: Returns the scopes of the session owner on a document type.
       description: |
         The endpoint returns a summary of the active rules that match the session owner.
+        A Website User can call it too: it is on the shell's allow-list
+        (`website_user_allowed_methods`). The user sees only their own scopes, never rule names,
+        rule fields or the scopes of other users.
         The interface uses this summary to tell the user which records will be visible.
         The endpoint does not change records.
 
@@ -655,7 +662,7 @@ x-report-rules:
     - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
     - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
     - The gate decides on the report Frappe really runs. Frappe follows `reference_report` only for a report of type “Custom Report”, and so does the gate. A report of another type is judged by its own type, also when that field still holds an old value.
-    - "A custom report whose references form a loop: running it, exporting it and reading its script return 403 for every user. Frappe follows the references before it asks the gate, so the engine counts how often one request loads the same custom report and refuses past 10 loads. Without this the request would end in a server error."
+    - "A custom report whose references form a loop: running it, exporting it and reading its script return 403 for every user. Frappe follows the references before it asks the gate. So the engine follows the chain itself as soon as Frappe loads the second report of a chain, keeps a list of the reports it has seen, and refuses at the first repeat. The length of the loop does not matter. Without this the request would end in a server error."
     - "A custom report whose reference cannot be found: running it and exporting it return 404 for every user. This is Frappe's own answer for the missing report, given before any data is read."
     - "A report with a loop or a missing reference can still be opened and saved, so that an administrator can repair it."
     - "The gate function itself (`report_guard`, Prepared Report, Auto Email Report) refuses both cases with a permission error. On a site with a governed document type such a report also counts as touching governed data."
