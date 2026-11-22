@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 import frappe
@@ -90,4 +91,56 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 			with self.subTest(url=url):
 				self.assertFalse(safe_url(url))
 		self.assertTrue(safe_url("/panel"))
-		self.assertTrue(safe_url("https://example.test/panel"))
+		self.assertFalse(safe_url("https://example.test/panel"))
+		with patch.dict(frappe.conf, {"shell_navigation_hosts": ["example.test"], "developer_mode": False}):
+			self.assertTrue(safe_url("https://example.test/panel"))
+			self.assertFalse(safe_url("http://example.test/panel"))
+			self.assertFalse(safe_url("https://sub.example.test/panel"))
+			self.assertFalse(safe_url("https://example.test@external.test/panel"))
+		with patch.dict(frappe.conf, {"shell_navigation_hosts": ["example.test"], "developer_mode": True}):
+			self.assertTrue(safe_url("http://example.test/panel"))
+
+	def test_bootstrap_includes_formatting_settings(self):
+		status, _, body = self.request("/api/method/platform_core.api.shell.get_bootstrap", self.reader_sid)
+		self.assertEqual(status, 200)
+		formatting = json.loads(body)["message"]["formatting"]
+		for key in ("time_zone", "number_format", "rounding_method"):
+			self.assertTrue(formatting[key])
+		self.assertEqual(formatting["currency"], frappe.get_system_settings("currency") or None)
+
+	def test_sidebar_drops_unknown_fields(self):
+		from platform_core.kabuk.bootstrap import project_sidebar
+
+		data = project_sidebar(
+			{
+				"name": "Example",
+				"internal": "ignore",
+				"items": [
+					{
+						"type": "Link",
+						"link_type": "DocType",
+						"link_to": DOCTYPE,
+						"new_key": "ignore",
+						"report": {"report_type": "Script Report", "private": "ignore"},
+					}
+				],
+			}
+		)
+		self.assertNotIn("internal", data)
+		self.assertNotIn("new_key", data["items"][0])
+		self.assertEqual(data["items"][0]["report"], {"report_type": "Script Report"})
+
+	def test_session_probe_and_shell_distinguish_guest_and_expired_sessions(self):
+		from frappe.sessions import delete_session
+
+		sid = self.login(READER)
+		probe = "/api/method/frappe.auth.get_logged_user"
+		status, _, body = self.request(probe, sid)
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(body)["message"], READER)
+		delete_session(sid=sid)
+		frappe.db.commit()
+		for path in (probe, "/api/method/platform_core.api.shell.get_bootstrap"):
+			self.assertEqual(self.request(path)[0], 403)
+			self.assertEqual(self.request(path, sid)[0], 401)
+		self.assertEqual(self.metadata(sid)[0], 401)

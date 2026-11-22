@@ -6,9 +6,43 @@ import frappe
 from frappe.desk.desktop import get_workspaces
 from frappe.desk.doctype.sidebar.sidebar import SidebarContext, get_navigable_modules, resolve_sidebar
 from frappe.desk.utils import is_item_allowed
+from frappe.utils import cint, get_system_timezone
 
 from platform_core.kabuk.cache import permission_version
 from platform_core.kabuk.serialization import digest
+
+SIDEBAR_FIELDS = (
+	"name",
+	"module",
+	"label",
+	"app",
+	"header_icon",
+	"module_onboarding",
+	"customized",
+	"computed",
+	"workspaces",
+)
+ITEM_FIELDS = (
+	"key",
+	"label",
+	"link_to",
+	"link_type",
+	"type",
+	"icon",
+	"child",
+	"collapsible",
+	"indent",
+	"keep_closed",
+	"url",
+	"show_arrow",
+	"filters",
+	"route_options",
+	"tab",
+	"open_in_new_tab",
+	"is_default_module",
+	"hidden",
+	"derived",
+)
 
 
 def safe_url(value: str | None) -> bool:
@@ -20,9 +54,33 @@ def safe_url(value: str | None) -> bool:
 		url = urlsplit(value)
 	except ValueError:
 		return False
-	if url.scheme:
-		return url.scheme.lower() in {"https", "http"} and bool(url.hostname) and not url.username
-	return value.startswith("/") and not value.startswith("//")
+	if not url.scheme:
+		return value.startswith("/") and not value.startswith("//")
+	if url.scheme != "https" and not (url.scheme == "http" and cint(frappe.conf.developer_mode)):
+		return False
+	if not url.hostname or url.username is not None or url.password is not None:
+		return False
+	try:
+		url.port
+	except ValueError:
+		return False
+	hosts = frappe.conf.get("shell_navigation_hosts")
+	return isinstance(hosts, list) and any(
+		isinstance(host, str) and host.lower() == url.hostname for host in hosts
+	)
+
+
+def project_sidebar(source: dict) -> dict:
+	data = {key: source[key] for key in SIDEBAR_FIELDS if key in source}
+	items = []
+	for row in source.get("items", []):
+		if row.get("link_type") in {"URL", "Help"} and not safe_url(row.get("url")):
+			continue
+		item = {key: row[key] for key in ITEM_FIELDS if key in row}
+		if isinstance(report := row.get("report"), dict):
+			item["report"] = {key: report[key] for key in ("report_type", "ref_doctype") if key in report}
+		items.append(item)
+	return {**data, "items": items}
 
 
 def get_bootstrap(user: str) -> dict:
@@ -54,12 +112,7 @@ def get_bootstrap(user: str) -> dict:
 		resolved = resolve_sidebar(shell, user, context)
 		if not resolved or (resolved.app and resolved.app not in apps):
 			continue
-		data = resolved.as_boot_entry()
-		data["items"] = [
-			item
-			for item in data["items"]
-			if item.get("link_type") not in {"URL", "Help"} or safe_url(item.get("url"))
-		]
+		data = project_sidebar(resolved.as_boot_entry())
 		if any(item.get("type") == "Link" for item in data["items"]):
 			sidebars.append({"name": shell, "data": data})
 
@@ -72,6 +125,12 @@ def get_bootstrap(user: str) -> dict:
 			"roles": sorted(frappe.get_roles(user)),
 		},
 		"installed_apps": apps,
+		"formatting": {
+			"time_zone": get_system_timezone(),
+			"currency": frappe.get_system_settings("currency") or None,
+			"number_format": frappe.get_system_settings("number_format") or "#,###.##",
+			"rounding_method": frappe.get_system_settings("rounding_method") or "Banker's Rounding (legacy)",
+		},
 		"workspaces": [
 			{
 				"name": page["name"],

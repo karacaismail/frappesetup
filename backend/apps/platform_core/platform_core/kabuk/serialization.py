@@ -34,6 +34,20 @@ FIELD_PROPERTIES = (
 )
 
 
+BOOLEAN_PROPERTIES = {
+	"reqd",
+	"hidden",
+	"fetch_if_empty",
+	"set_only_once",
+	"unique",
+	"in_list_view",
+	"in_standard_filter",
+	"non_negative",
+	"collapsible",
+}
+STRING_PROPERTIES = {"label", "description", "options", "default", "fetch_from", "precision"}
+
+
 DEPENDENCY_PROPERTIES = (
 	"depends_on",
 	"mandatory_depends_on",
@@ -76,7 +90,12 @@ def project_meta(
 			field.pop("fetch_if_empty", None)
 		if field["fieldtype"] == "Dynamic Link" and field.get("options") not in readable:
 			field.pop("options", None)
-		field["read_only"] = bool(source.get("read_only")) or name not in writable
+		for key in field.keys() & BOOLEAN_PROPERTIES:
+			field[key] = field[key] in (True, 1, "1")
+		for key in field.keys() & STRING_PROPERTIES:
+			if field[key] is not None and not isinstance(field[key], str):
+				field[key] = str(field[key])
+		field["read_only"] = source.get("read_only") in (True, 1, "1") or name not in writable
 		# A configured password default must never become client bootstrap data.
 		if field.get("fieldtype") == "Password":
 			field.pop("default", None)
