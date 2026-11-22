@@ -47,6 +47,8 @@ def keycloak_callback(
 	try:
 		target = sign_in.complete_callback(code, state, error)
 	except sign_in.SignInRefused as refusal:
+		# Releases the identity lock at once (merge review E1). Nothing of a refused sign-in is kept.
+		frappe.db.rollback()
 		frappe.respond_as_web_page(
 			_("Sign-in failed", context="platform_core.kimlik"),
 			refusal.message,

@@ -200,7 +200,11 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	if decision == "force":
 		# O-25: an employee idle for the limit authenticates again; the open Keycloak cookie does not count.
 		return build_login_url(record.get("redirect_to") or None, force_login=True)["login_url"]
+	_lock_identity_for_sign_in(settings.issuer, claims, user)
 	frappe.local.login_manager.login_as(user)
+	# Frappe commits right after it inserts the session row (frappe/sessions.py:301), which ends the lock.
+	# Take it again and check once more: a deletion that ran in between has closed this session too.
+	_lock_identity_for_sign_in(settings.issuer, claims, user, session_open=True)
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
 	frappe.local.session.data["session_expiry"] = session_policy.IDLE_TIMEOUT
 	remember_keycloak_session(claims.get("sid"), frappe.session.sid)
@@ -212,6 +216,41 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	frappe.db.commit()
 	frappe.local.cookie_manager.delete_cookie(_cookie_name())
 	return record.get("redirect_to") or settings.panel_url
+
+
+def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str, session_open: bool = False) -> None:
+	"""Merge review E1: sign-in and deletion take the same identity lock.
+
+	The lock is held until the callback commits, so the session row exists before a deletion can run.
+	A new transaction starts first: locking reads then see the latest committed rows. The account state
+	is read again under the lock. Frappe's `login_as` does not check it (frappe/auth.py:357).
+	"""
+	from platform_core.kimlik import anonymization
+
+	frappe.db.commit()
+	link, record = anonymization.lock_identity(issuer, claims["sub"].strip(), require_key=False)
+	if not session_open:
+		_after_identity_lock()
+	refused = record or not link or link.user != user
+	if not refused and not frappe.db.get_value("User", user, "enabled", for_update=True):
+		refused = True
+	if refused:
+		if session_open:
+			_close_new_session()
+		raise SignInRefused(403, _("This user is disabled.", context="platform_core.kimlik"))
+
+
+def _close_new_session() -> None:
+	from frappe.sessions import delete_session
+
+	sid = getattr(frappe.session, "sid", None)
+	if sid and sid != "Guest":
+		delete_session(sid, reason="Account deleted during sign-in")
+	frappe.local.cookie_manager.delete_cookie("sid")
+
+
+def _after_identity_lock() -> None:
+	"""Test seam: runs while the sign-in holds the identity lock. Does nothing in production."""
 
 
 def resolve_user(issuer: str, claims: dict) -> str:

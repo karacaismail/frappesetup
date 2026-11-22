@@ -55,8 +55,14 @@ def identity_hash(issuer: str, subject: str) -> str:
 	return hmac.new(str(key).encode(), message, hashlib.sha256).hexdigest()
 
 
-def lock_identity(issuer: str, subject: str) -> tuple[frappe._dict | None, frappe._dict | None]:
-	"""Locks the identity link and then the deletion record of `(iss, sub)`. Same order everywhere."""
+def lock_identity(
+	issuer: str, subject: str, *, require_key: bool = True
+) -> tuple[frappe._dict | None, frappe._dict | None]:
+	"""Locks the identity link and then the deletion record of `(iss, sub)`. Same order everywhere.
+
+	Sign-in passes `require_key=False`: without the key no deletion can have happened, so only the link
+	is locked. Identity changes keep failing closed with 503.
+	"""
 	link = frappe.db.get_value(
 		provisioning.LINK,
 		{"issuer": issuer, "subject": subject},
@@ -64,6 +70,8 @@ def lock_identity(issuer: str, subject: str) -> tuple[frappe._dict | None, frapp
 		as_dict=True,
 		for_update=True,
 	)
+	if not require_key and not frappe.conf.get(KEY_SETTING):
+		return link, None
 	record = frappe.db.get_value(
 		DELETION, identity_hash(issuer, subject), ["name", "state", "user"], as_dict=True, for_update=True
 	)

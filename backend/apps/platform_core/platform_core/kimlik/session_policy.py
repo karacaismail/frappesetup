@@ -13,6 +13,7 @@
   from that attempt. Customer durations apply only to Press.
 """
 
+import re
 import time
 
 import frappe
@@ -22,6 +23,7 @@ IDLE_SECONDS = 3600
 ACTIVITY_PREFIX = "kimlik_activity"
 AUTH_TIME_LEEWAY = 30
 BACKGROUND_HEADER = "X-Platform-Background"
+METHOD_PATH = re.compile(r"^/api/(?:v[12]/)?method/([^/?#]+)")
 # Polling and realtime helpers of the desk. They keep a tab alive but are not user activity.
 BACKGROUND_METHOD_PREFIXES = (
 	"frappe.realtime.",
@@ -67,24 +69,38 @@ def is_background_request(request) -> bool:
 	"""Requests that must not renew the idle time (O-25: background sync does not extend sessions)."""
 	if request.headers.get(BACKGROUND_HEADER) == "1":
 		return True
+	return requested_method(request).startswith(BACKGROUND_METHOD_PREFIXES)
+
+
+def requested_method(request) -> str:
+	"""Method name of a request in every form Frappe accepts (merge review Ö2).
+
+	`/api/method/<m>`, `/api/v1/method/<m>`, `/api/v2/method/<m>` and the `cmd` field in the form or
+	in the query string (frappe/app.py:340).
+	"""
 	path = request.path or ""
-	method = path.split("/api/method/", 1)[1] if "/api/method/" in path else (request.form.get("cmd") or "")
-	return method.startswith(BACKGROUND_METHOD_PREFIXES)
+	match = METHOD_PATH.match(path)
+	if match:
+		return match.group(1)
+	return str(request.form.get("cmd") or request.args.get("cmd") or "")
 
 
 def before_request() -> None:
 	"""Ends a cookie session whose last real activity is older than the idle limit.
 
 	Frappe renews `last_updated` on every request, background polling included (frappe/sessions.py:420).
-	This hook measures real activity instead. Token requests (service and mobile) carry no cookie session
-	and are skipped.
+	This hook measures real activity instead. A request with the session cookie is always checked.
 	"""
 	request = getattr(frappe.local, "request", None)
 	session = getattr(frappe.local, "session", None)
 	if request is None or session is None:
 		return
 	sid, user = session.get("sid"), session.get("user")
-	if not sid or sid == "Guest" or not user or user == "Guest" or request.headers.get("Authorization"):
+	# Merge review Ö1: a cookie session is always checked, also when an Authorization header is present.
+	# Token identities (service and mobile) carry no cookie session and have no session id here.
+	if not sid or sid == "Guest" or not user or user == "Guest":
+		return
+	if request.cookies.get("sid") != sid:
 		return
 	if frappe.cache.get_value(_session_key(sid), expires=True, use_local_cache=False) is None:
 		from frappe.auth import clear_cookies

@@ -118,15 +118,9 @@ def _mark_used_or_reject(claims: dict) -> None:
 
 def _close(finder, *args) -> int:
 	closed = 0
-	for _round in range(MAX_BATCHES):
-		rows = finder(*args)
-		if not rows:
-			break
-		for sid, user in rows:
-			delete_session(sid, user=user, reason=LOGOUT_REASON)
-			closed += 1
-		if len(rows) < BATCH:
-			break
+	for sid, user in finder(*args):
+		delete_session(sid, user=user, reason=LOGOUT_REASON)
+		closed += 1
 	return closed
 
 
@@ -137,24 +131,31 @@ def _session_exists(frappe_sid: str) -> bool:
 
 def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
 	"""Sessions of the user that were created before the logout token was issued. A replayed or
-	delayed token therefore never closes a session that was opened after it."""
+	delayed token therefore never closes a session that was opened after it.
+
+	Merge review Ö3: every page is read. A first page full of newer sessions does not hide older ones.
+	"""
 	sessions = frappe.qb.DocType("Sessions")
-	rows = (
-		frappe.qb.from_(sessions)
-		.select(sessions.sid, sessions.user, sessions.sessiondata)
-		.where(sessions.user == user)
-		.orderby(sessions.lastupdate)
-		.orderby(sessions.sid)
-		.limit(BATCH)
-		.run()
-	)
 	now = now_datetime()
 	selected = []
-	for sid, owner, raw in rows:
-		created = _created_epoch(raw, now)
-		# `iat` has second precision; a session opened within that same second is treated as older.
-		if created is None or created < iat + 1:
-			selected.append((sid, owner))
+	for page in range(MAX_BATCHES):
+		rows = (
+			frappe.qb.from_(sessions)
+			.select(sessions.sid, sessions.user, sessions.sessiondata)
+			.where(sessions.user == user)
+			.orderby(sessions.lastupdate)
+			.orderby(sessions.sid)
+			.limit(BATCH)
+			.offset(page * BATCH)
+			.run()
+		)
+		for sid, owner, raw in rows:
+			created = _created_epoch(raw, now)
+			# `iat` has second precision; a session opened within that same second is treated as older.
+			if created is None or created < iat + 1:
+				selected.append((sid, owner))
+		if len(rows) < BATCH:
+			break
 	return selected
 
 

@@ -196,6 +196,71 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertNotEqual(frappe.db.get_value("ToDo", self.todo.name, "allocated_to"), DELETED)
 		self.assertNotEqual(frappe.db.get_value("ToDo", self.todo.name, "owner"), DELETED)
 
+	def test_shared_business_file_stays_and_personal_file_goes(self):
+		# Merge review E3: a file bound to the User record is personal. A file on a business record is a
+		# business record, even when the person uploaded it privately.
+		personal = self._file("profil.txt", "User", DELETED)
+		business = self._file("ortak-is.txt", "ToDo", self.todo.name)
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		self.assertFalse(frappe.db.exists("File", personal))
+		self.assertTrue(frappe.db.exists("File", business))
+
+	def test_only_the_exact_address_changes_in_e_mail_fields(self):
+		similar = f"x.{DELETED}, {DELETED}.ornek"
+		communication = frappe.get_doc(
+			{
+				"doctype": "Communication",
+				"communication_type": "Communication",
+				"communication_medium": "Email",
+				"subject": "Ornek konu",
+				"sender": NAMESAKE,
+				"recipients": f"{similar}, {DELETED}",
+				"content": "Ornek ileti",
+			}
+		).insert(ignore_permissions=True)
+		other = frappe.get_doc(
+			{
+				"doctype": "Communication",
+				"communication_type": "Communication",
+				"communication_medium": "Email",
+				"subject": "Benzer adres",
+				"sender": NAMESAKE,
+				"recipients": similar,
+				"content": "Ornek ileti",
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.commit()
+		self.addCleanup(frappe.db.delete, "Communication", {"name": ("in", [communication.name, other.name])})
+		response = self.call()
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		anon = response.json["message"]["user"]
+		h.refresh()
+		recipients = [
+			a.strip()
+			for a in frappe.db.get_value("Communication", communication.name, "recipients").split(",")
+		]
+		self.assertEqual(recipients, [f"x.{DELETED}", f"{DELETED}.ornek", anon])
+		self.assertEqual(frappe.db.get_value("Communication", other.name, "recipients"), similar)
+
+	def _file(self, name: str, doctype: str, docname: str) -> str:
+		doc = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": name,
+				"content": b"ornek",
+				"is_private": 1,
+				"attached_to_doctype": doctype,
+				"attached_to_name": docname,
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.set_value("File", doc.name, "owner", DELETED, update_modified=False)
+		frappe.db.commit()
+		self.addCleanup(
+			frappe.delete_doc, "File", doc.name, force=True, ignore_permissions=True, ignore_missing=True
+		)
+		return doc.name
+
 	def test_no_mail_and_no_frappe_deletion_request(self):
 		before = frappe.db.count("Personal Data Deletion Request")
 		self.assertEqual(self.call().status_code, 200)

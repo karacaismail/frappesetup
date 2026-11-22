@@ -81,3 +81,10 @@ class DeletionKeyMissing(frappe.ValidationError):
 	"""The site setting `kimlik_deletion_hmac_key` is missing. Identity changes fail closed."""
 
 	http_status_code = 503
+
+
+class IdentityInternalError(frappe.ValidationError):
+	"""An unexpected server error of an identity endpoint. The message carries no request data (review E2)."""
+
+	http_status_code = 500
+	skip_error_log = True

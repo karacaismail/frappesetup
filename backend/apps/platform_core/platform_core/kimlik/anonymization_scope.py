@@ -15,6 +15,7 @@ The caller renames the user afterwards; Frappe then rewrites every Link, `owner`
 """
 
 import json
+import re
 
 import frappe
 
@@ -73,10 +74,15 @@ def _text_fields(doctype: str) -> list[str]:
 	return [df.fieldname for df in frappe.get_meta(doctype).fields if df.fieldtype in TEXT_TYPES]
 
 
+def _address_pattern(address: str) -> re.Pattern:
+	"""Merge review E3: only the exact address matches, not `x.<address>` or `<address>.tr`."""
+	return re.compile(rf"(?<![A-Za-z0-9._%+-]){re.escape(address)}(?![A-Za-z0-9._%+-])", re.IGNORECASE)
+
+
 def _scrub(text, user: str, anon: str, full_name: str):
 	if not isinstance(text, str) or not text:
 		return text
-	result = text.replace(user, anon)
+	result = _address_pattern(user).sub(anon, text)
 	if full_name and full_name != user:
 		result = result.replace(full_name, REDACTED)
 	return result
@@ -155,13 +161,21 @@ def _extra_records(user: str, anon: str, full_name: str) -> None:
 		if scrubbed != row["data"]:
 			frappe.db.set_value("Version", row["name"], "data", scrubbed, update_modified=False)
 
-	# Profile photo and personal files the user uploaded.
+	# Personal files (merge review E3): files bound to the User record or to the person's own records
+	# (Contact). A file on a business record is a business record and stays, whoever uploaded it.
 	files = set(
 		frappe.get_all(
 			"File", filters={"attached_to_doctype": "User", "attached_to_name": user}, pluck="name"
 		)
 	)
-	files |= set(frappe.get_all("File", filters={"owner": user, "is_private": 1}, pluck="name"))
+	if contacts:
+		files |= set(
+			frappe.get_all(
+				"File",
+				filters={"attached_to_doctype": "Contact", "attached_to_name": ("in", list(contacts))},
+				pluck="name",
+			)
+		)
 	for name in files:
 		frappe.delete_doc("File", name, force=True, ignore_permissions=True)
 	frappe.db.set_value("User", user, {"user_image": None, "banner_image": None}, update_modified=False)
@@ -178,11 +192,17 @@ def _extra_records(user: str, anon: str, full_name: str) -> None:
 		fields=["name", "sender", "sender_full_name", "recipients", "cc", "bcc"],
 	):
 		values = {f: _scrub(row[f], user, anon, "") for f in ("sender", "recipients", "cc", "bcc")}
-		if row["sender"] == user:
+		values = {f: v for f, v in values.items() if v != row[f]}
+		if (row["sender"] or "").lower() == user.lower():
 			values["sender_full_name"] = REDACTED
-		frappe.db.set_value("Communication", row["name"], values, update_modified=False)
-	for row in frappe.get_all("Email Queue", filters={"sender": ("like", f"%{user}%")}, pluck="name"):
-		frappe.db.set_value("Email Queue", row, "sender", anon, update_modified=False)
+		if values:
+			frappe.db.set_value("Communication", row["name"], values, update_modified=False)
+	for row in frappe.get_all(
+		"Email Queue", filters={"sender": ("like", f"%{user}%")}, fields=["name", "sender"]
+	):
+		scrubbed = _scrub(row["sender"], user, anon, "")
+		if scrubbed != row["sender"]:
+			frappe.db.set_value("Email Queue", row["name"], "sender", scrubbed, update_modified=False)
 	for row in frappe.get_all("Email Queue Recipient", filters={"recipient": user}, pluck="name"):
 		frappe.db.set_value("Email Queue Recipient", row, "recipient", anon, update_modified=False)
 
