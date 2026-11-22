@@ -21,7 +21,7 @@ paths:
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
         Binds the installation to a verified Keycloak session.
-        A revoked installation cannot be reactivated. A new session requires a new installation ID.
+        A revoked installation cannot be reactivated. An active installation can be rebound to a new verified Keycloak session.
       requestBody:
         required: true
         content:
@@ -238,7 +238,7 @@ paths:
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
         Registers the mobile installation using a same-origin Frappe session.
-        A revoked installation cannot be reactivated. A new session requires a new installation ID.
+        An active installation can be reused after signing in again. A revoked installation cannot be reactivated.
       requestBody:
         required: true
         content:
@@ -264,8 +264,8 @@ paths:
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
         Revokes one installation or all active installations for the account.
-        The returned count reflects local revocations. The server then requests session closure.
-        A single-installation revocation can be retried from another valid session.
+        The count reflects local revocations. The browser session stays open.
+        Registering a new installation after revocation requires a new cookie session.
       requestBody:
         required: true
         content:
@@ -393,6 +393,90 @@ paths:
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_list_installations:
+    post:
+      summary: List your mobile installations
+      operationId: mobileV1ListInstallations
+      description: Lists installations for the verified account, ordered by installation ID.
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallationListRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/InstallationListSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_revoke_installation:
+    post:
+      summary: Revoke one of your mobile installations
+      operationId: mobileV1RevokeInstallation
+      description: Revokes one owned installation and requests closure of its Keycloak session when present.
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_list_installations:
+    post:
+      summary: List your mobile installations
+      operationId: mobilePwaV1ListInstallations
+      description: Lists installations for the signed-in account, ordered by installation ID.
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallationListRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/InstallationListSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_revoke_installation:
+    post:
+      summary: Revoke one of your mobile installations
+      operationId: mobilePwaV1RevokeInstallation
+      description: Revokes one owned installation without signing out the current browser.
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     identitySyncBearer:
@@ -427,6 +511,11 @@ components:
       type: string
       format: uuid
       pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    InstallationListRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        after: { $ref: '#/components/schemas/UUID' }
     Device:
       type: object
       additionalProperties: false
@@ -476,6 +565,8 @@ components:
       type: object
       required: [dry_run, removed, operations_removed, eligible_changes, eligible_operations, deliveries_removed, eligible_deliveries]
       properties:
+        eligible_revoked_sessions: { type: integer, minimum: 0, maximum: 1000 }
+        revoked_sessions_removed: { type: integer, minimum: 0, maximum: 1000 }
         dry_run: { type: boolean }
         removed: { type: integer, minimum: 0, maximum: 2000 }
         operations_removed: { type: integer, minimum: 0, maximum: 1000 }
@@ -530,6 +621,7 @@ components:
             - service_token_required
             - pwa_request_forbidden
             - pwa_session_required
+            - reauthentication_required
             - rate_limit
             - record_not_found
             - unexpected_version
@@ -540,6 +632,33 @@ components:
         exc_type: { type: string, description: Error type returned if Frappe rejects the request before it reaches the endpoint. }
         current: { $ref: '#/components/schemas/Change', description: Current record visible to the user. }
   responses:
+    InstallationListSuccess:
+      description: A page of installations for the authenticated account.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message:
+                type: object
+                required: [installations, next_after]
+                properties:
+                  installations:
+                    type: array
+                    maxItems: 20
+                    items:
+                      type: object
+                      required: [installation_id, scope, revoked]
+                      properties:
+                        installation_id: { $ref: '#/components/schemas/UUID' }
+                        scope: { type: string, enum: [mobile, pwa] }
+                        revoked: { type: boolean }
+                  next_after:
+                    anyOf:
+                      - { $ref: '#/components/schemas/UUID' }
+                      - { type: 'null' }
     DeviceSuccess:
       description: The request completed.
       content:

@@ -92,6 +92,12 @@ def _limit_and_count(principal, app_version, contract_version):
 	)
 
 
+def _identity_link(account):
+	if not frappe.db.exists("DocType", "Platform Identity Link"):
+		return None
+	return frappe.db.get_value("Platform Identity Link", {"user": account}, ["issuer", "subject"])
+
+
 def mobile_request(endpoint):
 	request = frappe.local.request
 	expected_path = f"/api/method/platform_core.api.mobile.{endpoint}"
@@ -139,9 +145,7 @@ def mobile_request(endpoint):
 
 	issuer, subject = identity.get("issuer"), identity.get("subject")
 	if not issuer and not subject:
-		issuer, subject = frappe.db.get_value(
-			"Platform Identity Link", {"user": account}, ["issuer", "subject"]
-		) or (None, None)
+		issuer, subject = _identity_link(account) or (None, None)
 	if not isinstance(issuer, str) or not issuer or not isinstance(subject, str) or not subject:
 		raise MobileError("mobile_token_required", 401)
 	principal = content_digest([issuer, subject])
@@ -149,7 +153,11 @@ def mobile_request(endpoint):
 		request, Identity(frappe.local.site, account, principal, scope, issued_at, sid, installation)
 	)
 	# Account owners may revoke a different installation from their current one.
-	if endpoint != "v1_revoke" and "installation_id" in body and body["installation_id"] != installation:
+	if (
+		endpoint not in {"v1_revoke", "v1_revoke_installation"}
+		and "installation_id" in body
+		and body["installation_id"] != installation
+	):
 		raise MobileError("installation_unavailable", 403)
 	return mobile_identity, body
 
@@ -176,7 +184,7 @@ def pwa_request(endpoint):
 	csrf_token = request.headers.get("X-Frappe-CSRF-Token", "")
 	expected_csrf = frappe.session.data.csrf_token
 	if (
-		origin != request.host_url.rstrip("/")
+		origin != (frappe.conf.get("host_name") or request.host_url).rstrip("/")
 		or not expected_csrf
 		or not compare_digest(csrf_token.encode(), expected_csrf.encode())
 	):
@@ -187,7 +195,10 @@ def pwa_request(endpoint):
 	except ValueError as error:
 		raise MobileError("pwa_session_required", 401) from error
 	issued_at = int(created.replace(tzinfo=ZoneInfo(get_system_timezone())).timestamp())
-	principal = content_digest(["pwa", account])
+	link = _identity_link(account)
+	if not link or not all(isinstance(value, str) and value for value in link):
+		raise MobileError("pwa_session_required", 401)
+	principal = content_digest(list(link))
 	return _sync_payload(request, Identity(frappe.local.site, account, principal, "pwa", issued_at, None))
 
 

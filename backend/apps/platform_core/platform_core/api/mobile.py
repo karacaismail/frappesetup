@@ -2,8 +2,10 @@
 
 import hashlib
 import time
+from zoneinfo import ZoneInfo
 
 import frappe
+from frappe.utils import get_system_timezone
 
 from platform_core.mobil.lifecycle import (
 	_require_enabled_user,
@@ -65,12 +67,38 @@ def _revoke(identity, body):
 	return result
 
 
+def _require_recent_activity(identity, row):
+	last_activity = max(int(row.last_user_activity_at or 0), int(row.session_bound_at or 0))
+	if not last_activity:
+		last_activity = int(row.creation.replace(tzinfo=ZoneInfo(get_system_timezone())).timestamp())
+	employee = frappe.db.get_value("User", identity.account, "user_type") == "System User"
+	idle_limit = 3600 if employee else 7 * 86400
+	if int(time.time()) - last_activity >= idle_limit:
+		raise MobileError("reauthentication_required", 401)
+
+
+def _list_installations(identity, body):
+	_keys(body, set(), {"after"})
+	_require_enabled_user(identity.account)
+	after = uuid4_id(body["after"]) if "after" in body else None
+	return MobileStore().list_owned_installations(identity, after)
+
+
+def _revoke_installation(identity, body):
+	_keys(body, {"installation_id"})
+	installation = uuid4_id(body["installation_id"])
+	_lock_mobile_account(identity)
+	return MobileStore().revoke_owned_installation(identity, installation)
+
+
 def _activity(identity, body):
 	_keys(body, {"installation_id"})
 	_lock_mobile_account(identity)
-	MobileStore().require_installation(identity, uuid4_id(body["installation_id"]), for_update=True)
+	installation = uuid4_id(body["installation_id"])
+	row = MobileStore().require_installation(identity, installation, for_update=True)
+	_require_recent_activity(identity, row)
 	activity_at = int(time.time())
-	frappe.db.set_value("Mobile Account State", identity.account, "last_user_activity_at", str(activity_at))
+	frappe.db.set_value("Mobile Installation", installation, "last_user_activity_at", str(activity_at))
 	return {"last_user_activity_at": activity_at}
 
 
@@ -78,7 +106,8 @@ def _push(identity, body):
 	_keys(body, {"installation_id", "operations"})
 	_lock_mobile_account(identity)
 	store = MobileStore()
-	store.require_installation(identity, uuid4_id(body["installation_id"]), for_update=True)
+	row = store.require_installation(identity, uuid4_id(body["installation_id"]), for_update=True)
+	_require_recent_activity(identity, row)
 	disabled = frappe.conf.get("mobile_disabled_commands", [])
 	if not isinstance(disabled, list) or any(not isinstance(name, str) for name in disabled):
 		raise MobileError("invalid_mobile_settings", 503)
@@ -98,7 +127,8 @@ def _pull(identity, body):
 	_keys(body, {"installation_id"}, {"limit", "cursor"})
 	installation = uuid4_id(body["installation_id"])
 	store = MobileStore()
-	store.require_installation(identity, installation)
+	row = store.require_installation(identity, installation)
+	_require_recent_activity(identity, row)
 	site_secret = frappe.conf.get("mobile_cursor_key")
 	if not isinstance(site_secret, str) or len(site_secret) < 32:
 		raise MobileError("cursor_key_unavailable", 503)
@@ -180,3 +210,13 @@ def v1_cleanup():
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def revoke_user_installations():
 	return identity_sync_response(_revoke_user_installations)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def v1_list_installations():
+	return endpoint_response("v1_list_installations", _list_installations)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def v1_revoke_installation():
+	return endpoint_response("v1_revoke_installation", _revoke_installation)

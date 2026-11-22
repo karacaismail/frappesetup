@@ -12,7 +12,9 @@
   "revoked",
   "last_audit_at",
   "session_id",
-  "notification_token"
+  "notification_token",
+  "last_user_activity_at",
+  "session_bound_at"
  ],
  "fields": [
   {
@@ -75,6 +77,22 @@
    "label": "Notification token",
    "hidden": 1,
    "description": "The private notification binding for this installation."
+  },
+  {
+   "description": "Unix time of the last reported interactive action for this installation.",
+   "fieldname": "last_user_activity_at",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Last user activity time",
+   "length": 16
+  },
+  {
+   "description": "Unix time used as the idle baseline for the current authenticated session.",
+   "fieldname": "session_bound_at",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Session binding time",
+   "length": 16
   }
  ],
  "links": [],

@@ -24,7 +24,7 @@ REVOKE_ONE = "mobile-revoke-one@example.test"
 RECORD = "Mobile Fixture Record"
 MOBILE_PATHS = frozenset(
 	f"/api/method/platform_core.api.mobile.v1_{action}"
-	for action in ("register", "revoke", "pull", "push", "cleanup")
+	for action in ("register", "revoke", "pull", "push", "cleanup", "activity", "list_installations", "revoke_installation")
 )
 PROBE_PATH = "/api/method/mobile_test_app.fixture.commit_probe"
 TOKENS = {

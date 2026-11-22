@@ -70,6 +70,16 @@ def cleanup(dry_run=False):
 	if deliveries and not dry_run:
 		frappe.db.delete("Mobile Delivery", {"name": ["in", deliveries]})
 
+	# Keycloak sessions last at most 30 days. Keep denials an extra day for clock skew.
+	revoked_sessions = _eligible(
+		"Mobile Revoked Session",
+		{"creation": ["<", now - timedelta(days=31)]},
+		["name"],
+		for_update=not dry_run,
+	)
+	if revoked_sessions and not dry_run:
+		frappe.db.delete("Mobile Revoked Session", {"name": ["in", [row.name for row in revoked_sessions]]})
+
 	floor = frappe.db.get_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "retention_floor", for_update=not dry_run)
 	if floor is None:
 		raise MobileError("mobile_schema_unavailable", 503)
@@ -87,6 +97,7 @@ def cleanup(dry_run=False):
 		frappe.db.delete("Mobile Change", {"name": ["in", [row.name for row in changes]]})
 		floor = max(floor, *(row.sequence for row in changes))
 		frappe.db.set_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "retention_floor", floor)
+
 	return {
 		"dry_run": dry_run,
 		"removed": 0 if dry_run else len(changes),
@@ -95,4 +106,6 @@ def cleanup(dry_run=False):
 		"eligible_operations": len(operations),
 		"eligible_deliveries": len(deliveries),
 		"deliveries_removed": 0 if dry_run else len(deliveries),
+		"eligible_revoked_sessions": len(revoked_sessions),
+		"revoked_sessions_removed": 0 if dry_run else len(revoked_sessions),
 	}

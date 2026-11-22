@@ -9,7 +9,7 @@ from .protocol import MobileError, content_digest
 from .store import _insert
 
 REVOKED_SESSION = "Mobile Revoked Session"
-SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9._~-]{1,140}")
+SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
 def valid_session_id(value):
@@ -35,7 +35,7 @@ def is_session_closure_pending(sid):
 	return bool(frappe.db.get_value(REVOKED_SESSION, _session_key(sid), "delivery_pending"))
 
 
-def revoke_after_commit(session_ids):
+def revoke_after_commit(session_ids, *, remote=True):
 	pending = []
 	for sid in sorted({sid for sid in session_ids if valid_session_id(sid)}):
 		key = _session_key(sid)
@@ -47,13 +47,21 @@ def revoke_after_commit(session_ids):
 			for_update=True,
 		)
 		if row is None:
-			_insert(REVOKED_SESSION, session_key=key, delivery_pending=1, ignore_duplicate=True)
-		if row is None or row.delivery_pending:
+			_insert(REVOKED_SESSION, session_key=key, delivery_pending=int(remote), ignore_duplicate=True)
+		if remote and (row is None or row.delivery_pending):
 			pending.append(sid)
+		elif not remote and row is not None and row.delivery_pending:
+			frappe.db.set_value(REVOKED_SESSION, key, "delivery_pending", 0)
 
 	if pending:
 		# A failed transaction or its retry cannot send the remote request.
-		frappe.db.after_commit.add(lambda: _deliver_committed(tuple(pending)))
+		request = getattr(frappe.local, "request", None)
+		queue = getattr(request, "after_response", None)
+		session_ids = tuple(pending)
+		if queue is None:
+			frappe.db.after_commit.add(lambda: _deliver_committed(session_ids))
+		else:
+			frappe.db.after_commit.add(lambda: queue.add(lambda: _deliver_committed(session_ids)))
 
 
 def _deliver_committed(session_ids):
@@ -65,5 +73,4 @@ def _deliver_committed(session_ids):
 			frappe.db.commit()  # nosemgrep: acknowledge after the revocation transaction committed
 	except Exception:
 		# The pending marker is already durable. Retry the same installation if acknowledgement fails.
-		frappe.db.rollback()
 		frappe.logger("mobile_sessions").warning("A mobile session closure could not be acknowledged.")

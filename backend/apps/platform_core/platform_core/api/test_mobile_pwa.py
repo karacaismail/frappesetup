@@ -15,6 +15,12 @@ from frappe.utils.password import update_password
 class MobilePwaTest(IntegrationTestCase):
 	def setUp(self):
 		self.site = frappe.local.site
+		self.enterContext(
+			patch(
+				"platform_core.mobil.request._identity_link",
+				side_effect=lambda account: ("https://identity.example.test", account),
+			)
+		)
 
 	def tearDown(self):
 		frappe.db.rollback()
@@ -46,7 +52,7 @@ class MobilePwaTest(IntegrationTestCase):
 		session["data"]["csrf_token"] = frappe.generate_hash()
 		frappe.cache.hset("session", sid, session)
 		headers = {
-			"Origin": "http://localhost",
+			"Origin": (frappe.conf.get("host_name") or "http://localhost").rstrip("/"),
 			"X-Frappe-CSRF-Token": session["data"]["csrf_token"],
 			"X-Mobile-App-Version": "1.0.0",
 			"X-Mobile-Contract-Version": "1",
@@ -60,7 +66,15 @@ class MobilePwaTest(IntegrationTestCase):
 	def test_website_user_can_call_only_declared_mobile_cookie_methods(self):
 		methods = {
 			f"platform_core.api.mobile_pwa.v1_{name}"
-			for name in ("activity", "pull", "push", "register", "revoke")
+			for name in (
+				"activity",
+				"list_installations",
+				"pull",
+				"push",
+				"register",
+				"revoke",
+				"revoke_installation",
+			)
 		}
 		configured = set(frappe.get_hooks("website_user_allowed_methods"))
 		self.assertEqual({method for method in configured if ".api.mobile" in method}, methods)
@@ -120,6 +134,32 @@ class MobilePwaTest(IntegrationTestCase):
 		self.assertEqual(response.status_code, expected, response.get_data(as_text=True))
 		if operation == "v1_revoke":
 			self.assertEqual(response.json["message"], {"revoked": 0})
+
+	def test_v1_list_installations_guest_denied(self):
+		self.guest_denied("v1_list_installations")
+
+	def test_v1_list_installations_foreign_data_denied(self):
+		owner, _, owner_headers = self.login()
+		other, _, other_headers = self.login()
+		body = {"installation_id": str(uuid4())}
+		self.assertEqual(self.post(owner, "v1_register", body, owner_headers).status_code, 200)
+		response = self.post(other, "v1_list_installations", {}, other_headers)
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json["message"]["installations"], [])
+
+	def test_v1_revoke_installation_guest_denied(self):
+		self.guest_denied("v1_revoke_installation")
+
+	def test_v1_revoke_installation_foreign_data_denied(self):
+		owner, _, headers = self.login()
+		other, _, other_headers = self.login()
+		body = {"installation_id": str(uuid4())}
+		self.assertEqual(self.post(owner, "v1_register", body, headers).status_code, 200)
+		result = self.post(other, "v1_revoke_installation", body, other_headers)
+		self.assertEqual(result.status_code, 404)
+		result = self.post(owner, "v1_revoke_installation", body, headers)
+		self.assertEqual(result.status_code, 200)
+		self.assertEqual(result.json["message"], {"revoked": 1})
 
 	def test_v1_register_guest_denied(self):
 		self.guest_denied("v1_register")

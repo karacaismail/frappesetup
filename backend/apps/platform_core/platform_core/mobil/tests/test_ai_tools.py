@@ -65,14 +65,25 @@ class MobileAiToolsTest(IntegrationTestCase):
 			else:
 				self.assertEqual(tool["kind"], "write")
 				self.assertIs(tool["destructive"], True)
+				self.assertIs(tool["versioned"], True)
 				for field in ("handler", "preview", "prepare"):
 					self.assertTrue(callable(frappe.get_attr(tool[field])))
+
+	def test_installation_uuid_must_match_the_entire_string(self):
+		from platform_core.mobil.ai_tools import InstallationArguments
+
+		for invalid in (f"x{self.installation}", f"{self.installation}x"):
+			with self.assertRaises(ValidationError):
+				InstallationArguments(installation_id=invalid)
 
 	def test_lists_only_requested_account_without_internal_identity(self):
 		from platform_core.mobil.ai_tools import list_installations
 
 		result = list_installations(self.account)
-		self.assertEqual(result["installations"], [{"installation_id": self.installation, "revoked": False}])
+		self.assertEqual(
+			result["installations"],
+			[{"installation_id": self.installation, "revoked": False, "closure_pending": False}],
+		)
 		self.assertIsNone(result["next_after"])
 
 	def test_single_preview_does_not_mutate_and_execution_sets_cutoff(self):

@@ -76,24 +76,27 @@ class ServiceRevocationTest(IntegrationTestCase):
 			self.assertEqual(revoke_user_installations(), result)
 			self.assertEqual(lifecycle._account_state(self.account).revoked_through, first_cutoff)
 
-	def test_repeat_retries_pending_closure_but_never_resends_confirmed_closure(self):
+	def test_service_denies_sessions_locally_without_scheduling_delivery(self):
 		from platform_core.api.mobile import revoke_user_installations
+		from platform_core.mobil.sessions import is_session_closure_pending, is_session_revoked
 
 		sid = str(uuid4())
 		identity = SimpleNamespace(account=self.account, scope="mobile", principal="fixture", sid=sid)
 		MobileStore().install(identity, str(uuid4()))
+		self.request.after_response = Mock()
 		with (
 			patch("platform_core.api.mobile._linked_account", return_value=self.account),
-			patch("platform_core.mobil.sessions.send_session_revocations", side_effect=[(sid,), ()]) as send,
+			patch("platform_core.mobil.sessions.send_session_revocations") as send,
 			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
-			patch.object(frappe.db, "commit"),
 		):
-			for call_number in range(3):
+			for _ in range(2):
 				self.assertEqual(revoke_user_installations(), {"revoked": 1})
-				for callback in list(after_commit.add.call_args_list):
-					callback.args[0]()
-				after_commit.reset_mock()
-				self.assertEqual(send.call_count, min(call_number + 1, 2))
+			self.assertTrue(is_session_revoked(sid))
+			self.assertFalse(is_session_closure_pending(sid))
+			for callback in after_commit.add.call_args_list:
+				callback.args[0]()
+			self.request.after_response.add.assert_not_called()
+			send.assert_not_called()
 
 	def test_no_identity_link_returns_404_without_creating_state(self):
 		from platform_core.api.mobile import revoke_user_installations

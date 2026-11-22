@@ -103,6 +103,24 @@ class MobileHTTPTest(unittest.TestCase):
 		status, payload, _ = self.post("v1_activity", self.register(), token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
+	def test_v1_list_installations_guest_denied(self):
+		self.guest_denied("v1_list_installations", {})
+
+	def test_v1_list_installations_foreign_data_denied(self):
+		body = self.register()
+		status, payload, _ = self.post("v1_list_installations", {}, token=OTHER_TOKEN)
+		self.assertEqual(status, 200, payload)
+		self.assertNotIn(
+			body["installation_id"], [row["installation_id"] for row in payload["message"]["installations"]]
+		)
+
+	def test_v1_revoke_installation_guest_denied(self):
+		self.guest_denied("v1_revoke_installation", {"installation_id": str(uuid4())})
+
+	def test_v1_revoke_installation_foreign_data_denied(self):
+		status, payload, _ = self.post("v1_revoke_installation", self.register(), token=OTHER_TOKEN)
+		self.assertEqual(status, 404, payload)
+
 	def test_v1_cleanup_guest_denied(self):
 		self.guest_denied("v1_cleanup", {})
 

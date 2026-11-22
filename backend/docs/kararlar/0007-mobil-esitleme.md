@@ -270,12 +270,15 @@ Kullanıcı öneriyi onaylayana kadar sunucu hiçbir kurulumu iptal etmez.
 Onaydan önce kurulumlar değişirse sunucu yeni bir önizleme ister.
 Kurulum, doğrulanmış Keycloak oturum kimliğini `sid` alanından alır.
 Eski kurulumlar yeniden kayıt olurken oturum kimliğini bağlar.
-Yeni oturum, yeni kurulum kimliği ister.
+Yeni doğrulanmış oturum, aynı etkin kurulum kimliğini kullanabilir.
+Sunucu eski oturumu reddeder ve kapatma isteği gönderir.
 Sunucu iptal edilen oturumun özetini saklar.
 Aynı oturumla gelen mobil istekler reddedilir.
 
 Kurulum iptali tek başına Keycloak oturumunu kapatmaz.
-Veritabanı işlemi kesinleşince sunucu `POST /v1/sessions/revoke` çağrısı yapar.
+Kullanıcı veya yönetici iptalinde sunucu yanıtı gönderdikten sonra oturumu kapatır.
+Sunucu `POST /v1/sessions/revoke` yolunu çağırır.
+HTTP isteği yoksa sunucu veritabanı işlemi kesinleşince çağrıyı yapar.
 Bu çağrı kimlik servisi için ayrı bir servis belirteci kullanır.
 Kimlik servisi oturumu kapatana kadar yenileme belirteci geçerli kalabilir.
 Uzak çağrı başarısız olursa yerel iptal geçerli kalır.
@@ -299,7 +302,9 @@ O-25 uyarınca erişim belirteci 5 dakika geçerlidir.
 Çalışanın Keycloak oturumu 1 saat boşta kalabilir. Toplam süre 24 saattir.
 Müşterinin oturumu 7 gün boşta kalabilir. Toplam süre 30 gündür.
 Yenileme belirteci her kullanımda değişir.
-Bu oturum sürelerini kimlik tarafı uygular.
+Mobil sunucu boşta kalma süresini her kurulum için ayrı denetler.
+Süre dolarsa çekme ve gönderme uçları 401 döndürür.
+Yanıt kodu `reauthentication_required` olur.
 
 O-27 uyarınca hesap silme akışını kimlik servisi başlatır.
 Kullanıcı silinince mobil kurulumlar ve bağlı teslim kayıtları temizlenir.
@@ -309,14 +314,12 @@ Uç bütün kurulumları iptal eder ve özel bildirim bağlarını kaldırır.
 Aynı istek, kurulum listesi değişmedikçe aynı iptal sayısını verir.
 Kimlik kancası bu adresi kesin servis adresleri listesine almalıdır.
 Kanca bu yolu mobil belirteç yolundan önce ayırmalıdır.
-Tekrar çağrısı, bekleyen kapanmaları sınırlı sayıda yeniden dener.
-Daha önce doğrulanan kapanmalar yeniden gönderilmez.
+Bu servis ucu yalnız yerel oturum ret kaydı yazar.
+Kimlik servisi, Keycloak oturumunu kendi akışında kapatır.
+Temizlik, 31 günden eski ret kayıtlarını sınırlı gruplar hâlinde siler.
 İş kayıtlarının anonim yapılması hesap silme akışının ayrı adımıdır.
 
-Yapay zekâ temizlik denemesini de öneri olarak açar.
-Önizleme süresi dolan kayıtların sayısını gösterir.
-Sunucu onaydan sonra sayımı tekrar çalıştırır.
-Onay ekranında ilk önizlemenin sayıları kalır.
+Yapay zekâ temizlik aracından süresi dolan kayıtların sayısını okuyabilir.
 Bu araç kayıt silmez.
 
 ## Kaynakta doğrulanan Frappe davranışı
@@ -358,7 +361,9 @@ PWA ve kiracı API'si aynı kökenden HTTPS ile sunulur.
 Köken, isteğin şemasını, sunucu adını ve portunu kapsar.
 PWA ayrı bir kökene istek izni veren CORS başlığına ihtiyaç duymaz.
 PWA, Frappe oturum çerezini ve `X-Frappe-CSRF-Token` başlığını gönderir.
-Sunucu, `Origin` başlığını kiracı adresiyle karşılaştırır.
+Sunucu, `Origin` başlığını site ayarındaki `host_name` ile karşılaştırır.
+Üretimde bu ayara tam HTTPS kökenini yazın. Örneğin `https://tenant.example.test`.
+Ayar yoksa sunucu istekteki kökeni esas alır.
 Ters vekil, istemcinin gönderdiği `X-Forwarded-*` başlıklarına güvenmez.
 Kendi doğruladığı kiracı adresini ve HTTPS bilgisini Frappe'ye iletir.
 
@@ -400,5 +405,17 @@ Hesap sahibi, aynı hesaba bağlı başka bir kurulumu da iptal edebilir.
 Bu değer, erişim belirtecinin verildiği zamanı gösterir.
 Bu bilgi eksikse sunucu yeni kurulumu reddeder. Böylece eski belirteç yeniden kurulum açamaz.
 
-Website User, aynı kökenden ve çerezle beş PWA yöntemini çağırabilir.
+Website User, aynı kökenden ve çerezle yedi PWA yöntemini çağırabilir.
+Kullanıcı kendi kurulumlarını listeleyebilir ve bir kurulumu tek başına iptal edebilir.
+Sunucu bu işlemlerde hesap ve sabit kimlik anahtarını denetler.
 Kanca, belirteçli uçları ve toplu servis iptalini listeye almaz.
+
+PWA kimlik anahtarı, kimlik bağındaki veren ve konu kimliğinden üretilir.
+Kimlik bağı yoksa sunucu isteği reddeder.
+Eski deneme PWA kurulumları yeni anahtarla yeniden kaydedilir.
+Eski anahtarla yazma komutu açılmış bir site varsa dağıtımdan önce geçiş planı gerekir.
+Üretim komut listesi bu turda boş kalır.
+
+Yeni doğrulanmış `sid`, kurulumun boşta kalma sayacını başlatır.
+Sunucu aynı `sid` ile yeniden kayıt olunca sayacı başlatmaz.
+Kimlik kancası bu sözleşmede ayrı bir `auth_time` sağlamaz.

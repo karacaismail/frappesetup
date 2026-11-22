@@ -17,7 +17,7 @@ ADMIN_ROLE = "System Manager"
 TOOL_PATH = "platform_core.mobil.ai_tools"
 INSTALLATION = "Mobile Installation"
 Account = Annotated[str, Field(min_length=1, max_length=140)]
-InstallationId = Annotated[str, Field(pattern=UUID_PATTERN.pattern)]
+InstallationId = Annotated[str, Field(pattern=f"^{UUID_PATTERN.pattern}$")]
 
 
 class AccountArguments(BaseModel):
@@ -105,10 +105,17 @@ def list_installations(account, after=None, limit=20):
 	filters = {"account": args.account}
 	if args.after is not None:
 		filters["name"] = [">", args.after]
-	rows = _select(INSTALLATION, ["name", "revoked"], filters, limit=args.limit + 1, order_by="name asc")
+	rows = _select(
+		INSTALLATION, ["name", "revoked", "session_id"], filters, limit=args.limit + 1, order_by="name asc"
+	)
 	return {
 		"installations": [
-			{"installation_id": row.name, "revoked": bool(row.revoked)} for row in rows[: args.limit]
+			{
+				"installation_id": row.name,
+				"revoked": bool(row.revoked),
+				"closure_pending": is_session_closure_pending(row.session_id),
+			}
+			for row in rows[: args.limit]
 		],
 		"next_after": rows[args.limit - 1].name if len(rows) > args.limit else None,
 	}

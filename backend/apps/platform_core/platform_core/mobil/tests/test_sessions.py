@@ -34,16 +34,38 @@ class MobileSessionTest(IntegrationTestCase):
 		)
 		self.body = {"installation_id": str(uuid4())}
 
-	def test_registration_persists_sid_and_does_not_replace_it(self):
+	def test_registration_rebinds_one_installation_across_twenty_one_sessions(self):
 		from platform_core.api.mobile import _register
-		from platform_core.mobil.protocol import MobileError
+		from platform_core.mobil.sessions import is_session_revoked
 
-		_register(self.identity, self.body)
+		previous = None
+		for _ in range(21):
+			current = str(uuid4())
+			identity = SimpleNamespace(**{**vars(self.identity), "sid": current})
+			_register(identity, self.body)
+			if previous:
+				self.assertTrue(is_session_revoked(previous))
+			previous = current
+		self.assertEqual(frappe.db.count("Mobile Installation", {"account": self.account, "revoked": 0}), 1)
 		self.assertEqual(
-			frappe.db.get_value("Mobile Installation", self.body["installation_id"], "session_id"), self.sid
+			frappe.db.get_value("Mobile Installation", self.body["installation_id"], "session_id"), current
 		)
-		with self.assertRaises(MobileError):
-			_register(SimpleNamespace(**{**vars(self.identity), "sid": str(uuid4())}), self.body)
+
+	def test_http_delivery_is_enqueued_only_after_commit(self):
+		from platform_core.mobil.sessions import revoke_after_commit
+
+		queue = Mock()
+		with (
+			patch.object(frappe.local, "request", SimpleNamespace(after_response=queue), create=True),
+			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
+			patch("platform_core.mobil.sessions._deliver_committed") as deliver,
+		):
+			revoke_after_commit((self.sid,))
+			queue.add.assert_not_called()
+			after_commit.add.call_args.args[0]()
+			deliver.assert_not_called()
+			queue.add.call_args.args[0]()
+			deliver.assert_called_once_with((self.sid,))
 
 	def test_local_revocation_schedules_remote_close_only_after_commit(self):
 		from platform_core.api.mobile import _register, _revoke
@@ -98,21 +120,32 @@ class MobileSessionTest(IntegrationTestCase):
 			frappe.db.get_value("Mobile Installation", self.body["installation_id"], "session_id"), self.sid
 		)
 
-	def test_only_explicit_activity_updates_last_user_activity(self):
-		from platform_core.api.mobile import _activity, _push, _register
+	def test_idle_boundary_checks_each_installation_and_background_does_not_renew_it(self):
+		from platform_core.api.mobile import _activity, _pull, _push, _register
+		from platform_core.mobil.protocol import MobileError
 
 		_register(self.identity, self.body)
-		state = "Mobile Account State"
-		self.assertIsNone(frappe.db.get_value(state, self.account, "last_user_activity_at"))
-		with patch("platform_core.api.mobile.push", return_value={}):
-			_push(self.identity, {**self.body, "operations": []})
-		self.assertIsNone(frappe.db.get_value(state, self.account, "last_user_activity_at"))
-		with patch("platform_core.api.mobile.time.time", return_value=1700000000):
+		table = "Mobile Installation"
+		name = self.body["installation_id"]
+		initial = int(time.time())
+		with patch("platform_core.api.mobile.time.time", return_value=initial):
 			_activity(self.identity, self.body)
-		self.assertEqual(frappe.db.get_value(state, self.account, "last_user_activity_at"), "1700000000")
-		with patch("platform_core.api.mobile.push", return_value={}):
-			_push(self.identity, {**self.body, "operations": []})
-		self.assertEqual(frappe.db.get_value(state, self.account, "last_user_activity_at"), "1700000000")
+		body = {**self.body, "operations": []}
+		for user_type, seconds in (("System User", 3600), ("Website User", 604800)):
+			frappe.db.set_value("User", self.account, "user_type", user_type)
+			with (
+				patch("platform_core.api.mobile.time.time", return_value=initial + seconds - 1),
+				patch("platform_core.api.mobile.push", return_value={}),
+			):
+				_push(self.identity, body)
+			self.assertEqual(int(frappe.db.get_value(table, name, "last_user_activity_at")), initial)
+			with patch("platform_core.api.mobile.time.time", return_value=initial + seconds):
+				for action, payload in ((_push, body), (_pull, self.body), (_activity, self.body)):
+					with self.assertRaises(MobileError) as raised:
+						action(self.identity, payload)
+					self.assertEqual(
+						(raised.exception.status, raised.exception.code), (401, "reauthentication_required")
+					)
 
 	def test_device_revocation_clears_only_its_notification_binding(self):
 		from platform_core.api.mobile import _register, _revoke
@@ -131,3 +164,22 @@ class MobileSessionTest(IntegrationTestCase):
 			frappe.db.get_value("Mobile Installation", other["installation_id"], "notification_token"),
 			"fixture",
 		)
+
+	def test_cleanup_keeps_recent_session_denials(self):
+		from datetime import timedelta
+
+		from frappe.utils import now_datetime
+
+		from platform_core.mobil.retention import cleanup
+		from platform_core.mobil.sessions import _session_key, is_session_revoked, revoke_after_commit
+
+		old = str(uuid4())
+		revoke_after_commit((old, self.sid), remote=False)
+		frappe.db.set_value(
+			"Mobile Revoked Session", _session_key(old), "creation", now_datetime() - timedelta(days=32)
+		)
+		self.assertEqual(cleanup(dry_run=True)["eligible_revoked_sessions"], 1)
+		self.assertTrue(is_session_revoked(old))
+		self.assertEqual(cleanup()["revoked_sessions_removed"], 1)
+		self.assertFalse(is_session_revoked(old))
+		self.assertTrue(is_session_revoked(self.sid))

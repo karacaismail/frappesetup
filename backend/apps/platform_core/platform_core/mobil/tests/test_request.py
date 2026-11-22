@@ -99,6 +99,11 @@ class MobileRequestTest(unittest.TestCase):
 				self.frappe.local.mobile_identity["iat"] = invalid
 				self.assert_rejected("mobile_token_required", 401)
 
+	def test_sid_matches_identity_sync_contract(self):
+		for invalid in ("has.dot", "has~tilde", "x" * 129):
+			with patch.dict(self.frappe.local.mobile_identity, {"sid": invalid}):
+				self.assert_rejected("mobile_token_required", 401)
+
 	def test_mobile_identity_requires_sid_and_rejects_revoked_session(self):
 		identity, _ = request.mobile_request("v1_register")
 		self.assertEqual(identity.sid, "session-01")
@@ -174,7 +179,9 @@ class MobileRequestTest(unittest.TestCase):
 
 	def test_pwa_requires_matching_cookie_origin_and_csrf(self):
 		self.request.path = "/api/method/platform_core.api.mobile_pwa.v1_pull"
-		self.request.host_url = "https://test-mobile.localhost/"
+		self.request.host_url = "http://test-mobile.localhost/"
+		self.frappe.conf = {"host_name": "https://test-mobile.localhost"}
+		self.frappe.db.get_value.return_value = ("fixture", "fixture-user")
 		self.request.cookies = {"sid": "cookie-session"}
 		self.request.headers.pop("Authorization")
 		self.request.headers.update(
@@ -189,6 +196,10 @@ class MobileRequestTest(unittest.TestCase):
 		):
 			identity, body = request.pwa_request("v1_pull")
 			self.assertEqual((identity.scope, identity.sid, body), ("pwa", None, {}))
+			self.assertEqual(identity.principal, request.content_digest(["fixture", "fixture-user"]))
+			with patch.object(self.frappe.db.get_value, "return_value", None):
+				with self.assertRaises(MobileError):
+					request.pwa_request("v1_pull")
 			for header, invalid in (
 				("Origin", "https://other.example.test"),
 				("X-Frappe-CSRF-Token", ""),

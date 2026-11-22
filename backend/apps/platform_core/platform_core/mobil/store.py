@@ -1,6 +1,7 @@
 """Frappe storage for internal mobile metadata."""
 
 import json
+import time
 from datetime import UTC, datetime, timedelta
 
 import frappe
@@ -10,7 +11,6 @@ from .protocol import DELIVERY_AUDIT_SIZE, MobileError, content_digest
 SEQUENCE_DOCTYPE = "Mobile Sequence"
 SEQUENCE_NAME = "site"
 DELIVERY_AUDIT_INTERVAL = timedelta(minutes=5)
-SERVICE_SESSION_BATCH_SIZE = 20
 INTERNAL_TYPES = frozenset(
 	{
 		SEQUENCE_DOCTYPE,
@@ -88,18 +88,43 @@ class MobileStore:
 				scope=identity.scope,
 				principal=identity.principal,
 				session_id=sid,
+				session_bound_at=str(int(time.time())),
 			)
-		elif not self._matches(current, identity) or (current.session_id and current.session_id != sid):
+		elif not self._matches(current, identity) or (current.session_id and not sid):
 			raise MobileError("installation_unavailable", 403)
-		elif sid and not current.session_id:
-			frappe.db.set_value("Mobile Installation", installation_id, "session_id", sid)
+		elif sid and current.session_id != sid:
+			from .sessions import revoke_after_commit
+
+			frappe.db.set_value(
+				"Mobile Installation",
+				installation_id,
+				{"session_id": sid, "session_bound_at": str(int(time.time()))},
+			)
+			revoke_after_commit((current.session_id,))
+		elif (
+			identity.scope == "pwa"
+			and identity.issued_at
+			and identity.issued_at > int(current.session_bound_at or 0)
+		):
+			frappe.db.set_value(
+				"Mobile Installation", installation_id, "session_bound_at", str(identity.issued_at)
+			)
 		return {"installation_id": installation_id}
 
 	def _installation(self, installation_id, *, for_update=False):
 		return frappe.db.get_value(
 			"Mobile Installation",
 			installation_id,
-			["account", "scope", "principal", "revoked", "session_id"],
+			[
+				"account",
+				"scope",
+				"principal",
+				"revoked",
+				"session_id",
+				"last_user_activity_at",
+				"session_bound_at",
+				"creation",
+			],
 			as_dict=True,
 			for_update=for_update,
 		)
@@ -118,6 +143,29 @@ class MobileStore:
 		if not self._matches(row, identity) or (row.session_id or None) != getattr(identity, "sid", None):
 			raise MobileError("installation_unavailable", 403)
 
+		return row
+
+	def list_owned_installations(self, identity, after):
+		filters = {"account": identity.account, "principal": identity.principal}
+		if after is not None:
+			filters["name"] = [">", after]
+		rows = _select(
+			"Mobile Installation", ["name", "scope", "revoked"], filters, limit=21, order_by="name asc"
+		)
+		return {
+			"installations": [
+				{"installation_id": row.name, "scope": row.scope, "revoked": bool(row.revoked)}
+				for row in rows[:20]
+			],
+			"next_after": rows[19].name if len(rows) > 20 else None,
+		}
+
+	def revoke_owned_installation(self, identity, installation):
+		row = self._installation(installation, for_update=True)
+		if row is None or row.account != identity.account or row.principal != identity.principal:
+			raise MobileError("installation_unavailable", 404)
+		return {"revoked": self.revoke_targets((installation,))}
+
 	def revoke(self, identity, installation_id):
 		rows = self.revocation_targets(
 			identity.account,
@@ -129,16 +177,8 @@ class MobileStore:
 		return {"revoked": self.revoke_targets(row.name for row in rows)}
 
 	def revoke_account_installations(self, account):
-		from .sessions import is_session_closure_pending
-
 		rows = self.revocation_targets(account, include_revoked=True)
-		targets = [row.name for row in rows if not row.revoked]
-		for row in rows:
-			if len(targets) >= SERVICE_SESSION_BATCH_SIZE:
-				break
-			if row.revoked and is_session_closure_pending(row.session_id):
-				targets.append(row.name)
-		changed = self.revoke_targets(targets)
+		changed = self.revoke_targets((row.name for row in rows), remote=False)
 
 		# Update only rows with a binding so a repeated call does not change them.
 		frappe.db.set_value(
@@ -169,7 +209,7 @@ class MobileStore:
 			for_update=True,
 		)
 
-	def revoke_targets(self, installation_ids):
+	def revoke_targets(self, installation_ids, *, remote=True):
 		from .sessions import revoke_after_commit
 
 		count = 0
@@ -191,7 +231,7 @@ class MobileStore:
 					"Mobile Installation", installation_id, {"revoked": 1, "notification_token": None}
 				)
 				count += int(not row.revoked)
-		revoke_after_commit(session_ids)
+		revoke_after_commit(session_ids, remote=remote)
 		return count
 
 	def get_operation(self, key):
