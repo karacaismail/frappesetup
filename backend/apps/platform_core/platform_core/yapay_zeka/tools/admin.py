@@ -86,11 +86,11 @@ PERMISSION_TYPES = (
 
 
 class AddCustomFieldArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
 	fieldname: str = Field(pattern=r"^[a-z][a-z0-9_]{1,60}$")
-	label: str = Field(min_length=1)
+	label: str = Field(min_length=1, max_length=140)
 	fieldtype: FieldType
-	description: str = Field(min_length=1)
+	description: str = Field(min_length=1, max_length=2000)
 	options: str | None = None
 	reqd: bool = False
 	insert_after: str | None = None
@@ -98,26 +98,26 @@ class AddCustomFieldArguments(ToolArguments):
 
 
 class SetFieldPropertyArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
-	fieldname: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
+	fieldname: str = Field(min_length=1, max_length=140)
 	property: PropertyName
 	value: str | int | bool
 
 
 class SetRolePermissionArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
-	role: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
+	role: str = Field(min_length=1, max_length=140)
 	permlevel: int = Field(default=0, ge=0, le=9)
 	permissions: dict[str, bool]
 
 
 class UserRoleArguments(ToolArguments):
-	user: str = Field(min_length=1)
-	role: str = Field(min_length=1)
+	user: str = Field(min_length=1, max_length=140)
+	role: str = Field(min_length=1, max_length=140)
 
 
 class PurgeActionLogArguments(ToolArguments):
-	older_than_days: int = Field(default=retention.MIN_DAYS, ge=retention.MIN_DAYS)
+	older_than_days: int = Field(default=retention.MIN_DAYS, ge=retention.MIN_DAYS, le=retention.MAX_DAYS)
 
 
 # A direct call has no version check. The approval flow always passes the expected version.
@@ -198,6 +198,7 @@ def preview_custom_field(doctype: str, fieldname: str, **values) -> dict:
 
 def prepare_custom_field(doctype: str, fieldname: str, expected_version=_UNCHECKED, **values) -> dict:
 	"""Pre-check: run every preview check again on the current definition."""
+	frappe.only_for(ADMIN_ROLE)
 	frappe.clear_cache(doctype=doctype)
 	_verify(preview_custom_field(doctype, fieldname, **values), expected_version)
 	return {
@@ -214,10 +215,6 @@ def write_custom_field(prepared: dict) -> dict:
 	doc.insert()
 	frappe.clear_cache(doctype=prepared["dt"])
 	return {"name": doc.name}
-
-
-def run_custom_field(doctype: str, fieldname: str, expected_version=_UNCHECKED, **values) -> dict:
-	return write_custom_field(prepare_custom_field(doctype, fieldname, expected_version, **values))
 
 
 # --- field property ---
@@ -243,7 +240,7 @@ def _property_value(property: str, value: str | int | bool) -> str:
 
 
 def _property_state(doctype: str, fieldname: str, property: str, *, for_update: bool = False) -> list:
-	"""The "Property Setter" rows of one field property: name, value and `modified` of each.
+	"""The stored rows of one field property: its "Property Setter" rows and the field's own rows.
 
 	With `for_update` this is a locking read. It returns the latest committed rows and also locks
 	the gap, so no other transaction can add the first row for this property until this one ends.
@@ -252,33 +249,12 @@ def _property_state(doctype: str, fieldname: str, property: str, *, for_update: 
 	"""
 	if property not in PROPERTY_TYPES:
 		raise ToolDenied("invalid_arguments", _("Unknown field: {0}", context=CONTEXT).format(property))
-	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
 	try:
-		rows = frappe.db.get_values(
-			"Property Setter", key, ["name", "value", "modified"], for_update=for_update, as_dict=True
-		)
-		field_rows = _field_rows(doctype, fieldname, property, for_update=for_update)
+		return store.field_property_rows(doctype, fieldname, property, for_update=for_update)
 	except frappe.QueryDeadlockError:
 		raise ToolDenied(
 			"document_changed", _("The target changed after the preview.", context=CONTEXT)
 		) from None
-	return [sorted([row.name, row.value, str(row.modified)] for row in rows), field_rows]
-
-
-def _field_rows(doctype: str, fieldname: str, property: str, *, for_update: bool) -> list:
-	"""The field's own definition rows: the property's value and `modified` of each.
-
-	A standard field is a "DocField" row of the DocType, a custom one is a "Custom Field" record.
-	`property` is a key of `PROPERTY_TYPES`, so it is a known column name.
-	"""
-	found = []
-	for table, key in (
-		("DocField", {"parent": doctype, "parenttype": "DocType", "fieldname": fieldname}),
-		("Custom Field", {"dt": doctype, "fieldname": fieldname}),
-	):
-		rows = frappe.db.get_values(table, key, ["name", property, "modified"], for_update=for_update)
-		found += sorted([table, row[0], row[1], str(row[2])] for row in rows)
-	return found
 
 
 def preview_field_property(doctype: str, fieldname: str, property: str, value: str | int | bool) -> dict:
@@ -322,6 +298,7 @@ def prepare_field_property(
 	The locking read comes before every plain read. It covers an existing row and the first insert.
 	The compared version is built from the rows of that same locking read.
 	"""
+	frappe.only_for(ADMIN_ROLE)
 	state = _property_state(doctype, fieldname, property, for_update=True)
 	new = _property_value(property, value)
 	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
@@ -352,13 +329,7 @@ def write_field_property(prepared: dict) -> dict:
 	return {"name": doc.name}
 
 
-def run_field_property(
-	doctype: str, fieldname: str, property: str, value: str | int | bool, expected_version=_UNCHECKED
-) -> dict:
-	return write_field_property(prepare_field_property(doctype, fieldname, property, value, expected_version))
-
-
-# --- rol izni ---
+# --- role permission ---
 
 
 def _permission_row(doctype: str, role: str, permlevel: int) -> dict | None:
@@ -452,14 +423,6 @@ def write_role_permission(prepared: dict) -> dict:
 	return {"name": f"{doctype}|{role}|{permlevel}"}
 
 
-def run_role_permission(
-	doctype: str, role: str, permissions: dict[str, bool], permlevel: int = 0, expected_version=_UNCHECKED
-) -> dict:
-	return write_role_permission(
-		prepare_role_permission(doctype, role, permissions, permlevel, expected_version)
-	)
-
-
 # --- user role ---
 
 
@@ -519,10 +482,6 @@ def write_assign_role(prepared: tuple) -> dict:
 	return {"name": doc.name}
 
 
-def run_assign_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
-	return write_assign_role(prepare_assign_role(user, role, expected_version))
-
-
 def preview_remove_role(user: str, role: str) -> dict:
 	return _role_spec(user, role, adding=False)[0]
 
@@ -537,10 +496,6 @@ def write_remove_role(prepared: tuple) -> dict:
 	doc, role = prepared
 	doc.remove_roles(role)
 	return {"name": doc.name}
-
-
-def run_remove_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
-	return write_remove_role(prepare_remove_role(user, role, expected_version))
 
 
 # --- manually started command: log cleanup ---
@@ -569,7 +524,3 @@ def prepare_purge(older_than_days: int = retention.MIN_DAYS) -> int:
 
 def write_purge(older_than_days: int) -> dict:
 	return retention.purge(older_than_days, dry_run=False)
-
-
-def run_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
-	return write_purge(prepare_purge(older_than_days))

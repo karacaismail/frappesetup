@@ -88,6 +88,9 @@ def _check_principal() -> None:
 		# endpoint does not allow guests. The check stays as a second guard.
 		raise McpError(protocol.INVALID_REQUEST, "Authentication required", status=401)
 	if kind == access.OTHER:
+		# BORC(scale): outside MCP clients cannot sign in with OAuth 2.1 yet. Effect: a client outside
+		# the panel has no way in. Owner: platform-core-yz. Closes when decision note 0002, section 6,
+		# gets an approved OAuth design.
 		# API keys and OAuth tokens are long-lived and do not carry the G-148 limits.
 		# The user is known here, so the denial is logged. The 403 response rolls the request
 		# back, so the log row is committed first. Nothing else has been written yet.
@@ -226,7 +229,7 @@ def call_tool(params: dict) -> dict:
 		frappe.log_error(title=f"AI tool {tool.name} failed", message=traceback_without_text(error))
 		frappe.clear_messages()
 		access.record("call", decision="error", deny_reason="internal_error", **context)
-		return _error("internal_error", "The tool failed. The error was recorded.")
+		return _error("internal_error", _("The tool failed. The error was recorded.", context=CONTEXT))
 
 
 def _target(arguments: dict) -> dict:

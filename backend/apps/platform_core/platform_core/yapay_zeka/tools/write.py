@@ -21,19 +21,19 @@ RESERVED_KEYS = frozenset(
 
 
 class CreateDocumentArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
 	data: dict[str, Any]
 
 
 class UpdateDocumentArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
-	name: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
+	name: str = Field(min_length=1, max_length=140)
 	data: dict[str, Any]
 
 
 class DocumentTargetArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
-	name: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
+	name: str = Field(min_length=1, max_length=140)
 
 
 def writable_meta(doctype: str):
@@ -199,10 +199,6 @@ def write_create(prepared: tuple) -> dict:
 	return {"name": doc.name}
 
 
-def run_create(doctype: str, data: dict[str, Any]) -> dict:
-	return write_create(prepare_create(doctype, data))
-
-
 # --- update ---
 
 
@@ -250,10 +246,6 @@ def write_update(prepared: tuple) -> dict:
 	return {"name": doc.name}
 
 
-def run_update(doctype: str, name: str, data: dict[str, Any], expected_version: str | None = None) -> dict:
-	return write_update(prepare_update(doctype, name, data, expected_version))
-
-
 # --- submit, cancel, delete ---
 
 
@@ -295,10 +287,6 @@ def write_submit(doc) -> dict:
 	return {"name": doc.name}
 
 
-def run_submit(doctype: str, name: str, expected_version: str | None = None) -> dict:
-	return write_submit(prepare_submit(doctype, name, expected_version))
-
-
 def preview_cancel(doctype: str, name: str) -> dict:
 	_meta, doc = _load(doctype, name, "cancel")
 	_check_cancel(doc)
@@ -314,10 +302,6 @@ def prepare_cancel(doctype: str, name: str, expected_version: str | None = None)
 def write_cancel(doc) -> dict:
 	doc.cancel()
 	return {"name": doc.name}
-
-
-def run_cancel(doctype: str, name: str, expected_version: str | None = None) -> dict:
-	return write_cancel(prepare_cancel(doctype, name, expected_version))
 
 
 def preview_delete(doctype: str, name: str) -> dict:
@@ -336,7 +320,3 @@ def write_delete(doc) -> dict:
 	# `frappe.delete_doc` checks the delete permission and linked documents itself as well.
 	frappe.delete_doc(doc.doctype, doc.name)
 	return {"name": doc.name}
-
-
-def run_delete(doctype: str, name: str, expected_version: str | None = None) -> dict:
-	return write_delete(prepare_delete(doctype, name, expected_version))

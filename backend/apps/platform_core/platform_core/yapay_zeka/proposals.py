@@ -26,11 +26,14 @@ STATUS_FILTERS = {
 APPROVE_ATTEMPTS = 4
 # Paging by offset scans the skipped rows. The list is for a human's recent proposals.
 MAX_LIST_START = 10_000
+# Upper bounds of the two texts a human endpoint takes. A name is at most 140 characters in Frappe.
+MAX_ID_CHARS = 140
+MAX_DIGEST_CHARS = 128
 PREVIEW_KEYS = ("action", "summary", "changes", "details")
 
 
 class GetProposalArguments(ToolArguments):
-	proposal_id: str = Field(min_length=1)
+	proposal_id: str = Field(min_length=1, max_length=MAX_ID_CHARS)
 
 
 def _json(value: Any) -> str:
@@ -214,8 +217,15 @@ def public(doc, *, with_digest: bool = True) -> dict:
 	return result
 
 
+def check_proposal_id(proposal_id: object) -> None:
+	"""Refuse an id that cannot be a proposal's name, before it reaches the database."""
+	if not isinstance(proposal_id, str) or not 0 < len(proposal_id) <= MAX_ID_CHARS:
+		frappe.throw(_("Proposal not found.", context=CONTEXT), frappe.ValidationError)
+
+
 def _own(proposal_id: str, *, for_update: bool = False):
 	"""Load the user's own proposal. Another user's proposal raises a permission error."""
+	check_proposal_id(proposal_id)
 	doc = store.load_proposal(proposal_id, for_update=for_update)
 	if doc is None:
 		raise frappe.DoesNotExistError(_("Proposal not found.", context=CONTEXT))
@@ -277,6 +287,18 @@ def _denied(doc, reason: str, *, new_status: str | None = None) -> dict:
 	return {"executed": False, "deny_reason": reason, "proposal": public(doc)}
 
 
+def _preview_refused(doc, reason: str) -> dict:
+	"""Reject a proposal whose preview failed at approval. Undo whatever the preview wrote first.
+
+	An app tool's preview is app code. If it wrote something before it raised, a normal end of
+	the request would commit that write. So the transaction is rolled back and the proposal is
+	read again under its lock before the rejection is stored.
+	"""
+	frappe.db.rollback()
+	frappe.clear_messages()
+	return _denied(store.load_proposal(doc.name, for_update=True), reason, new_status="rejected")
+
+
 def approve(proposal_id: str, digest: str) -> dict:
 	"""Human approval. If the checks pass, executes the action once, in this request.
 
@@ -285,6 +307,9 @@ def approve(proposal_id: str, digest: str) -> dict:
 	checks are done again with current data. Nothing has been written before the lock is taken.
 	"""
 	access.require_human("approve")
+	check_proposal_id(proposal_id)
+	if not isinstance(digest, str) or len(digest) > MAX_DIGEST_CHARS:
+		frappe.throw(_("The digest is not valid.", context=CONTEXT), frappe.ValidationError)
 	if frappe.db.transaction_writes:
 		# Approval commits inside the request. It must not make foreign pending writes permanent.
 		access.record_denial("approve", "transaction_active", tool="approve_proposal")
@@ -338,17 +363,14 @@ def _approve(proposal_id: str, digest: str) -> dict:
 	try:
 		spec = _run_preview(tool, arguments)
 	except ToolDenied as error:
-		return _denied(doc, error.code, new_status="rejected")
+		return _preview_refused(doc, error.code)
 	except frappe.PermissionError:
-		frappe.clear_messages()
-		return _denied(doc, "permission", new_status="rejected")
+		return _preview_refused(doc, "permission")
 	except frappe.DoesNotExistError:
-		frappe.clear_messages()
-		return _denied(doc, "document_changed", new_status="rejected")
+		return _preview_refused(doc, "document_changed")
 	except frappe.ValidationError:
-		# The preview of an app tool refused the action. Nothing has been written.
-		frappe.clear_messages()
-		return _denied(doc, "invalid_arguments", new_status="rejected")
+		# The preview of an app tool refused the action.
+		return _preview_refused(doc, "invalid_arguments")
 	if (spec.get("target_version") or None) != (doc.target_modified or None):
 		return _denied(doc, "document_changed", new_status="rejected")
 	if preview_digest(spec, _row_stamp(tool, spec)) != doc.preview_digest:

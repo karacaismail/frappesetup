@@ -22,7 +22,7 @@ class SearchDoctypesArguments(ToolArguments):
 
 
 class GetDoctypeSchemaArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
 
 
 def search_doctypes(query: str | None = None, limit: int = 50) -> dict:

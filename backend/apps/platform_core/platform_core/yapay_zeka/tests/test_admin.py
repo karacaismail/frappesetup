@@ -80,9 +80,11 @@ class TestAdminTools(YzTestCase):
 			lambda: admin.preview_custom_field(
 				DOCTYPE, "yz_x", label="X", fieldtype="Data", description="X."
 			),
-			lambda: admin.run_field_property(DOCTYPE, "title", "reqd", True),
-			lambda: admin.run_role_permission(DOCTYPE, RESTRICTED_ROLE, {"delete": False}),
-			lambda: admin.run_assign_role(USER_B, EXTRA_ROLE),
+			lambda: admin.write_field_property(admin.prepare_field_property(DOCTYPE, "title", "reqd", True)),
+			lambda: admin.write_role_permission(
+				admin.prepare_role_permission(DOCTYPE, RESTRICTED_ROLE, {"delete": False})
+			),
+			lambda: admin.write_assign_role(admin.prepare_assign_role(USER_B, EXTRA_ROLE)),
 			lambda: retention.purge(365, dry_run=False),
 		)
 

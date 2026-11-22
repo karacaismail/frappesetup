@@ -41,11 +41,11 @@ servers:
 tags:
   - name: mcp
     description: The MCP endpoint the model uses
-  - name: belirtec
+  - name: token
     description: Agent token
-  - name: oneri
+  - name: proposal
     description: Write proposals and human approval
-  - name: yonetim
+  - name: admin
     description: Maintenance commands started by hand
 
 paths:
@@ -64,8 +64,8 @@ paths:
         A tool error is not an HTTP error. A tool error is a result that carries `isError: true`.
         Every call and every denial is written to an "AI Action Log" record.
       security:
-        - insanOturumu: []
-        - araciBelirteci: []
+        - humanSession: []
+        - agentToken: []
       parameters:
         - name: MCP-Protocol-Version
           in: header
@@ -108,7 +108,7 @@ paths:
 
   /platform_core.api.ai.issue_agent_token:
     post:
-      tags: [belirtec]
+      tags: [token]
       operationId: issueAgentToken
       summary: Issues a short-lived agent token from a human session.
       description: |
@@ -116,7 +116,7 @@ paths:
         The token is bound to the Frappe session that made the request. When the session ends, the token becomes invalid.
         The server stores only the digest of the token. The token is visible only in this response.
         Do not write the token to browser storage. Keep it only in memory (G-148).
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       responses:
         "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
@@ -132,14 +132,14 @@ paths:
 
   /platform_core.api.ai.list_proposals:
     get:
-      tags: [oneri]
+      tags: [proposal]
       operationId: listProposals
       summary: Lists the write proposals of the session user page by page.
       description: |
         Only the user's own proposals are returned. The newest proposal comes first.
         Filtering and paging are done in the database. For the next page, increase `start` by `limit`.
         A successful read is not written to the log. A denied read is written.
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       parameters:
         - name: status
           in: query
@@ -176,13 +176,13 @@ paths:
 
   /platform_core.api.ai.get_proposal:
     get:
-      tags: [oneri]
+      tags: [proposal]
       operationId: getProposal
       summary: Returns the preview, digest and status of a proposal.
       description: |
         The human reads the preview in this response. The approval request carries the `digest` value from this response.
         A successful read is not written to the log. A denied read is written.
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       parameters:
         - name: proposal_id
           in: query
@@ -204,7 +204,7 @@ paths:
 
   /platform_core.api.ai.approve_proposal:
     post:
-      tags: [oneri]
+      tags: [proposal]
       operationId: approveProposal
       summary: Approves the proposal and executes the action in this request.
       description: |
@@ -225,7 +225,7 @@ paths:
         The tool locks the target just before writing it and compares its version with the one in the preview.
         If the application tool raises an error, the result still stays `unknown`. The tool may have touched an external system.
         No blind retry is made on the same target. The human closes the state with `resolve_proposal`.
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       requestBody:
         required: true
         content:
@@ -256,11 +256,11 @@ paths:
 
   /platform_core.api.ai.reject_proposal:
     post:
-      tags: [oneri]
+      tags: [proposal]
       operationId: rejectProposal
       summary: Rejects a pending proposal.
       description: Nothing is written to the document. A rejected proposal cannot be approved later. If the proposal is not `pending`, 417 is returned.
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       requestBody:
         required: true
         content:
@@ -286,14 +286,14 @@ paths:
 
   /platform_core.api.ai.resolve_proposal:
     post:
-      tags: [oneri]
+      tags: [proposal]
       operationId: resolveProposal
       summary: Closes a proposal with an unknown result by human decision.
       description: |
         The human checks the target document with their own eyes. Then they report whether the action was applied.
         This endpoint does not write to the document. It only sets the result of the proposal to `succeeded` or `failed`.
         After that a new proposal can be opened for the same target.
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       requestBody:
         required: true
         content:
@@ -320,7 +320,7 @@ paths:
 
   /platform_core.api.ai.purge_logs:
     post:
-      tags: [yonetim]
+      tags: [admin]
       operationId: purgeLogs
       summary: Deletes log and proposal records whose retention period has passed.
       description: |
@@ -335,9 +335,10 @@ paths:
           The `usage_logs` field says plainly whether that ran: `ok`, `not_run` or `error`. Other records are still cleaned.
         The counting mode (`dry_run`) counts exactly the records the delete would remove.
         There is no scheduled job. This endpoint is started by hand. The command for the same action is this:
-        `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365}"`.
+        `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365, 'dry_run': False}"`, run in the bench folder.
+        One run deletes at most 500 records of each kind. `logs_waiting` and `proposals_waiting` say how many waited. Run it again until they reach zero.
         The AI starts the same action with the `purge_action_log` tool, with a preview and human approval.
-      security: [{insanOturumu: []}]
+      security: [{humanSession: []}]
       requestBody:
         required: false
         content:
@@ -346,7 +347,7 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                older_than_days: {type: integer, minimum: 365, default: 365}
+                older_than_days: {type: integer, minimum: 365, maximum: 36500, default: 365}
                 dry_run: {type: boolean, default: true}
       responses:
         "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
@@ -364,12 +365,12 @@ paths:
 
 components:
   securitySchemes:
-    insanOturumu:
+    humanSession:
       type: apiKey
       in: cookie
       name: sid
       description: Frappe session cookie. A POST request also carries the `X-Frappe-CSRF-Token` header.
-    araciBelirteci:
+    agentToken:
       type: http
       scheme: bearer
       description: "The token with the `fsat_` prefix that the `issue_agent_token` endpoint issues."
@@ -546,12 +547,13 @@ components:
 
     PurgeResult:
       type: object
-      required: [dry_run, older_than_days, proposal_days, logs, usage_logs, proposals]
+      required: [dry_run, older_than_days, proposal_days, logs, logs_waiting, usage_logs, proposals, proposals_waiting]
       properties:
         dry_run: {type: boolean}
         older_than_days: {type: integer, description: Retention period of the AI Action Log in days.}
         proposal_days: {type: integer, description: "Retention period of proposals in days, counted from the decision or the expiry. Fixed at 30."}
-        logs: {type: integer, description: Number of AI Action Log records deleted or to be deleted.}
+        logs: {type: integer, description: "Number of AI Action Log records this run deletes. One run takes at most 500 records of each kind, oldest first."}
+        logs_waiting: {type: integer, description: Number of AI Action Log records past their period when the run started.}
         usage_logs:
           type: object
           description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage`. The function checks the caller's permission and applies 365 days from the web and from the command line alike. This field is never null."
@@ -564,7 +566,8 @@ components:
             eligible: {type: integer, description: "With `ok`: number of records past 365 days that waited when the run started."}
             deleted: {type: integer, description: "With `ok`: number of records this run deleted. The gateway deletes in batches, so it may be smaller than `eligible`. Zero in the counting mode."}
             reason: {type: string, description: "With `not_run` or `error`: a fixed code or the type of the error. Never the text of the error."}
-        proposals: {type: integer, description: Number of AI Action Proposal records deleted or to be deleted.}
+        proposals: {type: integer, description: Number of AI Action Proposal records this run deletes.}
+        proposals_waiting: {type: integer, description: Number of AI Action Proposal records past their period when the run started.}
 
     ApprovalRequired:
       type: object
@@ -777,7 +780,7 @@ x-mcp-tools:
       type: object
       additionalProperties: false
       properties:
-        older_than_days: {type: integer, minimum: 365, default: 365}
+        older_than_days: {type: integer, minimum: 365, maximum: 36500, default: 365}
 
 # Result schema of the tools. A successful call returns this shape in `structuredContent`.
 # `tools/list` publishes the same schema as `outputSchema`. A test ties the code to this section.

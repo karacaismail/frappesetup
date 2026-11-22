@@ -2,7 +2,7 @@
 
 import re
 from itertools import islice
-from typing import Any
+from typing import Annotated, Any
 
 import frappe
 from frappe import _
@@ -21,25 +21,27 @@ MAX_RESULT_BYTES = envelope.MAX_RESULT_BYTES
 REPORT_ENVELOPE_BYTES = 32
 
 OPERATORS = frozenset({"=", "!=", ">", "<", ">=", "<=", "like", "not like", "in", "not in", "between", "is"})
+# The order of a list that names none. Newest first, with the name as the tie breaker.
+DEFAULT_ORDER = "creation desc, name desc"
 ORDER_BY = re.compile(r"^\s*(\w+)(?:\s+(asc|desc))?\s*$", re.IGNORECASE)
 
 
 class ListDocumentsArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
 	filters: dict[str, Any] | None = None
-	fields: list[str] | None = None
-	order_by: str | None = None
+	fields: list[Annotated[str, Field(max_length=140)]] | None = Field(default=None, max_length=100)
+	order_by: str | None = Field(default=None, max_length=140)
 	start: int = Field(default=0, ge=0)
 	limit: int = Field(default=20, ge=1, le=100)
 
 
 class GetDocumentArguments(ToolArguments):
-	doctype: str = Field(min_length=1)
-	name: str = Field(min_length=1)
+	doctype: str = Field(min_length=1, max_length=140)
+	name: str = Field(min_length=1, max_length=140)
 
 
 class RunReportArguments(ToolArguments):
-	report: str = Field(min_length=1)
+	report: str = Field(min_length=1, max_length=140)
 	filters: dict[str, Any] | None = None
 	limit: int = Field(default=100, ge=1, le=500)
 
@@ -78,7 +80,7 @@ def list_documents(
 		field_rules.check_readable(meta, fieldname)
 		query_filters[fieldname] = _condition(condition)
 
-	order = None
+	order = DEFAULT_ORDER
 	if order_by:
 		match = ORDER_BY.match(order_by)
 		if not match:
@@ -86,7 +88,9 @@ def list_documents(
 				"invalid_arguments", _("order_by takes a field name and asc or desc.", context=CONTEXT)
 			)
 		field_rules.check_readable(meta, match.group(1))
-		order = f"{match.group(1)} {(match.group(2) or 'asc').lower()}"
+		field, direction = match.group(1), (match.group(2) or "asc").lower()
+		# The name breaks ties. Without it rows with equal values can repeat or drop out between pages.
+		order = f"{field} {direction}" if field == "name" else f"{field} {direction}, name {direction}"
 
 	# `frappe.get_list` applies user permissions and sharing (G-3).
 	rows = frappe.get_list(

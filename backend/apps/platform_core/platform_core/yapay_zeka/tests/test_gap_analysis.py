@@ -188,7 +188,10 @@ class TestProposalListQuery(YzTestCase):
 
 		self.assertEqual(everything.status_code, 200, everything.get_data(as_text=True))
 		self.assertEqual(len(everything.json["message"]["proposals"]), 3)
-		listed = lambda response: {row["proposal_id"] for row in response.json["message"]["proposals"]}  # noqa: E731
+
+		def listed(response) -> set:
+			return {row["proposal_id"] for row in response.json["message"]["proposals"]}
+
 		self.assertLessEqual({ids[2], ids[3]}, listed(pending))
 		self.assertFalse({ids[0], ids[1]} & listed(pending))
 		self.assertIn(ids[0], listed(expired))

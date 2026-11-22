@@ -269,7 +269,7 @@ class TestApproval(YzTestCase):
 		frappe.set_user(USER_A)
 
 		with self.assertRaises(ToolDenied) as raised:
-			write.run_update(DOCTYPE, name, {"title": "Yeni"}, expected_version="2020-01-01 00:00:00")
+			write.prepare_update(DOCTYPE, name, {"title": "Yeni"}, expected_version="2020-01-01 00:00:00")
 
 		self.assertEqual(raised.exception.code, "document_changed")
 

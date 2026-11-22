@@ -265,7 +265,9 @@ class TestProposalPages(YzTestCase):
 		).json["message"]
 		far = self.human(client, "GET", "list_proposals", query={"limit": 2, "start": 10000}).json["message"]
 
-		page = lambda body: [row["proposal_id"] for row in body["proposals"]]  # noqa: E731
+		def page(body: dict) -> list:
+			return [row["proposal_id"] for row in body["proposals"]]
+
 		self.assertEqual(page(first), [ids[4], ids[3]])
 		self.assertEqual(page(second), [ids[2], ids[1]])
 		self.assertEqual(page(third)[:1], [ids[0]])

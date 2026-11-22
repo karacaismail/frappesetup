@@ -485,7 +485,7 @@ Only a proposal with an unknown result can be resolved.,Yalnız sonucu bilinmeye
 The preview of tool {0} must be an object.,{0} aracının önizlemesi bir nesne olmalı.,platform_core.yapay_zeka
 The preview of tool {0} is not valid: {1},{0} aracının önizlemesi geçersiz: {1},platform_core.yapay_zeka
 The preview of versioned tool {0} must return {1}.,Sürüm denetimi isteyen {0} aracının önizlemesi şunları döndürmeli: {1}.,platform_core.yapay_zeka
-The retention period is at least {0} days.,Saklama süresi en az {0} gündür.,platform_core.yapay_zeka
+The retention period is between {0} and {1} days.,Saklama süresi {0} ile {1} gün arasında olmalı.,platform_core.yapay_zeka
 You may not create custom fields.,Özel alan oluşturma izniniz yok.,platform_core.yapay_zeka
 Select and Link fields need options.,Select ve Link türündeki alanlar seçenek ister.,platform_core.yapay_zeka
 insert_after names a field that does not exist.,insert_after değeri var olmayan bir alanı gösteriyor.,platform_core.yapay_zeka
@@ -617,3 +617,6 @@ SHA-256 of the whole preview and its target. The server previews again at approv
 You do not have permission for this action.,Bu işlem için izniniz yok.,platform_core.yapay_zeka
 The record was not found.,Kayıt bulunamadı.,platform_core.yapay_zeka
 The tool refused the input.,Araç girdiyi kabul etmedi.,platform_core.yapay_zeka
+The digest is not valid.,Özet geçerli değil.,platform_core.yapay_zeka
+A proposal cannot change after it is opened or decided.,Öneri açıldıktan ya da karar verildikten sonra değişemez.,platform_core.yapay_zeka
+The tool failed. The error was recorded.,Araç hata verdi. Hata kaydedildi.,platform_core.yapay_zeka

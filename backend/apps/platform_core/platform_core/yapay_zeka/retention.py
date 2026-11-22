@@ -2,7 +2,8 @@
 
 There is no scheduled job (D-6). The command starts in these three ways:
 
-- `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365}"`
+- in the bench folder: `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365, 'dry_run': False}"`.
+  Without `dry_run` the command only counts.
 - the `platform_core.api.ai.purge_logs` endpoint,
 - the `purge_action_log` tool for AI. This way requires a preview and human approval.
 """
@@ -18,9 +19,13 @@ from platform_core.yapay_zeka.errors import CONTEXT, log_tool_error
 MIN_DAYS = 365
 # "AI Action Proposal": this many days after the decision or the expiry, whichever comes first.
 PROPOSAL_DAYS = 30
+# Upper bound of the period a caller may ask for. A larger number has no use and overflows dates.
+MAX_DAYS = 36_500
+# Records of each kind one run deletes at most. Each delete loads its document, so a run is bounded.
+BATCH_SIZE = 500
 
 
-def purge(older_than_days: int = MIN_DAYS, dry_run: bool = False) -> dict:
+def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
 	"""Delete records past their retention period. If `dry_run` is true, only count (V-10).
 
 	`older_than_days` is the period of the action log. The period of proposals is fixed.
@@ -28,13 +33,20 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = False) -> dict:
 	The counts are taken in the same transaction as the delete.
 	"""
 	frappe.only_for("System Manager")
-	days = int(older_than_days)
-	if days < MIN_DAYS:
+	if isinstance(older_than_days, bool) or not isinstance(older_than_days, int | str):
+		older_than_days = -1
+	try:
+		days = int(older_than_days)
+	except ValueError:
+		days = -1
+	if not MIN_DAYS <= days <= MAX_DAYS:
 		frappe.throw(
-			_("The retention period is at least {0} days.", context=CONTEXT).format(MIN_DAYS),
+			_("The retention period is between {0} and {1} days.", context=CONTEXT).format(
+				MIN_DAYS, MAX_DAYS
+			),
 			frappe.ValidationError,
 		)
-	counts = store.purge_older_than(days, PROPOSAL_DAYS, delete=not dry_run)
+	counts = store.purge_older_than(days, PROPOSAL_DAYS, BATCH_SIZE, delete=not dry_run)
 	return {
 		"dry_run": bool(dry_run),
 		"older_than_days": days,

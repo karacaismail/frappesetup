@@ -136,9 +136,9 @@ class TestChildTables(YzTestCase):
 		frappe.set_user(USER_A)
 
 		with self.assertRaises(ToolDenied):
-			write.run_update(DOCTYPE, mine, {"rows": [{"name": foreign.name, "item": "calindi"}]})
+			write.prepare_update(DOCTYPE, mine, {"rows": [{"name": foreign.name, "item": "calindi"}]})
 		with self.assertRaises(ToolDenied):
-			write.run_create(DOCTYPE, {"title": "x", "rows": [{"name": foreign.name}]})
+			write.prepare_create(DOCTYPE, {"title": "x", "rows": [{"name": foreign.name}]})
 
 
 class TestReportSecrets(YzTestCase):

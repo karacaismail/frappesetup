@@ -128,6 +128,30 @@ def lock_row(doctype: str, name: str) -> bool:
 	return bool(frappe.db.get_value(doctype, name, "name", for_update=True))
 
 
+def field_property_rows(doctype: str, fieldname: str, property: str, *, for_update: bool) -> list:
+	"""The stored rows behind one field property: "Property Setter" rows, then the field's own rows.
+
+	Each row gives its name, the property's value and `modified`. A standard field is a "DocField"
+	row of the DocType, a custom one is a "Custom Field" record. `property` is a known column
+	name: the caller checks it against its allow list.
+
+	With `for_update` these are locking reads. They return the latest committed rows and lock
+	the gap too, so no other transaction can add the first setter row until this one ends.
+	"""
+	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
+	setters = frappe.db.get_values(
+		"Property Setter", key, ["name", "value", "modified"], for_update=for_update, as_dict=True
+	)
+	found = []
+	for table, filters in (
+		("DocField", {"parent": doctype, "parenttype": "DocType", "fieldname": fieldname}),
+		("Custom Field", {"dt": doctype, "fieldname": fieldname}),
+	):
+		rows = frappe.db.get_values(table, filters, ["name", property, "modified"], for_update=for_update)
+		found += sorted([table, row[0], row[1], str(row[2])] for row in rows)
+	return [sorted([row.name, row.value, str(row.modified)] for row in setters), found]
+
+
 def row_stamp(doctype: str, name: str) -> str | None:
 	"""The `modified` value of a target row, read by the layer itself. None if the row does not exist."""
 	value = frappe.db.get_value(doctype, name, "modified")
@@ -165,27 +189,46 @@ def _delete_for_good(doctype: str, name: str) -> None:
 		doc.delete(force=True, delete_permanently=True)
 
 
-def purge_older_than(days: int, proposal_days: int, *, delete: bool) -> dict:
+def purge_older_than(days: int, proposal_days: int, batch: int, *, delete: bool) -> dict:
 	"""Count the records past their retention period and delete them if asked.
 
 	A log row goes `days` after it was written. A proposal goes `proposal_days` after its decision
 	or its expiry, whichever comes first. Every proposal has an expiry, so none stays forever.
 
+	One run takes at most `batch` records of each kind, oldest first. `logs` and `proposals` are
+	what this run takes. `logs_waiting` and `proposals_waiting` are all records past their period
+	when the run started.
+
 	Only `retention.purge` calls this path. That function checks the admin role.
 	"""
 	now = now_datetime()
 	cutoff = add_days(now, -proposal_days)
+	old_logs = {"creation": ("<", add_days(now, -days))}
 	# A filter on an empty `decided_at` alone would match every undecided proposal, because the
-	# database layer reads an empty date as a very old one. So the decided ones are asked for first.
-	decided = [["decided_at", "is", "set"], ["decided_at", "<", cutoff]]
-	proposals = sorted(
-		{
-			*frappe.get_all(PROPOSAL, filters=decided, pluck="name"),
-			*frappe.get_all(PROPOSAL, filters={"expires_at": ("<", cutoff)}, pluck="name"),
-		}
+	# database layer reads an empty date as a very old one. So the two groups are asked for apart.
+	# The period starts at the decision or the expiry, whichever comes first. The three groups
+	# below do not overlap, so their counts add up.
+	groups = (
+		[["decided_at", "is", "set"], ["decided_at", "<", cutoff]],
+		[["decided_at", "is", "not set"], ["expires_at", "<", cutoff]],
+		# Closed late by a human: decided lately, but expired long ago.
+		[["decided_at", "is", "set"], ["decided_at", ">=", cutoff], ["expires_at", "<", cutoff]],
 	)
-	logs = frappe.get_all(LOG, filters={"creation": ("<", add_days(now, -days))}, pluck="name")
-	counts = {"logs": len(logs), "proposals": len(proposals)}
+	oldest_first = "creation asc, name asc"
+
+	logs = frappe.get_all(LOG, filters=old_logs, pluck="name", order_by=oldest_first, limit=batch)
+	proposals = []
+	for filters in groups:
+		if len(proposals) < batch:
+			proposals += frappe.get_all(
+				PROPOSAL, filters=filters, pluck="name", order_by=oldest_first, limit=batch - len(proposals)
+			)
+	counts = {
+		"logs": len(logs),
+		"logs_waiting": frappe.db.count(LOG, old_logs),
+		"proposals": len(proposals),
+		"proposals_waiting": sum(frappe.db.count(PROPOSAL, filters) for filters in groups),
+	}
 	if delete:
 		for doctype, names in ((LOG, logs), (PROPOSAL, proposals)):
 			for name in names:
