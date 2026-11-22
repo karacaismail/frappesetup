@@ -4,6 +4,7 @@ import json
 import os
 import re
 import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -332,3 +333,45 @@ class ComposeContractTest(unittest.TestCase):
         )
         dockerfile = (PRESS_DEV / "Dockerfile").read_text()
         self.assertRegex(dockerfile, re.compile(r"^FROM \S+@sha256:[0-9a-f]{64} AS \w+$", re.MULTILINE))
+
+
+@unittest.skipUnless(shutil.which("docker"), "Docker Compose is required")
+class UnpatchedComposeContractTest(unittest.TestCase):
+    def config(self, with_port=False):
+        docker_path = shutil.which("docker")
+        self.assertIsNotNone(docker_path)
+        process_env = {name: setting for name, setting in os.environ.items() if name != "PANE_PORT"}
+        if with_port:
+            process_env["PANE_PORT"] = "47320"
+        completed = subprocess.run(
+            [
+                docker_path,
+                "--context",
+                "colima-factory",
+                "compose",
+                "-f",
+                str(PRESS_DEV / "compose.unpatched.yaml"),
+                "config",
+                "--format",
+                "json",
+            ],
+            env=process_env,
+            capture_output=True,
+            text=True,
+            check=False,
+            shell=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return json.loads(completed.stdout)
+
+    def test_probe_does_not_require_or_publish_a_port(self):
+        probe = self.config()["services"]["probe"]
+        self.assertNotIn("PANE_PORT", probe.get("environment", {}))
+        self.assertNotIn("ports", probe)
+        self.assertEqual(probe["network_mode"], "none")
+
+    def test_probe_never_pulls_a_missing_local_image(self):
+        self.assertEqual(self.config(with_port=True)["services"]["probe"].get("pull_policy"), "never")
+
+    def test_probe_project_uses_the_assigned_task_name(self):
+        self.assertEqual(self.config(with_port=True)["name"], "fs-pd-press-py314")

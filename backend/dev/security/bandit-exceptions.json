@@ -198,6 +198,15 @@
     "ignoreUntil": "2027-02-22"
   },
   {
+    "rule": "B603",
+    "file": "backend/dev/ai_readiness/gate.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "2fbcfde7a77e4a5e80de80cb79f8201ae2214350250c46566bc026b1e6cd1ed9",
+    "reason": "The command uses the running Python interpreter and a checked in-repository script path.",
+    "owner": "ai-readiness-gate",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
     "rule": "B404",
     "file": "backend/dev/ai_readiness/test_gate.py",
     "code": "import subprocess",
@@ -1299,8 +1308,8 @@
     "rule": "B603",
     "file": "backend/dev/security/semgrep_exceptions.py",
     "code": "listing = subprocess.run(",
-    "statementSha256": "706b7f50459ff1d9b451b9f967fd3a58b0f32af0ea4af26410d11f8462d4007c",
-    "reason": "Calls absolute Git without a shell, with validated literal file or directory pathspecs after the argument separator.",
+    "statementSha256": "21caf1cad401f2bdf4b597eeb30e928055b0fc391631cb7106487ec2e2fea9bf",
+    "reason": "Executes absolute Git without a shell and limits file listing to a literal path after the argument separator.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   },
@@ -1652,6 +1661,15 @@
     "file": "backend/identity/identity_sync/tests/test_server.py",
     "code": "PRESS_TOKEN = \"press-token\"  # the Press service token: may only request an account deletion",
     "statementSha256": "77bece1a86eadd668fa5780ce4c28d5c4ce800bbed197115cb3cc3a7b4619269",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "PREVIEW_TOKEN = \"preview-token\"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler",
+    "statementSha256": "f713a9561df32d0e74160f3ee651cc597b66733395f1380f8fab9662fac58a7e",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "identity-sync",
     "ignoreUntil": "2027-02-22"
@@ -2018,6 +2036,51 @@
   },
   {
     "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "2274c9e4f8355d143f59e7eedcf59eafaaae64138efa8c03a3fa51ba2b159f46",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "6cc335476eb278d61c35fdfe18d2e0ed7893afa0b7266be592192f0225a10285",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e151932b3eed9e54ac80619cb31cbef89e5836ce4051ce77030cdd4af0abd7df",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "f4c60f326264dcc0f0ebccbb87fc534461c2a087a07d0c2f12241941727e5b80",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "subprocess.run([\"bash\", str(self.script), \"prod-check\"], env=self.env, capture_output=True,",
+    "statementSha256": "eea4ba92960975ad0735da5d53f00560ae5fe413028abc9128e0b616b3321235",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
     "file": "backend/identity/keycloak/tests/test_event_listener.py",
     "code": "result = subprocess.run(",
     "statementSha256": "e5b34f916e5aab9fd6fad8fa0421cd92f1483fba89e40f2fea0f250d4bfa4f42",
@@ -2068,6 +2131,51 @@
     "statementSha256": "85e3a4c7bb25504c4a5b5d1aefbabb12678abe1d09d48db45b07d5192128a526",
     "reason": "The developer test runner supplies the executable PATH for this fixture command.",
     "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "2274c9e4f8355d143f59e7eedcf59eafaaae64138efa8c03a3fa51ba2b159f46",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "6cc335476eb278d61c35fdfe18d2e0ed7893afa0b7266be592192f0225a10285",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e151932b3eed9e54ac80619cb31cbef89e5836ce4051ce77030cdd4af0abd7df",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "f4c60f326264dcc0f0ebccbb87fc534461c2a087a07d0c2f12241941727e5b80",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "subprocess.run([\"bash\", str(self.script), \"prod-check\"], env=self.env, capture_output=True,",
+    "statementSha256": "eea4ba92960975ad0735da5d53f00560ae5fe413028abc9128e0b616b3321235",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
     "ignoreUntil": "2027-02-22"
   },
   {
@@ -2225,6 +2333,26 @@
   },
   {
     "rule": "B105",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "statementSha256": "31e2540a5fde3126c1b6cfd430e47db487d918544fa376faa85d08782a2f2e54",
+    "owner": "press-tr",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "statementSha256": "42f5dac4bec816e3861d4415b6cdcae91b1acc50d685f756ac287d48480d7bf3",
+    "owner": "press-tr",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B105",
     "file": "backend/identity/identity_sync/tests/test_config_cli.py",
     "code": "\"IDENTITY_SYNC_CLIENT_SECRET\": \"test-client-secret\",",
     "statementSha256": "e0331e54c41eb4f91101a360d4773c7be68271f520916057c0c9d9b30c49e95a",
@@ -2342,6 +2470,15 @@
   },
   {
     "rule": "B603",
+    "file": "backend/dev/security/test_review.py",
+    "code": "result = subprocess.run([bin_dir / \"security-audit\"], env={**env, \"BASE\": base},",
+    "statementSha256": "3b9a44235c9937ae1ed727ad2cae48e8cd72f10d970b6629e08748c31bb82374",
+    "owner": "security-tooling",
+    "reason": "The regression test executes its own temporary security audit stub.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
     "file": "backend/e2e/preview/fixtures.py",
     "code": "result = subprocess.run(",
     "statementSha256": "f105c048aa5428aa77bedaab2ed4c348fad1fd231162814f61031bd6dbeaee90",
@@ -2375,6 +2512,141 @@
     "code": "return subprocess.run(",
     "statementSha256": "1056fa27157270019254851f8cc87b58727e58ec8085bd19adcfcfe803fd8933",
     "reason": "Executes the repository CLI with the current Python interpreter and test-owned arguments, without a shell.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/ansible_test_env.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess to inspect the operator-selected test interpreter.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/ansible_test_env.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "e23e5ba153aa77684b82ca78a0596c0d791d9c34d34a9ec203bc8d5f6eac58f8",
+    "reason": "Uses the trusted test interpreter with a fixed Python expression and no shell to verify runtime versions.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_ansible_playbook_syntax.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess for the syntax-only Ansible regression test.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_ansible_playbook_syntax.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "5b89eac4938c6852f5adcbd49510389d0c90d902196dc5b70e8b02018562f159",
+    "reason": "Runs syntax checks without a shell against two fixed playbook names and a localhost inventory.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_ansible_runner.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess to isolate the local Ansible harness.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_ansible_runner.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "9418ce90faafa0ae02d4b3f77f59d5bd8de0448cdf11e4c2e9e9008aaf55dbdf",
+    "reason": "Runs the repository harness in isolated Python without a shell. The scenario and bridge mode come from test cases.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "shell=False,",
+    "statementSha256": "8584fc0a123180db8cac56f8312a9ee432d31f6d56e31021769c4a805d8f269e",
+    "reason": "The local contract test resolves Docker with shutil.which and renders the fixed Compose file using separate arguments and shell=False. Compose config starts no container and pulls no image. The test runner controls PATH.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for local acceptance tests. Each subprocess call has a separate statement-scoped review.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "1ec3ad575e54a73f054d9e1039d03ff59189f06e4734b66e43ffa05bc4f6efa6",
+    "reason": "The local probe uses the operator-selected Bench Python by absolute path with separate arguments and shell=False. Code comes from fixed test expressions or the pinned upstream source, not an application request.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "[git_executable, \"-C\", str(self.source), \"rev-parse\", \"HEAD\"], text=True, shell=False",
+    "statementSha256": "3ef78b586922de079b92dd6488429cf701670f72beedd398df4a5bad150d230f",
+    "reason": "The local test resolves Git with shutil.which and an absolute path, then reads the selected checkout revision with fixed arguments and shell=False. The test runner controls PATH.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "25dbe862461cdbe8028dc570fc44ec6a2a571886cf5e25f3e50dea72725418cc",
+    "reason": "The local test resolves Git to an absolute executable, then checks the checkout diff with fixed arguments and shell=False. The test runner controls PATH and the checkout path.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "66bcd35d4bb14b4683394cd03736b52546c830dff0a0d7f40ddbdfabdbce4372",
+    "reason": "The local test resolves Git to an absolute executable and lists untracked source files with fixed arguments and shell=False. The test runner controls PATH and the checkout path.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "1d6a2ed0731f2d4a7b469d582f634d9b5380a761a360ec697a4c013c6eefe0d3",
+    "reason": "The local test resolves uv to an absolute executable and checks installed dependencies with fixed arguments and shell=False. It does not install packages. The test runner controls PATH.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "8866f924fc3c581601dde6adc34f1774b9bbd93bdf2c056370d58b4fef9b410e",
+    "reason": "The local test invokes the selected Bench Ansible executable by absolute path, with a repository-owned local-only playbook and shell=False. No application request supplies arguments.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/semgrep_exceptions.py",
+    "code": "listing = subprocess.run(",
+    "statementSha256": "706b7f50459ff1d9b451b9f967fd3a58b0f32af0ea4af26410d11f8462d4007c",
+    "reason": "Calls absolute Git without a shell, with validated literal file or directory pathspecs after the argument separator.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   },
