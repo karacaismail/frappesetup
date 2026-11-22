@@ -188,6 +188,7 @@ def main():
     fixture = seed_site(project, "kiraci-web", BENCH, {
         **common,
         "E2E_PROVIDER_IP": str(address),
+        "PYTHONPATH": "/tmp",
         "E2E_KEYCLOAK_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
         "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
     })

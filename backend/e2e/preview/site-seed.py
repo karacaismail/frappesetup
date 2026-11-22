@@ -118,6 +118,7 @@ def main():
     service_email = "e2e-service@example.test"
     provider_urls = {}
     if tenant:
+        config.pop("keycloak_service_client_secret", None)
         provider_urls = {
             part: f"http://e2e-provider:{port + 7}/{part}" for part in ("limited", "fallback")
         }
@@ -125,7 +126,7 @@ def main():
             keycloak_client_id="site-kiraci1",
             keycloak_client_secret=os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
             keycloak_service_client_id="site-kiraci1-service",
-            keycloak_service_client_secret=os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
+            extra_config="preview_site_config.tenant_service_config",
             kimlik_marka_adi="Atonota",
             kimlik_mobil_azp=["mobile-app"],
             kimlik_deletion_hmac_key=token_urlsafe(32),
