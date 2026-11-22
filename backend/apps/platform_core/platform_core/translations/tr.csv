@@ -1,0 +1,13 @@
+Sign in with {0},{0} ile oturum aç
+Sign in with {0} is not configured.,{0} ile oturum açma kurulu değil.
+Redirect target must be a relative path on this site.,Yönlendirme hedefi bu sitede göreli bir yol olmalıdır.
+Keycloak settings are missing: {0},Keycloak ayarları eksik: {0}
+The identity provider did not send a subject.,Kimlik sunucusu kullanıcı kimliğini göndermedi.
+This identity is linked to a different user.,Bu kimlik başka bir kullanıcıya bağlı.
+This user is already linked to a different identity.,Bu kullanıcı zaten başka bir kimliğe bağlı.
+The e-mail address is not verified by the identity provider.,E-posta adresi kimlik sunucusunda doğrulanmadı.
+Back-channel logout must not carry a session cookie.,Arka kanal çıkış isteği oturum çerezi taşıyamaz.
+Logout token is missing.,Çıkış belirteci eksik.
+Logout token rejected: {0},Çıkış belirteci reddedildi: {0}
+Identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.
+Issuer and subject are required.,Veren ve kullanıcı kimliği zorunludur.

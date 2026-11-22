@@ -1,0 +1,69 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-22 10:00:00.000000",
+ "description": "Links one identity at the identity provider (issuer and subject) to one Frappe user. The pair is the permanent key of the user. The e-mail address is only contact data and may change.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "issuer",
+  "subject",
+  "user"
+ ],
+ "fields": [
+  {
+   "description": "Identity provider address as written in the token's iss claim, for example http://kimlik.localhost:8660/realms/platform. Together with Subject it is unique.",
+   "fieldname": "issuer",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Issuer",
+   "reqd": 1
+  },
+  {
+   "description": "Stable user identifier at the identity provider (the sub claim). Together with Issuer it is unique. It never changes when the e-mail changes.",
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "description": "The Frappe user this identity signs in as. One user has at most one link.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "unique": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Kimlik",
+ "name": "Platform Identity Link",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "search_fields": "user,subject",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "user",
+ "track_changes": 1
+}
