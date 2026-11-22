@@ -9,6 +9,15 @@ _CACHES: dict[str, JwksCache] = {}
 _LOCK = threading.Lock()
 
 
+def is_keys_unavailable(error: BaseException) -> bool:
+	"""True for oidc_verify's JwksUnavailable (keys could not be fetched and none are cached).
+
+	The package does not export that class yet, and the module boundary check forbids importing
+	`oidc_verify.hatalar` directly. kimlik-realm was asked to export it; until then it is matched by name.
+	"""
+	return type(error).__name__ == "JwksUnavailable"
+
+
 def jwks_cache(jwks_url: str) -> JwksCache:
 	with _LOCK:
 		cache = _CACHES.get(jwks_url)

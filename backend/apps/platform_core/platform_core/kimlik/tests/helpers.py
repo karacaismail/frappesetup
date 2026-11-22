@@ -260,6 +260,43 @@ def jwks_unavailable_patch():
 	return patch("platform_core.kimlik.jwks.jwks_cache", side_effect=fake)
 
 
+def ensure_system_manager(email: str, password: str) -> str:
+	"""A System User with a known password for password sign-in tests. Fictional address."""
+	if frappe.db.exists("User", email):
+		frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+	user = frappe.new_doc("User")
+	user.update(
+		{
+			"email": email,
+			"first_name": "Kimlik",
+			"user_type": "System User",
+			"enabled": 1,
+			"send_welcome_email": 0,
+			"new_password": password,
+		}
+	)
+	user.append("roles", {"role": "System Manager"})
+	user.insert(ignore_permissions=True)
+	return user.name
+
+
+class single_value:
+	"""Temporarily sets one field of a Single DocType without validating the whole document."""
+
+	def __init__(self, doctype: str, field: str, value):
+		self.doctype, self.field, self.value = doctype, field, value
+
+	def __enter__(self):
+		self.old = frappe.db.get_single_value(self.doctype, self.field)
+		frappe.db.set_single_value(self.doctype, self.field, self.value)
+		refresh()
+		return self
+
+	def __exit__(self, *_):
+		frappe.db.set_single_value(self.doctype, self.field, self.old)
+		refresh()
+
+
 def ensure_role(name: str, desk_access: int) -> str:
 	if frappe.db.exists("Role", name):
 		return name

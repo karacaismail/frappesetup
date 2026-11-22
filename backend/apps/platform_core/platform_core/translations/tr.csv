@@ -11,3 +11,22 @@ Logout token is missing.,Çıkış belirteci eksik.
 Logout token rejected: {0},Çıkış belirteci reddedildi: {0}
 Identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.
 Issuer and subject are required.,Veren ve kullanıcı kimliği zorunludur.
+Service requests must not carry a cmd field.,Servis isteği cmd alanı taşıyamaz.
+Service requests must not carry a session cookie.,Servis isteği oturum çerezi taşıyamaz.
+Service token rejected: {0},Servis belirteci reddedildi: {0}
+This endpoint accepts only the {0} service token.,Bu uç yalnız {0} servis belirtecini kabul eder.
+E-mail differs from the linked user. Use change_email.,E-posta bağlı kullanıcıdan farklı. change_email ucunu kullanın.
+The first link requires a verified e-mail address.,İlk bağ için doğrulanmış e-posta gerekir.
+This e-mail is already linked to a different identity.,Bu e-posta zaten başka bir kimliğe bağlı.
+No user is linked to this identity.,Bu kimliğe bağlı kullanıcı yok.
+The new e-mail address belongs to another user.,Yeni e-posta adresi başka bir kullanıcıya ait.
+Issuer is not the configured identity provider.,Veren ayarlı kimlik sunucusu değil.
+Field {0} is required.,{0} alanı zorunludur.
+E-mail address is not valid.,E-posta adresi geçerli değil.
+Field {0} must be true or false.,{0} alanı doğru ya da yanlış olmalıdır.
+Field {0} must be a list of role profile names.,{0} alanı rol profili adlarının listesi olmalıdır.
+Role profile {0} does not exist.,{0} rol profili yok.
+Role profile grants desk access: {0},Rol profili masaüstü erişimi veriyor: {0}
+Password sign-in is disabled. Sign in with the identity provider.,Parola ile giriş kapalı. Kimlik sunucusu ile oturum açın.
+E-mail link sign-in is disabled. Sign in with the identity provider.,E-posta bağlantısıyla giriş kapalı. Kimlik sunucusu ile oturum açın.
+This page is not available. Use the application.,Bu sayfa kullanılamaz. Uygulamayı kullanın.

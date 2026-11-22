@@ -4,7 +4,6 @@ import frappe
 from frappe import _
 from frappe.sessions import delete_session
 from oidc_verify import TokenError, verify_logout_token
-from oidc_verify.hatalar import JwksUnavailable
 
 from platform_core.kimlik import helpers, jwks, site_settings
 from platform_core.kimlik.exceptions import InvalidLogoutToken, KeycloakKeysUnavailable
@@ -48,7 +47,9 @@ def handle_logout_token(logout_token: object) -> dict:
 		)
 	except TokenError as error:
 		frappe.throw(_("Logout token rejected: {0}").format(error.code), InvalidLogoutToken)
-	except JwksUnavailable:
+	except Exception as error:
+		if not jwks.is_keys_unavailable(error):
+			raise
 		frappe.throw(_("Identity provider keys are not available."), KeycloakKeysUnavailable)
 
 	closed = 0

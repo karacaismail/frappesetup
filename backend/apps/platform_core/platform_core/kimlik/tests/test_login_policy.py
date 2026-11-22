@@ -15,6 +15,8 @@ class TestKeycloakOnly(FrappeAPITestCase):
 		cls.addClassCleanup(cls.settings.__exit__, None, None, None)
 		provider_setup.ensure_social_login_key()
 		h.ensure_user(h.AYSE)
+		cls.admin_password = frappe.generate_hash(length=24)
+		cls.admin_user = h.ensure_system_manager("kimlik.yonetici@example.test", cls.admin_password)
 		h.refresh()
 
 	@classmethod
@@ -30,7 +32,7 @@ class TestKeycloakOnly(FrappeAPITestCase):
 		return h.request(
 			h.new_client().post,
 			"/api/method/login",
-			data={"usr": "Administrator", "pwd": frappe.conf.admin_password or "admin"},
+			data={"usr": self.admin_user, "pwd": self.admin_password},
 		)
 
 	def test_password_login_works_while_gate_is_off(self):
@@ -42,7 +44,7 @@ class TestKeycloakOnly(FrappeAPITestCase):
 			password = self.password_login()
 			self.assertEqual(password.status_code, 401, password.data[:200])
 
-			with self.change_settings("System Settings", login_with_email_link=1, commit=True):
+			with h.single_value("System Settings", "login_with_email_link", 1):
 				link = h.request(
 					h.new_client().post,
 					"/api/method/frappe.www.login.send_login_link",

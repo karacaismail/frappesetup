@@ -69,8 +69,9 @@ class TestServiceToken(FrappeAPITestCase):
 		self.assertEqual(response.status_code, 200, response.data[:300])
 
 	def test_request_with_cmd_field_is_rejected(self):
+		# A JSON request ignores query arguments (frappe/app.py:340), so `cmd` travels in the body.
 		response = self.call(
-			self.key.sign(h.access_payload()), query_string={"cmd": "frappe.auth.get_logged_user"}
+			self.key.sign(h.access_payload()), body={**BODY, "cmd": "frappe.auth.get_logged_user"}
 		)
 		self.assertEqual(response.status_code, 401)
 		self.assertEqual(response.json.get("exc_type"), "ServiceTokenRejected")
