@@ -353,6 +353,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
   - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
+- **O-54. Press TR test paketi Press çekirdek dosyalarını karşılaştırır.**
+  - Test, yerel koşudan önce ve sonra dosyaları karşılaştırır.
+  - Test, dosya eklenirse, silinirse veya değişirse başarısız olur.
+  - Test, kurulumda uygulanmış uyum yamalarını ilk ölçüme dahil eder.
+  - Eklerin listesi ve test adımları [devir notundadır](docs/handoff/press-tr-extension-test.md).
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:

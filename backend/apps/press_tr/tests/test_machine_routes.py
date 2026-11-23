@@ -156,6 +156,15 @@ class MachineRoutesTest(PressHttpClient, unittest.TestCase):
 				unwrap(site_backup.create_snapshot)("fixture", "invalid")
 			backup.create_database_snapshot.assert_not_called()
 
+	def test_press_team_has_installed_organization_field(self):
+		field = frappe.get_meta("Team").get_field("custom_ptr_keycloak_org_id")
+		self.assertIsNotNone(field)
+		self.assertEqual(field.fieldtype, "Data")
+		self.assertTrue(frappe.db.has_column("Team", "custom_ptr_keycloak_org_id"))
+		tuning = frappe.get_meta("Team").get_field("enable_performance_tuning")
+		self.assertIsNotNone(tuning)
+		self.assertEqual(str(tuning.default), "0")
+
 	def test_account_request_cannot_create_native_invitation(self):
 		from press.press.doctype.account_request.account_request import AccountRequest
 
