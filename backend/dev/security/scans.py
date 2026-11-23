@@ -295,6 +295,10 @@ def osv_scanner():
     return str(local) if local.is_file() and os.access(local, os.X_OK) else None
 
 
+def osv_version(scanner):
+    return subprocess.check_output([scanner, "--version"], text=True, cwd=ROOT)
+
+
 def osv_database():
     os.environ.setdefault("OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY", str(OSV_HOME / "db"))
 
@@ -417,7 +421,7 @@ def scan_press_lock():
         return result
     try:
         osv_database()
-        output = subprocess.check_output([scanner, "--version"], text=True, cwd=ROOT)
+        output = osv_version(scanner)
         if not re.search(rf"(?m)^osv-scanner version: v?{re.escape(OSV)}\s*$", output, re.IGNORECASE):
             raise ValueError(f"OSV-Scanner {OSV} is required.")
         validate_osv_inputs([str(PRESS_LOCK)])
@@ -447,7 +451,7 @@ def scan_dependencies(requirements=None, *, reproduce=False):
             print("OSV-Scanner is not available on PATH.")
             return replace(result, status="not_run")
         osv_database()
-        output = subprocess.check_output([scanner, "--version"], text=True, cwd=ROOT)
+        output = osv_version(scanner)
         if not locks:
             raise ValueError("No tracked dependency lock files.")
         verify_python_lock(locks, reproduce=reproduce)
