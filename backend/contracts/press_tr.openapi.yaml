@@ -3,6 +3,38 @@ info:
   title: Press TR
   version: 0.1.0
 paths:
+  /api/method/press_tr.pricing.create_price_revision:
+    post:
+      operationId: createPriceRevision
+      summary: Copy a Site Plan with a new Turkish lira price.
+      description: Requires System Manager and Site Plan create permission. Creates a disabled successor and records a notice for each active subscriber team in the same transaction. Each team must have an email address. Email is queued in the transaction and sent after commit. The effective date must be at least 30 calendar days from the site date.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan, name, price_try, price_usd, effective_date]
+              properties:
+                plan: {type: string, minLength: 1, maxLength: 140}
+                name: {type: string, minLength: 1, maxLength: 140}
+                price_try: {type: string, pattern: '^[0-9]{1,12}([.][0-9]{1,2})?$'}
+                price_usd: {type: string, pattern: '^[0-9]{1,12}([.][0-9]{1,2})?$'}
+                effective_date: {type: string, format: date}
+      responses:
+        "200":
+          description: The new Site Plan name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: string}
+        "403":
+          description: The caller cannot create a price revision.
+        "417":
+          description: Invalid plan name, price, or effective date, or a subscriber team has no email address.
   /api/method/press_tr.api.auth.get_login_url:
     post:
       operationId: getLoginUrl

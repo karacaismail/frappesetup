@@ -289,7 +289,15 @@ doc_events = {
 		"validate": "press_tr.backup_keys.validate_site_keys",
 		"on_update": "press_tr.setup_wizard.start_setup_wizard",
 	},
+	"Site Plan": {"validate": "press_tr.pricing.reject_price_edit"},
+	"Subscription": {"validate": "press_tr.pricing.reject_early_subscription"},
 }
-extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
+extend_doctype_class = {
+	"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"],
+	"Site Plan": ["press_tr.pricing.SitePlanPricing"],
+}
+
+after_install = "press_tr.pricing_schema.sync_pricing_fields"
+after_migrate.append("press_tr.pricing_schema.sync_pricing_fields")
 
 ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session"]

@@ -138,3 +138,22 @@ Email address of the account to recover.,Kurtarılacak hesabın e-posta adresi.,
 The request was received. The answer does not show whether an account exists.,İstek alındı. Yanıt hesabın var olup olmadığını göstermez.,press_tr.openapi
 The request had extra fields.,İstekte fazladan alan vardı.,press_tr.openapi
 Recovery request limit reached.,Kurtarma isteği sınırına ulaşıldı.,press_tr.openapi
+Enter a price with at most two decimal places.,En çok iki ondalık basamağı olan bir fiyat yazın.
+Create a new plan to change its price.,Fiyatı değiştirmek için yeni bir plan açın.
+You cannot change the price start date.,Fiyatın başlangıç tarihini değiştiremezsiniz.
+You can enable the plan when its price starts.,Fiyat başladığında planı açabilirsiniz.
+Set a Turkish lira price for this paid plan.,Bu ücretli planın Türk lirası fiyatını belirleyin.
+Enter valid plan names.,Geçerli plan adları yazın.
+Enter a valid price start date.,Geçerli bir fiyat başlangıç tarihi yazın.
+Choose a start date at least 30 days from today.,Bugünden en az 30 gün sonrasını seçin.
+Enter a USD equivalent for a paid plan. Use zero for both prices on a free plan.,Ücretli planın dolar karşılığını yazın. Ücretsiz planın iki fiyatını da sıfır yazın.
+Enter a price that differs from the current price.,Şu anki fiyattan farklı bir fiyat yazın.
+Site plan price change,Site planı fiyat değişikliği
+Site Plan Price Change,Site Planı Fiyat Değişikliği
+The new plan price is {0} TRY from {1}.,Yeni planın fiyatı {1} günü {0} Türk lirası olur.
+Price (TRY),Fiyat (Türk lirası)
+Price Start Date,Fiyat Başlangıç Tarihi
+Plan price in Turkish lira.,Planın Türk lirası fiyatı.
+First date when the revised price can be enabled.,Yeni fiyatın başlayabileceği ilk tarih.
+You can assign the plan when its price starts.,Fiyat başladığında aboneyi bu plana geçirebilirsiniz.
+Add an email address for each subscriber team before changing the price.,Fiyatı değiştirmeden önce her abone ekibine e-posta adresi ekleyin.
