@@ -27,5 +27,18 @@ python3 "$DEV_DIR/init_env.py"
     env/bin/python /workspace/dev/bootstrap.py "$SITE" ${REQUIRED_APPS[@]+"${REQUIRED_APPS[@]}"} --app "$APP"
 "$DEV_DIR/bin/compose" run --rm --no-deps tenant-web \
     bench --site "$SITE" migrate --skip-search-index
-"$DEV_DIR/bin/compose" run --rm --no-deps "${test_options[@]}" tenant-web \
+# Frappe's run-tests prints "Testing is disabled" and exits 0 when allow_tests is off.
+# Stop with a non-zero code instead, so a skipped run cannot pass as a green one.
+status=0
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web env/bin/python -c \
+    'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("allow_tests") is True else 3)' \
+    "sites/$SITE/site_config.json" || status=$?
+if [[ "$status" == 3 ]]; then
+    printf 'Tests are disabled on %s: allow_tests is not true in its site_config.json.\n' "$SITE" >&2
+    exit 3
+elif [[ "$status" != 0 ]]; then
+    printf 'Could not read the test settings of %s.\n' "$SITE" >&2
+    exit "$status"
+fi
+"$DEV_DIR/bin/compose" run --rm --no-deps ${test_options[@]+"${test_options[@]}"} tenant-web \
     bench --site "$SITE" run-tests --app "$APP" "$@"

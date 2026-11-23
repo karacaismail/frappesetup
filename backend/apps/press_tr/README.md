@@ -104,6 +104,10 @@ PRESS_TEST_COMPOSE_PROJECT=press-test PRESS_TEST_PANEL_URL=https://panel.example
 
 AGPL-3.0. See [license.txt](license.txt).
 
+### Müşteri oturumunda açık uçlar
+
+Press müşteri oturumunda `frappe.auth.get_logged_user` ucu 401 döner. Aynı oturumda `press.api.account.me` ucu 200 döner. Bu ret Press'in kendi korumasıdır. Press TR bu davranışı değiştirmez. Testler oturumu `press.api.account.me` ile denetler.
+
 ### Hesabı anonim yapma
 
 Identity Sync, silme uç noktasını servis belirteciyle çağırır.

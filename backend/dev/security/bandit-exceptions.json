@@ -3099,5 +3099,14 @@
     "reason": "Default seed manifest path inside the web container, as written by seed.py; the host never writes it.",
     "owner": "ilk-dikey-dilim",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_environment.py",
+    "code": "result = subprocess.run([str(dev / \"bin/test\"), app], env=self.env, capture_output=True, text=True)",
+    "statementSha256": "fc2a53ea700f5be4d2ed25e7e2c0824881a708b8e5f4cb041a870db0b41deec5",
+    "reason": "Test runs a copy of the fixed bin/test script with a fake Compose and a validated app name.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
   }
 ]
