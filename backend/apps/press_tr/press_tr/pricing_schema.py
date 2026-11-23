@@ -28,6 +28,15 @@ def sync_pricing_fields():
 					"insert_after": "price_try",
 					"description": "First date when the revised price can be enabled.",
 				},
+				{
+					"fieldname": "price_previous_plan",
+					"fieldtype": "Link",
+					"label": "Previous Plan",
+					"options": "Site Plan",
+					"read_only": 1,
+					"no_copy": 1,
+					"insert_after": "price_effective_date",
+				},
 			],
 		}
 	)

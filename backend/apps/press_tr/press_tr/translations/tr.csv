@@ -157,3 +157,6 @@ Plan price in Turkish lira.,Planın Türk lirası fiyatı.
 First date when the revised price can be enabled.,Yeni fiyatın başlayabileceği ilk tarih.
 You can assign the plan when its price starts.,Fiyat başladığında aboneyi bu plana geçirebilirsiniz.
 Add an email address for each subscriber team before changing the price.,Fiyatı değiştirmeden önce her abone ekibine e-posta adresi ekleyin.
+Previous Plan,Önceki Plan
+You cannot change the previous plan.,Önceki planı değiştiremezsiniz.
+Site plans only support Turkish lira.,Site planlarında yalnız Türk lirası kullanabilirsiniz.

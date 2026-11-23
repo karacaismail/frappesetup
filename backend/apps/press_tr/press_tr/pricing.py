@@ -9,6 +9,7 @@ from babel.dates import format_date
 from babel.numbers import format_decimal
 from press.press.doctype.communication_info.communication_info import get_communication_info
 
+CURRENCY = "TRY"
 PRICE_FIELDS = ("price_try", "price_usd", "price_inr")
 PRICE_PATTERN = re.compile(r"[0-9]{1,12}(?:\.[0-9]{1,2})?")
 NOTICE_TYPE = "Site Plan Price Change"
@@ -24,6 +25,9 @@ def reject_price_edit(doc, method=None):
 	before = doc.get_doc_before_save()
 	if before and any((doc.get(field) or 0) != (before.get(field) or 0) for field in PRICE_FIELDS):
 		frappe.throw(frappe._("Create a new plan to change its price."))
+	if before and doc.get("price_previous_plan") != before.get("price_previous_plan"):
+		frappe.throw(frappe._("You cannot change the previous plan."))
+
 	effective_date = doc.get("price_effective_date")
 	if before and str(effective_date or "") != str(before.get("price_effective_date") or ""):
 		frappe.throw(frappe._("You cannot change the price start date."))
@@ -38,10 +42,48 @@ def reject_early_subscription(doc, method=None):
 			frappe.throw(frappe._("You can assign the plan when its price starts."))
 
 
+def move_subscriptions_on_activation(doc, method=None):
+	previous_plan = doc.get("price_previous_plan")
+	before = doc.get_doc_before_save()
+	if not previous_plan or not before or before.enabled or not doc.enabled:
+		return
+
+	subscriptions = frappe.get_all(
+		"Subscription",
+		filters={"plan_type": "Site Plan", "plan": previous_plan, "enabled": 1},
+		pluck="name",
+		order_by="name",
+	)
+	for name in subscriptions:
+		subscription = frappe.get_doc("Subscription", name, for_update=True)
+		if subscription.enabled and subscription.plan_type == "Site Plan" and subscription.plan == previous_plan:
+			subscription.plan = doc.name
+			subscription.save()
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def get_panel_plans():
+	from press.api import site
+
+	plans = site.get_site_plans()
+	if not plans:
+		return plans
+	prices = frappe.get_all(
+		"Site Plan",
+		filters={"name": ["in", [plan.name for plan in plans]]},
+		fields=["name", "price_try"],
+	)
+	price_by_plan = {row["name"]: row["price_try"] for row in prices}
+	for plan in plans:
+		plan.currency = CURRENCY
+		plan.price_try = price_by_plan.get(plan.name)
+	return plans
+
+
 class SitePlanPricing:
 	def get_price_per_day(self, currency):
-		if currency != "TRY":
-			return super().get_price_per_day(currency)
+		if currency != CURRENCY:
+			frappe.throw(frappe._("Site plans only support Turkish lira."))
 		if self.price_usd and not self.price_try:
 			frappe.throw(frappe._("Set a Turkish lira price for this paid plan."))
 		return frappe.utils.rounded((self.price_try or 0) / self.period, 2)
@@ -90,6 +132,7 @@ def create_price_revision(plan: str, name: str, price_try: str, price_usd: str, 
 	successor.price_try = lira
 	successor.price_usd = dollars
 	successor.price_effective_date = start
+	successor.price_previous_plan = original.name
 	successor.enabled = 0
 	successor.legacy_plan = 0
 	successor.insert(set_name=name)

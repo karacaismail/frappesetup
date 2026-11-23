@@ -7,7 +7,7 @@ from datetime import date
 from importlib.util import find_spec
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 if find_spec("babel") is None:
     raise unittest.SkipTest("Run with Babel 2.16.0, as pinned by Frappe 16.50.0")
@@ -77,6 +77,7 @@ class PriceRevisionTest(unittest.TestCase):
         self.successor.insert.assert_called_once_with(set_name="new")
         self.assertEqual(float(self.successor.price_try), 125.50)
         self.assertEqual(self.successor.enabled, 0)
+        self.assertEqual(self.successor.price_previous_plan, "old")
         self.assertEqual((self.original.price_try, self.original.price_usd, self.original.enabled), before)
         self.original.check_permission.assert_called_once_with("read")
         self.original.save.assert_not_called()
@@ -155,20 +156,79 @@ class PriceRevisionTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.pricing.reject_price_edit(changed)
 
-    def test_try_daily_price_preserves_existing_currency_behavior(self):
-        fallback = type("Plan", (), {"get_price_per_day": lambda self, currency: currency})
-        controller = type("SitePlan", (self.pricing.SitePlanPricing, fallback), {})
-        plan = controller()
+    def test_daily_price_accepts_only_turkish_lira(self):
+        plan = self.pricing.SitePlanPricing()
         plan.price_try, plan.price_usd, plan.period = 125.5, 6, 30
         self.assertEqual(plan.get_price_per_day("TRY"), 4.18)
-        self.assertEqual(plan.get_price_per_day("USD"), "USD")
-        self.assertEqual(plan.get_price_per_day("INR"), "INR")
+        for currency in ("USD", "INR", "", None):
+            with self.subTest(currency=currency), self.assertRaises(ValidationError):
+                plan.get_price_per_day(currency)
+
+    def activate_revision(self, today):
+        start = date(2026, 12, 23)
+        before = Record(enabled=0, price_effective_date=start, price_previous_plan="old")
+        revision = Record(**vars(before), name="new", get_doc_before_save=lambda: before)
+        revision.enabled = 1
+        self.frappe.utils.getdate = lambda value=None: value or today
+        self.pricing.reject_price_edit(revision)
+        self.pricing.move_subscriptions_on_activation(revision)
+
+    def test_subscribers_stay_on_old_plan_the_day_before_start(self):
+        subscription = Mock(plan="old", plan_type="Site Plan", enabled=1)
+        self.frappe.get_doc.side_effect = None
+        self.frappe.get_doc.return_value = subscription
+        with self.assertRaises(ValidationError):
+            self.activate_revision(date(2026, 12, 22))
+        self.assertEqual(subscription.plan, "old")
+        subscription.save.assert_not_called()
+
+    def test_active_subscribers_move_on_the_start_day(self):
+        subscriber = Mock(plan="old", plan_type="Site Plan", enabled=1)
+        already_changed = Mock(plan="unrelated", plan_type="Site Plan", enabled=1)
+        self.frappe.get_all.return_value = ["active", "changed"]
+        self.frappe.get_doc.side_effect = [subscriber, already_changed]
+        self.activate_revision(date(2026, 12, 23))
+        self.frappe.get_all.assert_called_once_with(
+            "Subscription",
+            filters={"plan_type": "Site Plan", "plan": "old", "enabled": 1},
+            pluck="name",
+            order_by="name",
+        )
+        self.assertEqual(
+            self.frappe.get_doc.call_args_list,
+            [
+                call("Subscription", "active", for_update=True),
+                call("Subscription", "changed", for_update=True),
+            ],
+        )
+        self.assertEqual(subscriber.plan, "new")
+        subscriber.save.assert_called_once_with()
+        self.assertEqual(already_changed.plan, "unrelated")
+        already_changed.save.assert_not_called()
+
+    def test_panel_plan_returns_currency_and_price_in_try(self):
+        press_site = SimpleNamespace(get_site_plans=Mock(return_value=[Record(name="new", price_usd=6)]))
+        self.frappe.get_all.return_value = [{"name": "new", "price_try": 125.5}]
+        with patch.dict(sys.modules, {"press.api": SimpleNamespace(site=press_site)}):
+            result = self.pricing.get_panel_plans()
+        press_site.get_site_plans.assert_called_once_with()
+        self.frappe.get_all.assert_called_once_with(
+            "Site Plan", filters={"name": ["in", ["new"]]}, fields=["name", "price_try"]
+        )
+        self.assertEqual(result[0].currency, "TRY")
+        self.assertEqual(result[0].price_try, 125.5)
 
     def test_application_registers_install_and_save_hooks(self):
         with patch.object(sys, "path", [str(APP), *sys.path]):
             hooks = importlib.import_module("press_tr.hooks")
         self.assertEqual(hooks.after_install, "press_tr.pricing_schema.sync_pricing_fields")
         self.assertEqual(hooks.after_migrate, hooks.after_install)
+        self.assertEqual(
+            hooks.doc_events["Site Plan"]["on_update"], "press_tr.pricing.move_subscriptions_on_activation"
+        )
+        self.assertEqual(
+            hooks.override_whitelisted_methods["press.api.site.get_site_plans"], "press_tr.pricing.get_panel_plans"
+        )
         self.assertEqual(hooks.doc_events["Site Plan"]["validate"], "press_tr.pricing.reject_price_edit")
         self.assertIn("press_tr.pricing.SitePlanPricing", hooks.extend_doctype_class["Site Plan"])
         self.assertEqual(

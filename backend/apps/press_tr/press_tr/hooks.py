@@ -289,12 +289,19 @@ doc_events = {
 		"validate": "press_tr.backup_keys.validate_site_keys",
 		"on_update": "press_tr.setup_wizard.start_setup_wizard",
 	},
-	"Site Plan": {"validate": "press_tr.pricing.reject_price_edit"},
+	"Site Plan": {
+		"validate": "press_tr.pricing.reject_price_edit",
+		"on_update": "press_tr.pricing.move_subscriptions_on_activation",
+	},
 	"Subscription": {"validate": "press_tr.pricing.reject_early_subscription"},
 }
 extend_doctype_class = {
 	"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"],
 	"Site Plan": ["press_tr.pricing.SitePlanPricing"],
+}
+
+override_whitelisted_methods = {
+	"press.api.site.get_site_plans": "press_tr.pricing.get_panel_plans",
 }
 
 after_install = "press_tr.pricing_schema.sync_pricing_fields"
