@@ -141,6 +141,17 @@ class PressDockerfile(unittest.TestCase):
         self.assertIn("rm -rf apps/press/node_modules apps/press/dashboard/node_modules", final)
 
 
+    def test_arm64_source_build_runs_only_for_a_local_trial(self):
+        # Review 1, finding 2: on arm64 the dockerfile sdist fetches Go code without a pinned
+        # version. That build is allowed only with PRESS_LOCAL_ARM64_TRIAL=1; build-release never
+        # sets it, so a release image never carries the unpinned Go code.
+        stage = dockerfile().split(" AS dockerfile-wheel\n", 1)[1].split("\nFROM ", 1)[0]
+        self.assertIn("ARG PRESS_LOCAL_ARM64_TRIAL=0", stage)
+        gate = stage.index('[ "$PRESS_LOCAL_ARM64_TRIAL" = 1 ] || {')
+        self.assertLess(gate, stage.index("apt-get update"))
+        self.assertLess(gate, stage.index("curl "))
+        self.assertNotIn("PRESS_LOCAL_ARM64_TRIAL", (DEPLOY / "bin" / "build-release").read_text())
+
 class PatchSeries(unittest.TestCase):
     def patches(self):
         return sorted(PATCHES.glob("*.patch"))
@@ -265,6 +276,16 @@ class ReleaseCarriesPress(unittest.TestCase):
         self.assertEqual(len(press), 1)
         self.assertEqual(press[0][-1], str(BACKEND))
 
+
+    def test_every_release_image_is_built_for_amd64(self):
+        # Review 1, finding 2 and E-15: the release images are built for linux/amd64 on any build
+        # agent, so an arm64 agent cannot produce a different Press image from the same commit.
+        self.build_release()
+        builds = [line.split("\t") for line in self.log.read_text().splitlines() if line.startswith("docker\tbuild")]
+        self.assertEqual(len(builds), len(release.REQUIRED["backend"]))
+        for call in builds:
+            with self.subTest(dockerfile=call[call.index("--file") + 1]):
+                self.assertEqual(call[call.index("--platform") + 1], "linux/amd64")
 
 class StackServesPress(unittest.TestCase):
     def stack(self):
