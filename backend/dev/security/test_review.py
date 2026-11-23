@@ -165,6 +165,8 @@ class ReviewTests(unittest.TestCase):
             calls = root / "calls"
             env = {**os.environ, "PATH": f"{tools}:{os.environ['PATH']}", "CALLS": str(calls)}
             bandit_call = "run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py bandit"
+            # The gate also scans the Press lock offline (review 1, finding 3).
+            press_lock_call = "run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py press-lock"
             for base, bandit_status, gate_status, remaining in (
                 ("abc", 0, 0, ["--self-test", "--commit-base abc"]),
                 ("", 0, 1, ["--self-test"]),
@@ -175,7 +177,7 @@ class ReviewTests(unittest.TestCase):
                     result = subprocess.run([bin_dir / "security-audit"], env={**env, "BASE": base,
                                             "BANDIT_STATUS": str(bandit_status)}, capture_output=True, text=True)
                     self.assertEqual(result.returncode, gate_status, result.stderr)
-                    self.assertEqual(calls.read_text().splitlines(), [bandit_call, *remaining])
+                    self.assertEqual(calls.read_text().splitlines(), [bandit_call, press_lock_call, *remaining])
 
     def test_handoff_describes_database_timestamp_limit(self):
         handoff = (scans.ROOT / "backend/docs/handoff/ci-security.md").read_text()
@@ -260,8 +262,10 @@ class ReviewTests(unittest.TestCase):
                     self.assertEqual(result.stdout, "")
 
     def test_missing_osv_binary_is_not_run(self):
+        # osv_scanner() finds no pinned scanner on PATH or in the osv-setup cache. Patch it, because
+        # the machine running the test may have the cached copy.
         with patch.object(scans, "git", return_value="backend/dev/security/requirements.txt"), \
-                patch.object(scans.subprocess, "check_output", side_effect=FileNotFoundError("osv-scanner")), \
+                patch.object(scans, "osv_scanner", return_value=None), \
                 patch.object(scans, "verify_python_lock") as verify:
             result = scans.scan_dependencies()
         self.assertEqual(result.status, "not_run")

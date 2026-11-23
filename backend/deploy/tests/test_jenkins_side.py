@@ -125,6 +125,9 @@ class DeployScript(unittest.TestCase):
         self.assertIn(self.release / "deploy" / "compose" / "stack.yaml", sent)
         self.assertIn(self.release / "deploy" / "remote" / "apply", sent)
         self.assertIn(self.release / "deploy" / "environments" / "beta.env", sent)
+        # The server checks its secret files against the lists of the release (blocker E-4).
+        self.assertIn(self.release / "deploy" / "settings" / "keycloak.production.env.example", sent)
+        self.assertIn(self.release / "deploy" / "remote" / "settings.py", sent)
         for name in sent:
             self.assertTrue(str(name).startswith(str(self.release)), name)
         stack = (self.release / "deploy" / "compose" / "stack.yaml").read_text()
@@ -152,6 +155,17 @@ class DeployScript(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit", result.stderr)
         self.assertEqual(self.calls(), [])
+
+    def test_build_web_needs_the_vite_manifest(self):
+        # The /panel page of Frappe loads the files this manifest names (E-3).
+        checkout = self.folder / "web"
+        (checkout / "dist" / "assets").mkdir(parents=True)
+        (checkout / "dist" / "index.html").write_text("<!doctype html>")
+        self.environment["BUILD_NUMBER"] = "3"
+        result = self.run_command(DEPLOY / "bin" / "build-web", checkout, self.folder / "out")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("dist/.vite/manifest.json is missing", result.stderr)
+        self.assertFalse((self.folder / "out").exists())
 
     def test_resume_runs_the_apply_script_of_the_pending_release(self):
         result = self.run_command(DEPLOY / "bin" / "resume", "beta", self.folder / "out")
@@ -206,6 +220,22 @@ class Jenkinsfiles(unittest.TestCase):
                     continue
                 self.assertIn("--failed", line, f"{name}: {line.strip()}")
 
+    def test_backend_gates_prepare_osv_first(self):
+        # Review 2, finding 2: security-audit scans the Press lock offline. A new agent has no
+        # scanner and a database older than seven days fails the gate. Scheduled jobs are not
+        # allowed, so the line itself refreshes the database before the gates.
+        text = jenkinsfile("backend.Jenkinsfile")
+        stages = re.findall(r"stage\('([^']+)'\)", text)
+        self.assertLess(stages.index("Checkout"), stages.index("Security tools"))
+        self.assertEqual(stages.index("Security tools") + 1, stages.index("Gates"))
+        block = text.split("stage('Security tools')", 1)[1].split("stage('Gates')", 1)[0]
+        self.assertIn("sh 'backend/dev/security/osv-setup --if-stale'", block)
+        self.assertLess(text.index("osv-setup --if-stale"), text.index("backend/dev/bin/security-audit"))
+        # The setup comment (comments are stripped above) names what the agent needs.
+        header = (JENKINS / "backend.Jenkinsfile").read_text().split("pipeline {", 1)[0]
+        self.assertIn("curl", header)
+        self.assertIn("osv-vulnerabilities.storage.googleapis.com", header)
+
     def test_approval_does_not_hold_an_agent(self):
         # An input step inside steps keeps the agent busy until someone answers (finding K4).
         for name in self.ALL:
@@ -239,6 +269,33 @@ class Jenkinsfiles(unittest.TestCase):
         self.assertNotRegex(text, r"bin/deploy \$\{params.ENVIRONMENT\} (?!archive/release)")
         self.assertIn("'resume'", text)
         self.assertIn("bin/resume", text)
+
+
+class PanelBundle(unittest.TestCase):
+    """The /panel page reads the web bundle's Vite manifest; the edge serves its assets (E-3)."""
+
+    MANIFEST = "/srv/panel/current/.vite/manifest.json"
+
+    def test_web_build_uses_the_panel_base_and_writes_a_manifest(self):
+        text = jenkinsfile("web.Jenkinsfile")
+        self.assertIn("sh 'npm run build -- --base=/panel/ --manifest'", text)
+
+    def test_tenant_containers_know_the_manifest_path(self):
+        stack = (DEPLOY / "compose" / "stack.yaml").read_text()
+        anchor = stack[stack.index("x-tenant: &tenant"):stack.index("services:")]
+        self.assertIn("- /srv/atonota/web/${ATONOTA_ENV:?}:/srv/panel:ro", anchor)
+        self.assertIn(f"ATONOTA_PANEL_MANIFEST: {self.MANIFEST}", anchor)
+
+    def test_edge_serves_panel_assets_from_the_current_bundle(self):
+        edge = (DEPLOY / "compose" / "edge.yaml").read_text()
+        self.assertIn("- /srv/atonota/web:/srv/web:ro", edge)
+        template = (DEPLOY / "compose" / "site.caddy.template").read_text()
+        block = template[template.index("__TENANT_SITES__ {"):]
+        lines = [line.strip() for line in block.splitlines()]
+        start = lines.index("handle_path /panel/assets/* {")
+        self.assertEqual(lines[start + 1], "root * /srv/web/__ENV__/current/assets")
+        self.assertIn("file_server", lines[start:start + 5])
+        self.assertLess(start, lines.index("reverse_proxy __ENV__-tenant:8080"))
 
 
 class EdgeHeaders(unittest.TestCase):

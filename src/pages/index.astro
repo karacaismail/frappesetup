@@ -18,7 +18,7 @@ const g = requirements.filter((r) => r.id.startsWith('G-')).length;
 const sa = requirements.filter((r) => r.id.startsWith('SA-')).length;
 
 const decisions = [
-  { id: 'K1', title: 'Kontrol düzlemi', text: "Press v0.154.x (master) + Frappe v15 + Python 3.11 — Press'in test edildiği tek hat." },
+  { id: 'K1', title: 'Kontrol düzlemi', text: "Press v0.154.x + Frappe 16 + Python 3.14. Press bu sürümde yama dizisiyle açılır (O-52)." },
   { id: 'K2', title: 'Müşteri siteleri', text: "ERPNext v16.50 + Frappe v16; müşteri başına bir Frappe sitesi, Press'in kurduğu bench'lerde." },
   { id: 'K3', title: 'Altyapı', text: "Hetzner bare-metal, self-host; KVKK için AB içi veri yerleşimi. Sunucular DevOps sorumlusunda." },
   { id: 'K4', title: 'Frontend', text: '%100 headless React SPA; Ant Design tek tasarım sistemi, @ant-design/x AI arayüzlerinde birinci sınıf, TanStack veri katmanı.' },
@@ -26,7 +26,7 @@ const decisions = [
   { id: 'K6', title: 'Navigasyon', text: 'Sidebar Workspace + kurulu app + izin verisinden türer; hiçbir menü elle kodlanmaz.' },
   { id: 'K7', title: 'Kimlik', text: 'Keycloak tüm uygulamalar için tek giriş/kayıt sağlayıcısı; Frappe ve Press OIDC ile bağlanır.' },
   { id: 'K8', title: 'Erişim', text: 'Zoho/Odoo düzeyinde yetki: ReBAC/ABAC kayıt kuralları, hiyerarşi ve alan düzeyi — platform_core Access Rule motoru.' },
-  { id: 'K9', title: 'AI-first', text: "Press ve siteler MCP ile yönetilir; Claude Agent SDK servisi; yazma eylemleri önizleme + onay, her eylem audit'e düşer." },
+  { id: 'K9', title: 'AI-first', text: "Press ve siteler MCP ile yönetilir. Ajan servisi ve model geçidi sağlayıcıdan bağımsızdır. Yazma eylemi önizleme ve onay ister, her eylem günlüğe düşer." },
   { id: 'K10', title: 'Ürünler', text: "Ayrı Frappe app'leri: HRMS TR → CRM → Webshop; ortak admin shell; etkinleştirme Press Marketplace / App Plan üzerinden." },
 ];
 
@@ -47,8 +47,8 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
       <p class="eyebrow">Mimari karar çerçevesi · {AS_OF}</p>
       <h1>Frappe üzerinde çok kiracılı SaaS: on sabit karar, altı ray, {requirements.length} numaralı gereksinim</h1>
       <p class="lede">
-        Self-host Hetzner altyapısında Press kontrol düzlemi (Frappe v15) ile ERPNext v16 müşteri sitelerini,
-        Keycloak kimliğini, Ant Design tabanlı headless paneli, MCP/Claude Agent SDK AI katmanını ve superadmin
+        Self-host Hetzner altyapısında Press kontrol düzlemi (Frappe 16) ile ERPNext v16 müşteri sitelerini,
+        Keycloak kimliğini, Ant Design tabanlı headless paneli, sağlayıcıdan bağımsız MCP ve AI katmanını ve superadmin
         operasyon düzlemini tek plan altında birleştirir. Yalnızca olması gerekenler yazılır; her madde
         numaralı, sahipli ve fazlıdır.
       </p>

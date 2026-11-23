@@ -34,8 +34,9 @@ def timeline() -> str:
     for p in phases:
         columns[level[p["id"]]].append(p["id"])
     # Düzen: düzey başına bir sütun. Satırlar P1/P3, P0/P4/P5 ve P2/P6 hizalanır. Böylece komşu oklar düz kalır.
-    ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190}
-    BOX_W, BOX_H, COL_X0, COL_STEP, BELOW_Y = 200, 64, 40, 256, 372
+    # P7 (P1 ve P2 sonrası) P6'nın altındaki dördüncü satırdadır. Sütun atlayan oklar P7'nin altından dolaşır.
+    ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190, "P7": 370}
+    BOX_W, BOX_H, COL_X0, COL_STEP, BELOW_Y = 200, 64, 40, 256, 462
     col_x = {pid: COL_X0 + COL_STEP * lvl for pid, lvl in level.items()}
     name_of = lambda pid: by_id[pid]["title"].split(" ", 1)[1]  # noqa: E731
     gates = [  # (kimlik, ad, çıkışına bağlı olduğu fazlar)
@@ -49,7 +50,7 @@ def timeline() -> str:
     deps_txt = " ".join(f"{p['id']}, {join(p['after'])} bitince başlar." for p in phases if p["after"])
     gates_txt = ", ".join(f"{k} {n} ({join(ids)} çıkışı)" for k, n, ids in gates)
     o = [
-        f"<svg viewBox='0 0 1040 520' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
+        f"<svg viewBox='0 0 1040 610' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
         "<title id='tl-title'>Yol haritası faz sırası</title>",
         f"<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir. {levels_txt} Oklar önkoşuldan bağımlı faza gider. {deps_txt} "
         f"P2, P1'deki Keycloak adımı bitince başlar. Kapılar: {gates_txt}. Takvim tarihi ve süre yoktur.</desc>",
@@ -67,8 +68,29 @@ def timeline() -> str:
         o.append(f"<rect x='{x}' y='{y}' width='{BOX_W}' height='{BOX_H}' rx='10' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>")
         o.append(f"<text x='{x + 16}' y='{y + 26}' font-size='18' font-weight='650' fill='var(--fs-ink)'>{pid}</text>")
         o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
+    # P7'ye giden iki ok kendi yolundan gider. Hiçbiri başka fazın okuyla çizgi ya da çıkış noktası paylaşmaz.
+    # P1 → P7: P1'in sağından ayrı bir noktadan (y=148) çıkar. x=510 şeridinden iner, P7'ye üst yarıdan girer.
+    #   x=510, P1 → P4 şeridinin (x=524) solundadır. Böylece P1 → P4'ün y=222 parçasını kesmez.
+    #   P2 → P6 çizgisini (y=312) kesmek zorunludur. Kesişme noktasında zemin renginde bir boşluk bırakılır.
+    # P2 → P7: P2'nin altından (x=456) çıkar. P2 → P6 sağdan, P2 → P5 x=396'dan çıkar. P7'ye alt yarıdan girer.
+    P7_Y1, P7_Y2 = ROW_Y["P7"] + 16, ROW_Y["P7"] + BOX_H - 16
+    P1P7_X, P1P7_OUT_Y, P2P7_X = col_x["P7"] - 42, ROW_Y["P1"] + 48, col_x["P2"] + 160
+    routes = {
+        "P1-P7": f"M{col_x['P1'] + BOX_W} {P1P7_OUT_Y} L{P1P7_X} {P1P7_OUT_Y} L{P1P7_X} {P7_Y1} L{col_x['P7']} {P7_Y1}",
+        "P2-P7": f"M{P2P7_X} {ROW_Y['P2'] + BOX_H} L{P2P7_X} {P7_Y2} L{col_x['P7']} {P7_Y2}",
+    }
+    halo_y = ROW_Y["P2"] + BOX_H // 2  # P1 → P7'nin P2 → P6 çizgisini kestiği yer
     for p in phases:
         for pre in p["after"]:
+            edge = f"{pre}-{p['id']}"
+            if edge in routes:
+                if edge == "P1-P7":
+                    o.append(
+                        f"<path data-halo='{edge}' d='M{P1P7_X} {halo_y - 7} L{P1P7_X} {halo_y + 7}' fill='none' "
+                        "stroke='var(--fs-surface-2)' stroke-width='7'/>"
+                    )
+                o.append(f"<path data-edge='{edge}' d='{routes[edge]}' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>")
+                continue
             x1, y1 = col_x[pre] + BOX_W, ROW_Y[pre] + BOX_H / 2
             x2, y2 = col_x[p["id"]], ROW_Y[p["id"]] + BOX_H / 2
             if level[p["id"]] - level[pre] > 1:  # sütun atlayan ok kutuların altından dolaşır, hedefe alttan girer
@@ -88,7 +110,7 @@ def timeline() -> str:
         "stroke-width='1.5' stroke-dasharray='5 5' marker-end='url(#tl-arr)'/>"
     )
     o.append(f"<text x='{gx + 10}' y='{(ROW_Y['P1'] + BOX_H + ROW_Y['P2']) / 2 + 6:.0f}' fill='var(--fs-accent-ink)'>Keycloak adımı</text>")
-    gy = 404
+    gy = 494
     o.append(f"<text x='24' y='{gy}' font-weight='650' fill='var(--fs-ink)'>Kapılar (hangi fazın çıkışına bağlı)</text>")
     for i, (k, name, ids) in enumerate(gates):
         x = 24 + 500 * (i % 2)
@@ -102,7 +124,8 @@ def timeline() -> str:
     caption = (
         "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
         "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
-        "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır."
+        "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. "
+        "P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
     )
     return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 
@@ -144,7 +167,7 @@ def rails() -> str:
         f"<svg viewBox='0 0 {W} 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' {FONT}>",
         "<title id='rails-title'>Altı mimari ray ve iki taban bandı</title>",
         "<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 "
-        "Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
+        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
         "Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 "
         "ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, "
         "kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
@@ -162,12 +185,12 @@ def rails() -> str:
              ["@platform/shell · meta-ui · frappe-sdk · design-tokens · ai-sidebar · @apps/*",
               "Superadmin operatör modu (Rail 6'nın kullanıcı yüzü)"])
     # Satır 2: AI (120..460), Keycloak (600..940), y 300..470
-    o += box(120, 300, 340, 170, "Rail 5 — AI", "Claude Agent SDK · PostgreSQL/Redis",
-             ["Model yönlendirme · önizle+onayla", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
-    o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "id.&lt;marka&gt; · realm platform · HA",
+    o += box(120, 300, 340, 170, "Rail 5 — AI", "Ajan servisi · model geçidi",
+             ["Önizle+onayla · PostgreSQL/Redis", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
+    o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "api.login.&lt;marka&gt; · realm platform · HA",
              ["Client'lar: press · site-&lt;kiracı&gt;", "agent-service · identity-sync", "Organizations · MFA · passkey"])
     # Satır 3: Press (40..320), Kiracı (360..680), Ops (720..1000), y 570..740
-    o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe v15 · press.&lt;marka&gt;",
+    o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe 16 · press.&lt;marka&gt;",
              ["Team · Site · Plan · Marketplace", "Abonelik · Fatura · Agent Job", "press_tr · press_ops_bridge"])
     o += box(360, 570, 320, 170, "Rail 2 — Kiracı siteleri", "ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;",
              ["Site + DB kiracı başına", "platform_core · tr_localization", "HRMS TR · CRM · Webshop app'leri"])

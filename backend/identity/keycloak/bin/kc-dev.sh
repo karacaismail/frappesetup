@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manages the Keycloak development environment. Owned by the kimlik-realm workstream.
-# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|realm-reload|realm-delete-only|delete-realm>
+# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|platforms|realm-reload|realm-delete-only|delete-realm>
 # Keycloak uses PANE_PORT. The Mailpit UI uses PANE_PORT + 6.
 set -euo pipefail
 
@@ -59,10 +59,28 @@ prepare_env() {
 
 load_environment() {
   prepare_env
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
+  # The file is read the way "docker run --env-file" and e2e/stack read it: the rest of the line
+  # is the value, with no shell quoting. So a value with a space, like "AtonotA Login", stays whole.
+  # Quotes and a trailing "# comment" stay in the value, as with docker. A final "\r" (CRLF file) is
+  # removed. Blank lines and lines starting with "#" are skipped. Any other line must be KEY=value.
+  # Two differences from docker make this reader stricter, never silently different:
+  # a key with leading spaces ("  KEY=1") is rejected, while docker strips the spaces;
+  # a bare "KEY" line is rejected, while docker copies KEY from the host environment.
+  local line key number=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
+    line="${line%$'\r'}"
+    case "${line#"${line%%[![:space:]]*}"}" in
+      '' | '#'*) continue ;;
+    esac
+    key="${line%%=*}"
+    if [ "$key" = "$line" ] || ! [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      printf '%s:%s: expected KEY=value, without "export".\n' \
+        "$ENV_FILE" "$number" >&2
+      exit 2
+    fi
+    export "$key=${line#*=}"
+  done < "$ENV_FILE"
   export KC_PORT="$PANE_PORT"
   export KC_PUBLIC_URL="http://identity.localhost:$PANE_PORT"
   export MAILPIT_UI_PORT="$((PANE_PORT + 6))"
@@ -263,6 +281,11 @@ case "$command" in
     # Keycloak must be reachable from this Mac (see "tunnel").
     python3 -I "$SCRIPT_DIR/bin/sync-dev-realm.py" --from-env
     ;;
+  platforms)
+    # Opens a sign-in platform whose secrets are all set in .env and closes the others (G-159).
+    # The platform list is data: ../atonota_login/platforms/. Development only unless approved.
+    python3 -I "$SCRIPT_DIR/../atonota_login/bin/atonota-login" apply --from-env "$@"
+    ;;
   realm-reload)
     # Loads the realm file without an image build: the file is copied into the running container, the
     # realm is deleted and the container restarts, so --import-realm imports the file again.
@@ -309,7 +332,7 @@ case "$command" in
     compose up -d --force-recreate --wait keycloak
     ;;
   *)
-    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|realm-reload|realm-delete-only|delete-realm>" >&2
+    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|platforms|realm-reload|realm-delete-only|delete-realm>" >&2
     exit 2
     ;;
 esac

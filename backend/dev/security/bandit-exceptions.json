@@ -81,20 +81,11 @@
     "ignoreUntil": "2027-02-22"
   },
   {
-    "rule": "B607",
-    "file": "backend/dev/security/scans.py",
-    "code": "output = subprocess.check_output([\"osv-scanner\", \"--version\"], text=True, cwd=ROOT)",
-    "statementSha256": "9f60b237c084f57bd3259f151a6bbc5f1f9a6c5acfff51af37d9d890a0d4be72",
-    "reason": "The only arguments are the configured OSV executable and its version flag.",
-    "owner": "security-tooling",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "code": "output = subprocess.check_output([\"osv-scanner\", \"--version\"], text=True, cwd=ROOT)",
-    "statementSha256": "9f60b237c084f57bd3259f151a6bbc5f1f9a6c5acfff51af37d9d890a0d4be72",
-    "reason": "The only arguments are the configured OSV executable and its version flag.",
+    "code": "return subprocess.check_output([scanner, \"--version\"], text=True, cwd=ROOT)",
+    "statementSha256": "b283c755d6ee94700162e4498d11fbf7dc50ffd441462c1f19d2fa81c4e18265",
+    "reason": "The only arguments are the OSV executable found by osv_scanner() and its version flag.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   },
@@ -1901,6 +1892,15 @@
   },
   {
     "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
     "file": "backend/identity/keycloak/tests/test_event_listener.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
@@ -2714,6 +2714,15 @@
     "ignoreUntil": "2027-02-22"
   },
   {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "5d3bafac377137b4a63e1da199131a0621a62fa4274accea27f29e7706490e92",
+    "owner": "kimlik-realm",
+    "reason": "The test starts its fixture command with an argument list and no implicit host shell.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
     "rule": "B607",
     "file": "backend/dev/ai_readiness/test_gate.py",
     "code": "subprocess.run([\"git\", \"-C\", str(self.repository), \"add\", \"backend\"], check=True)",
@@ -3197,6 +3206,60 @@
     "statementSha256": "ea968afeeba9ebfb9803ad3d8e58043e2d8fda2d465b0a6e80992ac6b0524389",
     "reason": "The keys name field kinds and the values are length limits; none is a credential.",
     "owner": "platform-core-gecit",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_settings.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_settings.py",
+    "code": "return subprocess.run([sys.executable, \"-I\", *map(str, arguments)], input=input_text,",
+    "statementSha256": "df1ad51817c28c6e876c4240a17fb5b5e00fbe35a05e82e778a889b0c6226fe5",
+    "reason": "Test runs the repository's own deploy scripts with this Python, fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_press_image.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_press_image.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "debd4cad75ac37a9391a52fb01cfd9e650e577dab7f0975e00a5491bb8514b2a",
+    "reason": "Test runs the repository's own build-release script with a fake docker, fixed arguments and no shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_osv_setup.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; the one subprocess call in this test is reviewed separately.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_osv_setup.py",
+    "code": "process = subprocess.run([BASH, str(SETUP), *args], env=self.env, capture_output=True, text=True)",
+    "statementSha256": "ac44c177b0d33a38943edf544b0a6a94caf9e5469d7ad0b32944960b4ec2f2f5",
+    "reason": "Runs the repository's own osv-setup script with bash and no shell string. The arguments are fixed test values, PATH points curl at a fake that writes only inside a temporary folder.",
+    "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   }
 ]

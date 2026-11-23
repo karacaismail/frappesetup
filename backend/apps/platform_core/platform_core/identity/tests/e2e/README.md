@@ -14,7 +14,7 @@ WebKit bağlantıya Tab ile değil, Alt+Tab ile gider. Safari'nin varsayılanı 
 Çalıştırma, depo kökünden:
 
 ```bash
-npx playwright test -c backend/apps/platform_core/platform_core/kimlik/tests/e2e/playwright.config.ts
+npx playwright test -c backend/apps/platform_core/platform_core/identity/tests/e2e/playwright.config.ts
 ```
 
 Başka adres için `IDENTITY_E2E_BASE_URL` değişkenini verin.
@@ -24,5 +24,5 @@ Parola formu testi `login-password.spec.ts` yalnız kapı kapalıyken çalışı
 Tür denetimi, depo kökünden çalışır.
 
 ```bash
-npm exec --package=typescript@5.9.3 -- tsc --noEmit --strict --skipLibCheck --module NodeNext --target ES2022 backend/apps/platform_core/platform_core/kimlik/tests/e2e/*.ts
+npm exec --package=typescript@5.9.3 -- tsc --noEmit --strict --skipLibCheck --module NodeNext --target ES2022 backend/apps/platform_core/platform_core/identity/tests/e2e/*.ts
 ```

@@ -14,9 +14,42 @@ __ID_HOST__ {
 	reverse_proxy __ENV__-keycloak:8080
 }
 
+# Press (O-55, G-6, G-13, G-119). Desk, dashboard and every Press API answer only on Tailscale.
+# Customers reach only the account deletion flow (O-27): the page, its files, the Keycloak login
+# and return, Keycloak's logout notice and the deletion request. A new customer path is added here
+# one by one, with its reason in O-55. Everything else gets 404.
+# Only the Tailscale ranges count as private. Docker's own 172.16.0.0/12 addresses do not: a public
+# IPv6 client can reach Caddy from the Docker gateway address.
 __PRESS_HOST__ {
 	import security_headers
-	reverse_proxy __ENV__-press:8000
+	# The refusals below hold only outside Tailscale. Desk record names may carry "%2F".
+	# Frappe 16 runs a "cmd" field before it reads the path, so "?cmd=" would reach any method.
+	# Dot segments and encoded slashes could reach another path behind nginx. Caddy cleans the path
+	# before "path" matches it, so this matcher reads the raw request path. The lines of one
+	# matcher must all hold, so each refusal has its own matcher.
+	@press_refused query cmd=*
+	@press_refused_path vars_regexp {http.request.orig_uri.path} (?i)(\.\.|%2e|%2f|%5c|\\|//)
+	@press_customer {
+		path /account-deletion /account-deletion/ /assets/* /website_script.js
+		path /api/method/press_tr.api.auth.get_login_url /api/method/press_tr.api.auth.keycloak_callback
+		path /api/method/press_tr.api.keycloak_backchannel_logout /api/method/press_tr.api.account.request_deletion
+	}
+	@press_private remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48
+	handle @press_private {
+		reverse_proxy __ENV__-press:8080
+	}
+	handle @press_refused {
+		respond 404
+	}
+	handle @press_refused_path {
+		respond 404
+	}
+	handle @press_customer {
+		reverse_proxy __ENV__-press:8080
+	}
+	handle {
+		respond 404
+	}
 }
 
 # Tenant sites. The panel HTML is Frappe's /panel page (session check, CSRF meta, CSP).

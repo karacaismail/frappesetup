@@ -7,6 +7,16 @@ import AxeBuilder from '@axe-core/playwright';
 const require = createRequire(import.meta.url);
 const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
   require('../src/data/requirements.json');
+type Release = { pr: number; commit: string } | null;
+const board: {
+  update: { date: string; commit: string; release: Release; note: string };
+  audit: { commit: string; release: Release; note: string };
+  epics: { id: string; title: string }[];
+  statuses: { id: string; label: string }[];
+  levels: { id: string; label: string }[];
+  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; release: Release } }>;
+} = require('../src/data/task-board.json');
+const phaseList: { id: string; title: string }[] = require('../src/data/phases.json');
 
 // Kabul: 320→360→375→390→yatay telefon→tablet→masaüstü; yatay taşma yok; metin ≥ 1rem (SVG dahil);
 // tek odak göstergesi yalnız klavye odağında; menü, tema, gezgin, diyagramlar ve erişilebilirlik.
@@ -618,7 +628,8 @@ test.describe('focus', () => {
     const switchInput = '.req-explorer input[role="switch"]';
     let switchIndicator: { proxy: boolean } | undefined;
     let facetButtons = 0;
-    for (let i = 0; i < 60; i++) {
+    // Açılan bölümde faz, düzey, durum, epic, ray ve kaynak düğmeleri, ardından görünüm düğmeleri gelir.
+    for (let i = 0; i < 90; i++) {
       const { indicator, tag } = await step();
       if (tag.startsWith('BUTTON')) facetButtons++;
       if (await isActive(switchInput)) {
@@ -941,7 +952,7 @@ test.describe('requirements explorer', () => {
   // Regresyon (rapor Y-10): ada JS'i gecikirken bir kez yazılan metin kaybolmamalı ve filtre uygulanmalı.
   // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez. Sayaç kesin metinle
   // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
-  const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} gereksinim$`);
+  const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} görev$`);
   for (const vp of [
     { name: 'desktop', width: 1366, height: 900, tableVisible: true, tag: '' },
     { name: '320', width: 320, height: 640, tableVisible: false, tag: ' @touch' },
@@ -1042,6 +1053,197 @@ test.describe('requirements explorer', () => {
     await expect(count).toHaveText(exactCount(keycloakCount));
     await expect(search).toBeFocused();
     await noHorizontalOverflow(page);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// Görev panosu: gereksinimler görev olarak gösterilir (durum, olgunluk düzeyi, epic). Bitti görevin başlığı üstü
+// çizilidir; görünür "Bitti" etiketi ve ekran okuyucunun okuduğu metin de vardır. Gruplu görünüm faz, sonra epic sırasıyla
+// "bitti / toplam" sayısını verir. Veri src/data/task-board.json dosyasındadır.
+const statusLabel = (id: string) => board.statuses.find((s) => s.id === id)!.label;
+const doneIds = requirements.filter((r) => board.items[r.id].status === 'done').map((r) => r.id);
+const countWhere = (f: (r: (typeof requirements)[number]) => boolean) => requirements.filter(f).length;
+
+test.describe('task board', () => {
+  for (const vp of [
+    { name: 'desktop', width: 1366, height: 900, title: '.req-table .req-title', row: (id: string) => `tr:has(code.req-id:text-is("${id}"))` },
+    { name: '320', width: 320, height: 640, title: '.req-card-title', row: (id: string) => `#req-${id}` },
+  ]) {
+    test(`done tasks are struck through, labelled and keep text contrast at ${vp.name}`, async ({ page }) => {
+      expect(doneIds.length).toBeGreaterThan(0);
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto('gereksinimler/');
+      await waitForHydration(page);
+      if (vp.name === 'desktop') await expect(page.getByTestId('req-table')).toBeVisible();
+      const done = page.locator(vp.row(doneIds[0]));
+      const open = page.locator(vp.row(requirements.find((r) => board.items[r.id].status !== 'done')!.id));
+      const style = (row: typeof done) =>
+        row.locator(vp.title.split(' ').pop()!).evaluate((el) => {
+          const cs = getComputedStyle(el);
+          return { line: cs.textDecorationLine, color: cs.color };
+        });
+      const d = await style(done);
+      const o = await style(open);
+      expect(d.line, 'bitti başlığı üstü çizili').toContain('line-through');
+      expect(o.line, 'açık başlık çizili değil').not.toContain('line-through');
+      expect(d.color, 'çizili başlık rengi açık başlıkla aynı (karşıtlık korunur)').toBe(o.color);
+      // Görünür etiket ve erişilebilir ad: yalnız çizgi gösterge değildir.
+      await expect(done.locator('.task-status')).toHaveText(statusLabel('done'));
+      await expect(done.locator('.task-status')).toBeVisible();
+      await expect(done).toContainText(/Kanıt:/);
+      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu ve commit'in dalını açıkça söyler.
+      const ev = board.items[doneIds[0]].evidence!;
+      await expect(done).toContainText(`Denetim commit'i ${ev.commit} backend dalındadır.`);
+      // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+      if (ev.release) {
+        const link = done.getByRole('link', { name: `PR #${ev.release.pr} ile yayımlandı` });
+        await expect(link).toHaveAttribute('href', `https://github.com/karacaismail/frappesetup/pull/${ev.release.pr}`);
+      } else {
+        await expect(done).toContainText('Henüz yayımlanmadı.');
+      }
+      // Pano başlığı ile markdown kuralları başlığı aynı adı taşımaz (ekran okuyucu başlık listesi).
+      const h2 = (await page.locator('main h2').allTextContents()).map((t) => t.trim());
+      expect(h2.filter((t, i) => h2.indexOf(t) !== i), 'tekrarlanan h2').toEqual([]);
+      await expect(page.locator(`${vp.title}.is-done`)).toHaveCount(doneIds.length);
+      await noHorizontalOverflow(page);
+    });
+  }
+
+  test('the board says when and at which commit the statuses were updated', async ({ page }) => {
+    // Okur durumun hangi güne ve hangi commit'e göre yazıldığını panonun kurallar bölümünde görür.
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const stamp = page.getByTestId('task-board-updated');
+    const day = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: 'UTC' })
+      .formatToParts(new Date(`${board.update.date}T00:00:00Z`))
+      .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+    await expect(stamp).toContainText(
+      `Durumlar ${day.day} ${day.month} ${day.year} ${day.weekday} günü backend dalındaki ${board.update.commit} commit'ine göre güncellendi.`,
+    );
+    await expect(stamp).toBeVisible();
+    const audit = page.locator('.task-rules > p').nth(1);
+    await expect(audit).toContainText(`Denetim backend dalındaki ${board.audit.commit} commit'inde yapıldı.`);
+    // İki commit aynı biçimde görünür (inceleme 1, K-3).
+    await expect(stamp.locator('code')).toHaveText(board.update.commit);
+    await expect(audit.locator('code')).toHaveText(board.audit.commit);
+    // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+    for (const [where, rel] of [[stamp, board.update.release], [audit, board.audit.release]] as const) {
+      if (rel) {
+        await expect(where.getByRole('link', { name: `PR #${rel.pr} ile yayımlandı` })).toHaveAttribute(
+          'href',
+          `https://github.com/karacaismail/frappesetup/pull/${rel.pr}`,
+        );
+      } else {
+        await expect(where).toContainText('Bu commit henüz yayımlanmadı.');
+      }
+    }
+    // Cümleler arasında boşluk kalır: derleme metni bitişik yazarsa "güncellendi.Güncelleme" tek sözcük olur.
+    const lead = (rel: Release) => (rel ? `PR #${rel.pr} ile yayımlandı.` : 'henüz yayımlanmadı.');
+    await expect(stamp).toContainText(`${lead(board.update.release)} ${board.update.note}`);
+    await expect(audit).toContainText(`${lead(board.audit.release)} ${board.audit.note}`);
+    await noHorizontalOverflow(page);
+  });
+
+  test('status, level and epic filters are toggle groups with exact counts', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const count = page.getByTestId('req-count');
+    await page.locator('.req-more > summary').click();
+    const total = requirements.length;
+    const press = async (group: string, label: string, n: number) => {
+      const b = page.getByRole('group', { name: group }).getByRole('button', { name: new RegExp(`^${label} · ${n}$`) });
+      await b.click();
+      await expect(b).toHaveAttribute('aria-pressed', 'true');
+      await expect(count).toContainText(`${n} / ${total}`);
+      await b.click();
+      await expect(count).toContainText(`${total} / ${total}`);
+    };
+    await press('Durum', statusLabel('done'), doneIds.length);
+    await press('Durum', statusLabel('unverified'), countWhere((r) => board.items[r.id].status === 'unverified'));
+    for (const l of board.levels) await press('Olgunluk düzeyi', l.label, countWhere((r) => board.items[r.id].level === l.id));
+    const epic = board.epics[0];
+    await press('Epic', epic.title, countWhere((r) => board.items[r.id].epic === epic.id));
+    // Süzgeçler birleşir: MVP + Bitti.
+    const mvpDone = countWhere((r) => board.items[r.id].level === 'mvp' && board.items[r.id].status === 'done');
+    await page.getByRole('group', { name: 'Olgunluk düzeyi' }).getByRole('button', { name: /^MVP · / }).click();
+    await page.getByRole('group', { name: 'Durum' }).getByRole('button', { name: new RegExp(`^${statusLabel('done')} · `) }).click();
+    await expect(count).toContainText(`${mvpDone} / ${total}`);
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+  });
+
+  for (const vp of [
+    { name: 'desktop', width: 1366, height: 900, tag: '' },
+    { name: '320', width: 320, height: 640, tag: ' @touch' },
+  ]) {
+    test(`grouped view lists phases, then epics, with done / total counts at ${vp.name}${vp.tag}`, async ({ page }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto('gereksinimler/');
+      await waitForHydration(page);
+      const viewGroup = page.getByRole('group', { name: 'Görünüm' });
+      const grouped = viewGroup.getByRole('button', { name: 'Gruplu' });
+      await expect(viewGroup.getByRole('button', { name: 'Tablo' })).toHaveAttribute('aria-pressed', 'true');
+      await grouped.focus();
+      await page.keyboard.press('Space');
+      await expect(grouped).toHaveAttribute('aria-pressed', 'true');
+      const groups = page.locator('.task-phase');
+      const phasesWithItems = phaseList.filter((p) => requirements.some((r) => r.phase === p.id));
+      await expect(groups).toHaveCount(phasesWithItems.length);
+      await expect(page.locator('.req-cards')).toHaveCount(0);
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
+      for (const [i, p] of phasesWithItems.entries()) {
+        const items = requirements.filter((r) => r.phase === p.id);
+        const done = items.filter((r) => board.items[r.id].status === 'done').length;
+        const g = groups.nth(i);
+        await expect(g.locator('h3')).toContainText(p.title);
+        await expect(g.locator('h3 .task-count')).toHaveText(`${done} / ${items.length} bitti`);
+        const epics = board.epics.filter((e) => items.some((r) => board.items[r.id].epic === e.id));
+        await expect(g.locator('h4')).toHaveCount(epics.length);
+        const first = items.filter((r) => board.items[r.id].epic === epics[0].id);
+        await expect(g.locator('h4').first()).toContainText(epics[0].title);
+        await expect(g.locator('h4 .task-count').first()).toHaveText(
+          `${first.filter((r) => board.items[r.id].status === 'done').length} / ${first.length} bitti`,
+        );
+      }
+      await expect(page.locator('.task-phase .req-card')).toHaveCount(requirements.length);
+      // Süzgeç gruplu görünümde de çalışır; boş grup gösterilmez.
+      // Bitti görevin başlığı tek görevi bulur.
+      await page.getByRole('textbox', { name: 'Ara' }).fill(requirements.find((r) => r.id === doneIds[0])!.title);
+      await expect(page.locator('.task-phase')).toHaveCount(1);
+      await expect(page.locator('.task-phase .req-card-title.is-done')).toHaveCount(1);
+      await page.getByRole('textbox', { name: 'Ara' }).fill('');
+      await noHorizontalOverflow(page);
+      await expectMinFont(page);
+      expect(await forcedBreakRules(page)).toEqual([]);
+      expect(await midWordSplits(page)).toEqual([]);
+      await viewGroup.getByRole('button', { name: 'Tablo' }).click();
+      await expect(page.locator('.task-phase')).toHaveCount(0);
+    });
+  }
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`axe ${scheme} grouped task view and done labels`, async ({ page }) => {
+      await page.setViewportSize({ width: 1366, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto('gereksinimler/');
+      await waitForHydration(page);
+      await page.locator('.req-more > summary').click();
+      await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: 'Gruplu' }).click();
+      await expect(page.locator('.task-phase').first()).toBeVisible();
+      const results = await new AxeBuilder({ page })
+        .include('.req-explorer')
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
+        .analyze();
+      expect(results.violations.map((v) => `${v.impact} ${v.id}: ${v.nodes.length} × ${v.nodes[0]?.target.join(' ')}`)).toEqual([]);
+    });
+  }
+
+  test('task board rules are rendered from the data file', async ({ page }) => {
+    await page.goto('gereksinimler/');
+    const rules = page.locator('.task-rules');
+    for (const l of board.levels) await expect(rules).toContainText(l.label);
+    for (const e of board.epics) await expect(rules).toContainText(e.title);
+    for (const s of board.statuses) await expect(rules).toContainText(s.label);
   });
 });
 

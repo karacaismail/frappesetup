@@ -131,7 +131,9 @@ class RealmSettingsTest(unittest.TestCase):
 
     def test_marka_dil_tema(self):
         r = self.realm
-        self.assertEqual(r["displayName"], "Atonota")
+        self.assertEqual(r["displayName"], get_environment_value("IDENTITY_BRAND_NAME"))
+        # Review 1, minor finding 2: the passkey window shows the brand, not the "${...}" placeholder.
+        self.assertEqual(r["webAuthnPolicyPasswordlessRpEntityName"], get_environment_value("IDENTITY_BRAND_NAME"))
         self.assertEqual(r["defaultLocale"], "tr")
         self.assertEqual(set(r["supportedLocales"]), {"tr", "en"})
         self.assertEqual(r["loginTheme"], "atonota")

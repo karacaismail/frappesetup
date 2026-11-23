@@ -43,7 +43,7 @@ Yetkili hesap 200, yetkisiz hesap 403 almalıdır.
 
 DevOps sorumlusu araç sürümlerini ve açık veritabanını günceller.
 Her yanlış alarm için sorumlu rolü ve gerekçeyi yazın.
-OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin.
+OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin. Press imajının kilidine ait istisnayı `osv-exceptions-press.toml` dosyasına girin.
 Bandit istisnaları `backend/dev/security/bandit-exceptions.json` dosyasındadır.
 Semgrep istisnaları `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
 Gitleaks istisnaları `backend/dev/security/.gitleaksignore` dosyasındadır.
@@ -65,6 +65,7 @@ Süresi geçen veya eşleşmeyen istisna denetimi durdurur.
 Gitleaks yalnız kural, dosya, satır, commit ve parmak izi gösterir.
 
 OSV-Scanner kökteki npm kilidini ve diğer izlenen kilitleri tarar.
+Press imajının kilidi de bu taramaya girer. `security-audit` kapısı bu kilidi ayrıca ağsız tarar. Aracı ve veritabanını `backend/dev/security/osv-setup` indirir. Bu betik ağ ister.
 Paket bulguları sürüm raporuna yazılır. Paket sürümü bu komutla değişmez.
 
 Python kilidi, Git'in izlediği backend projelerinin `dependencies` listelerini kapsar.

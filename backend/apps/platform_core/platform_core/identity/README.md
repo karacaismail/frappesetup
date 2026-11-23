@@ -1,6 +1,6 @@
 # Kimlik modülü
 
-Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belirtecini doğrular. identity-sync için kullanıcı uçlarını verir. Sahibi platform-core-kimlik işidir. Uçların sözleşmesi `backend/contracts/platform_core-kimlik.openapi.yaml` dosyasındadır.
+Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belirtecini doğrular. identity-sync için kullanıcı uçlarını verir. Sahibi platform-core-kimlik işidir. Uçların sözleşmesi `backend/contracts/platform_core-identity.openapi.yaml` dosyasındadır.
 
 ## Dosyalar
 
@@ -56,7 +56,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `mcp_oauth_resource` | Dış MCP erişiminde | MCP ucunun tam HTTPS adresi. |
 | `mcp_oauth_client_ids` | Dış MCP erişiminde | İzin verilen açık Keycloak istemcilerinin kimlik listesi. |
 | `mcp_oauth_introspection_secret` | Dış MCP erişiminde | Keycloak belirtecini denetleyen istemcinin sırrı. Yalnız site ayarında saklanır. |
-| `identity_brand_name` | Evet | Düğme metni bundan üretilir, örneğin `Atonota` |
+| `identity_brand_name` | Evet | Düğme metni bundan üretilir, örneğin `AtonotA Login` |
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `identity_keycloak_only` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |
 | `identity_service_azp` | Hayır | Servis belirtecinde izinli `azp` listesi. Varsayılan `["identity-sync"]` |
@@ -82,7 +82,7 @@ Sunucu, istemci sırrını yalnız `site_config.json` dosyasından okur.
 Site ayarlarını yazdıktan sonra şu komut “Social Login Key” kaydını kurar:
 
 ```bash
-bench --site <site> execute platform_core.kimlik.provider_setup.ensure_social_login_key
+bench --site <site> execute platform_core.identity.provider_setup.ensure_social_login_key
 ```
 
 Aynı iş HTTP ile de yapılır. Uç `platform_core.api.auth.setup_keycloak_login` olur. Yalnız System Manager çağırır.

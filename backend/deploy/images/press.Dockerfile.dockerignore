@@ -1,0 +1,16 @@
+**
+!deploy/images/press-patches/*.patch
+!deploy/images/press-requirements.lock.txt
+!deploy/images/press-pip-check.allowed
+!apps/
+!apps/press_tr/
+!apps/press_tr/**
+!libs/
+!libs/oidc_verify/
+!libs/oidc_verify/**
+**/.git
+**/.env*
+**/__pycache__
+**/*.pyc
+**/.ruff_cache
+**/node_modules/

@@ -386,6 +386,39 @@ class RequestGuardsTest(unittest.TestCase):
 				with self.assertRaises(frappe.PermissionError):
 					request_policy.block_team_invitation(target, {})
 
+	def test_command_field_must_name_the_method_of_its_path(self):
+		# O-55: Frappe 16 runs "cmd" before it reads the path (frappe/app.py). A "cmd" body field on
+		# a customer path would otherwise call any Press method past the edge allowlist.
+		with (
+			patch.object(request_policy, "_", side_effect=lambda message, **_translation_options: message),
+			patch.object(request_policy, "frappe") as facade,
+			patch.object(request_policy, "request_target", return_value=(None, None)),
+		):
+			facade.PermissionError = frappe.PermissionError
+			facade.throw.side_effect = frappe.PermissionError
+			refused = (
+				("/account-deletion", "frappe.client.get_list"),
+				("/api/method/press_tr.api.account.request_deletion", "frappe.client.get_list"),
+				("/api/method/press_tr.api.auth.get_login_url", "press.api.account.signup"),
+				("/", "web_logout"),
+			)
+			for path, command in refused:
+				facade.request.path = path
+				facade.form_dict = {"cmd": command}
+				with self.subTest(path=path, command=command), self.assertRaises(frappe.PermissionError):
+					request_policy.before_request()
+			for prefix in request_policy.API_PREFIXES:
+				method = "press_tr.api.account.request_deletion"
+				facade.request.path = prefix + method
+				facade.form_dict = {"cmd": method}
+				with self.subTest(prefix=prefix):
+					request_policy.before_request()
+			facade.request.path = "/account-deletion"
+			facade.form_dict = {}
+			request_policy.before_request()
+			facade.throw.assert_called()
+			self.assertEqual(facade.throw.call_count, len(refused))
+
 	def test_server_script_cannot_replace_an_allowed_python_target(self):
 		with (
 			patch.object(request_policy, "frappe") as facade,

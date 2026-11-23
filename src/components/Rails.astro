@@ -5,7 +5,7 @@
 <div class="diagram-scroll" tabindex="0" role="region" aria-label="Mimari raylar diyagramı (yatay kaydırılabilir)">
 <svg viewBox='0 0 1040 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' style='font-family: var(--mantine-font-family), "Outfit Variable", Outfit, system-ui, sans-serif'>
 <title id='rails-title'>Altı mimari ray ve iki taban bandı</title>
-<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>
+<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>
 <defs><marker id='arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>
 <text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Altı ray, iki taban bandı: her ray kendi alanının tek doğruluk kaynağı</text>
 <text x='24' y='60' fill='var(--fs-quiet)'>Oklar adlandırılmış sözleşmeleri gösterir; yatay sözleşmeler altta listelenir</text>
@@ -21,8 +21,8 @@
 <rect x='120' y='300' width='340' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='120' y='300' width='6' height='170' rx='3' fill='var(--fs-line)'/>
 <text x='140' y='330' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 5 — AI</text>
-<text x='140' y='354' fill='var(--fs-quiet)'>Claude Agent SDK · PostgreSQL/Redis</text>
-<text x='140' y='384' fill='var(--fs-ink)'>Model yönlendirme · önizle+onayla</text>
+<text x='140' y='354' fill='var(--fs-quiet)'>Ajan servisi · model geçidi</text>
+<text x='140' y='384' fill='var(--fs-ink)'>Önizle+onayla · PostgreSQL/Redis</text>
 <text x='140' y='408' fill='var(--fs-ink)'>Yerel maskeleme · kota · AI Action Log</text>
 <text x='140' y='432' fill='var(--fs-ink)'>Site aracı belirteci (K-25)</text>
 </g>
@@ -30,7 +30,7 @@
 <rect x='600' y='300' width='340' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='600' y='300' width='6' height='170' rx='3' fill='var(--fs-line)'/>
 <text x='620' y='330' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 4 — Keycloak</text>
-<text x='620' y='354' fill='var(--fs-quiet)'>id.&lt;marka&gt; · realm platform · HA</text>
+<text x='620' y='354' fill='var(--fs-quiet)'>api.login.&lt;marka&gt; · realm platform · HA</text>
 <text x='620' y='384' fill='var(--fs-ink)'>Client'lar: press · site-&lt;kiracı&gt;</text>
 <text x='620' y='408' fill='var(--fs-ink)'>agent-service · identity-sync</text>
 <text x='620' y='432' fill='var(--fs-ink)'>Organizations · MFA · passkey</text>
@@ -39,7 +39,7 @@
 <rect x='40' y='570' width='280' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='40' y='570' width='6' height='170' rx='3' fill='var(--fs-line)'/>
 <text x='60' y='600' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 1 — Press</text>
-<text x='60' y='624' fill='var(--fs-quiet)'>Frappe v15 · press.&lt;marka&gt;</text>
+<text x='60' y='624' fill='var(--fs-quiet)'>Frappe 16 · press.&lt;marka&gt;</text>
 <text x='60' y='654' fill='var(--fs-ink)'>Team · Site · Plan · Marketplace</text>
 <text x='60' y='678' fill='var(--fs-ink)'>Abonelik · Fatura · Agent Job</text>
 <text x='60' y='702' fill='var(--fs-ink)'>press_tr · press_ops_bridge</text>

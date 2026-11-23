@@ -1,2 +1,5 @@
-# Each [[IgnoredVulns]] entry must have an id, owner and reason.
+# OSV exceptions for every lock except the Press image lock. That lock has its own file,
+# osv-exceptions-press.toml, so an exception there does not hide the same package here.
+# Each [[IgnoredVulns]] entry must have an id and a reason that opens with "Owner: <role>.".
+# OSV-Scanner refuses unknown keys, so there is no owner key (scans.py osv_exception_valid).
 # Set ignoreUntil and OSV's effectiveUntil to the same date.

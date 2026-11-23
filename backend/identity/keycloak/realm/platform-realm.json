@@ -63,7 +63,7 @@
   "otpPolicyLookAheadWindow": 1,
   "otpPolicyPeriod": 30,
   "otpPolicyCodeReusable": false,
-  "webAuthnPolicyPasswordlessRpEntityName": "Atonota",
+  "webAuthnPolicyPasswordlessRpEntityName": "${IDENTITY_BRAND_NAME}",
   "webAuthnPolicyPasswordlessSignatureAlgorithms": [
     "ES256",
     "RS256"
@@ -1098,25 +1098,6 @@
   ],
   "identityProviders": [
     {
-      "alias": "google",
-      "displayName": "Google",
-      "providerId": "google",
-      "enabled": false,
-      "trustEmail": false,
-      "storeToken": false,
-      "addReadTokenRoleOnCreate": false,
-      "linkOnly": false,
-      "hideOnLogin": true,
-      "firstBrokerLoginFlowAlias": "first broker login",
-      "config": {
-        "clientId": "${ATONOTA_GOOGLE_CLIENT_ID}",
-        "clientSecret": "${ATONOTA_GOOGLE_CLIENT_SECRET}",
-        "syncMode": "IMPORT",
-        "defaultScope": "openid email profile"
-      },
-      "postBrokerLoginFlowAlias": "atonota-post-broker"
-    },
-    {
       "alias": "apple",
       "displayName": "Apple",
       "providerId": "apple",
@@ -1126,13 +1107,97 @@
       "addReadTokenRoleOnCreate": false,
       "linkOnly": false,
       "hideOnLogin": true,
-      "firstBrokerLoginFlowAlias": "first broker login",
+      "firstBrokerLoginFlowAlias": "atonota-first-broker-login",
       "config": {
         "clientId": "${ATONOTA_APPLE_CLIENT_ID}",
         "clientSecret": "${ATONOTA_APPLE_P8_KEY}",
         "teamId": "${ATONOTA_APPLE_TEAM_ID}",
         "keyId": "${ATONOTA_APPLE_KEY_ID}",
         "defaultScope": "name email",
+        "syncMode": "IMPORT",
+        "filteredByClaim": "true",
+        "claimFilterName": "email_verified",
+        "claimFilterValue": "true"
+      },
+      "postBrokerLoginFlowAlias": "atonota-post-broker"
+    },
+    {
+      "alias": "facebook",
+      "displayName": "Facebook",
+      "providerId": "facebook",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "linkOnly": false,
+      "hideOnLogin": true,
+      "firstBrokerLoginFlowAlias": "atonota-first-broker-login",
+      "config": {
+        "clientId": "${ATONOTA_FACEBOOK_CLIENT_ID}",
+        "clientSecret": "${ATONOTA_FACEBOOK_CLIENT_SECRET}",
+        "syncMode": "IMPORT",
+        "defaultScope": "email public_profile"
+      },
+      "postBrokerLoginFlowAlias": "atonota-post-broker"
+    },
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "linkOnly": false,
+      "hideOnLogin": true,
+      "firstBrokerLoginFlowAlias": "atonota-first-broker-login",
+      "config": {
+        "clientId": "${ATONOTA_GOOGLE_CLIENT_ID}",
+        "clientSecret": "${ATONOTA_GOOGLE_CLIENT_SECRET}",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid email profile",
+        "filteredByClaim": "true",
+        "claimFilterName": "email_verified",
+        "claimFilterValue": "true"
+      },
+      "postBrokerLoginFlowAlias": "atonota-post-broker"
+    },
+    {
+      "alias": "linkedin",
+      "displayName": "LinkedIn",
+      "providerId": "linkedin-openid-connect",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "linkOnly": false,
+      "hideOnLogin": true,
+      "firstBrokerLoginFlowAlias": "atonota-first-broker-login",
+      "config": {
+        "clientId": "${ATONOTA_LINKEDIN_CLIENT_ID}",
+        "clientSecret": "${ATONOTA_LINKEDIN_CLIENT_SECRET}",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid profile email",
+        "filteredByClaim": "true",
+        "claimFilterName": "email_verified",
+        "claimFilterValue": "true"
+      },
+      "postBrokerLoginFlowAlias": "atonota-post-broker"
+    },
+    {
+      "alias": "x",
+      "displayName": "X",
+      "providerId": "twitter",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "linkOnly": false,
+      "hideOnLogin": true,
+      "firstBrokerLoginFlowAlias": "atonota-first-broker-login",
+      "config": {
+        "clientId": "${ATONOTA_X_CLIENT_ID}",
+        "clientSecret": "${ATONOTA_X_CLIENT_SECRET}",
         "syncMode": "IMPORT"
       },
       "postBrokerLoginFlowAlias": "atonota-post-broker"
@@ -1150,6 +1215,7 @@
     "organization"
   ],
   "browserFlow": "atonota-browser",
+  "firstBrokerLoginFlow": "atonota-first-broker-login",
   "authenticationFlows": [
     {
       "alias": "atonota-browser",
@@ -1322,7 +1388,7 @@
     },
     {
       "alias": "atonota-post-broker",
-      "description": "Second factor after an external provider login (Google, Apple). Asked when the user has set up TOTP or a security key.",
+      "description": "Runs after every external platform login. Refuses social sign-in when the user's organization requires corporate sign-in (G-160). Then asks the second factor when the user has set up TOTP or a security key.",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -1330,9 +1396,48 @@
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
+          "priority": 5,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-post-broker-enterprise"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
           "priority": 10,
           "userSetupAllowed": false,
           "flowAlias": "atonota-post-broker-2fa"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 100,
+          "userSetupAllowed": false,
+          "authenticator": "allow-access-authenticator"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-post-broker-enterprise",
+      "description": "Refuses an external platform login for a user who must use the organization's corporate sign-in. The role is set by the membership layer.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "atonota-enterprise-sso-role"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "deny-access-authenticator",
+          "authenticatorConfig": "atonota-enterprise-sso-deny"
         }
       ]
     },
@@ -1420,6 +1525,107 @@
           "userSetupAllowed": false
         }
       ]
+    },
+    {
+      "alias": "atonota-first-broker-login",
+      "description": "First login with an external platform (G-160). Never links by e-mail. An existing account is linked only after the user confirms and signs in again with that account.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "idp-review-profile",
+          "authenticatorConfig": "atonota-review-profile"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-first-broker-user"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-first-broker-organization"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-first-broker-user",
+      "description": "Creates a new user when no account has the same e-mail or user name. Otherwise the existing account branch runs.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "idp-create-user-if-unique",
+          "authenticatorConfig": "atonota-create-unique"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-first-broker-existing"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-first-broker-existing",
+      "description": "An account with the same e-mail exists. The user confirms the link and signs in again with that account. E-mail verification alone is not offered (G-163).",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "idp-confirm-link"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "idp-username-password-form"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-first-broker-organization",
+      "description": "Adds the user to the organization of the platform when the platform belongs to one.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "idp-add-organization-member"
+        }
+      ]
     }
   ],
   "authenticatorConfig": [
@@ -1440,6 +1646,31 @@
       "config": {
         "loa-condition-level": "1",
         "loa-max-age": "3600"
+      }
+    },
+    {
+      "alias": "atonota-review-profile",
+      "config": {
+        "update.profile.on.first.login": "off"
+      }
+    },
+    {
+      "alias": "atonota-create-unique",
+      "config": {
+        "require.password.update.after.registration": "false"
+      }
+    },
+    {
+      "alias": "atonota-enterprise-sso-role",
+      "config": {
+        "condUserRole": "enterprise-sso-required",
+        "negate": "false"
+      }
+    },
+    {
+      "alias": "atonota-enterprise-sso-deny",
+      "config": {
+        "denyErrorMessage": "atonotaEnterpriseSsoRequired"
       }
     }
   ],
@@ -1575,6 +1806,12 @@
       },
       {
         "name": "uma_authorization",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "enterprise-sso-required",
+        "description": "The user's organization requires corporate sign-in. Social sign-in is refused (G-160). Set by the membership layer, not by the user.",
         "composite": false,
         "clientRole": false
       }

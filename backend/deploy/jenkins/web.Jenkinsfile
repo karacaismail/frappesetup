@@ -107,7 +107,8 @@ pipeline {
                             sh 'npm run typecheck'
                             sh 'npm test'
                             // The panel is served under /panel/ on each tenant host (ortamlar.md).
-                            sh 'npm run build -- --base=/panel/'
+                            // The /panel page of Frappe reads dist/.vite/manifest.json (E-3).
+                            sh 'npm run build -- --base=/panel/ --manifest'
                         }
                     }
                 }

@@ -76,7 +76,12 @@ export const SECTIONS: Record<string, SectionMeta> = {
   gereksinimler: { group: 'Teslim', icon: 'list', summary: 'G ve SA serisi gereksinimlerin ana listesi, süzülebilir gezgin.' },
   'admin-shell': { group: 'Teslim', icon: 'sidebar', summary: 'Her SaaS admin shell için olmazsa olmazlar.' },
   'app-cercevesi': { group: 'Teslim', icon: 'apps', summary: 'Satılan her app için çerçeve şablonu.' },
-  'yol-haritasi': { group: 'Teslim', icon: 'map', summary: 'P0–P6 fazları, kapılar ve ilk dikey dilim.' },
+  'yol-haritasi': { group: 'Teslim', icon: 'map', summary: 'P0–P7 fazları, kapılar ve ilk dikey dilim.' },
+  'atonota-login': {
+    group: 'Teslim',
+    icon: 'key',
+    summary: 'Bağımsız giriş ürünü: Keycloak ile Frappe iş bölümü, giriş yolu, platformlar ve ücretli kullanım.',
+  },
   'acik-kararlar': { group: 'Teslim', icon: 'alert', summary: 'Açık kararlar, riskler ve dış bağımlılıklar.' },
   izlenebilirlik: {
     group: 'Teslim',
@@ -102,10 +107,10 @@ export const SECTIONS: Record<string, SectionMeta> = {
 };
 
 export const RAILS = [
-  { n: 1, name: 'Press', detail: 'Frappe v15 · Python 3.11', slug: 'rail-1-press' },
+  { n: 1, name: 'Press', detail: 'Frappe 16 · Python 3.14', slug: 'rail-1-press' },
   { n: 2, name: 'Kiracı siteleri', detail: 'ERPNext v16 · Frappe v16', slug: 'rail-2-yapilandirma' },
   { n: 3, name: 'Headless panel', detail: 'React · Ant Design · TanStack', slug: 'rail-3-frontend' },
   { n: 4, name: 'Keycloak', detail: 'OIDC · Organizations · MFA', slug: 'rail-4-keycloak' },
-  { n: 5, name: 'AI', detail: 'Claude Agent SDK · MCP', slug: 'rail-5-ai' },
+  { n: 5, name: 'AI', detail: 'Ajan servisi · Model geçidi · MCP', slug: 'rail-5-ai' },
   { n: 6, name: 'Operasyon', detail: 'ERPNext · CRM · Helpdesk', slug: 'rail-6-operasyon' },
 ];

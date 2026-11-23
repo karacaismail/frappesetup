@@ -28,7 +28,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "96a1302a2043a00754e5ea4a0dd44475caf3fdfa078424c9bc8a109156f2a0e8",
+  "sha256": "b73c3558c475ef4b903213343b708829384ec1a872f38ae59ea8f35412b425f4",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -148,7 +148,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "65573ab4379e05a624b4ea031ed9aa99e44526a000b24447239eb194716ca8ab",
+      "sha256": "e80c605c7a90926eec93895ebcd66a34d8d170121ef8ad1436b68347cfa4caaf",
       "findings": [
         {
           "rule": "frappe-missing-permission",

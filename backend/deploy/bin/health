@@ -46,10 +46,10 @@ if [[ "$kind" == backend ]]; then
         probe "https://$site/api/method/ping" '"message":"pong"'
         redirect "https://$site/panel" "/login"
     done
-    if release_py images "$manifest" | grep -q '^press='; then
+    if press_on "$ATONOTA_PRESS_ENABLED" "$manifest"; then
         probe "https://$ATONOTA_PRESS_HOST/api/method/ping" '"message":"pong"'
     else
-        printf 'not_run press (no press image in this release)\n'
+        printf 'not_run press (ATONOTA_PRESS_ENABLED is 0 or the release has no press image)\n'
     fi
 else
     # Every file the bundle's index.html names must be served from /panel/assets/.

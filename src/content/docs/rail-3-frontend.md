@@ -4,7 +4,7 @@ nav: "Rail 3 · Frontend"
 order: 6
 ---
 
-Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.<marka>.com.tr/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.<marka>.com.tr`, `press.api.*` / `press_tr.api.*`, Frappe v15). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.<marka>.com.tr` origin'inde, operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
+Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.atonota.net/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.atonota.net`, MVP sonrası hedef, MVP'de Press `press.atonota.net` adresindedir; `press.api.*` / `press_tr.api.*`, Frappe 16). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.atonota.net` origin'inde (MVP sonrası hedef, backend ad haritasında yok), operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
 
 ## 1. Monorepo ve paket sınırları (G-66, G-103)
 

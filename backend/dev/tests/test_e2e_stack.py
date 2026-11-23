@@ -33,7 +33,7 @@ PRESS_ENVIRONMENT.update(
     ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:7151",
     ATONOTA_SITE_TENANT1_SECRET=secrets.token_urlsafe(16),
     ATONOTA_SITE_TENANT1_SERVICE_SECRET=secrets.token_urlsafe(16),
-    IDENTITY_BRAND_NAME="Atonota",
+    IDENTITY_BRAND_NAME="AtonotA Login",
 )
 STACK_ENVIRONMENT = dict(
     PRESS_ENVIRONMENT,
@@ -227,7 +227,8 @@ class StackTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), original)
         for line in original.decode().splitlines():
             key, value = line.split("=", 1)
-            if "SECRET" in key or "PASSWORD" in key:
+            # An empty value cannot leak. Closed sign-in platforms have empty secrets (O-56).
+            if value and ("SECRET" in key or "PASSWORD" in key):
                 self.assertNotIn(value, result.stdout + result.stderr)
 
     def test_invalid_port_and_profile_do_not_create_credentials(self):
