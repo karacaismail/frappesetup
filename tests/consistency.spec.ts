@@ -61,32 +61,60 @@ const releaseMessages = (ref: string) =>
     .map((e) => ({ sha: e.slice(0, e.indexOf('\n') < 0 ? e.length : e.indexOf('\n')), body: e }))
     .filter((e) => /^Kaynak: /m.test(e.body));
 // Kanıt commit'leri backend dalındadır. Backend geçmişi GitHub'a gitmez ve CI kopyası sığdır (tek commit).
-// Bu yüzden denetim üç durumu ayırır (inceleme 1, Ö-2):
-// 1. Commit yerelde varsa HEAD geçmişinde olmalıdır. release boşsa origin/main'deki hiçbir yayın onu adlandırmamalıdır.
-// 2. Commit yerelde yoksa ve release doluysa yayın commit'i aranır. Yayın commit'i yerelde varsa metninde kanıt
-//    commit'ini adlandırmalıdır. Tam geçmişte yayın commit'i ayrıca HEAD geçmişinde olmalıdır. Sığ kopyada yayın
-//    commit'i yoksa biçim denetimi yeter.
-// 3. Commit yerelde yoksa ve release null ise kayıt açıkça "henüz yayımlanmadı" der. Alan eksik olamaz (releaseShape).
+// Yayın commit'lerinin "Kaynak:" satırı backend commit'idir. Bu commit'lerden biri yerelde varsa backend geçmişi vardır.
+const mainRef = () => (gitOk('rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main') ? 'refs/remotes/origin/main' : null);
+let backendCache: boolean | undefined;
+const hasBackendHistory = () => {
+  if (backendCache !== undefined) return backendCache;
+  const refs = ['refs/heads/backend', 'refs/remotes/origin/backend'];
+  const sources = [...releaseMessages('HEAD'), ...(mainRef() ? releaseMessages(mainRef()!) : [])]
+    .map((e) => e.body.match(/^Kaynak: ([0-9a-f]{7,40})$/m)?.[1])
+    .filter((x): x is string => Boolean(x));
+  backendCache = refs.some((r) => gitOk('rev-parse', '--verify', '--quiet', r)) || sources.some(hasCommit);
+  return backendCache;
+};
+// Denetim kopyanın türüne göre ayrılır (inceleme 1 Ö-2, inceleme r2-1 E-1 ve K-1):
+// 1. Commit yerelde varsa HEAD geçmişinde olmalıdır. release doluysa yayın commit'i de yerelde olmalı ve metninde kanıt
+//    commit'ini adlandırmalıdır. release null ise origin/main'deki hiçbir yayın commit'i onu adlandırmamalıdır.
+// 2. Commit yerelde yoksa ve backend geçmişi varsa commit uydurmadır.
+// 3. Tam geçmişli main kopyasında commit yoktur. release doluysa yayın commit'i HEAD geçmişinde olmalı ve kanıt commit'ini
+//    adlandırmalıdır. release null ise HEAD geçmişindeki bir yayın commit'i onu adlandırmalıdır. Bu, dosyayı main'e
+//    getiren yayındır.
+// 4. Sığ kopyada geçmiş yoktur. Yayın commit'i yerelde varsa onu adlandırmalıdır. Yoksa yalnız alan biçimi denetlenir.
+//    release null ise kayıt açıkça "henüz yayımlanmadı" der. Alan eksik olamaz (releaseShape).
 const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
   const out: string[] = [];
   const shallow = isShallow();
+  const relNames = (r: NonNullable<Release>) => {
+    if (hasCommit(r.commit)) {
+      if (!namesCommit(git('log', '-1', '--format=%B', r.commit), c))
+        out.push(`${label}: yayın commit'i ${r.commit} metninde ${c} commit'ini adlandırmıyor`);
+    } else if (!shallow) {
+      out.push(`${label}: yayın commit'i ${r.commit} depoda yok (origin/main çekilmemiş olabilir)`);
+    }
+  };
   if (hasCommit(c)) {
     if (!inHead(c)) out.push(`${label}: ${c} HEAD geçmişinde değil`);
-    if (rel && hasCommit(rel.commit) && !namesCommit(git('log', '-1', '--format=%B', rel.commit), c))
-      out.push(`${label}: yayın commit'i ${rel.commit} metninde ${c} commit'ini adlandırmıyor`);
-    if (!rel && gitOk('rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main')) {
-      const named = releaseMessages('refs/remotes/origin/main').filter((e) => namesCommit(e.body, c));
+    if (rel) relNames(rel);
+    else if (mainRef()) {
+      const named = releaseMessages(mainRef()!).filter((e) => namesCommit(e.body, c));
       if (named.length > 0) out.push(`${label}: ${c} ${named[0].sha.slice(0, 8)} ile yayımlandı ama release alanı null`);
     }
     return out;
   }
-  if (!rel) return out;
-  if (hasCommit(rel.commit)) {
-    if (!namesCommit(git('log', '-1', '--format=%B', rel.commit), c))
-      out.push(`${label}: yayın commit'i ${rel.commit} metninde ${c} commit'ini adlandırmıyor`);
-    if (!shallow && !inHead(rel.commit)) out.push(`${label}: yayın commit'i ${rel.commit} HEAD geçmişinde değil`);
-  } else if (!shallow) {
-    out.push(`${label}: ${c} da yayın commit'i ${rel.commit} de depoda yok`);
+  if (shallow) {
+    if (rel) relNames(rel);
+    return out;
+  }
+  if (hasBackendHistory()) {
+    out.push(`${label}: ${c} depoda yok`);
+    return out;
+  }
+  if (rel) {
+    relNames(rel);
+    if (hasCommit(rel.commit) && !inHead(rel.commit)) out.push(`${label}: yayın commit'i ${rel.commit} HEAD geçmişinde değil`);
+  } else if (!releaseMessages('HEAD').some((e) => namesCommit(e.body, c))) {
+    out.push(`${label}: ${c} depoda yok ve HEAD geçmişindeki hiçbir yayın commit'i onu adlandırmıyor`);
   }
   return out;
 };
@@ -225,6 +253,19 @@ test.describe('content consistency', () => {
     if (hasCommit(u.commit) && hasCommit(a.commit)) {
       expect(gitOk('merge-base', '--is-ancestor', a.commit, u.commit), `update.commit ${u.commit}, audit.commit ${a.commit} torunu`).toBe(true);
     }
+  });
+
+  test('fabricated evidence commits fail in full history', () => {
+    // Uydurma commit kodu tam geçmişte geçmez (inceleme r2-1, E-1). release null olsa da geçmez.
+    // Sığ kopyada geçmiş yoktur; orada bu denetim koşamaz.
+    test.skip(isShallow(), 'Sığ kopya: commit geçmişi yok.');
+    const fake = { pr: 18, commit: '1d3e6344' };
+    for (const c of ['deadbeef', 'abcdef12']) {
+      expect(evidenceProblems('sahte', c, null), `${c}, release null`).not.toEqual([]);
+      expect(evidenceProblems('sahte', c, fake), `${c}, release dolu`).not.toEqual([]);
+    }
+    // Yayın commit'i uydurmaysa da geçmez (inceleme r2-1, K-1).
+    expect(evidenceProblems('sahte', '36afb874', { pr: 18, commit: 'abcdef12' }), 'uydurma yayın commit').not.toEqual([]);
   });
 
   test('task board names environments, not staging', () => {
