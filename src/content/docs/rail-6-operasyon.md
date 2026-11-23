@@ -156,7 +156,7 @@ Proje sahibi şu sırayı seçti:
 | rc | Prod'un aynısında son kabul denemesi | Jenkins'te biri "Move to rc" düğmesine basar |
 | prod | Gerçek müşteri | Jenkins'te biri "Move to prod" düğmesine basar |
 
-Colima yalnız geliştirme içindir. Colima, bu Mac'teki konteyner ortamıdır.
+Colima yalnız geliştirme içindir. Colima, geliştiricinin yerel bilgisayarındaki konteyner ortamıdır.
 
 ### Ad haritası
 
@@ -185,7 +185,7 @@ Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dos
 | No | Engel | Sahibi |
 | --- | --- | --- |
 | E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. MVP'de ilk kiracı sitesini DevOps sorumlusu elle açar | press-tr işi ve DevOps sorumlusu |
-| E-2 | Press üretim imajı yazıldı ve Colima'da denendi. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor. Press bu yüzden bütün ortamlarda kapalıdır | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor. Press anahtarı bugün bütün ortamlarda kapalıdır. rc ve prod'da bu betikler bitmeden açılamaz. alpha'da DevOps sorumlusu Press'i elle açar | press-tr işi ve DevOps sorumlusu |
 | E-3 | `/panel` sayfası arka uçta hazır. Arayüz paketi bu adrese göre henüz ayarlanmadı | atonota-web işi |
 | E-4 | Çözüldü. Ayar listeleri yazıldı. Gerçek değerleri DevOps sorumlusu sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok | DevOps sorumlusu |
