@@ -220,6 +220,22 @@ class Jenkinsfiles(unittest.TestCase):
                     continue
                 self.assertIn("--failed", line, f"{name}: {line.strip()}")
 
+    def test_backend_gates_prepare_osv_first(self):
+        # Review 2, finding 2: security-audit scans the Press lock offline. A new agent has no
+        # scanner and a database older than seven days fails the gate. Scheduled jobs are not
+        # allowed, so the line itself refreshes the database before the gates.
+        text = jenkinsfile("backend.Jenkinsfile")
+        stages = re.findall(r"stage\('([^']+)'\)", text)
+        self.assertLess(stages.index("Checkout"), stages.index("Security tools"))
+        self.assertEqual(stages.index("Security tools") + 1, stages.index("Gates"))
+        block = text.split("stage('Security tools')", 1)[1].split("stage('Gates')", 1)[0]
+        self.assertIn("sh 'backend/dev/security/osv-setup --if-stale'", block)
+        self.assertLess(text.index("osv-setup --if-stale"), text.index("backend/dev/bin/security-audit"))
+        # The setup comment (comments are stripped above) names what the agent needs.
+        header = (JENKINS / "backend.Jenkinsfile").read_text().split("pipeline {", 1)[0]
+        self.assertIn("curl", header)
+        self.assertIn("osv-vulnerabilities.storage.googleapis.com", header)
+
     def test_approval_does_not_hold_an_agent(self):
         # An input step inside steps keeps the agent busy until someone answers (finding K4).
         for name in self.ALL:

@@ -2,28 +2,60 @@
 // Görev panosu kuralları: durum, olgunluk düzeyi ve epic tabloları src/data/task-board.json'dan derleme anında üretilir.
 import requirements from '../data/requirements.json';
 import board from '../data/task-board.json';
+import { REPO_URL } from '../data/site';
 
 type Item = { epic: string; status: string; level: string };
 const items = board.items as Record<string, Item>;
 const all = requirements.map((r) => ({ ...r, ...items[r.id] }));
 const done = (list: typeof all) => list.filter((r) => r.status === 'done').length;
 
-const auditDate = new Intl.DateTimeFormat('tr-TR', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  weekday: 'long',
-  timeZone: 'UTC',
-})
-  .formatToParts(new Date(`${board.audit.date}T00:00:00Z`))
-  .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
-const auditText = `${auditDate.day} ${auditDate.month} ${auditDate.year} ${auditDate.weekday}`;
+// Tarih gün, ay adı, yıl ve gün adıyla yazılır: "23 Kasım 2026 Pazartesi".
+const longDate = (iso: string) => {
+  const parts = new Intl.DateTimeFormat('tr-TR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    weekday: 'long',
+    timeZone: 'UTC',
+  })
+    .formatToParts(new Date(`${iso}T00:00:00Z`))
+    .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+  return `${parts.day} ${parts.month} ${parts.year} ${parts.weekday}`;
+};
+// Kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer. Okur commit'i yayın PR'ından bulur.
+type Release = { pr: number; commit: string } | null;
+const prUrl = (r: NonNullable<Release>) => `${REPO_URL}/pull/${r.pr}`;
+const updateRelease = board.update.release as Release;
+const auditRelease = board.audit.release as Release;
+const auditText = longDate(board.audit.date);
+const updateText = longDate(board.update.date);
 const phasesOf = (list: typeof all) => [...new Set(list.map((r) => r.phase))].sort().join(', ');
 ---
 
 <div class="task-rules">
+  <p data-testid="task-board-updated">
+    <strong>
+      Durumlar {updateText} günü backend dalındaki <code>{board.update.commit}</code> commit'ine göre güncellendi.
+    </strong>{' '}
+    {updateRelease ? (
+      <>
+        Bu commit <a href={prUrl(updateRelease)}>PR #{updateRelease.pr} ile yayımlandı</a>.
+      </>
+    ) : (
+      'Bu commit henüz yayımlanmadı.'
+    )}{' '}
+    {board.update.note}
+  </p>
   <p>
-    Durumun kaynağı {auditText} günkü MVP durum denetimidir. Denetim {board.audit.commit} commit'inde yapıldı.
+    Durumun ilk kaynağı {auditText} günkü MVP durum denetimidir. Denetim backend dalındaki{' '}
+    <code>{board.audit.commit}</code> commit'inde yapıldı.{' '}
+    {auditRelease ? (
+      <>
+        Bu commit <a href={prUrl(auditRelease)}>PR #{auditRelease.pr} ile yayımlandı</a>.
+      </>
+    ) : (
+      'Bu commit henüz yayımlanmadı.'
+    )}{' '}
     {board.audit.note}
   </p>
 
