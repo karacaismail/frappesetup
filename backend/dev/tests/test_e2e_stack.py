@@ -6,6 +6,7 @@ import json
 import os
 import re
 import runpy
+import secrets
 import shutil
 import subprocess
 import tempfile
@@ -23,6 +24,12 @@ PRESS_ENVIRONMENT = {
     "ATONOTA_PRESS_SECRET": "fake-press-client-value",
     "ATONOTA_PRESS_SERVICE_SECRET": "fake-press-service-value",
 }
+# As in real use, the credential file also supplies the Keycloak admin login for the realm sync.
+# The values are made at run time so no credential-like literal sits in the source.
+PRESS_ENVIRONMENT.update(
+    KC_BOOTSTRAP_ADMIN_USERNAME=secrets.token_hex(8),
+    KC_BOOTSTRAP_ADMIN_PASSWORD=secrets.token_urlsafe(16),
+)
 
 
 class StackTests(unittest.TestCase):
@@ -106,7 +113,11 @@ class StackTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "one valid internal ID"):
                         namespace["up"](["docker"], ["compose"], environment)
                 commands = [call.args[0] for call in execute.call_args_list]
-                self.assertEqual(len(commands), 2)
+                # Keycloak up, realm sync (T-11), realm ID query; nothing after the bad ID.
+                self.assertEqual(len(commands), 3)
+                self.assertEqual(commands[0][:2], ["compose", "up"])
+                sync = ["compose", "run", "--rm", "--no-deps", "-T", "identity-sync"]
+                self.assertEqual(commands[1][:6], sync)
                 self.assertEqual(commands[-1][-1], "SELECT id FROM realm WHERE name = 'platform'")
                 self.assertFalse(any(command[-1] == "identity-sync" for command in commands))
                 self.assertFalse(any("/workspace/dev/bootstrap.py" in command for command in commands))

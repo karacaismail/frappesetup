@@ -78,7 +78,7 @@ class StackRealmSyncTest(unittest.TestCase):
             "container_ids": Mock(return_value=[]),
         }
         with patch.dict(up.__globals__, replacements):
-            up(["engine"], ["compose"], {"PANE_PORT": "43820"})
+            up(["engine"], ["compose"], dict(environment(), PANE_PORT="43820"))
         keycloak_up = next(
             i for i, line in enumerate(order) if line.startswith("compose up") and " keycloak" in line
         )

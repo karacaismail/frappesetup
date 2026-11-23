@@ -414,12 +414,27 @@ REALM_SYNC = BACKEND / "identity/keycloak/bin/sync-dev-realm.py"
 REALM_FILE = BACKEND / "identity/keycloak/realm/platform-realm.json"
 
 
+REALM_SYNC_SETTINGS = ("KC_PUBLIC_URL", "KC_BOOTSTRAP_ADMIN_USERNAME", "KC_BOOTSTRAP_ADMIN_PASSWORD")
+
+
+def require_realm_sync_settings(environment):
+    """Name missing Keycloak admin settings without printing any value."""
+    missing = [key for key in REALM_SYNC_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Realm sync needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
 def sync_realm(compose, environment):
     """Apply the realm file's clients and scopes to a kept Keycloak database (finding T-11).
 
     --import-realm skips an existing realm. The sync runs in the stack network, so it reaches only
     this stack's Keycloak. Secrets travel on stdin, never on the command line.
     """
+    require_realm_sync_settings(environment)
     realm_text = REALM_FILE.read_text()
     names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)", realm_text))
     payload = {
@@ -441,6 +456,7 @@ def sync_realm(compose, environment):
 def up(engine, compose, environment):
     # Fail before any container work, not after a long startup.
     require_press_settings(environment)
+    require_realm_sync_settings(environment)
     check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
