@@ -2,6 +2,7 @@
 
 Expected behaviour (D-1):
 - every user-visible message of the layer is English in code and is translated with a context,
+- the shared MCP token rejection uses the identity layer's translation context,
 - the Turkish text is in `translations/tr.csv` with the same context (Frappe 16 CSV: source, text, context),
 - no row of this layer is context-free, except the two DocType names, so Frappe's own translations
   are never overridden,
@@ -23,6 +24,7 @@ from platform_core.ai.tests.base import AiTestCase
 APP = Path(platform_core.__file__).parent
 LAYER = APP / "ai"
 DOCTYPES = ("PLT AI Action Log", "PLT AI Action Proposal")
+SHARED_CONTEXTS = {"MCP token rejected.": "platform_core.identity"}
 # Turkish letters, written as code points so that this file passes its own check.
 TURKISH_CODE_POINTS = (231, 287, 305, 304, 246, 351, 252, 199, 286, 214, 350, 220, 226)
 TURKISH_LETTERS = re.compile("[" + "".join(map(chr, TURKISH_CODE_POINTS)) + "]")
@@ -35,21 +37,19 @@ def layer_sources() -> list[Path]:
 
 
 def message_calls() -> list[tuple[Path, int, str | None, str | None]]:
-	"""(path, line, message, name of the context argument) for every `_()` call of the layer."""
+	"""(path, line, message, context) for every `_()` call of the layer."""
 	found = []
 	for path in layer_sources():
 		for node in ast.walk(ast.parse(path.read_text())):
 			if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_":
 				first = node.args[0] if node.args else None
 				message = first.value if isinstance(first, ast.Constant) else None
-				context = next(
-					(
-						kw.value.id
-						for kw in node.keywords
-						if kw.arg == "context" and isinstance(kw.value, ast.Name)
-					),
-					None,
-				)
+				argument = next((kw.value for kw in node.keywords if kw.arg == "context"), None)
+				context = None
+				if isinstance(argument, ast.Name) and argument.id == "CONTEXT":
+					context = CONTEXT
+				elif isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+					context = argument.value
 				found.append((path, node.lineno, message, context))
 	return found
 
@@ -60,25 +60,26 @@ def rows() -> list[list[str]]:
 
 
 class TestTranslations(AiTestCase):
-	def test_every_message_is_a_literal_with_the_layer_context(self):
+	def test_every_message_is_a_literal_with_the_expected_context(self):
 		calls = message_calls()
 
 		self.assertGreater(len(calls), 70)
 		for path, line, message, context in calls:
 			self.assertIsInstance(message, str, f"{path.name}:{line}")
-			self.assertEqual(context, "CONTEXT", f"{path.name}:{line}")
+			self.assertEqual(context, SHARED_CONTEXTS.get(message, CONTEXT), f"{path.name}:{line}")
 
 	def test_every_message_has_a_turkish_row_with_the_same_context(self):
-		translated = {row[0]: row[1] for row in rows() if len(row) == 3 and row[2] == CONTEXT}
+		translated = {(row[0], row[2]): row[1] for row in rows() if len(row) == 3}
 
-		for path, line, message, _context in message_calls():
-			self.assertIn(message, translated, f"{path.name}:{line}")
-			text = translated[message]
+		for path, line, message, context in message_calls():
+			key = (message, context)
+			self.assertIn(key, translated, f"{path.name}:{line}")
+			text = translated[key]
 			self.assertTrue(text.strip() and text != message, message)
 			self.assertEqual(sorted(PLACEHOLDER.findall(text)), sorted(PLACEHOLDER.findall(message)), message)
 
 	def test_no_row_of_the_layer_is_left_without_a_use(self):
-		used = {message for _path, _line, message, _context in message_calls()}
+		used = {message for _path, _line, message, context in message_calls() if context == CONTEXT}
 		unused = [row[0] for row in rows() if len(row) == 3 and row[2] == CONTEXT and row[0] not in used]
 
 		self.assertEqual(unused, [])

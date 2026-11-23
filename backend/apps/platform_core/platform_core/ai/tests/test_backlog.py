@@ -12,6 +12,7 @@
 
 import json
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import frappe
@@ -91,23 +92,25 @@ class TestSessionStatus(AiTestCase):
 		self.assertEqual((expired.status_code, expired_post.status_code), (401, 401))
 		self.assertEqual(no_session.status_code, 403)
 
-	def test_contract_states_401_for_every_human_endpoint(self):
+	def test_contract_states_401_for_authenticated_endpoints(self):
 		import yaml
 
 		import platform_core
 
-		path = platform_core.__file__
-		contract = (
-			__import__("pathlib").Path(path).parent.parents[2]
-			/ "contracts"
-			/ "platform_core-ai.openapi.yaml"
-		)
+		contract = Path(platform_core.__file__).parents[3] / "contracts" / "platform_core-ai.openapi.yaml"
 		if not contract.exists():
 			self.skipTest(f"The contract file is not in this environment: {contract}")
 		paths = yaml.safe_load(contract.read_text())["paths"]
+		discovery_route = "/platform_core.api.ai.mcp_resource_metadata"
+		discovery = paths[discovery_route]["get"]
+		self.assertEqual(discovery["security"], [])
+		self.assertIn("200", discovery["responses"])
+		self.assertNotIn("401", discovery["responses"])
 
 		for route, operations in paths.items():
-			for operation in operations.values():
+			for method, operation in operations.items():
+				if (route, method) == (discovery_route, "get"):
+					continue
 				self.assertIn("401", operation["responses"], route)
 
 
@@ -119,9 +122,7 @@ class TestPreviewSchema(AiTestCase):
 		client = self.login(USER_A)
 
 		with with_hook("ai_tools", [self.HOOK]):
-			result = self.call_tool(
-				client, "plt_wrong_preview_keys", {"name": name, "title": "New"}
-			)
+			result = self.call_tool(client, "plt_wrong_preview_keys", {"name": name, "title": "New"})
 
 		self.assert_denied(result, "invalid_preview")
 		self.assertEqual(frappe.db.count("PLT AI Action Proposal", {"args_json": ("like", f"%{name}%")}), 0)
@@ -151,7 +152,9 @@ class TestClosedDoctypeLists(AiTestCase):
 		target = {"doctype": DOCTYPE, "name": name}
 
 		with with_hook("ai_write_closed_doctypes", [DOCTYPE]):
-			created = self.call_tool(client, "plt_create_document", {"doctype": DOCTYPE, "data": {"title": "x"}})
+			created = self.call_tool(
+				client, "plt_create_document", {"doctype": DOCTYPE, "data": {"title": "x"}}
+			)
 			updated = self.call_tool(client, "plt_update_document", {**target, "data": {"title": "x"}})
 			deleted = self.call_tool(client, "plt_delete_document", target)
 			still_reads = self.call_tool(client, "plt_get_document", target)
