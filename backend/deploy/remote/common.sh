@@ -42,7 +42,16 @@ load_host_env() {
 
 # Press runs only when the environment switch is 1 and the release carries the Press image.
 # bin/lib.sh has the same rule for the health check. Usage: press_on <switch> <release.json>
+# The switch is 1 only in alpha and beta, as in release.py (PRESS_ENVIRONMENTS). Backup and restore
+# do not cover the Press site yet (blocker E-2). Jenkins checks this too; the server checks again,
+# because a person may run apply by hand (review 1, finding 5).
 press_on() {
+    if [[ "$1" == 1 ]]; then
+        case "${ATONOTA_ENV:?host.env is not loaded}" in
+        alpha | beta) ;;
+        *) fail "ATONOTA_PRESS_ENABLED=1 is refused in $ATONOTA_ENV; Press is not backed up there yet (E-2)" ;;
+        esac
+    fi
     [[ "$1" == 1 ]] && python3 -I -c 'import json,sys; sys.exit("press" not in json.load(open(sys.argv[1]))["components"])' "$2"
 }
 
