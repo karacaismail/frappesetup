@@ -62,6 +62,7 @@
   "id": "P5",
   "title": "P5 CRM · Webshop",
   "after": [
+   "P2",
    "P4"
   ],
   "goal": "CRM ve Webshop uygulamalarının aynı kontrol listesiyle yayına alınması, ilişki tabanlı paylaşım kataloğu, tek Release Group içinde çoklu uygulama, ileri Press yetenekleri (partner, sürüm yükseltme, site devri), hassas müşteri izolasyon kademeleri ve e-belge kapsamının kiracı satış faturalarına genişlemesi.",

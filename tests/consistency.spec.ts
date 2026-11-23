@@ -125,7 +125,7 @@ test.describe('content consistency', () => {
       P3: ['P1'],
       P4: ['P1'],
       P6: ['P2'],
-      P5: ['P4'],
+      P5: ['P2', 'P4'],
     });
     expect(ph.P2.entryGate).toMatch(/Keycloak/);
     expect(ph.P2.entryGate).toMatch(/G-12.*G-16.*G-79.*G-81/);
@@ -160,9 +160,21 @@ test.describe('content consistency', () => {
       [/göreli süre/iu, 'göreli süre'],
       [/story ?point/iu, 'story point'],
       [/\bsprint\b/iu, 'sprint'],
-      [/adam[- ]gün/iu, 'adam-gün'],
+      [/adam[- /]?(gün|ay)/iu, 'adam-gün'],
       [/hafta sayısı/iu, 'hafta sayısı'],
+      [/\d+\s*hafta\b/iu, 'N hafta'],
+      [/hafta(sı|sında)(?![\p{L}\p{N}])/iu, 'haftası'], // \b ASCII sınırıdır; "ı" sonrası için Unicode sınır
+      [/\befor\b/iu, 'efor'],
+      [/\b\d+\s*SP\b/u, 'N SP'],
     ];
+    // Kalıpların kendisi denenir: görev süresi yakalanır, ürün süresi geçer ("ay" için kalıp yok: "ilk 6 ay açık" ürün kuralıdır).
+    const hit = (t: string) => PATTERNS.some(([re]) => re.test(t));
+    for (const bad of ['P1 12 hafta sürer', '3 hafta', "P0'ın ilk haftasında başlar", 'bitiş haftası', '5 SP', 'efor: 10 gün', '3 adam/gün', '14–26. hafta', '≈12 hafta', '42 haftalık plan', 'story point', 'iki sprint']) {
+      expect(hit(bad), `yakalanmalı: ${bad}`).toBe(true);
+    }
+    for (const ok of ['4 haftalık', 'haftalık realm export', '14 günlük deneme', 'ilk 6 ay açık', '7 günlük/4 haftalık/12 aylık', 'haftalık sapma kontrolü', '72 saat', '365 gün', 'efora', 'spring']) {
+      expect(hit(ok), `geçmeli: ${ok}`).toBe(false);
+    }
     const rootDir = fileURLToPath(root);
     const walk = (dir: string, exts: string[]): string[] =>
       readdirSync(dir).flatMap((name) => {
@@ -187,10 +199,6 @@ test.describe('content consistency', () => {
       });
     }
     expect(offenders).toEqual([]);
-    // Ürün süreleri kalıplara takılmaz (bilinçli örnekler).
-    for (const ok of ['haftalık sapma kontrolü', '7 günlük/4 haftalık/12 aylık', '14 günlük deneme', 'haftalık realm export']) {
-      expect(PATTERNS.some(([re]) => re.test(ok)), ok).toBe(false);
-    }
   });
 
   test('README counts match the requirement data', () => {

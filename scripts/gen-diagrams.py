@@ -33,9 +33,9 @@ def timeline() -> str:
     columns: list[list[str]] = [[] for _ in range(max(level.values()) + 1)]
     for p in phases:
         columns[level[p["id"]]].append(p["id"])
-    # Düzen: düzey başına bir sütun; satırlar P1/P3, P0/P4/P5, P2/P6 hizalanır (oklar düz kalsın).
+    # Düzen: düzey başına bir sütun. Satırlar P1/P3, P0/P4/P5 ve P2/P6 hizalanır. Böylece komşu oklar düz kalır.
     ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190}
-    BOX_W, BOX_H, COL_X0, COL_STEP = 200, 64, 40, 256
+    BOX_W, BOX_H, COL_X0, COL_STEP, BELOW_Y = 200, 64, 40, 256, 372
     col_x = {pid: COL_X0 + COL_STEP * lvl for pid, lvl in level.items()}
     name_of = lambda pid: by_id[pid]["title"].split(" ", 1)[1]  # noqa: E731
     gates = [  # (kimlik, ad, çıkışına bağlı olduğu fazlar)
@@ -44,19 +44,19 @@ def timeline() -> str:
         ("M3", "Operasyon canlı", ["P6"]),
         ("M4", "CRM/Webshop", ["P5"]),
     ]
-    join = lambda ids: " ve ".join(ids)  # noqa: E731
-    levels_txt = "; ".join(f"{i + 1}. sütun {', '.join(c)}" for i, c in enumerate(columns))
-    deps_txt = "; ".join(f"{p['id']} {join(p['after'])} bitince başlar" for p in phases if p["after"])
+    join = lambda ids: ids[0] if len(ids) == 1 else ", ".join(ids[:-1]) + " ve " + ids[-1]  # noqa: E731
+    levels_txt = " ".join(f"{i + 1}. sütun {join(c)}." for i, c in enumerate(columns))
+    deps_txt = " ".join(f"{p['id']}, {join(p['after'])} bitince başlar." for p in phases if p["after"])
     gates_txt = ", ".join(f"{k} {n} ({join(ids)} çıkışı)" for k, n, ids in gates)
     o = [
         f"<svg viewBox='0 0 1040 520' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
         "<title id='tl-title'>Yol haritası faz sırası</title>",
-        f"<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir: {levels_txt}. Oklar önkoşuldan bağımlı faza gider: {deps_txt}. "
+        f"<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir. {levels_txt} Oklar önkoşuldan bağımlı faza gider. {deps_txt} "
         f"P2, P1'deki Keycloak adımı bitince başlar. Kapılar: {gates_txt}. Takvim tarihi ve süre yoktur.</desc>",
         "<defs><marker id='tl-arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'>"
         "<path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>",
         "<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Yol haritası faz sırası: her faz önkoşulu bitince başlar</text>",
-        "<text x='24' y='60' fill='var(--fs-quiet)'>Sütunlar bağımlılık düzeyidir; oklar önkoşuldan bağımlı faza gider; takvim tarihi ve süre yoktur</text>",
+        "<text x='24' y='60' fill='var(--fs-quiet)'>Sütunlar bağımlılık düzeyidir. Oklar önkoşuldan bağımlı faza gider. Takvim tarihi ve süre yoktur.</text>",
     ]
     for p in phases:
         pid = p["id"]
@@ -71,8 +71,15 @@ def timeline() -> str:
         for pre in p["after"]:
             x1, y1 = col_x[pre] + BOX_W, ROW_Y[pre] + BOX_H / 2
             x2, y2 = col_x[p["id"]], ROW_Y[p["id"]] + BOX_H / 2
-            xm = x2 - 28
-            d = f"M{x1} {y1:.0f} L{x2} {y2:.0f}" if y1 == y2 else f"M{x1} {y1:.0f} L{xm} {y1:.0f} L{xm} {y2:.0f} L{x2} {y2:.0f}"
+            if level[p["id"]] - level[pre] > 1:  # sütun atlayan ok kutuların altından dolaşır, hedefe alttan girer
+                bx, by = col_x[pre] + BOX_W / 2, ROW_Y[pre] + BOX_H
+                tx, ty = col_x[p["id"]] + BOX_W / 2, ROW_Y[p["id"]] + BOX_H
+                d = f"M{bx:.0f} {by} L{bx:.0f} {BELOW_Y} L{tx:.0f} {BELOW_Y} L{tx:.0f} {ty}"
+            elif y1 == y2:
+                d = f"M{x1} {y1:.0f} L{x2} {y2:.0f}"
+            else:
+                xm = x2 - 28
+                d = f"M{x1} {y1:.0f} L{xm} {y1:.0f} L{xm} {y2:.0f} L{x2} {y2:.0f}"
             o.append(f"<path data-edge='{pre}-{p['id']}' d='{d}' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>")
     # P1 → P2 ara kapısı: P1 bitmeden, Keycloak adımı bitince (kesikli ok).
     gx = col_x["P1"] + 60
@@ -95,7 +102,7 @@ def timeline() -> str:
     caption = (
         "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
         "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
-        "P5, P4 bitince gelir."
+        "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır."
     )
     return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 

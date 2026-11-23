@@ -70,7 +70,7 @@ Her liste kancası dosyada yalnız bir kez atanır. Örneğin `auth_hooks` ya da
 
 ### Süre ve efor yasağı
 
-- Fazlara ve görevlere süre, hafta, story point ya da efor tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Deponun kökündeki `tests/consistency.spec.ts` bunu denetler.
+- Fazlara ve görevlere süre, hafta, story point ya da efor tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Deponun kökündeki `tests/consistency.spec.ts` site dosyalarını denetler.
 - Ürün kuralı olan süreler bu yasağın dışındadır. Örneğin log saklama günleri, 14 günlük deneme sitesi, oturum süresi ve K-26 yama hedefleri böyledir.
 
 ### Veri ve sırlar

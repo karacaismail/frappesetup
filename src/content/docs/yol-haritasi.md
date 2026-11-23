@@ -4,7 +4,7 @@ nav: "Yol haritası"
 order: 17
 ---
 
-Yol haritası yedi fazdan oluşur (P0–P5 ve P6 operasyon düzlemi); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir: Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) bitince P2 başlar. Fazlara süre, hafta ya da efor tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
+Yol haritası yedi fazdan oluşur (P0–P5 ve P6 operasyon düzlemi); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir. Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) bitince P2 başlar. Fazlara süre, hafta ya da iş yükü tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
 
 ## Faz tablosu
 
@@ -18,7 +18,7 @@ Hedef, çıkış ve sahip `phases.json`, gereksinim kimlikleri `requirements.jso
 
 <div data-embed="timeline"></div>
 
-P2 ticari katman, P1'deki Keycloak adımı bitince başlar. P2 operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir. P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür. P6 operasyon düzlemi P2 tamamlanınca açılır. P5 ilk ödeyen müşteriden sonra gelir.
+P2 ticari katman, P1'deki Keycloak adımı bitince başlar. P2 operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir. P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür. P6 operasyon düzlemi P2 tamamlanınca açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır.
 
 ## İlk dikey dilim: İzin talebi (Leave Application)
 

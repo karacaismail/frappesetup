@@ -19,7 +19,7 @@ Yayın: **https://karacaismail.github.io/frappesetup/**
 src/
   content/docs/            27 bölüm (frontmatter: title, nav, order)
   data/requirements.json   gereksinimlerin tek kaynağı (id, title, detail, rail, priority, phase, source, owner)
-  data/phases.json         P0–P6 faz hedefi, çıkış ölçütü, sahip, başlangıç/bitiş haftası
+  data/phases.json         P0–P6 faz hedefi, çıkış ölçütü, sahip, önkoşul (`after`)
   data/sections.ts         bölüm grubu, ikon, özet
   components/Shell.tsx     MantineProvider + AppShell adası (gezinme, TOC, tema düğmesi)
   components/RequirementsExplorer.tsx   süzülebilir gereksinim gezgini (Gereksinimler sayfası)
