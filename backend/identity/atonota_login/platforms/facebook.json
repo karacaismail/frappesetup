@@ -1,0 +1,15 @@
+{
+  "alias": "facebook",
+  "providerId": "facebook",
+  "displayName": "Facebook",
+  "authorizationHost": "graph.facebook.com",
+  "secrets": {
+    "clientId": "ATONOTA_FACEBOOK_CLIENT_ID",
+    "clientSecret": "ATONOTA_FACEBOOK_CLIENT_SECRET"
+  },
+  "config": {
+    "syncMode": "IMPORT",
+    "defaultScope": "email public_profile"
+  },
+  "active": false
+}
