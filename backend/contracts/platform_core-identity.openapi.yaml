@@ -96,7 +96,9 @@ tags:
   - name: sync
     description: User endpoints of the sync service. They need a service token.
   - name: atonota-login
-    description: AtonotA Login action decisions (G-161, G-166). They need a signed-in session.
+    description: |
+      AtonotA Login action decisions (G-161, G-166). They need a signed-in session.
+      The verification inbox endpoint (G-164) is the one exception: the provider calls it without a session.
 
 x-site-settings:
   description: |
@@ -131,6 +133,11 @@ x-site-settings:
       example: platform
       required: false
       note: The default is `platform`.
+    - key: atonota_verification_secret
+      required: false
+      note: |
+        Signing secret of the external verification provider (G-164). At least 32 bytes. Keep it in site configuration only.
+        While it is missing or shorter, every verification notice gets 503 and `VerificationNotConfigured`.
     - key: keycloak_client_id
       example: site-tenant1
       required: true
@@ -1402,6 +1409,95 @@ paths:
                     exception: "platform_core.identity.atonota.decision_api.ActionRefused: The action open-paid-plan is not allowed now (configuration_required)."
         "401":
           $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.api.atonota_login.verification_notice:
+    post:
+      tags: [atonota-login]
+      operationId: atonotaLoginVerificationNotice
+      summary: Receives one result notice of the external document and face check (G-164).
+      description: |
+        The external verification provider calls this endpoint. The browser does not call it.
+        The provider carries no session, so the endpoint is open to guests. The signature authorizes the notice.
+        The provider is not chosen yet. Until the `atonota_verification_secret` site setting exists,
+        every notice gets 503 and `VerificationNotConfigured`, and nothing is stored.
+
+        Order of work:
+
+        1. The endpoint reads the raw body with `frappe.request.get_data()`.
+        2. It checks the `X-Verification-Signature` header over these raw bytes, before it reads any field.
+           The header is `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>." + raw body>`.
+           The time may differ from the server clock by at most 300 seconds. Several `v1` values may be sent; one match is enough.
+           A missing, wrong or old signature gets 401 and `NoticeSignatureRejected`. Nothing is stored.
+        3. It reads four fields: `event_id`, `case_id`, `attempt` and `outcome`. Bad fields get 400 and `InvalidInput`.
+        4. It stores one `PLT Verification Notice` record. The provider's `event_id` is unique.
+           The same notice again gives `duplicate` and stores nothing new.
+        5. It hands the processing to the queue (`frappe.enqueue`, after the commit). Processing never runs in the request.
+
+        Frappe itself copies JSON body fields into its form fields before the endpoint runs.
+        The endpoint does not use them and empties them first, so they cannot reach an error log.
+        Other body fields, such as document images or face data, are dropped. They never reach a record or a log.
+
+        The queue job applies each notice once. Only the newest attempt of a case decides.
+        A notice for an older attempt is kept as `stale`. A notice for an unknown attempt is kept as `unknown-attempt`.
+        No scheduled job runs. A System Manager replays unknown-attempt notices by hand with
+        `bench execute platform_core.identity.atonota.verification_api.replay_unknown`.
+        No endpoint marks a case complete from the browser.
+
+        At most 300 requests per minute are accepted from the same IP address. Extra requests get 429.
+        This is the same limit as `keycloak_backchannel_logout`.
+      x-yikici: false
+      security: []
+      parameters:
+        - name: X-Verification-Signature
+          in: header
+          required: true
+          schema: {type: string}
+          description: Signature over the raw body, as described above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AtonotaVerificationNotice"
+            examples:
+              onay:
+                summary: The provider approved attempt 1 of a case.
+                value: {event_id: evt-0001, case_id: case-0001, attempt: 1, outcome: approved}
+      responses:
+        "200":
+          description: |
+            The notice was stored (`accepted`) or was stored before (`duplicate`). Only `accepted` queues processing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AtonotaVerificationReceipt"}
+              examples:
+                yeni:
+                  value: {message: {status: accepted}}
+                tekrar:
+                  value: {message: {status: duplicate}}
+        "400":
+          description: |
+            The signature is valid but a field is missing or wrong. The `exc_type` value is `InvalidInput`.
+            A body that is not JSON may also get the Frappe value `DataError`. Nothing is stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          description: The signature is missing, wrong or too old. The `exc_type` value is `NoticeSignatureRejected`. Nothing is stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "503":
+          description: No verification provider is configured. The `exc_type` value is `VerificationNotConfigured`. Nothing is stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
 
   /platform_core.identity.login_policy.reset_password:
     post:
@@ -2793,6 +2889,35 @@ components:
           type: array
           items: {$ref: "#/components/schemas/AtonotaOwnerTask"}
           description: Rules without a value and their owners. Empty unless the state is `configuration_required`.
+    AtonotaVerificationNotice:
+      type: object
+      required: [event_id, case_id, attempt, outcome]
+      description: |
+        Fields the endpoint reads. Other fields are allowed and dropped. They are never stored.
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: The provider's event id. It is unique.
+        case_id:
+          type: string
+          minLength: 1
+          maxLength: 140
+        attempt:
+          type: integer
+          minimum: 1
+        outcome:
+          type: string
+          enum: [approved, rejected, review]
+    AtonotaVerificationReceipt:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, duplicate]
     FrappeError:
       type: object
       description: |
@@ -2800,8 +2925,8 @@ components:
         The custom values in this file are these: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
-        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable`, `IdentityInternalError`
-        and `ActionRefused`.
+        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable`, `IdentityInternalError`,
+        `ActionRefused`, `NoticeSignatureRejected` and `VerificationNotConfigured`.
         The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
         `DataError`, `RateLimitExceededError` and `ValidationError`.
         The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.

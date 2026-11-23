@@ -78,7 +78,7 @@ def collect_evidence(user: str, now: datetime) -> dict:
 def _signed_in_user() -> str:
 	user = frappe.session.user
 	if not user or user == "Guest":
-		frappe.throw(_("Sign in to continue."), frappe.PermissionError)
+		frappe.throw(_("Sign in to continue.", context="platform_core.identity"), frappe.PermissionError)
 	return user
 
 
@@ -122,13 +122,21 @@ def evaluate(action: object) -> dict:
 	"""Decision for the signed-in user. Called by `platform_core.api.atonota_login.evaluate`."""
 	user = _signed_in_user()
 	if not isinstance(action, str) or not action or len(action) > MAX_ACTION_LENGTH:
-		frappe.throw(_("The action field must be a non-empty text of at most 140 characters."), InvalidInput)
+		frappe.throw(
+			_(
+				"The action field must be a non-empty text of at most 140 characters.",
+				context="platform_core.identity",
+			),
+			InvalidInput,
+		)
 	return _as_dict(_judge(action, user))
 
 
 def _refuse(result: decision.Result) -> None:
 	frappe.throw(
-		_("The action {0} is not allowed now ({1}).").format(result.action, result.status),
+		_("The action {0} is not allowed now ({1}).", context="platform_core.identity").format(
+			result.action, result.status
+		),
 		ActionRefused,
 	)
 
@@ -144,7 +152,13 @@ def run_final_step[T](action_id: str, work: Callable[[], T]) -> T:
 	# A refusal below may commit the owner task. That commit must never make a caller's earlier
 	# writes permanent, so the final step starts only in a clean transaction (AJA-264).
 	if frappe.db.transaction_writes:
-		frappe.throw(_("A final step cannot run inside a transaction with pending writes."), PendingWrites)
+		frappe.throw(
+			_(
+				"A final step cannot run inside a transaction with pending writes.",
+				context="platform_core.identity",
+			),
+			PendingWrites,
+		)
 	earlier = _judge(action_id, user)
 	if earlier.status != decision.READY:
 		if earlier.owner_tasks:
@@ -156,7 +170,9 @@ def run_final_step[T](action_id: str, work: Callable[[], T]) -> T:
 	if final.status != decision.READY:
 		reason = ", ".join(final.reasons) or final.status
 		frappe.throw(
-			_("The action {0} is not allowed now ({1}: {2}).").format(action_id, final.status, reason),
+			_("The action {0} is not allowed now ({1}: {2}).", context="platform_core.identity").format(
+				action_id, final.status, reason
+			),
 			ActionRefused,
 		)
 	return work()
@@ -165,7 +181,7 @@ def run_final_step[T](action_id: str, work: Callable[[], T]) -> T:
 def _create_paid_plan() -> dict:
 	# The plan record and its price come with the price decision (G-166, K-61). Until then the gate
 	# above never reaches this line, because the "paid-plan-pricing" rule has no value.
-	frappe.throw(_("Paid plans are not available yet."), ActionRefused)
+	frappe.throw(_("Paid plans are not available yet.", context="platform_core.identity"), ActionRefused)
 
 
 def open_paid_plan() -> dict:
