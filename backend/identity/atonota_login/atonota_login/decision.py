@@ -62,9 +62,16 @@ def _evidence_is_valid(item: object, now: datetime) -> bool:
     expires = item.get("expiresAt")
     if expires is None:
         return True
+    text = str(expires)
+    # Python 3.9 does not read a trailing "Z". A time without a zone is not accepted.
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
     try:
-        return datetime.fromisoformat(str(expires)) > now
-    except ValueError:
+        moment = datetime.fromisoformat(text)
+        if moment.tzinfo is None or now.tzinfo is None:
+            return False
+        return moment > now
+    except (TypeError, ValueError):
         return False
 
 
@@ -85,6 +92,8 @@ class Policy:
             action = _require_keys(action, ACTION_KEYS, "An action")
             if action["id"] in self.actions:
                 raise PolicyError(f"Action {action['id']} is listed twice.")
+            if not action["controls"]:
+                raise PolicyError(f"Action {action['id']} needs at least one control.")
             for control in action["controls"]:
                 control = _require_keys(control, CONTROL_KEYS, f"A control of {action['id']}")
                 if not isinstance(control["applies"], bool) or not isinstance(control["required"], bool):

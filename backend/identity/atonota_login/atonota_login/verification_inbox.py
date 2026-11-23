@@ -28,6 +28,8 @@ from typing import Mapping
 SIGNATURE_HEADER = "X-Verification-Signature"
 DEFAULT_TOLERANCE_SECONDS = 300
 OUTCOMES = {"approved", "rejected", "review"}
+# An attempt with a final outcome keeps it. A later notice for the same attempt changes nothing.
+FINAL_OUTCOMES = {"approved", "rejected"}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS attempts (
   case_id TEXT NOT NULL,
@@ -78,7 +80,7 @@ class HmacSignature:
         if abs(now - stamp) > self._tolerance:
             raise SignatureRejected("The signature time is outside the allowed window.")
         expected = hmac.new(self._secret, str(stamp).encode() + b"." + raw_body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, given):
+        if not hmac.compare_digest(expected.encode("ascii"), given.encode("utf-8", "replace")):
             raise SignatureRejected("The signature does not match the body.")
 
 
@@ -110,7 +112,12 @@ class VerificationInbox:
         """Check and store one notice. Returns 'accepted' or 'duplicate'."""
         self._configured()
         self._verifier.verify(raw_body, headers, now)
-        notice = json.loads(raw_body.decode("utf-8"))
+        try:
+            notice = json.loads(raw_body.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            raise ValueError("The notice body is not JSON.") from None
+        if not isinstance(notice, dict):
+            raise ValueError("The notice body must be a JSON object.")
         event_id, case_id, attempt, outcome = (
             notice.get("event_id"), notice.get("case_id"), notice.get("attempt"), notice.get("outcome")
         )
@@ -153,6 +160,11 @@ class VerificationInbox:
         (newest,) = self._db.execute("SELECT MAX(attempt) FROM attempts WHERE case_id = ?", (case_id,)).fetchone()
         if attempt < newest:
             return "stale"
+        current = self._db.execute(
+            "SELECT attempt, outcome FROM decisions WHERE case_id = ?", (case_id,)
+        ).fetchone()
+        if current is not None and current[0] == attempt and current[1] in FINAL_OUTCOMES:
+            return "final-kept"
         self._db.execute(
             "INSERT INTO decisions (case_id, attempt, outcome) VALUES (?, ?, ?) "
             "ON CONFLICT(case_id) DO UPDATE SET attempt = excluded.attempt, outcome = excluded.outcome",
@@ -160,6 +172,16 @@ class VerificationInbox:
         )
         return "applied"
 
+    def replay_unknown(self) -> int:
+        """Put notices for unknown attempts back in the queue. An operator runs this by hand."""
+        cursor = self._db.execute("UPDATE notices SET state = 'pending' WHERE state = 'unknown-attempt'")
+        return cursor.rowcount
+
     def decision(self, case_id: str) -> str:
-        row = self._db.execute("SELECT outcome FROM decisions WHERE case_id = ?", (case_id,)).fetchone()
+        """The outcome of the newest attempt. A newer attempt without a result is 'pending'."""
+        row = self._db.execute(
+            "SELECT d.outcome FROM decisions d WHERE d.case_id = ? AND d.attempt = "
+            "(SELECT MAX(attempt) FROM attempts WHERE case_id = d.case_id)",
+            (case_id,),
+        ).fetchone()
         return row[0] if row else "pending"

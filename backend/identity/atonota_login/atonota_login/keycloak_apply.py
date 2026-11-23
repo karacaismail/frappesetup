@@ -17,7 +17,9 @@ explicit expected host, so the command cannot reach a wrong environment by mista
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -38,12 +40,23 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def _resolves_to_loopback(host: str) -> bool:
+    try:
+        found = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    return bool(found) and all(ipaddress.ip_address(entry[4][0]).is_loopback for entry in found)
+
+
 def checked_keycloak_url(url: str, expected_remote_host: str | None = None) -> str:
     parts = urllib.parse.urlsplit(url.rstrip("/"))
     host = parts.hostname or ""
     if parts.username or parts.password or parts.path not in ("", "/") or parts.query or parts.fragment:
         raise ApplyError("The Keycloak address must be scheme, host and port only.")
     if platforms.LOCAL_HOST.fullmatch(host) and parts.scheme in ("http", "https"):
+        # The admin password goes over plain http only to this machine.
+        if not _resolves_to_loopback(host):
+            raise ApplyError("The local Keycloak name does not resolve to this machine.")
         return f"{parts.scheme}://{parts.netloc}"
     if expected_remote_host is None:
         raise ApplyError("Only a local Keycloak is accepted. Pass --remote-host for an approved remote change.")

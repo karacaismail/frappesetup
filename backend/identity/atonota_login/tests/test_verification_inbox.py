@@ -112,6 +112,53 @@ class InboxTest(unittest.TestCase):
         self.inbox.close()
         self.assertNotIn(marker.encode(), self.path.read_bytes())
 
+    def test_final_outcome_of_an_attempt_is_not_overwritten(self):
+        # Review finding 2: a late notice for the same attempt must not reverse a final decision.
+        for first, late in (("approved", "review"), ("rejected", "approved"), ("approved", "rejected")):
+            with self.subTest(first=first, late=late):
+                case = f"case-{first}-{late}"
+                self.inbox.open_attempt(case)
+                for event, outcome in ((f"{case}-a", first), (f"{case}-b", late)):
+                    body, headers = self.notice(event, 1, outcome, case=case)
+                    self.inbox.receive(body, headers, self.now)
+                self.assertEqual(self.inbox.process(), [(f"{case}-a", "applied"), (f"{case}-b", "final-kept")])
+                self.assertEqual(self.inbox.decision(case), first)
+
+    def test_review_can_become_final(self):
+        self.inbox.open_attempt("case-1")
+        for event, outcome in (("e1", "review"), ("e2", "approved")):
+            body, headers = self.notice(event, 1, outcome)
+            self.inbox.receive(body, headers, self.now)
+        self.assertEqual(self.inbox.process(), [("e1", "applied"), ("e2", "applied")])
+        self.assertEqual(self.inbox.decision("case-1"), "approved")
+
+    def test_new_attempt_makes_the_case_pending(self):
+        # Review finding 3: a new check replaces the old result until the new result arrives.
+        self.inbox.open_attempt("case-1")
+        body, headers = self.notice("e1", 1, "approved")
+        self.inbox.receive(body, headers, self.now)
+        self.inbox.process()
+        self.inbox.open_attempt("case-1")
+        self.assertEqual(self.inbox.decision("case-1"), "pending")
+
+    def test_unknown_attempt_can_be_replayed(self):
+        # Review finding 7: the notice is kept and an operator can replay it.
+        body, headers = self.notice("e1", 1, "approved")
+        self.inbox.receive(body, headers, self.now)
+        self.assertEqual(self.inbox.process(), [("e1", "unknown-attempt")])
+        self.inbox.open_attempt("case-1")
+        self.assertEqual(self.inbox.replay_unknown(), 1)
+        self.assertEqual(self.inbox.process(), [("e1", "applied")])
+
+    def test_malformed_signature_and_body_are_refused_cleanly(self):
+        # Review finding 6: bad input gives the module's own errors, not a crash.
+        body, _ = self.notice("e1", 1, "approved")
+        with self.assertRaises(SignatureRejected):
+            self.inbox.receive(body, {inbox_module.SIGNATURE_HEADER: f"t={self.now},v1=\u00e7ok"}, self.now)
+        for raw in (b"[1, 2]", b"\xff\xfe"):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                self.inbox.receive(raw, signed(self.secret, raw, self.now), self.now)
+
     def test_bad_outcome_is_refused(self):
         body, headers = self.notice("e1", 1, "approve-everything")
         with self.assertRaises(ValueError):

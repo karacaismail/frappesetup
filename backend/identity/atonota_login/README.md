@@ -36,6 +36,10 @@ Platform şu kurala göre açılır:
 - Bir değişken boşsa platform kapalı kalır. Düğmesi görünmez.
 - Kayıtta `"active": false` yazıyorsa platform sırla da kapalı kalır.
 
+Açık bir platform e-postanın doğrulandığını bildirmelidir. Kayıt bunun için `email_verified` iddiasını zorunlu kılar. Örnek `google.json` dosyasındadır. Bu kural yoksa biri başkasının e-postasıyla önceden hesap açabilir. Kişi sonra kaydolunca hesap saldırganın olur. Bu saldırıya önceden ele geçirme denir.
+
+Facebook ve X bu iddiayı Keycloak'a göndermez. Bu yüzden iki kayıt `"active": false` ile gelir. İki platformu açmak için önce ek bir denetim gerekir. Borç satırı proje kaydındadır (O-56).
+
 Açma ve kapama işini `bin/atonota-login apply --from-env` komutu yapar. Geliştirmede `identity/keycloak/bin/kc-dev.sh platforms` komutu aynı işi yapar.
 
 Platform işini bitirince tarayıcıyı şu adrese döndürür:
@@ -55,13 +59,16 @@ bin/atonota-login redirects --env all
 Kural G-160 gereksinimidir. Keycloak bu kuralı `atonota-first-broker-login` akışıyla uygular.
 
 1. Dış hesap, platformun adı ve platformdaki değişmeyen kullanıcı numarasıyla bağlanır.
-2. Aynı e-postalı hesap yoksa yeni kullanıcı açılır. E-posta doğrulanmamış sayılır.
-3. Aynı e-postalı hesap varsa Keycloak kullanıcıya sorar. Kullanıcı bağlamayı onaylarsa var olan hesabın parolasıyla yeniden oturum açar.
-4. E-posta eşleşmesi tek başına bağ kurmaz. E-postaya gelen bağlantı da bağ kurmaz.
+2. Platform e-postanın doğrulandığını bildirmezse giriş reddedilir. Hesap açılmaz.
+3. Aynı e-postalı hesap yoksa yeni kullanıcı açılır. Kullanıcı e-posta adresini kendisi yazamaz.
+4. Aynı e-postalı hesap varsa Keycloak kullanıcıya sorar. Kullanıcı bağlamayı onaylarsa var olan hesabın parolasıyla yeniden oturum açar.
+5. E-posta eşleşmesi tek başına bağ kurmaz. E-postaya gelen bağlantı da bağ kurmaz.
 
 Parolası olmayan kullanıcı bu yolla bağ kuramaz. Örneğin yalnız sihirli bağlantıyla giren kullanıcı böyledir. Bu kişi önce hesabına parola ekler. Bu kısıtlama bilinçlidir. Güvenli olmayan yol açılmaz.
 
 Kuruluş kurumsal girişi zorunlu kılabilir. Bu durumda üyelik katmanı kullanıcıya `enterprise-sso-required` rolünü verir. Rolü olan kullanıcı sosyal platformla giremez.
+
+Bağ, ikinci adımdan ve kurumsal giriş denetiminden önce kaydedilir. Bu sıra Keycloak'ın kendi sırasıdır. İkinci adım başarısız olursa bağ yine de kalır. Bağ yine de giriş açmaz, çünkü her girişte iki denetim yeniden çalışır.
 
 ## Testler
 

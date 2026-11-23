@@ -57,10 +57,11 @@ class LinkingRuleTest(unittest.TestCase):
         branch = [e.get("authenticator") for e in flow_tree(self.realm, existing[0]["flowAlias"])]
         self.assertLess(branch.index("idp-confirm-link"), branch.index("idp-username-password-form"))
 
-    def test_review_profile_asks_only_for_missing_fields(self):
+    def test_review_profile_never_lets_the_user_type_an_e_mail(self):
+        # Review finding 1: a typed e-mail on the review page could claim another person's address.
         tree = flow_tree(self.realm, platforms.FIRST_BROKER_FLOW)
         review = next(e for e in tree if e.get("authenticator") == "idp-review-profile")
-        self.assertEqual(self.configs[review["authenticatorConfig"]]["update.profile.on.first.login"], "missing")
+        self.assertEqual(self.configs[review["authenticatorConfig"]]["update.profile.on.first.login"], "off")
 
     def test_organization_onboarding_stays(self):
         tree = flow_tree(self.realm, platforms.FIRST_BROKER_FLOW)

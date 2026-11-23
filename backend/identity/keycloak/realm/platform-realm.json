@@ -1114,7 +1114,10 @@
         "teamId": "${ATONOTA_APPLE_TEAM_ID}",
         "keyId": "${ATONOTA_APPLE_KEY_ID}",
         "defaultScope": "name email",
-        "syncMode": "IMPORT"
+        "syncMode": "IMPORT",
+        "filteredByClaim": "true",
+        "claimFilterName": "email_verified",
+        "claimFilterValue": "true"
       },
       "postBrokerLoginFlowAlias": "atonota-post-broker"
     },
@@ -1152,7 +1155,10 @@
         "clientId": "${ATONOTA_GOOGLE_CLIENT_ID}",
         "clientSecret": "${ATONOTA_GOOGLE_CLIENT_SECRET}",
         "syncMode": "IMPORT",
-        "defaultScope": "openid email profile"
+        "defaultScope": "openid email profile",
+        "filteredByClaim": "true",
+        "claimFilterName": "email_verified",
+        "claimFilterValue": "true"
       },
       "postBrokerLoginFlowAlias": "atonota-post-broker"
     },
@@ -1171,7 +1177,10 @@
         "clientId": "${ATONOTA_LINKEDIN_CLIENT_ID}",
         "clientSecret": "${ATONOTA_LINKEDIN_CLIENT_SECRET}",
         "syncMode": "IMPORT",
-        "defaultScope": "openid profile email"
+        "defaultScope": "openid profile email",
+        "filteredByClaim": "true",
+        "claimFilterName": "email_verified",
+        "claimFilterValue": "true"
       },
       "postBrokerLoginFlowAlias": "atonota-post-broker"
     },
@@ -1642,7 +1651,7 @@
     {
       "alias": "atonota-review-profile",
       "config": {
-        "update.profile.on.first.login": "missing"
+        "update.profile.on.first.login": "off"
       }
     },
     {

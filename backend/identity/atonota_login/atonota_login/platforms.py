@@ -34,6 +34,9 @@ LOCAL_HOST = re.compile(r"(?:localhost|127\.0\.0\.1|[a-z0-9](?:[a-z0-9-]*[a-z0-9
 SECRET_LIKE_KEY = re.compile(r"secret|password|private", re.IGNORECASE)
 RECORD_KEYS = {"alias", "providerId", "displayName", "authorizationHost", "secrets", "config", "active"}
 REQUIRED_KEYS = {"alias", "providerId", "displayName", "authorizationHost", "secrets", "config"}
+# Keycloak's "essential claim" check. An open platform must prove the e-mail is verified, or a person
+# could claim someone else's address before that person registers (account pre-hijack).
+VERIFIED_EMAIL_CLAIM = {"filteredByClaim": "true", "claimFilterName": "email_verified", "claimFilterValue": "true"}
 # Fields the data may not set. They keep linking safe (G-160) and the platform closed until opened.
 FIXED_FIELDS = {
     "trustEmail": False,
@@ -100,6 +103,11 @@ def _check_record(record: object, path: Path) -> Platform:
     active = record.get("active", True)
     if not isinstance(active, bool):
         raise RegistryError(f"{where}: active must be true or false.")
+    if active and any(config.get(key) != value for key, value in VERIFIED_EMAIL_CLAIM.items()):
+        raise RegistryError(
+            f"{where}: an active platform must require email_verified=true "
+            "(filteredByClaim, claimFilterName, claimFilterValue). Otherwise set active to false."
+        )
     return Platform(alias, record["providerId"], record["displayName"], host, dict(secrets), dict(config), active, path)
 
 

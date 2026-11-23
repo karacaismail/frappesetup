@@ -65,6 +65,14 @@ class ShippedPolicyTest(unittest.TestCase):
         result = self.policy.evaluate("place-order", evidence(identity=VALID, membership=old), NOW)
         self.assertEqual(result.status, "denied")
 
+    def test_expiry_time_forms_are_handled(self):
+        # Review finding 5: "Z" works on Python 3.9 too. A time without a zone is not valid evidence.
+        later = (NOW + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ok = self.policy.evaluate("place-order", evidence(identity=VALID, membership={"status": "valid", "expiresAt": later}), NOW)
+        self.assertEqual(ok.status, "ready")
+        naive = {"status": "valid", "expiresAt": "2030-01-01T00:00:00"}
+        self.assertEqual(self.policy.evaluate("place-order", evidence(identity=VALID, membership=naive), NOW).status, "denied")
+
     def test_actions_differ(self):
         # A form needs less than an order.
         self.assertEqual(self.policy.evaluate("submit-form", evidence(identity=VALID), NOW).status, "ready")
@@ -143,6 +151,7 @@ class PolicyFileTest(unittest.TestCase):
             "applies is not a boolean": lambda d: d["actions"][0]["controls"][0].update(applies="maybe"),
             "duplicate action": lambda d: d["actions"].append(dict(d["actions"][0])),
             "unknown key": lambda d: d["actions"][0]["controls"][0].update(tokenRole="member"),
+            "action without controls": lambda d: d["actions"][0].update(controls=[]),
         }
         for label, change in changes.items():
             with self.subTest(label):

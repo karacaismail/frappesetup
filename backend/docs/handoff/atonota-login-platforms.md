@@ -69,6 +69,7 @@ Her ortam için platform panelinde ayrı istemci açın. Böylece alpha'nın sı
 - "Valid OAuth Redirect URIs" alanına dönüş adresini yazın. Prod adresi `https://api.login.atonota.net/realms/platform/broker/facebook/endpoint` olur.
 - Uygulama yayına alınmadan yalnız test kullanıcıları girebilir. Yayın için Meta'nın uygulama incelemesi gerekir.
 - Değerler `ATONOTA_FACEBOOK_CLIENT_ID` ve `ATONOTA_FACEBOOK_CLIENT_SECRET` değişkenlerine yazılır.
+- Kayıt şimdilik kapalıdır (`"active": false`). Facebook e-postanın doğrulandığını Keycloak'a bildirmez. Ek denetim yazılınca kayıt açılır.
 
 ### LinkedIn: `linkedin`
 
@@ -87,6 +88,7 @@ Her ortam için platform panelinde ayrı istemci açın. Böylece alpha'nın sı
 - Keycloak 26.8.2'nin X sağlayıcısı OAuth 1.0a kullanır. Bu yüzden "API Key" ve "API Key Secret" değerleri gerekir. OAuth 2.0 istemci değerleri bu sağlayıcıda çalışmaz.
 - X, OAuth 1.0a girişini kapatırsa kayıt genel OIDC sağlayıcısına geçer. Bu geçiş yalnız kayıt dosyasını değiştirir.
 - Değerler `ATONOTA_X_CLIENT_ID` ve `ATONOTA_X_CLIENT_SECRET` değişkenlerine yazılır.
+- Kayıt şimdilik kapalıdır (`"active": false`). X e-postanın doğrulandığını Keycloak'a bildirmez. Ek denetim yazılınca kayıt açılır.
 
 ## Alan adı işi
 

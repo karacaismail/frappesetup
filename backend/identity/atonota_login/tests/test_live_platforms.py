@@ -214,7 +214,15 @@ class LivePlatformTest(unittest.TestCase):
         # Fake platform accounts, each with the same e-mail as above or a new one.
         for email in (cls.shared_email, cls.enterprise_email, cls.newcomer_email):
             cls.users[(cls.upstream, email)] = secrets.token_urlsafe(18)
-            cls.make_user(cls.upstream, email, cls.users[(cls.upstream, email)], verified=False)
+            cls.make_user(cls.upstream, email, cls.users[(cls.upstream, email)], verified=True)
+        # Review finding 1 (pre-hijack): a platform account that claims a future victim's address
+        # without verifying it, and one with no e-mail at all.
+        cls.victim_email = f"victim-{secrets.token_hex(4)}@example.test"
+        cls.users[(cls.upstream, cls.victim_email)] = secrets.token_urlsafe(18)
+        cls.make_user(cls.upstream, cls.victim_email, cls.users[(cls.upstream, cls.victim_email)], verified=False)
+        cls.no_mail_name = f"nomail-{secrets.token_hex(4)}"
+        cls.users[(cls.upstream, cls.no_mail_name)] = secrets.token_urlsafe(18)
+        cls.make_user(cls.upstream, cls.no_mail_name, cls.users[(cls.upstream, cls.no_mail_name)], verified=False, email=None)
         upstream_enterprise = cls.admin.user(cls.upstream, cls.enterprise_email)["id"]
         # The fake platform comes as data only: the product records plus one new file.
         for record in (PRODUCT / "platforms").glob("*.json"):
@@ -233,6 +241,7 @@ class LivePlatformTest(unittest.TestCase):
                 "useJwksUrl": "true", "validateSignature": "true",
                 "clientAuthMethod": "client_secret_post", "defaultScope": "openid email profile",
                 "pkceEnabled": "true", "pkceMethod": "S256", "syncMode": "IMPORT",
+                "filteredByClaim": "true", "claimFilterName": "email_verified", "claimFilterValue": "true",
             },
         }), encoding="utf-8")
         cls.apply(open_fake=True)
@@ -242,12 +251,15 @@ class LivePlatformTest(unittest.TestCase):
         })
 
     @classmethod
-    def make_user(cls, realm, email, password, verified):
-        cls.admin.call("POST", f"/{realm}/users", {
-            "username": email, "email": email, "firstName": "Test", "lastName": "Person",
+    def make_user(cls, realm, username, password, verified, email=""):
+        user = {
+            "username": username, "firstName": "Test", "lastName": "Person",
             "enabled": True, "emailVerified": verified,
             "credentials": [{"type": "password", "value": password, "temporary": False}],
-        })
+        }
+        if email is not None:
+            user["email"] = email or username
+        cls.admin.call("POST", f"/{realm}/users", user)
 
     @classmethod
     def apply(cls, open_fake):
@@ -274,7 +286,7 @@ class LivePlatformTest(unittest.TestCase):
     def cleanup(cls):
         cls.admin.call("DELETE", f"/{cls.upstream}", expect=None)
         cls.admin.call("DELETE", f"/{REALM}/identity-provider/instances/{FAKE_ALIAS}", expect=None)
-        for email in (cls.shared_email, cls.enterprise_email, cls.newcomer_email):
+        for email in (cls.shared_email, cls.enterprise_email, cls.newcomer_email, cls.victim_email, cls.no_mail_name):
             found = cls.admin.user(REALM, email)
             if found:
                 cls.admin.call("DELETE", f"/{REALM}/users/{found['id']}", expect=None)
@@ -333,6 +345,20 @@ class LivePlatformTest(unittest.TestCase):
             "kurumsal girişi" in body or "corporate sign-in" in body,
             f"HTTP {status}: {page_message(body)}",
         )
+
+    def test_unverified_e_mail_cannot_claim_an_address(self):
+        # Pre-hijack: the platform says the e-mail is not verified. No account is made, nothing is linked.
+        browser, status, url, body = self.sign_in_at_fake_platform(self.victim_email)
+        self.assertFalse(url.startswith(browser.stop_prefix), f"HTTP {status}: {page_message(body)}")
+        self.assertIsNone(self.admin.user(REALM, self.victim_email), "An account was made for an unverified e-mail.")
+
+    def test_platform_without_e_mail_cannot_make_an_account(self):
+        browser, status, url, body = self.sign_in_at_fake_platform(self.no_mail_name)
+        self.assertFalse(url.startswith(browser.stop_prefix), f"HTTP {status}: {page_message(body)}")
+        if f"/realms/{REALM}/" in url:
+            # The fake platform may ask for an e-mail on its own page. Our realm never does.
+            self.assertNotIn('name="email"', body, "The user must not type an e-mail address.")
+        self.assertIsNone(self.admin.user(REALM, self.no_mail_name))
 
     def test_unknown_platform_return_address_is_refused(self):
         browser = Browser(f"{self.base}/realms/{REALM}/account/")

@@ -9,6 +9,9 @@
   },
   "config": {
     "syncMode": "IMPORT",
-    "defaultScope": "openid email profile"
+    "defaultScope": "openid email profile",
+    "filteredByClaim": "true",
+    "claimFilterName": "email_verified",
+    "claimFilterValue": "true"
   }
 }

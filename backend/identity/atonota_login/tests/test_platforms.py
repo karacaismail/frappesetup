@@ -36,7 +36,10 @@ def sample_record(alias: str = "sample-oidc") -> dict:
         "displayName": "Sample",
         "authorizationHost": "login.example.test",
         "secrets": {"clientId": f"ATONOTA_{upper}_CLIENT_ID", "clientSecret": f"ATONOTA_{upper}_CLIENT_SECRET"},
-        "config": {"syncMode": "IMPORT", "authorizationUrl": "https://login.example.test/authorize"},
+        "config": {
+            "syncMode": "IMPORT", "authorizationUrl": "https://login.example.test/authorize",
+            "filteredByClaim": "true", "claimFilterName": "email_verified", "claimFilterValue": "true",
+        },
     }
 
 
@@ -97,6 +100,30 @@ class RegistryTest(unittest.TestCase):
                 (Path(folder) / f"{name}.json").write_text(json.dumps(record), encoding="utf-8")
                 with self.assertRaises(RegistryError):
                     platforms.load_platforms(Path(folder))
+
+    def test_open_platform_must_require_a_verified_e_mail(self):
+        # Review finding 1 (pre-hijack): a platform that passes an unverified e-mail lets someone claim
+        # another person's address before that person registers. An active record must require the
+        # provider's email_verified claim. A platform that cannot send it stays inactive.
+        for key in ("filteredByClaim", "claimFilterName", "claimFilterValue"):
+            with self.subTest(missing=key), tempfile.TemporaryDirectory() as folder:
+                record = sample_record()
+                del record["config"][key]
+                write_record(Path(folder), record)
+                with self.assertRaises(RegistryError):
+                    platforms.load_platforms(Path(folder))
+        with tempfile.TemporaryDirectory() as folder:
+            record = sample_record()
+            record["config"]["claimFilterValue"] = "false"
+            write_record(Path(folder), record)
+            with self.assertRaises(RegistryError):
+                platforms.load_platforms(Path(folder))
+        with tempfile.TemporaryDirectory() as folder:
+            record = {**sample_record(), "active": False}
+            for key in ("filteredByClaim", "claimFilterName", "claimFilterValue"):
+                del record["config"][key]
+            write_record(Path(folder), record)
+            self.assertFalse(platforms.load_platforms(Path(folder))[0].active)
 
     def test_duplicate_secret_name_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:

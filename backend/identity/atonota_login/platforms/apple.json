@@ -11,6 +11,9 @@
   },
   "config": {
     "defaultScope": "name email",
-    "syncMode": "IMPORT"
+    "syncMode": "IMPORT",
+    "filteredByClaim": "true",
+    "claimFilterName": "email_verified",
+    "claimFilterValue": "true"
   }
 }

@@ -10,5 +10,6 @@
   "config": {
     "syncMode": "IMPORT",
     "defaultScope": "email public_profile"
-  }
+  },
+  "active": false
 }
