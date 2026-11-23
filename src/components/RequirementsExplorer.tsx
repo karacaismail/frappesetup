@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { IconFilterOff, IconSearch } from '@tabler/icons-react';
 import { theme } from '../theme';
+import { REPO_URL } from '../data/site';
 
 export interface Requirement {
   id: string;
@@ -31,20 +32,23 @@ export interface TaskBoard {
   epics: { id: string; title: string }[];
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
-  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[] } }>;
+  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[]; release: { pr: number; commit: string } | null } }>;
 }
+
+// Kanıt: commit, yayın PR numarası (0: henüz yayımlanmadı) ve test dosyası adları.
+type Evidence = [commit: string, pr: number, tests: string];
 
 interface Task extends Requirement {
   epic: string;
   status: string;
   level: string;
-  evidence?: string;
+  evidence?: Evidence;
 }
 
 type RequirementRow = [
   id: string, title: string, detail: string, rail: string,
   priority: string, phase: string, source: string, owner: string | null | undefined,
-  epic: number, status: number, level: number, evidence?: string,
+  epic: number, status: number, level: number, evidence?: Evidence,
 ];
 
 // Adaya giden sözlük: epic, durum, düzey ve faz adları bir kez gönderilir; satırlar yalnız sıra numarası taşır.
@@ -78,7 +82,7 @@ export function toRequirementRow(
     board.statuses.findIndex((s) => s.id === it.status),
     board.levels.findIndex((l) => l.id === it.level),
   ];
-  if (it.evidence) row.push(`Denetim commit'i ${it.evidence.commit}. Test: ${it.evidence.tests.map(fileName).join(', ')}.`);
+  if (it.evidence) row.push([it.evidence.commit, it.evidence.release?.pr ?? 0, it.evidence.tests.map(fileName).join(', ')]);
   return row;
 }
 
@@ -384,8 +388,17 @@ function Explorer({ items, meta: board }: Props) {
     </>
   );
 
-  const evidence = (r: Task, className: string) =>
-    r.evidence && <p className={className}>Kanıt: {r.evidence}</p>;
+  // Kanıt commit'i backend dalındadır; okur onu main yayınının PR'ından bulur.
+  const evidence = (r: Task, className: string) => {
+    if (!r.evidence) return null;
+    const [commit, pr, tests] = r.evidence;
+    return (
+      <p className={className}>
+        Kanıt: Denetim commit'i {commit} backend dalındadır.{' '}
+        {pr > 0 ? <a href={`${REPO_URL}/pull/${pr}`}>PR #{pr} ile yayımlandı</a> : 'Henüz yayımlanmadı'}. Test: {tests}.
+      </p>
+    );
+  };
 
   const card = (r: Task) => (
     <li key={r.id} className="req-card" id={`req-${r.id}`}>

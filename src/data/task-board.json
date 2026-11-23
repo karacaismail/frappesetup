@@ -2,6 +2,10 @@
  "audit": {
   "date": "2026-11-23",
   "commit": "36afb874",
+  "release": {
+   "pr": 18,
+   "commit": "1d3e6344"
+  },
   "note": "MVP durum denetimi. Denetim P0 ile P4 arasındaki MUST kalemlerini okudu. Bitti kalemleri yalnız yerel yığında testle geçti. G-155 ile G-167 arasındaki kalemler denetimden sonra eklendi.",
   "addedAfter": [
    "G-155",
@@ -22,6 +26,7 @@
  "update": {
   "date": "2026-11-23",
   "commit": "e44fba2f",
+  "release": null,
   "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı.",
   "reviewed": [
    "G-155",
@@ -55,7 +60,7 @@
   {
    "id": "poc",
    "label": "PoC",
-   "rule": "Başlığında \"prototip\" geçen P1 kalemleri PoC olur. Bu kalemler staging denemesidir.",
+   "rule": "Başlığında \"prototip\" geçen P1 kalemleri PoC olur. Bu kalemler beta ortamı denemesidir.",
    "ids": [
     "G-129",
     "SA-40"
@@ -278,6 +283,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/press_tr/tests/test_auth_http.py",
      "backend/apps/press_tr/tests/test_authorization_code.py"
@@ -445,6 +454,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_login_policy.py",
      "backend/apps/platform_core/platform_core/identity/tests/test_provider_setup.py",
@@ -458,6 +471,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/shell/test_panel_template.py",
      "backend/apps/platform_core/platform_core/access/tests/test_http_contract.py"
@@ -525,6 +542,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_provisioning.py",
      "backend/identity/identity_sync/tests/test_mapping.py"
@@ -537,6 +558,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_sign_out.py"
     ]
@@ -553,6 +578,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/access/tests/test_record_rule.py",
      "backend/apps/platform_core/platform_core/access/tests/test_hierarchy.py"
@@ -565,6 +594,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/access/tests/test_field_level.py"
     ]
@@ -656,6 +689,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/identity/keycloak/tests/test_second_factor.py",
      "backend/identity/keycloak/tests/test_session_lifetimes.py"
@@ -703,6 +740,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/ai/tests/test_approval.py"
     ]
@@ -879,6 +920,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_sign_in.py"
     ]
@@ -1025,6 +1070,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/ai/tests/test_identity.py"
     ]

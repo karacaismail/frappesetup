@@ -17,16 +17,89 @@ const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
   .map((f) => ({ slug: f.replace(/\.md$/, ''), text: readFileSync(new URL(f, docsDir), 'utf8') }));
 const ids = new Set(reqs.map((r) => r.id));
-type TaskItem = { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[] } };
+// release: commit'i içeren main yayını (PR numarası ve yayın commit'i); null ise commit henüz yayımlanmadı.
+type Release = { pr: number; commit: string } | null;
+type TaskItem = { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[]; release: Release } };
 type TaskBoard = {
-  audit: { date: string; commit: string; note: string; addedAfter: string[] };
-  update: { date: string; commit: string; note: string; reviewed: string[] };
+  audit: { date: string; commit: string; release: Release; note: string; addedAfter: string[] };
+  update: { date: string; commit: string; release: Release; note: string; reviewed: string[] };
   epics: { id: string; title: string; goal: string }[];
   statuses: { id: string; label: string; rule: string }[];
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
   items: Record<string, TaskItem>;
 };
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
+
+// Git yardımcıları: kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer.
+const cwd = fileURLToPath(root);
+const git = (...args: string[]) => execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+const gitOk = (...args: string[]) => {
+  try {
+    execFileSync('git', args, { cwd, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+const isShallow = () => git('rev-parse', '--is-shallow-repository') === 'true';
+const hasCommit = (c: string) => gitOk('cat-file', '-e', `${c}^{commit}`);
+const inHead = (c: string) => hasCommit(c) && gitOk('merge-base', '--is-ancestor', c, 'HEAD');
+// Yayın commit'i backend commit'ini metninde adlandırır: "Birleşmeler" listesinde "- <kısa ad> " satırıyla ya da
+// "Kaynak: <tam ad>" satırıyla. Kısa ad en az 7 karakterdir; iki ad önek olarak karşılaştırılır.
+const samePrefix = (a: string, b: string) => a.length >= 7 && b.length >= 7 && (a.startsWith(b) || b.startsWith(a));
+const namesCommit = (message: string, c: string) =>
+  /^Kaynak: [0-9a-f]{7,40}$/m.test(message) &&
+  message.split('\n').some((l) => {
+    const m = l.match(/^(?:- |Kaynak: )([0-9a-f]{7,40})\b/);
+    return m !== null && samePrefix(m[1], c);
+  });
+const releaseMessages = (ref: string) =>
+  git('log', '--format=%H%n%B%x1e', ref)
+    .split('\x1e')
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map((e) => ({ sha: e.slice(0, e.indexOf('\n') < 0 ? e.length : e.indexOf('\n')), body: e }))
+    .filter((e) => /^Kaynak: /m.test(e.body));
+// Kanıt commit'leri backend dalındadır. Backend geçmişi GitHub'a gitmez ve CI kopyası sığdır (tek commit).
+// Bu yüzden denetim üç durumu ayırır (inceleme 1, Ö-2):
+// 1. Commit yerelde varsa HEAD geçmişinde olmalıdır. release boşsa origin/main'deki hiçbir yayın onu adlandırmamalıdır.
+// 2. Commit yerelde yoksa ve release doluysa yayın commit'i aranır. Yayın commit'i yerelde varsa metninde kanıt
+//    commit'ini adlandırmalıdır. Tam geçmişte yayın commit'i ayrıca HEAD geçmişinde olmalıdır. Sığ kopyada yayın
+//    commit'i yoksa biçim denetimi yeter.
+// 3. Commit yerelde yoksa ve release null ise kayıt açıkça "henüz yayımlanmadı" der. Alan eksik olamaz (releaseShape).
+const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
+  const out: string[] = [];
+  const shallow = isShallow();
+  if (hasCommit(c)) {
+    if (!inHead(c)) out.push(`${label}: ${c} HEAD geçmişinde değil`);
+    if (rel && hasCommit(rel.commit) && !namesCommit(git('log', '-1', '--format=%B', rel.commit), c))
+      out.push(`${label}: yayın commit'i ${rel.commit} metninde ${c} commit'ini adlandırmıyor`);
+    if (!rel && gitOk('rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main')) {
+      const named = releaseMessages('refs/remotes/origin/main').filter((e) => namesCommit(e.body, c));
+      if (named.length > 0) out.push(`${label}: ${c} ${named[0].sha.slice(0, 8)} ile yayımlandı ama release alanı null`);
+    }
+    return out;
+  }
+  if (!rel) return out;
+  if (hasCommit(rel.commit)) {
+    if (!namesCommit(git('log', '-1', '--format=%B', rel.commit), c))
+      out.push(`${label}: yayın commit'i ${rel.commit} metninde ${c} commit'ini adlandırmıyor`);
+    if (!shallow && !inHead(rel.commit)) out.push(`${label}: yayın commit'i ${rel.commit} HEAD geçmişinde değil`);
+  } else if (!shallow) {
+    out.push(`${label}: ${c} da yayın commit'i ${rel.commit} de depoda yok`);
+  }
+  return out;
+};
+const releaseShape = (label: string, rel: unknown): string[] => {
+  if (rel === null) return [];
+  if (typeof rel !== 'object' || rel === undefined) return [`${label}: release alanı yok`];
+  const r = rel as Record<string, unknown>;
+  const out: string[] = [];
+  if (Object.keys(r).sort().join(',') !== 'commit,pr') out.push(`${label}: release yalnız pr ve commit taşır`);
+  if (!Number.isInteger(r.pr) || (r.pr as number) < 1) out.push(`${label}: release.pr pozitif tam sayı değil`);
+  if (typeof r.commit !== 'string' || !/^[0-9a-f]{7,40}$/.test(r.commit)) out.push(`${label}: release.commit biçimi`);
+  return out;
+};
 
 test.describe('content consistency', () => {
   test.beforeEach(({ browserName }) => {
@@ -87,24 +160,27 @@ test.describe('content consistency', () => {
   });
 
   test('every done task carries evidence that exists in the repository', () => {
-    // "Bitti" yalnız kanıtla yazılır: denetim commit'i depoda olmalı, test dosyası yolu gerçek olmalı.
+    // "Bitti" yalnız kanıtla yazılır: kanıt commit'i depoda olmalı, test dosyası yolu gerçek olmalı.
     const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
     const done = Object.entries(board.items).filter(([, it]) => it.status === 'done');
     expect(done.length, 'en az bir bitti kaydı').toBeGreaterThan(0);
+    const shape: string[] = [];
     for (const [id, it] of done) {
       expect(it.evidence, `${id} kanıt`).toBeTruthy();
       const ev = it.evidence!;
+      expect(Object.keys(ev).sort(), `${id} kanıt alanları`).toEqual(['commit', 'release', 'tests']);
       expect(ev.commit, `${id} commit`).toMatch(/^[0-9a-f]{7,40}$/);
+      shape.push(...releaseShape(id, ev.release));
       expect(ev.tests.length, `${id} test listesi boş`).toBeGreaterThan(0);
       for (const t of ev.tests) expect(existsSync(new URL(t, root)), `${id} test dosyası ${t}`).toBe(true);
     }
-    const commits = new Set(done.map(([, it]) => it.evidence!.commit));
-    // Sığ klonda (CI'daki actions/checkout varsayılanı) eski commit yoktur; commit denetimi yalnız tam geçmişte koşar.
-    const shallow =
-      execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: fileURLToPath(root) }).toString().trim() === 'true';
-    for (const c of shallow ? [] : commits) {
-      expect(() => execFileSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: fileURLToPath(root), stdio: 'ignore' }), `commit ${c}`).not.toThrow();
-    }
+    expect(shape, 'release biçimi').toEqual([]);
+    // Kural metinleri iki sınırı açık söyler: "Bitti" yalnız yerel yığında geçti, canlı kabul "Sürüyor" kalır.
+    expect(board.statuses.find((s) => s.id === 'done')!.rule).toContain('yalnız yerel yığında');
+    expect(board.statuses.find((s) => s.id === 'in-progress')!.rule).toContain('canlı');
+    // Sığ kopyada da koşar: commit yerelde yoksa release eşlemesi ve yayın commit'i denetlenir (evidenceProblems).
+    const problems = done.flatMap(([id, it]) => evidenceProblems(id, it.evidence!.commit, it.evidence!.release));
+    expect(problems, 'kanıt commit geçmişi').toEqual([]);
     // Denetlenmemiş kalem bitti ya da sürüyor sayılmaz: denetim yalnız P0..P4 MUST kalemlerini okudu.
     // Denetimden sonra eklenen kalemler (audit.addedAfter) ayrıca adlandırılır; bunlar da denetim dışıdır.
     const addedAfter = new Set(board.audit.addedAfter);
@@ -115,6 +191,11 @@ test.describe('content consistency', () => {
     const reviewed = new Set(board.update.reviewed);
     expect([...reviewed].filter((id) => !ids.has(id)), 'reviewed bilinmeyen kimlik').toEqual([]);
     expect(reviewed.size, 'reviewed tekrarsız').toBe(board.update.reviewed.length);
+    // Okunan kalem "Doğrulanmadı" kalamaz: güncelleme onu okudu ve bir durum verdi (inceleme 1, K-4).
+    expect(
+      [...reviewed].filter((id) => board.items[id]?.status === 'unverified'),
+      'reviewed listesinde Doğrulanmadı kalan kalem',
+    ).toEqual([]);
     const audited = (r: Req) =>
       reviewed.has(r.id) ||
       (!addedAfter.has(r.id) && r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase));
@@ -127,20 +208,28 @@ test.describe('content consistency', () => {
     // bloğunu da günceller. update.commit depoda olmalı ve HEAD'in atası olmalı; tarih denetim tarihinden önce olamaz.
     const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
     const u = board.update;
+    const a = board.audit;
     expect(u.date, 'update.date YYYY-AA-GG').toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(Number.isNaN(Date.parse(`${u.date}T00:00:00Z`)), 'update.date geçerli tarih').toBe(false);
-    expect(u.date >= board.audit.date, 'güncelleme denetimden önce olamaz').toBe(true);
+    expect(u.date >= a.date, 'güncelleme denetimden önce olamaz').toBe(true);
     expect(u.commit, 'update.commit').toMatch(/^[0-9a-f]{7,40}$/);
+    expect(a.commit, 'audit.commit').toMatch(/^[0-9a-f]{7,40}$/);
     expect(u.note.trim(), 'update.note').not.toBe('');
-    const git = (...args: string[]) =>
-      execFileSync('git', args, { cwd: fileURLToPath(root), stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-    // Sığ klonda (CI'daki actions/checkout varsayılanı) geçmiş yoktur; denetim yerel kapıda ve birleştirmede koşar.
-    test.skip(git('rev-parse', '--is-shallow-repository') === 'true', 'Sığ klon: commit geçmişi yok.');
-    expect(() => git('cat-file', '-e', `${u.commit}^{commit}`), `update.commit ${u.commit} depoda`).not.toThrow();
+    expect([...releaseShape('update', u.release), ...releaseShape('audit', a.release)], 'release biçimi').toEqual([]);
+    // Sığ kopyada da koşar: commit yerelde yoksa release eşlemesi ve yayın commit'i denetlenir (evidenceProblems).
     expect(
-      () => execFileSync('git', ['merge-base', '--is-ancestor', u.commit, 'HEAD'], { cwd: fileURLToPath(root), stdio: 'ignore' }),
-      `update.commit ${u.commit} HEAD'in atası`,
-    ).not.toThrow();
+      [...evidenceProblems('update', u.commit, u.release), ...evidenceProblems('audit', a.commit, a.release)],
+      'update ve audit commit geçmişi',
+    ).toEqual([]);
+    // Güncelleme denetimden sonra gelir: iki commit de varsa update.commit audit.commit'in torunudur (K-2).
+    if (hasCommit(u.commit) && hasCommit(a.commit)) {
+      expect(gitOk('merge-base', '--is-ancestor', a.commit, u.commit), `update.commit ${u.commit}, audit.commit ${a.commit} torunu`).toBe(true);
+    }
+  });
+
+  test('task board names environments, not staging', () => {
+    // Backend'de staging ortamı yoktur; canlı ortamlar alpha, beta, rc ve prod'dur. Pano kuralları ortam adını yazar.
+    expect(read('src/data/task-board.json')).not.toMatch(/staging/i);
   });
 
   test('requirement ids are unique, contiguous and well formed', () => {
