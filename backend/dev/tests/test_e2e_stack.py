@@ -30,6 +30,11 @@ PRESS_ENVIRONMENT.update(
     KC_BOOTSTRAP_ADMIN_USERNAME=secrets.token_hex(8),
     KC_BOOTSTRAP_ADMIN_PASSWORD=secrets.token_urlsafe(16),
 )
+STACK_ENVIRONMENT = dict(
+    PRESS_ENVIRONMENT,
+    ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:7151",
+    ATONOTA_SITE_TENANT1_SECRET=secrets.token_urlsafe(16),
+)
 
 
 class StackTests(unittest.TestCase):
@@ -96,7 +101,7 @@ class StackTests(unittest.TestCase):
         namespace = runpy.run_path(str(STACK))
         for realm_id in ("", "first-id\nsecond-id\n", "invalid realm"):
             with self.subTest(realm_id=realm_id):
-                environment = dict(PRESS_ENVIRONMENT)
+                environment = dict(STACK_ENVIRONMENT)
                 with (
                     patch.dict(
                         namespace["up"].__globals__,
@@ -323,7 +328,7 @@ class StackTests(unittest.TestCase):
         namespace = runpy.run_path(str(STACK))
         for missing in PRESS_ENVIRONMENT:
             with self.subTest(missing=missing):
-                environment = {key: value for key, value in PRESS_ENVIRONMENT.items() if key != missing}
+                environment = {key: value for key, value in STACK_ENVIRONMENT.items() if key != missing}
                 with (
                     patch.dict(
                         namespace["up"].__globals__,
@@ -336,14 +341,14 @@ class StackTests(unittest.TestCase):
                 ):
                     with self.assertRaisesRegex(ValueError, missing) as caught:
                         namespace["up"](["docker"], ["compose"], environment)
-                for value in PRESS_ENVIRONMENT.values():
+                for value in STACK_ENVIRONMENT.values():
                     self.assertNotIn(value, str(caught.exception))
 
     def test_up_command_names_missing_press_settings_before_any_docker_call(self):
         namespace = runpy.run_path(str(STACK))
         for missing in (("ATONOTA_PRESS_SECRET",), ("ATONOTA_PRESS_URL", "ATONOTA_PRESS_SERVICE_SECRET")):
             with self.subTest(missing=missing):
-                environment = {key: value for key, value in PRESS_ENVIRONMENT.items() if key not in missing}
+                environment = {key: value for key, value in STACK_ENVIRONMENT.items() if key not in missing}
                 errors = io.StringIO()
                 with (
                     patch("sys.argv", [str(STACK), "up"]),
@@ -365,14 +370,14 @@ class StackTests(unittest.TestCase):
                         self.assertIn(key, message)
                     else:
                         self.assertNotIn(key, message)
-                for value in PRESS_ENVIRONMENT.values():
+                for value in STACK_ENVIRONMENT.values():
                     self.assertNotIn(value, message)
 
-    def test_setup_supplies_every_press_setting_from_the_templates(self):
+    def test_setup_supplies_every_stack_setting_from_the_templates(self):
         namespace = runpy.run_path(str(STACK))
         with patch.dict(os.environ, self.env):
             environment, _, _ = namespace["setup"]()
-        for key in PRESS_ENVIRONMENT:
+        for key in STACK_ENVIRONMENT:
             self.assertTrue(environment.get(key), key)
 
     def test_up_refuses_low_resources_before_building(self):
@@ -390,7 +395,7 @@ class StackTests(unittest.TestCase):
                 ),
             ):
                 with self.assertRaisesRegex(ValueError, "Startup requires"):
-                    up([], [], dict(PRESS_ENVIRONMENT))
+                    up([], [], dict(STACK_ENVIRONMENT))
 
     def test_credentials_are_not_published_when_write_fails(self):
         namespace = runpy.run_path(str(STACK))
@@ -505,7 +510,7 @@ class StackTests(unittest.TestCase):
             ),
             patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
         ):
-            namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
+            namespace["up"](["docker"], ["compose"], dict(STACK_ENVIRONMENT))
         migrations = [
             command for command in calls if "bench --site press.localhost migrate" in " ".join(command)
         ]
@@ -566,7 +571,7 @@ class StackTests(unittest.TestCase):
             patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
         ):
             with self.assertRaises(subprocess.CalledProcessError):
-                namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
+                namespace["up"](["docker"], ["compose"], dict(STACK_ENVIRONMENT))
         self.assertFalse(any("exec bench start" in " ".join(command) for command in calls))
 
     def test_rejects_environment_file_outside_the_repository(self):
@@ -744,7 +749,7 @@ class StackTests(unittest.TestCase):
             },
         ):
             with self.assertRaisesRegex(ValueError, "container ID"):
-                namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
+                namespace["up"](["docker"], ["compose"], dict(STACK_ENVIRONMENT))
         self.assertFalse(any("stats" in command for command in calls))
 
     def test_ready_probe_uses_the_validating_runner(self):
@@ -768,7 +773,7 @@ class StackTests(unittest.TestCase):
             ),
             patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
         ):
-            namespace["up"](["docker"], ["compose"], dict(PRESS_ENVIRONMENT))
+            namespace["up"](["docker"], ["compose"], dict(STACK_ENVIRONMENT))
         probe = ["compose", "exec", "-T", "web", "test", "-f", "/home/frappe/benches/.stack-installed"]
         self.assertIn((probe, False), calls)
 
@@ -819,6 +824,73 @@ class StackTests(unittest.TestCase):
     def test_matching_container_cannot_claim_unowned_volumes(self):
         with self.assertRaisesRegex(ValueError, "Unclaimed stack volumes"):
             self.owner_with_container(self.env["E2E_ENV_FILE"], volumes=self.project + "_db\n")
+
+    def test_legacy_env_without_mcp_urls_uses_local_defaults_without_rewriting_env_file(self):
+        namespace = runpy.run_path(str(STACK))
+        path = Path(self.env["E2E_ENV_FILE"])
+        namespace["credentials"](path)
+        kept = [
+            line
+            for line in path.read_text().splitlines()
+            if not line.startswith(("ATONOTA_MCP_REDIRECT_URI=", "ATONOTA_MCP_RESOURCE_URL="))
+        ]
+        path.write_text("\n".join(kept) + "\n")
+        before = path.read_bytes()
+
+        result = self.run_stack("config")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.read_bytes(), before)
+
+        with patch.dict(os.environ, self.env):
+            environment, _, compose = namespace["setup"]()
+        model = namespace["config"](compose, environment)
+        keycloak_env = model["services"]["keycloak"]["environment"]
+        self.assertEqual(
+            keycloak_env["ATONOTA_MCP_REDIRECT_URI"],
+            "https://mcp-client.example.test/callback",
+        )
+        self.assertEqual(
+            keycloak_env["ATONOTA_MCP_RESOURCE_URL"],
+            "https://tenant.example.test/api/method/platform_core.api.ai.mcp",
+        )
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_legacy_env_missing_mcp_secret_names_missing_key_before_docker(self):
+        namespace = runpy.run_path(str(STACK))
+        path = Path(self.env["E2E_ENV_FILE"])
+        namespace["credentials"](path)
+        kept = [
+            line
+            for line in path.read_text().splitlines()
+            if not line.startswith(
+                (
+                    "ATONOTA_MCP_REDIRECT_URI=",
+                    "ATONOTA_MCP_RESOURCE_URL=",
+                    "ATONOTA_MCP_INTROSPECTION_SECRET=",
+                )
+            )
+        ]
+        path.write_text("\n".join(kept) + "\n")
+        before = path.read_bytes()
+        docker = Path(self.temp.name) / "docker"
+        docker.write_text("#!/bin/sh\nexit 99\n")
+        docker.chmod(0o700)
+        for key in list(self.env):
+            if key.startswith("ATONOTA_MCP_"):
+                self.env.pop(key)
+
+        for action in ("config", "build", "up", "down", "check", "resources"):
+            with self.subTest(action=action):
+                result = self.run_stack(action, PATH=f"{self.temp.name}:{os.environ['PATH']}")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("ATONOTA_MCP_INTROSPECTION_SECRET", result.stderr)
+                self.assertNotIn("ATONOTA_MCP_REDIRECT_URI", result.stderr)
+                self.assertNotIn("ATONOTA_MCP_RESOURCE_URL", result.stderr)
+                self.assertEqual(path.read_bytes(), before)
+                for line in before.decode().splitlines():
+                    key, value = line.split("=", 1)
+                    if value and ("SECRET" in key or "PASSWORD" in key):
+                        self.assertNotIn(value, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

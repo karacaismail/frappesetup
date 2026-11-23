@@ -18,7 +18,37 @@ BACKEND = Path(__file__).resolve().parents[1]
 # Tests may move BACKEND. The trusted credential root stays this checkout.
 REPOSITORY = Path(__file__).resolve().parents[2]
 CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
+REQUIRED_SETTING = re.compile(r"\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}")
+INCLUDE_FILE = re.compile(r"^\s*-\s*(?:path:\s*)?([A-Za-z0-9_.-]+\.ya?ml)\s*$")
+SECRET_PREFIXES = ("degistir-", "example-only-")
+SECRET_KEY = re.compile(r"(?:^|_)(?:SECRET|PASSWORD|TOKEN|P8_KEY)(?:_|$)")
 REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+
+
+def template_entries():
+    root = BACKEND if (BACKEND / "dev/.env.example").is_file() else REPOSITORY / "backend"
+    for template in (
+        root / "dev/.env.example",
+        root / "identity/keycloak/.env.example",
+        root / "dev/press/.env.example",
+    ):
+        for line in template.read_text().splitlines():
+            key, separator, value = line.partition("=")
+            if not separator or not key or key.startswith("#"):
+                continue
+            yield key, value
+
+
+def default_settings():
+    """Return non-secret template defaults without touching E2E_ENV_FILE.
+
+    A key that names a credential is never filled, even when the template holds a fake value.
+    """
+    return {
+        key: value
+        for key, value in template_entries()
+        if not value.startswith(SECRET_PREFIXES) and not SECRET_KEY.search(key)
+    }
 
 
 def project_name(environment):
@@ -82,19 +112,10 @@ def run(command, environment, check=True, **kwargs):
 def credentials(path):
     """Read plain dotenv values, never execute them as shell code."""
     if not path.exists() and not path.is_symlink():
-        values = {}
-        for template in (
-            BACKEND / "dev/.env.example",
-            BACKEND / "identity/keycloak/.env.example",
-            BACKEND / "dev/press/.env.example",
-        ):
-            for line in template.read_text().splitlines():
-                if not line or line.startswith("#"):
-                    continue
-                key, value = line.split("=", 1)
-                if value.startswith(("degistir-", "example-only-")):
-                    value = secrets.token_urlsafe(32)
-                values[key] = value
+        values = {
+            key: secrets.token_urlsafe(32) if value.startswith(SECRET_PREFIXES) else value
+            for key, value in template_entries()
+        }
         path.parent.mkdir(parents=True, exist_ok=True)
         # The staging file holds secrets too, so Git must ignore its name before it exists.
         # The name is independent of the target so one narrow .gitignore rule covers it.
@@ -138,7 +159,7 @@ def setup():
     context = "colima-factory" if profile == "factory" else "colima"
     path = env_file(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
     assert_ignored(path)
-    environment = dict(os.environ, **credentials(path))
+    environment = {**default_settings(), **os.environ, **credentials(path)}
     environment.update(
         {
             "PANE_PORT": str(port),
@@ -157,12 +178,13 @@ def setup():
         }
     )
     environment["FS_STACK_IMAGE_TAG"] = project_name(environment)
-    # Domain separation keeps preview digests distinct from event signatures.
-    environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
-        environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),
-        b"frappesetup-e2e-preview-digest-v1",
-        hashlib.sha256,
-    ).hexdigest()
+    if environment.get("IDENTITY_SYNC_WEBHOOK_SECRET"):
+        # Domain separation keeps preview digests distinct from event signatures.
+        environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
+            environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),
+            b"frappesetup-e2e-preview-digest-v1",
+            hashlib.sha256,
+        ).hexdigest()
     engine = ["docker", "--context", context]
     compose = [
         *engine,
@@ -174,6 +196,8 @@ def setup():
         "--file",
         str(BACKEND / "dev/compose.yaml"),
     ]
+    # Name missing local settings before any Docker call, whatever the action.
+    require_compose_settings(compose, environment)
     return environment, engine, compose
 
 
@@ -229,7 +253,64 @@ def assert_owner(engine, compose, environment, create=False):
             raise ValueError("This stack's saved volumes belong to another worktree or port range.")
 
 
+def compose_files(compose):
+    entry = (
+        Path(compose[compose.index("--file") + 1])
+        if "--file" in compose and compose.index("--file") + 1 < len(compose)
+        else BACKEND / "dev/compose.yaml"
+    )
+    pending = [entry]
+    seen = []
+    while pending:
+        current = pending.pop(0)
+        if current in seen or not current.is_file():
+            continue
+        seen.append(current)
+        for line in current.read_text().splitlines():
+            match = INCLUDE_FILE.match(line)
+            if match:
+                pending.append(current.parent / match.group(1))
+    return seen
+
+
+def required_compose_settings(compose):
+    required_keys = []
+    for manifest in compose_files(compose):
+        text = manifest.read_text()
+        # Exclude nested fallbacks like ${FS_STACK_IMAGE_TAG:-${KC_PORT:?}} when the outer variable is set.
+        for outer, inner in re.findall(r"\$\{([A-Z][A-Z0-9_]*):-\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}\}", text):
+            text = re.sub(
+                rf"\$\{{{outer}:-\$\{{{inner}:\?[^}}]*\}}\}}",
+                f"${{{outer}:-}}",
+                text,
+            )
+            required_keys.append((outer, inner))
+        for key in REQUIRED_SETTING.findall(text):
+            if key != "IDENTITY_SYNC_DIGEST_KEY" and key not in required_keys:
+                required_keys.append(key)
+    return required_keys
+
+
+def require_compose_settings(compose, environment):
+    """Name missing Compose settings without printing any value or starting Docker."""
+    missing = []
+    for item in required_compose_settings(compose):
+        if isinstance(item, tuple):
+            outer, inner = item
+            if not environment.get(outer) and not environment.get(inner) and inner not in missing:
+                missing.append(inner)
+        elif not environment.get(item) and item not in missing:
+            missing.append(item)
+    if missing:
+        raise ValueError(
+            "Stack setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from the .env.example files into E2E_ENV_FILE."
+        )
+
+
 def config(compose, environment):
+    require_compose_settings(compose, environment)
     result = run(
         [*compose, "config", "--format", "json"],
         environment,
@@ -410,6 +491,70 @@ def configure_press(compose, environment):
     )
 
 
+VITE_ORIGIN = "http://localhost:5180"
+TENANT_CALLBACK = "/api/method/platform_core.api.auth.keycloak_callback"
+
+
+def tenant_browser_origin(environment):
+    if environment.get("FS_STACK_VITE") == "1":
+        return VITE_ORIGIN
+    return environment["ATONOTA_SITE_TENANT1_URL"]
+
+
+def tenant_login_settings(environment):
+    origin = tenant_browser_origin(environment)
+    settings = {
+        "keycloak_public_url": environment["KC_PUBLIC_URL"],
+        "keycloak_internal_url": environment["KC_PUBLIC_URL"],
+        "keycloak_client_id": "site-tenant1",
+        "keycloak_client_secret": environment["ATONOTA_SITE_TENANT1_SECRET"],
+        "identity_brand_name": "Atonota",
+        "platform_panel_url": origin + "/panel",
+    }
+    if environment.get("FS_STACK_VITE") == "1":
+        settings["host_name"] = origin
+    return settings
+
+
+def configure_tenant_login(compose, environment):
+    script = """import json, sys
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+path = Path("sites/tenant1.localhost/site_config.json")
+config = json.loads(path.read_text())
+config.update(json.load(sys.stdin))
+with NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
+    temporary = Path(stream.name)
+    try:
+        json.dump(config, stream, indent=2)
+        stream.write(chr(10))
+        stream.flush()
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+"""
+    run(
+        [*compose, "run", "--rm", "--no-deps", "-T", "tenant-web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(tenant_login_settings(environment)),
+        text=True,
+    )
+
+
+def stack_realm(realm, environment):
+    origin = tenant_browser_origin(environment)
+    if origin != environment["ATONOTA_SITE_TENANT1_URL"]:
+        tenant = next(client for client in realm["clients"] if client["clientId"] == "site-tenant1")
+        tenant["redirectUris"].append(origin + TENANT_CALLBACK)
+        logout_uris = tenant["attributes"]["post.logout.redirect.uris"]
+        recovery = "/api/method/platform_core.api.auth.start_login?switch_account=1"
+        tenant["attributes"]["post.logout.redirect.uris"] = "##".join(
+            (logout_uris, origin + "/panel", origin + recovery)
+        )
+    return realm
+
+
 REALM_SYNC = BACKEND / "identity/keycloak/bin/sync-dev-realm.py"
 REALM_FILE = BACKEND / "identity/keycloak/realm/platform-realm.json"
 
@@ -439,7 +584,7 @@ def sync_realm(compose, environment):
     names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)", realm_text))
     payload = {
         "keycloak_url": environment["KC_PUBLIC_URL"],
-        "realm": json.loads(realm_text),
+        "realm": stack_realm(json.loads(realm_text), environment),
         "values": {name: environment[name] for name in sorted(names) if name in environment},
         "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
         "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
@@ -457,6 +602,8 @@ def up(engine, compose, environment):
     # Fail before any container work, not after a long startup.
     require_press_settings(environment)
     require_realm_sync_settings(environment)
+    if not environment.get("ATONOTA_SITE_TENANT1_SECRET"):
+        raise ValueError("Tenant sign-in requires ATONOTA_SITE_TENANT1_SECRET in E2E_ENV_FILE.")
     check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
@@ -518,6 +665,7 @@ def up(engine, compose, environment):
         ],
         environment,
     )
+    configure_tenant_login(compose, environment)
     run(
         [*compose, "up", "-d", "--no-build", "tenant-web", "tenant-socket", "web"],
         environment,

@@ -10,7 +10,10 @@ Expected behaviour comes from docs/sozlesmeler.md sections 4 and 5 (D-1):
 
 import base64
 import hashlib
+import re
 import time
+from html import unescape
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 import frappe
@@ -288,6 +291,22 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 	def test_unknown_email_cannot_sign_up(self):
 		response = h.login_with_keycloak(self.client, h.userinfo("sub-new", "yeni.kisi@example.test"))
 		self.assertEqual(response.status_code, 403)
+		html = response.data.decode()
+		self.assertIn("Başka hesapla oturum aç", html)
+		self.assertNotIn("yeni.kisi@example.test", html)
+		action = re.search(r'href="([^"]+)">Başka hesapla oturum aç</a>', html)
+		self.assertIsNotNone(action)
+		logout = urlsplit(unescape(action[1]))
+		self.assertEqual(logout.netloc, "identity.localhost:8660")
+		self.assertTrue(logout.path.endswith("/protocol/openid-connect/logout"))
+		query = parse_qs(logout.query)
+		self.assertEqual(query["client_id"], ["site-tenant1"])
+		self.assertNotIn("id_token_hint", query)
+		restart = urlsplit(query["post_logout_redirect_uri"][0])
+		self.assertEqual(restart.netloc, "tenant1.localhost:8661")
+		forced = h.request(self.client.get, restart.path, query_string=restart.query)
+		self.assertEqual(forced.status_code, 302)
+		self.assertEqual(parse_qs(urlsplit(forced.headers["Location"]).query)["prompt"], ["login"])
 		self.assertEqual(h.logged_user(self.client), "Guest")
 		h.refresh()
 		self.assertFalse(frappe.db.exists("User", "yeni.kisi@example.test"))
