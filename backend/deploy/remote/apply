@@ -4,8 +4,10 @@
 #        apply <env> --resume    (run from backend-pending/bin; see "Resume" below)
 #
 # Backend order (each step must pass before the next one starts):
+#   0. check the secret files of this environment against the setting lists of the release
+#      (settings.py); a missing key stops the script before anything changes
 #   1. name the release in backend-pending, copy its files, pull every image by digest while the
-#      old release still runs
+#      old release still runs; check each site_config.json with the new image (site-probe.py)
 #   2. put the sites in maintenance mode, then stop every process that writes: the Frappe web
 #      front, workers, socket and scheduler, identity-sync and Keycloak
 #   3. back up the sites, Keycloak and identity-sync (remote/backup); nothing writes any more
@@ -47,6 +49,18 @@ else
 fi
 [[ "$ATONOTA_ENV" == "$env" ]] || fail "environment file is for $ATONOTA_ENV"
 [[ "$id" =~ ^(backend|web)-[0-9a-f]{12}-b[1-9][0-9]*$ ]] || fail "bad release id: $id"
+read -ra sites <<<"$ATONOTA_TENANT_SITES"
+settings_help="nothing changed; fill the settings, then deploy again (docs/dagitim/ortamlar.md, production settings)"
+
+# Production settings (blocker E-4): every secret file of this environment holds every listed
+# key, before anything on this server changes. The lists came with the release (settings/).
+if [[ "$kind" == backend && "$resume" == 0 ]]; then
+    press="$(python3 -I -c 'import json,sys; print(int("press" in json.load(open(sys.argv[1]))["components"]))' \
+        "$incoming/release.json")"
+    python3 -I "$here/settings.py" check-files "$env" "$incoming" --etc "$ATONOTA_ETC" \
+        --press "$press" --offsite "$ATONOTA_REQUIRE_OFFSITE_BACKUP" ||
+        fail "settings of $env are incomplete; $settings_help"
+fi
 
 install -d -m 0750 "$ATONOTA_ROOT/$env/releases" "$ATONOTA_ROOT/$env/backups" \
     "$ATONOTA_ROOT/$env/health" "$ATONOTA_ROOT/$env/bin" "$ATONOTA_ROOT/web/$env/releases"
@@ -111,7 +125,7 @@ else
     *) fail "release $id stopped in phase $reached in $env and is still pending; $decide" ;;
     esac
 fi
-first_site="${ATONOTA_TENANT_SITES%% *}"
+first_site="${sites[0]}"
 if [[ "$resume" == 0 ]]; then
     if [[ -L "$current" && "$(readlink "$current")" == "releases/$id" && ! -L "$pending" ]]; then
         say "backend release $id is already current in $env"
@@ -129,7 +143,9 @@ if [[ "$resume" == 0 ]]; then
     cp "$incoming"/{release.json,stack.yaml,edge.yaml,Caddyfile,site.caddy.template} "$folder/"
     cp "$incoming/$env.env" "$folder/host.env"
     install -d -m 0750 "$folder/bin"
-    cp "$here"/{common.sh,apply,backup,restore,status,rollback} "$folder/bin/"
+    cp "$here"/{common.sh,apply,backup,restore,status,rollback,settings.py,site-probe.py} "$folder/bin/"
+    install -d -m 0750 "$folder/settings"
+    cp "$incoming"/*.production.env.example "$folder/settings/"
 
     # release.env: one image variable per component. Compose reads it beside host.env.
     python3 -I - "$folder/release.json" >"$folder/release.env" <<'PY'
@@ -151,6 +167,17 @@ PY
     say "pull images of $id"
     phase "$folder" pulling
     stack "$folder" pull --quiet
+
+    # Site settings: the new image reads each site_config.json and prints key names only. The
+    # running release is still untouched here. The image entrypoint is skipped: it prints to
+    # stdout and relinks sites/assets on the volume that the running release uses.
+    say "check the site settings of $id"
+    fixed="$(python3 -I "$here/settings.py" site-fixed "$incoming")"
+    stack "$folder" run --rm --no-deps -T --entrypoint /home/frappe/frappe-bench/env/bin/python tenant-web \
+        -I - site-settings-probe "$fixed" "${sites[@]}" <"$here/site-probe.py" >"$folder/site-settings.json"
+    python3 -I "$here/settings.py" check-sites "$incoming" "$folder/site-settings.json" \
+        --first-install "$([[ ! -L "$current" && "${ATONOTA_FIRST_INSTALL:-0}" == 1 ]] && printf 1 || printf 0)" \
+        "${sites[@]}" || fail "site settings of $env are incomplete; the running release still runs; $settings_help"
 
     # Check what the backup needs before anything stops (remote/backup checks it again).
     if [[ -L "$current" && "$ATONOTA_REQUIRE_OFFSITE_BACKUP" == 1 && ! -r "$ATONOTA_ETC/$env/offsite.env" ]]; then
@@ -176,7 +203,7 @@ if [[ "$resume" == 0 || "$reached" == migrating ]]; then
     phase "$folder" migrating
     say "start databases and Keycloak of $id"
     stack "$folder" up --detach --wait --wait-timeout 600 tenant-db tenant-redis-cache tenant-redis-queue keycloak-db keycloak
-    for site in $ATONOTA_TENANT_SITES; do
+    for site in "${sites[@]}"; do
         stack "$folder" run --rm --no-deps tenant-web bench --site "$site" list-apps >/dev/null ||
             fail "site $site does not exist; create it with the first install steps"
         say "migrate $site"

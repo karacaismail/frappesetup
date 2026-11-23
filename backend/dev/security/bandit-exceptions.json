@@ -3198,5 +3198,23 @@
     "reason": "The keys name field kinds and the values are length limits; none is a credential.",
     "owner": "platform-core-gecit",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_settings.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_settings.py",
+    "code": "return subprocess.run([sys.executable, \"-I\", *map(str, arguments)], input=input_text,",
+    "statementSha256": "df1ad51817c28c6e876c4240a17fb5b5e00fbe35a05e82e778a889b0c6226fe5",
+    "reason": "Test runs the repository's own deploy scripts with this Python, fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
   }
 ]
