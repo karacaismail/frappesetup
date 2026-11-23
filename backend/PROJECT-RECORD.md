@@ -353,7 +353,15 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
   - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
-- **O-54. AtonotA Login ürününün geliştirmesi başladı.** Proje sahibi bu kararı 23 Kasım 2026 Pazartesi günü verdi. Proje sahibinin sözü şudur: "AtonotA Login geliştirmeleri bitsin."
+- **O-54. Her geçici Press yaması kayıt altına alınır.**
+  - [Yama kaydı](dev/press/patch-registry.json) geliştirme ve üretim yamalarını kapsar.
+  - Press Türkiye uygulamasının ekibi her yamanın sahibidir. Kayıtta ekibin adı `press-tr` olur.
+  - Ekip, kaldırma koşulu sağlanınca ilgili testi yamasız imajda çalıştırır.
+  - Depo testi eksik kayıtları ve boş alanları yakalar.
+  - Geçici geliştirme betiği değişirse dosya özeti de değişir. Test kayıt incelemesini ister.
+  - Bu karar G-7 kapsamındaki takibi sağlar. O-18 borcu açık kalır.
+
+- **O-56. AtonotA Login ürününün geliştirmesi başladı.** Proje sahibi bu kararı 23 Kasım 2026 Pazartesi günü verdi. Proje sahibinin sözü şudur: "AtonotA Login geliştirmeleri bitsin."
   - Bu karar O-51'in son iki hükmünü değiştirir. O-51 geçerli kalır. Değişen hükümler "yeni platform eklemek MVP sonrasıdır" ve "MVP'de yalnız çelişen yerler düzeltildi" hükümleridir.
   - Realm adı, istemci kimlikleri ve tema klasörünün adı değişmez. Bu kural O-51'den gelir.
   - Ürünün kodu `identity/atonota_login/` klasöründedir. Klasör MIT lisans dosyası taşır. Keycloak ve eklentileri Apache-2.0 lisanslıdır. Liste `identity/atonota_login/THIRD-PARTY-NOTICES.md` dosyasındadır.
@@ -367,6 +375,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Canlı deneme bir hata buldu. Keycloak 26.8.2, bağlantı sonrası akışta hiçbir adım çalışmazsa girişi reddediyordu. İkinci adımı olmayan kullanıcı hiçbir platformla giriş yapamıyordu. Akışın sonuna "allow access" adımı eklendi.
   - Üç parça ürün klasöründe Frappe kullanmadan yazıldı. Bunlar işlem kararı (G-161), değer bekleyen kurallar (G-167) ve dış doğrulama gelen kutusudur (G-164). Frappe bağlantısı ilgili klasörlerin sahiplerine devredildi. Borç tablosunda yazılıdır.
   - Tanıtım sayfası (G-165) site işidir. Bu iş site dosyalarına dokunmadı.
+  - Bu karar önce O-54 numarasını taşıyordu. O-54 ve O-55 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-56 oldu.
 
 ## Karar sitesine işlenecek farklar
 
@@ -429,8 +438,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Sihirli bağlantı eklentisi Keycloak 26.1.4 için yazıldı | Eklenti Keycloak'ın iç arayüzlerini kullanır. Keycloak yükseltmesi eklentiyi bozabilir. İşaret `identity/keycloak/Dockerfile` dosyasındadır | kimlik-realm | Eklentinin çalışan Keycloak sürümü için yayımı çıkar. Yayım yoksa her Keycloak yükseltmesinde `identity/keycloak/tests/test_magic_link.py` yeniden koşar |
 | `BORC(mvp)`: `list_identities` satırı e-posta ve takım taşımaz | Mutabakat, var olan kaydın e-posta farkını göremez. Fazla takım üyeliğini de göremez. İşaret `identity/identity_sync/README.md` dosyasındadır | Orkestratör | İki farkın nasıl bulunacağı sözleşmeye yazılır. Ya da iki fark kapsam dışı sayılır |
 | `BORC(mvp)`: identity-sync'in bazı veritabanı okumaları son ana bağlı değildir | Son an, isteğin en geç bitmesi gereken zamandır. Başka bir süreç yazarken okuma en çok 5 saniye bekleyebilir. Örnekler `is_processed`, `dead_letter_state` ve `progress` okumalarıdır. İşaret `docs/gap-backlog.md` dosyasının identity-sync bölümündedir | identity-sync işi | İki bağlantılı bir test, okuma beklerken de olay yanıtının 5 saniyelik sınırı aşmadığını gösterir |
-| `BORC(mvp)`: AtonotA Login karar katmanı Frappe'ye bağlanmadı (O-54) | `identity/atonota_login/atonota_login/decision.py` ve `verification_inbox.py` testlidir. Frappe uçları, kural sahibine iş kaydı ve doğrulama bildirimi ucu henüz yoktur. `enterprise-sso-required` rolünü veren üyelik kodu da yoktur | platform-core-kimlik ve erisim-kurali | Frappe bu iki modülü kendi uçlarından çağırır. Kuruluş kurumsal girişi zorunlu kılınca üyelik kodu rolü verir. Uçların sözleşmesi `contracts/` klasörüne girer |
-| `BORC(mvp)`: X girişi OAuth 1.0a ister (O-54) | Keycloak 26.8.2'nin X sağlayıcısı OAuth 1.0a kullanır. X bu yolu kapatırsa giriş durur | kimlik-realm | Kayıt genel OIDC ya da OAuth 2.0 sağlayıcısına geçer ve canlı deneme geçer |
+| `BORC(mvp)`: AtonotA Login karar katmanı Frappe'ye bağlanmadı (O-56) | `identity/atonota_login/atonota_login/decision.py` ve `verification_inbox.py` testlidir. Frappe uçları, kural sahibine iş kaydı ve doğrulama bildirimi ucu henüz yoktur. `enterprise-sso-required` rolünü veren üyelik kodu da yoktur | platform-core-kimlik ve erisim-kurali | Frappe bu iki modülü kendi uçlarından çağırır. Kuruluş kurumsal girişi zorunlu kılınca üyelik kodu rolü verir. Uçların sözleşmesi `contracts/` klasörüne girer |
+| `BORC(mvp)`: X girişi OAuth 1.0a ister (O-56) | Keycloak 26.8.2'nin X sağlayıcısı OAuth 1.0a kullanır. X bu yolu kapatırsa giriş durur | kimlik-realm | Kayıt genel OIDC ya da OAuth 2.0 sağlayıcısına geçer ve canlı deneme geçer |
 | `BORC(mvp)`: identity-sync gerçek TLS sunucusuyla süre denemesinden geçmedi | TLS kurulumu bağlantının kalan süresiyle bekler. Bu davranış gerçek sunucuyla sınanmadı. İşaret `docs/gap-backlog.md` dosyasının identity-sync bölümündedir | identity-sync işi | Yavaş el sıkışan bir test sunucusuyla istek son anda biter |
 
 ### Kapanan teknik borç

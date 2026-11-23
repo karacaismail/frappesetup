@@ -145,7 +145,7 @@ class LiveExtensionTest(unittest.TestCase):
         apple = admin("/identity-provider/instances/apple", self.admin_token).json()
         self.assertFalse(apple["enabled"])
         self.assertTrue(apple["hideOnLogin"])
-        # O-54: development keeps the platform secrets empty, and a closed platform stores none.
+        # O-56: development keeps the platform secrets empty, and a closed platform stores none.
         for key in ("clientId", "teamId", "keyId"):
             self.assertEqual(apple["config"].get(key, ""), "", key)
 

@@ -227,7 +227,7 @@ class StackTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), original)
         for line in original.decode().splitlines():
             key, value = line.split("=", 1)
-            # An empty value cannot leak. Closed sign-in platforms have empty secrets (O-54).
+            # An empty value cannot leak. Closed sign-in platforms have empty secrets (O-56).
             if value and ("SECRET" in key or "PASSWORD" in key):
                 self.assertNotIn(value, result.stdout + result.stderr)
 
