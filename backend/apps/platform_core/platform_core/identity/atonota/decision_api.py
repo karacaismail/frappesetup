@@ -8,6 +8,9 @@ code. This module is the thin Frappe layer around it:
 3. It runs the write of a final step only after `Policy.confirm` says "ready" again.
 
 The caller never supplies evidence. Request fields and token roles are not read.
+Membership is read from the server's `User.user_type` for now. Frappe derives that field from the
+user's desk roles on save, so a desk role on the server record gives membership evidence. This is a
+known debt until the organisation membership record exists (G-160, PROJECT-RECORD.md).
 Contract: `backend/contracts/platform_core-identity.openapi.yaml`, tag `atonota-login`.
 """
 
@@ -34,6 +37,12 @@ class ActionRefused(frappe.PermissionError):
 	http_status_code = 403
 
 
+class PendingWrites(frappe.ValidationError):
+	"""The request already holds writes. A final step does not start then (AJA-264)."""
+
+	http_status_code = 409
+
+
 def now_utc() -> datetime:
 	return datetime.now(UTC)
 
@@ -48,7 +57,11 @@ def _proof(now: datetime) -> dict:
 
 
 def collect_evidence(user: str, now: datetime) -> dict:
-	"""Evidence for `user` from Frappe records. Roles are not evidence."""
+	"""Evidence for `user` from Frappe records. Token and request roles are not read.
+
+	Membership comes from `user_type`, which Frappe derives from the server record's desk roles
+	(known debt, G-160).
+	"""
 	if not user or user == "Guest":
 		return {}
 	row = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
@@ -124,9 +137,14 @@ def run_final_step[T](action_id: str, work: Callable[[], T]) -> T:
 	"""Runs `work` only if the action is ready, and still ready at the final check (G-161).
 
 	The final check loads the policy again and collects the evidence again. `Policy.confirm` refuses
-	a result of another action, a changed policy and evidence that is gone.
+	a result of another action, a changed policy and evidence that is gone. The caller must not hold
+	pending writes: `PendingWrites` is raised before any decision.
 	"""
 	user = _signed_in_user()
+	# A refusal below may commit the owner task. That commit must never make a caller's earlier
+	# writes permanent, so the final step starts only in a clean transaction (AJA-264).
+	if frappe.db.transaction_writes:
+		frappe.throw(_("A final step cannot run inside a transaction with pending writes."), PendingWrites)
 	earlier = _judge(action_id, user)
 	if earlier.status != decision.READY:
 		if earlier.owner_tasks:
