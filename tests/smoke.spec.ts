@@ -7,11 +7,14 @@ import AxeBuilder from '@axe-core/playwright';
 const require = createRequire(import.meta.url);
 const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
   require('../src/data/requirements.json');
+type Release = { pr: number; commit: string } | null;
 const board: {
+  update: { date: string; commit: string; release: Release; note: string };
+  audit: { commit: string; release: Release; note: string };
   epics: { id: string; title: string }[];
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
-  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string } }>;
+  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; release: Release } }>;
 } = require('../src/data/task-board.json');
 const phaseList: { id: string; title: string }[] = require('../src/data/phases.json');
 
@@ -1088,8 +1091,16 @@ test.describe('task board', () => {
       await expect(done.locator('.task-status')).toHaveText(statusLabel('done'));
       await expect(done.locator('.task-status')).toBeVisible();
       await expect(done).toContainText(/Kanıt:/);
-      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu açıkça söyler.
-      await expect(done).toContainText(`Denetim commit'i ${board.items[doneIds[0]].evidence!.commit}.`);
+      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu ve commit'in dalını açıkça söyler.
+      const ev = board.items[doneIds[0]].evidence!;
+      await expect(done).toContainText(`Denetim commit'i ${ev.commit} backend dalındadır.`);
+      // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+      if (ev.release) {
+        const link = done.getByRole('link', { name: `PR #${ev.release.pr} ile yayımlandı` });
+        await expect(link).toHaveAttribute('href', `https://github.com/karacaismail/frappesetup/pull/${ev.release.pr}`);
+      } else {
+        await expect(done).toContainText('Henüz yayımlanmadı.');
+      }
       // Pano başlığı ile markdown kuralları başlığı aynı adı taşımaz (ekran okuyucu başlık listesi).
       const h2 = (await page.locator('main h2').allTextContents()).map((t) => t.trim());
       expect(h2.filter((t, i) => h2.indexOf(t) !== i), 'tekrarlanan h2').toEqual([]);
@@ -1097,6 +1108,41 @@ test.describe('task board', () => {
       await noHorizontalOverflow(page);
     });
   }
+
+  test('the board says when and at which commit the statuses were updated', async ({ page }) => {
+    // Okur durumun hangi güne ve hangi commit'e göre yazıldığını panonun kurallar bölümünde görür.
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const stamp = page.getByTestId('task-board-updated');
+    const day = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: 'UTC' })
+      .formatToParts(new Date(`${board.update.date}T00:00:00Z`))
+      .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+    await expect(stamp).toContainText(
+      `Durumlar ${day.day} ${day.month} ${day.year} ${day.weekday} günü backend dalındaki ${board.update.commit} commit'ine göre güncellendi.`,
+    );
+    await expect(stamp).toBeVisible();
+    const audit = page.locator('.task-rules > p').nth(1);
+    await expect(audit).toContainText(`Denetim backend dalındaki ${board.audit.commit} commit'inde yapıldı.`);
+    // İki commit aynı biçimde görünür (inceleme 1, K-3).
+    await expect(stamp.locator('code')).toHaveText(board.update.commit);
+    await expect(audit.locator('code')).toHaveText(board.audit.commit);
+    // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+    for (const [where, rel] of [[stamp, board.update.release], [audit, board.audit.release]] as const) {
+      if (rel) {
+        await expect(where.getByRole('link', { name: `PR #${rel.pr} ile yayımlandı` })).toHaveAttribute(
+          'href',
+          `https://github.com/karacaismail/frappesetup/pull/${rel.pr}`,
+        );
+      } else {
+        await expect(where).toContainText('Bu commit henüz yayımlanmadı.');
+      }
+    }
+    // Cümleler arasında boşluk kalır: derleme metni bitişik yazarsa "güncellendi.Güncelleme" tek sözcük olur.
+    const lead = (rel: Release) => (rel ? `PR #${rel.pr} ile yayımlandı.` : 'henüz yayımlanmadı.');
+    await expect(stamp).toContainText(`${lead(board.update.release)} ${board.update.note}`);
+    await expect(audit).toContainText(`${lead(board.audit.release)} ${board.audit.note}`);
+    await noHorizontalOverflow(page);
+  });
 
   test('status, level and epic filters are toggle groups with exact counts', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
