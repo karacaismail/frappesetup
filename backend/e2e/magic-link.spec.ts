@@ -1,23 +1,10 @@
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { localUrl, required } from './local';
+import { invalidTotpCode, totpCode, totpWaitMs } from './totp';
 
 const enabled = process.env.E2E_MAGIC_LINK === '1';
 test.skip(!enabled, 'Magic-link realm and Mailpit fixtures are required.');
-
-function totp(secret: string) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  const bits = secret.toUpperCase().replace(/=+$/, '').split('').map((letter) => {
-    const index = alphabet.indexOf(letter);
-    if (index < 0) throw new Error('The test OTP seed must be Base32.');
-    return index.toString(2).padStart(5, '0');
-  }).join('');
-  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((byte) => Number.parseInt(byte, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
-  const hash = createHmac('sha1', key).update(counter).digest();
-  return String((hash.readUInt32BE(hash[hash.length - 1] & 15) & 0x7fffffff) % 1_000_000).padStart(6, '0');
-}
 
 function identityOrigin() {
   return localUrl('identity.localhost', 0);
@@ -154,15 +141,16 @@ test('expired magic link is rejected and a new send works', async ({ browser, pa
   }
 });
 
-test('magic link still requires the enrolled second factor', async ({ page, request }) => {
-  test.setTimeout(70_000);
+test('magic link still requires the enrolled second factor', async ({ page, request }, testInfo) => {
+  test.setTimeout(90_000);
+  const seed = required('E2E_MAGIC_OTP_SEED');
   const attempt = await requestLink(page, request, required('E2E_MAGIC_OTP_EMAIL'));
   await page.goto(attempt.url.toString());
   expect(attempt.issuedCode()).toBe(false);
   const otp = page.locator('input[name="otp"]:visible');
   await expect(otp).toBeVisible();
-  const code = totp(required('E2E_MAGIC_OTP_SEED'));
-  await otp.fill(code === '000000' ? '111111' : '000000');
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  await otp.fill(invalidTotpCode(seed));
   const rejection = page.waitForResponse((response) => {
     const url = new URL(response.url());
     return response.request().method() === 'POST' && url.origin === identityOrigin()
@@ -172,9 +160,13 @@ test('magic link still requires the enrolled second factor', async ({ page, requ
   await rejection;
   await expect(otp).toBeVisible();
   expect(attempt.issuedCode()).toBe(false);
-  // Leave the quick-login lockout window before submitting the valid code.
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-  await otp.fill(totp(required('E2E_MAGIC_OTP_SEED')));
+  // Leave the quick-login lockout window and avoid reusing a consumed 30-second code across browsers.
+  const sharedAccount = process.env.E2E_FULL_BROWSER_FIXTURES !== '1' && testInfo.project.name !== 'chromium';
+  const waitMs = Math.max(1200, totpWaitMs(Date.now(), sharedAccount));
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
+  const boundaryMs = totpWaitMs(Date.now(), false);
+  if (boundaryMs > 0) await new Promise((resolve) => setTimeout(resolve, boundaryMs));
+  await otp.fill(totpCode(seed));
   await otp.evaluate((input: HTMLInputElement) => input.form!.requestSubmit());
   await expect.poll(attempt.authorized).toBe(true);
 });
