@@ -27,7 +27,7 @@ def stack_environment():
         "KC_PORT": PORT,
         "KC_PUBLIC_URL": f"http://identity.localhost:{PORT}",
         "ATONOTA_SITE_TENANT1_URL": f"http://tenant1.localhost:{int(PORT) + 1}",
-        "IDENTITY_BRAND_NAME": "Atonota",
+        "IDENTITY_BRAND_NAME": "AtonotA Login",
         "IDENTITY_SYNC_EVENTS_URL": "http://identity-sync.localhost:6115/v1/events",
         "ATONOTA_SITE_TENANT1_SECRET": secrets.token_urlsafe(16),
         "ATONOTA_SITE_TENANT1_SERVICE_SECRET": secrets.token_urlsafe(16),

@@ -3,7 +3,7 @@
 #   docker build -f deploy/images/press.Dockerfile .
 # The image holds code, locked Python packages and built assets only. Site data, site_config.json
 # and secrets live in volumes and server files (docs/dagitim/ortamlar.md). The development image
-# is dev/press/Dockerfile; its patch-py314.sh never enters this image (decision O-51).
+# is dev/press/Dockerfile; its patch-py314.sh never enters this image (decision O-52).
 # The base is the same pinned frappe/erpnext image as tenant.Dockerfile (Frappe 16, Python 3.14).
 
 # dockerfile==3.2.0 (pinned by Press) has a linux-amd64 wheel but no linux-arm64 wheel. Its sdist

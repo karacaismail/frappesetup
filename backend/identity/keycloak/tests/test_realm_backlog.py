@@ -105,12 +105,13 @@ class RealmBacklogFileTest(unittest.TestCase):
         missing = set(self.dev_env) - set(self.prod_env)
         self.assertEqual(missing, set())
 
-    # Item 10: the visible brand name comes from a variable (D-4).
+    # Item 10: the visible brand name comes from a variable (D-4, O-51).
     def test_brand_name_comes_from_a_variable(self):
         self.assertEqual(self.realm["displayName"], "${IDENTITY_BRAND_NAME}")
         self.assertEqual(self.realm["displayNameHtml"], "${IDENTITY_BRAND_NAME}")
         self.assertEqual(self.realm["smtpServer"]["fromDisplayName"], "${IDENTITY_BRAND_NAME}")
-        self.assertEqual(self.dev_env["IDENTITY_BRAND_NAME"], "Atonota")
+        self.assertEqual(self.dev_env["IDENTITY_BRAND_NAME"], "AtonotA Login")
+        self.assertEqual(self.prod_env["IDENTITY_BRAND_NAME"], "AtonotA Login")
         # The account console theme reads the same variable from the Keycloak container (kimlik-tema request).
         self.assertIn("IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}", self.compose)
 

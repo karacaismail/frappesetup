@@ -2,7 +2,22 @@
  "audit": {
   "date": "2026-11-23",
   "commit": "36afb874",
-  "note": "MVP durum denetimi. Denetim P0 ile P4 arasındaki MUST kalemlerini okudu. Bitti kalemleri yalnız yerel yığında testle geçti."
+  "note": "MVP durum denetimi. Denetim P0 ile P4 arasındaki MUST kalemlerini okudu. Bitti kalemleri yalnız yerel yığında testle geçti. G-155 ile G-167 arasındaki kalemler denetimden sonra eklendi.",
+  "addedAfter": [
+   "G-155",
+   "G-156",
+   "G-157",
+   "G-158",
+   "G-159",
+   "G-160",
+   "G-161",
+   "G-162",
+   "G-163",
+   "G-164",
+   "G-165",
+   "G-166",
+   "G-167"
+  ]
  },
  "statuses": [
   {
@@ -23,7 +38,7 @@
   {
    "id": "unverified",
    "label": "Doğrulanmadı",
-   "rule": "Denetim bu kalemi okumadı. Kalem SHOULD, MAY ya da P5 ve sonraki fazdadır."
+   "rule": "Denetim bu kalemi okumadı. Bunun üç nedeni olabilir. Kalem SHOULD ya da MAY olabilir. Kalem P5 ya da sonraki bir fazda olabilir. Kalem denetimden sonra eklenmiş olabilir."
   }
  ],
  "levels": [

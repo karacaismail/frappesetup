@@ -197,7 +197,7 @@ Bakımcılar uzun vadede bakımı süren bir Telegram istemcisine geçmelidir.
 
 ## Üretim imajındaki karşılıklar
 
-Öneriler üretim imajında yama dizisi olarak uygulandı (O-51).
+Öneriler üretim imajında yama dizisi olarak uygulandı (O-52).
 Yamalar `backend/deploy/images/press-patches/` klasöründedir.
 Öneri 4'ün bağımlılık kararları `0005-dependency-pins.patch` yamasının başında yazılıdır.
 Tam bağımlılık denetimi bu imajda iki bilinen satırla geçer.

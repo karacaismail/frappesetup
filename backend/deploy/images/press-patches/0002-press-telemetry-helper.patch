@@ -3,7 +3,7 @@ Purpose: Frappe 16 removed frappe.utils.telemetry.init_telemetry. Press already 
 helper in press/utils/telemetry.py (reads posthog_host and posthog_project_id; does nothing
 when they are unset). The product trial request module then imports on Frappe 16.
 Upstream: proposal 2 in backend/docs/press-python314-upstream.md (Press issue 7534).
-Remove when Press ships this change (decision O-51 in backend/PROJECT-RECORD.md).
+Remove when Press ships this change (decision O-52 in backend/PROJECT-RECORD.md).
 
 diff --git a/press/saas/doctype/product_trial_request/product_trial_request.py b/press/saas/doctype/product_trial_request/product_trial_request.py
 index fecbdee..3f84f24 100644

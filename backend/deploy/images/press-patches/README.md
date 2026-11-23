@@ -20,7 +20,7 @@ Derleme yamaları ad sırasıyla uygular. Her yamadan önce `git apply --check` 
 
 ## Ne zaman kaldırılır
 
-Press bir yamanın düzeltmesini yayımlarsa o yama silinir. Sonra Press sürümü yeni sürüme taşınır. Bu kural proje kaydındaki O-51 kararıdır.
+Press bir yamanın düzeltmesini yayımlarsa o yama silinir. Sonra Press sürümü yeni sürüme taşınır. Bu kural proje kaydındaki O-52 kararıdır.
 
 ## Lisans
 

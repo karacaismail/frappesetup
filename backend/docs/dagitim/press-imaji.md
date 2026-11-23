@@ -26,7 +26,7 @@ Bu belge Press'in üretim imajını anlatır. Belge 23 Kasım 2026 Pazartesi gü
 
 Press v0.154.1, Python 3.14 ve Frappe 16 ile yamasız açılmaz. Bu yüzden imaj beş yama uygular. Yamalar `backend/deploy/images/press-patches/` klasöründedir.
 
-Derleme her yamadan önce `git apply --check` çalıştırır. Bir yama tutmazsa derleme durur. Çalışan kapta kod değiştirilmez. Bu kural proje kaydındaki O-51 kararıdır.
+Derleme her yamadan önce `git apply --check` çalıştırır. Bir yama tutmazsa derleme durur. Çalışan kapta kod değiştirilmez. Bu kural proje kaydındaki O-52 kararıdır.
 
 Yamaların listesi ve lisansı [yama klasörünün notundadır](../../deploy/images/press-patches/README.md). Press'e gönderilecek öneriler [öneri belgesindedir](../press-python314-upstream.md).
 

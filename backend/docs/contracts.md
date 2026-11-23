@@ -15,9 +15,9 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 ## 1. Marka
 
-- Kimlik markasının adı “Atonota”dır.
-- Düğme metni “Atonota ile oturum aç” olur.
-- Keycloak'ın üretimdeki adresi `https://id.atonota.net` olur (Proje kaydı O-1).
+- Kimlik ürününün adı “AtonotA Login”dir. Ad tam olarak böyle yazılır (Proje kaydı O-51).
+- Düğme metni “AtonotA Login ile oturum aç” olur.
+- Giriş adresi üretimde `https://api.login.atonota.net` olur. alpha, beta ve rc ortamlarında adres `https://api.login.<ortam>.atonota.net` olur (Proje kaydı O-51).
 - Kod marka adını ve alan adını ayardan okur. Kodda sabit yazmayın.
 
 ## 2. Keycloak
@@ -28,7 +28,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 - Tarayıcının gördüğü adres `keycloak_public_url` ayarıdır.
 - Belirteçteki `iss` değeri `<keycloak_public_url>/realms/platform` olur.
 - Sunucu Keycloak'a başka adresten ulaşacaksa `keycloak_internal_url` ayarını kullanın. Bu ayar boşsa genel adres kullanılır.
-- Realm'in görünen adı “Atonota” olur. Giriş ve e-posta teması `atonota` adını taşır.
+- Realm'in görünen adı “AtonotA Login” olur. Realm adı, istemci kimlikleri ve tema adı değişmez. Giriş ve e-posta teması `atonota` adını taşır.
 - Tema Keycloak'ın kendi tema yapısıyla kurulur (Proje kaydı O-4).
 - Varsayılan dil Türkçedir. İkinci dil İngilizcedir.
 
@@ -420,7 +420,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_service_client_id` | `site-tenant1-service` ya da `press-service` | Servis belirteci için |
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `mobile_allow_development_http` | Kapalı | Yalnız geliştirmede açılır. `developer_mode` da açık olmalıdır. Mobil iptal isteği yalnız yerel kimlik servisine HTTP ile gider. Keycloak belirteç adresi HTTPS kalır. |
-| `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
+| `kimlik_marka_adi` | `AtonotA Login` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
 

@@ -53,15 +53,21 @@ class EnvironmentFiles(unittest.TestCase):
         for name, settings in release.load_environments().items():
             base = "atonota.net" if name == "prod" else f"{name}.atonota.net"
             self.assertEqual(settings["ATONOTA_BASE_HOST"], base)
-            self.assertEqual(settings["ATONOTA_ID_HOST"], f"id.{base}")
+            self.assertEqual(settings["ATONOTA_ID_HOST"], f"api.login.{base}")
             self.assertEqual(settings["ATONOTA_PRESS_HOST"], f"press.{base}")
             self.assertEqual(settings["ATONOTA_TENANT_ZONE"], f"app.{base}")
             for site in settings["ATONOTA_TENANT_SITES"].split():
                 self.assertTrue(site.endswith("." + settings["ATONOTA_TENANT_ZONE"]), site)
 
     def test_prod_keycloak_host_stays_as_recorded(self):
-        # PROJECT-RECORD.md O-1.
-        self.assertEqual(release.load_environments()["prod"]["ATONOTA_ID_HOST"], "id.atonota.net")
+        # PROJECT-RECORD.md O-51 (replaces the address in O-1).
+        self.assertEqual(release.load_environments()["prod"]["ATONOTA_ID_HOST"], "api.login.atonota.net")
+
+    def test_old_identity_host_names_are_gone(self):
+        # O-51: the old id.* names get no alias or redirect.
+        for name, settings in release.load_environments().items():
+            for value in settings.values():
+                self.assertFalse(value.startswith("id.") or " id." in value, f"{name}: {value}")
 
     def test_release_candidate_and_prod_are_strict(self):
         environments = release.load_environments()

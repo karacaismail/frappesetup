@@ -13,7 +13,7 @@ Purpose: keep pyproject.toml truthful for the locked image, so "uv pip check" ca
                                the newest semgrep that resolves; the marketplace audit is not tested
   frappe-mcp pinned to a commit  the unpinned Git URL was not reproducible
 Upstream: proposal 4 in backend/docs/press-python314-upstream.md.
-Remove when Press ships Python 3.14 pins (decision O-51 in backend/PROJECT-RECORD.md).
+Remove when Press ships Python 3.14 pins (decision O-52 in backend/PROJECT-RECORD.md).
 
 diff --git a/pyproject.toml b/pyproject.toml
 index 73a5467..05517f9 100644

@@ -6,7 +6,7 @@ to load. With this patch Press imports without the package. Sending a Telegram m
 raises ImportError, which Press logs ("Telegram Bot Error") and marks the Telegram Message as
 Error. Telegram alerts stay off in this image until Press moves to a maintained client.
 Upstream: new proposal 5 in backend/docs/press-python314-upstream.md.
-Remove when Press ships a Python 3.14 Telegram client (decision O-51 in backend/PROJECT-RECORD.md).
+Remove when Press ships a Python 3.14 Telegram client (decision O-52 in backend/PROJECT-RECORD.md).
 
 diff --git a/press/press/doctype/telegram_message/telegram_message.py b/press/press/doctype/telegram_message/telegram_message.py
 index 3958261..b7fa996 100644

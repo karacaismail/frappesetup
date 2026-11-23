@@ -132,7 +132,7 @@ class PatchSeries(unittest.TestCase):
                 self.assertIn("Upstream:", header)
                 self.assertIn("press-python314-upstream.md", header)
                 self.assertIn("Remove when", header)
-                self.assertIn("O-51", header)
+                self.assertIn("O-52", header)
 
     def test_patches_never_touch_frappe_or_tests(self):
         for path in self.patches():
@@ -147,7 +147,7 @@ class PatchSeries(unittest.TestCase):
 
     def test_record_links_the_new_decision_to_o18(self):
         record = (BACKEND / "PROJECT-RECORD.md").read_text()
-        decision = re.search(r"^- \*\*O-51\..*?(?=^- \*\*O-|^## )", record, re.M | re.S)
+        decision = re.search(r"^- \*\*O-52\..*?(?=^- \*\*O-|^## )", record, re.M | re.S)
         self.assertIsNotNone(decision)
         for term in ("O-18", "M-4", "press-patches"):
             self.assertIn(term, decision.group(0))

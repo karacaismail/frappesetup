@@ -27,7 +27,7 @@ class RealmFileTest(unittest.TestCase):
         self.assertEqual(REALM_FILE.name, "platform-realm.json")
 
     def test_display_name_and_languages(self):
-        # D-4: the brand name comes from a variable. The development value is "Atonota" (test_realm_backlog).
+        # D-4, O-51: the brand name comes from a variable. The value is "AtonotA Login" (test_realm_backlog).
         self.assertEqual(self.realm["displayName"], "${IDENTITY_BRAND_NAME}")
         self.assertTrue(self.realm["internationalizationEnabled"])
         self.assertEqual(self.realm["defaultLocale"], "tr")
@@ -146,7 +146,8 @@ class RealmFileTest(unittest.TestCase):
     def test_totp_and_passkey(self):
         self.assertEqual(self.realm["otpPolicyType"], "totp")
         self.assertTrue(self.realm["webAuthnPolicyPasswordlessPasskeysEnabled"])
-        self.assertEqual(self.realm["webAuthnPolicyPasswordlessRpEntityName"], "Atonota")
+        # The passkey dialog shows the same product name as the login page (O-51).
+        self.assertEqual(self.realm["webAuthnPolicyPasswordlessRpEntityName"], "${IDENTITY_BRAND_NAME}")
 
     def test_realm_file_has_no_users(self):
         for user in self.realm.get("users", []):

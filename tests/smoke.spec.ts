@@ -11,7 +11,7 @@ const board: {
   epics: { id: string; title: string }[];
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
-  items: Record<string, { epic: string; status: string; level: string }>;
+  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string } }>;
 } = require('../src/data/task-board.json');
 const phaseList: { id: string; title: string }[] = require('../src/data/phases.json');
 
@@ -949,7 +949,7 @@ test.describe('requirements explorer', () => {
   // Regresyon (rapor Y-10): ada JS'i gecikirken bir kez yazılan metin kaybolmamalı ve filtre uygulanmalı.
   // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez. Sayaç kesin metinle
   // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
-  const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} gereksinim$`);
+  const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} görev$`);
   for (const vp of [
     { name: 'desktop', width: 1366, height: 900, tableVisible: true, tag: '' },
     { name: '320', width: 320, height: 640, tableVisible: false, tag: ' @touch' },
@@ -1088,6 +1088,11 @@ test.describe('task board', () => {
       await expect(done.locator('.task-status')).toHaveText(statusLabel('done'));
       await expect(done.locator('.task-status')).toBeVisible();
       await expect(done).toContainText(/Kanıt:/);
+      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu açıkça söyler.
+      await expect(done).toContainText(`Denetim commit'i ${board.items[doneIds[0]].evidence!.commit}.`);
+      // Pano başlığı ile markdown kuralları başlığı aynı adı taşımaz (ekran okuyucu başlık listesi).
+      const h2 = (await page.locator('main h2').allTextContents()).map((t) => t.trim());
+      expect(h2.filter((t, i) => h2.indexOf(t) !== i), 'tekrarlanan h2').toEqual([]);
       await expect(page.locator(`${vp.title}.is-done`)).toHaveCount(doneIds.length);
       await noHorizontalOverflow(page);
     });

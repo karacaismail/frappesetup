@@ -13,7 +13,7 @@ Bu dosya backend'in seviyesini, sürümlerini ve kararlarını tutar. Kod standa
 | Bileşen | Hedef | Durum |
 | --- | --- | --- |
 | Kiracı sitesi | Frappe 16 ve ERPNext 16 | Yerelde `frappe/erpnext:v16.55.0` imajı var. Çalışan sürümü dev-ortam işi doğrular. |
-| Press sitesi | Frappe 16, Press v0.154.1 ve Python 3.14 | Bu Mac'teki deneme kurulumunda bu sürümler çalışıyor. Press bu sürümde yalnız yamalarla açılır (O-9). Üretim imajı `deploy/images/press.Dockerfile` dosyasıdır (O-51). |
+| Press sitesi | Frappe 16, Press v0.154.1 ve Python 3.14 | Bu Mac'teki deneme kurulumunda bu sürümler çalışıyor. Press bu sürümde yalnız yamalarla açılır (O-9). Üretim imajı `deploy/images/press.Dockerfile` dosyasıdır (O-52). |
 | Keycloak | 26.8 serisi | Son sürümü kimlik-realm işi resmî kaynaktan doğrular. |
 | Container | Colima, `colima-factory` profili | Docker Desktop kullanılmaz. |
 
@@ -85,7 +85,7 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - `platform_core` içinde giriş, çıkış ve ekran verisi uçları,
   - kullanıcı eşitleme servisi,
   - `press_tr` içinde Keycloak ile giriş.
-- **D-4. Kimlik markası Atonota'dır.** Proje sahibi alan adı olarak atonota.net yazdı.
+- **D-4. Kimlik markası Atonota'dır.** Proje sahibi alan adı olarak atonota.net yazdı. Ürünün adı O-51 ile “AtonotA Login” oldu.
   - Keycloak bu alan adında, platformdan ayrı durur.
   - Düğme metni “Atonota ile oturum aç” olur.
   - Marka adı ve alan adı ayardan gelir. Kodda sabit yazılmaz.
@@ -137,7 +137,7 @@ Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçt
 
 Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma”. Bu söz D-10 kararıdır. Orkestratör açık kararları bu yetkiyle kapattı. Proje sahibi her kararı değiştirebilir.
 
-- **O-1. Keycloak'ın sunucu adı `id.atonota.net` olur.** Kök alan adı markanın tanıtım sayfasına kalır. DNS değerini DevOps sorumlusu hazırlar. Kaydı alan adı sorumlusu uygular. Ajan DNS'e dokunmaz. Alan adının kayıt yeri doğrulanmadı.
+- **O-1. Keycloak'ın sunucu adı `id.atonota.net` olur.** Bu adres O-51 ile değişti. Yeni adres `api.login.atonota.net` olur. Kök alan adı markanın tanıtım sayfasına kalır. DNS değerini DevOps sorumlusu hazırlar. Kaydı alan adı sorumlusu uygular. Ajan DNS'e dokunmaz. Alan adının kayıt yeri doğrulanmadı.
 - **O-2. Platformun alan adı ayardan gelir.** Karar sitesi `<marka>.com.tr` yazar. Marka belli olunca yalnız ayar değişir.
 - **O-3. Kiracıda son kullanıcı “Website User” olur.** Bu, Karar 10'dur. Frappe 16 bu yolu engellerse işçi engeli kaynakla raporlar.
 - **O-4. Giriş teması Keycloak'ın kendi tema yapısıyla kurulur.** Tema `keycloak.v2` temasından türer. Renkler ve yazılar CSS değişkeniyle verilir. Bu yol yeni teknoloji eklemez (T-1). Keycloakify (G-80), panelin tasarım tokenları hazır olunca yeniden değerlendirilir.
@@ -156,7 +156,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 - **O-16. `hrms_tr` lisansı GPL-3.0 olur.** `hrms_tr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
 - **O-17. Yapay zekâ katmanı her sitede çalışacak.** Press ve operasyon sitesi de aynı katmanı kullanmalı. Katmanın ayrı bir uygulamaya bölünmesi sonraki turda karara bağlanır.
-- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. 22 Kasım 2026 Pazar günü temiz Press v0.154.1 kaynağı denendi. Python 3.14.10 ve Frappe 16.56.0 kullanıldı. Ansible, Telegram ve Stripe paket adayları içe aktarıldı. Press kaynak farkı boştu. Eski `TypedDict` tanımı ve kaldırılan `init_telemetry` işlevi modül açılışını engelledi. İnceleme, `press/api/cookies.py:7` satırında üçüncü kaynak engelini doğruladı. Frappe 16, `get_cookie_dict_from_headers` işlevini sunmuyor. `pyproject.toml` bağımlılık şartları da aday paketlerle karşılanmadı. `--no-deps` tanı kurulumu tam çözüm veya bağımlılık kilidi değildir. İnceleme sonrası başlangıç kaynağında 13 test çalıştı. Yedi test geçti ve altı test başarısız oldu. Kaynak bütünlüğü ve yama izi denetimleri geçti. `uv pip check`, 177 pakette 32 uyumsuzluk buldu. Site ve masa denemeleri çalıştırılmadı. Yama kaldırılmadı ve borç açık kaldı. [Press değişiklik önerisi](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Ardından 162 yeni etikette iki kaynak dosyası tarandı. İki dalın aynı dosyalara ait geçmişi de tarandı. `TypedDict` ve telemetri engelleri hepsinde korundu. Bu tarama çerez dosyasını veya bağımlılık çözümünü kapsamadı. Son develop commit koduyla ilk dar kapsamlı kabul testleri de başarısız oldu. [Sürüm taramasının kanıtı](docs/press-python314-version-audit.md) kaydedildi. Bu araştırma kolu kapatıldı. Kapanma koşulu borç tablosundadır. 23 Kasım 2026 Pazartesi günü O-51 kararı üretim imajı için açık bir yama dizisi kabul etti.
+- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. 22 Kasım 2026 Pazar günü temiz Press v0.154.1 kaynağı denendi. Python 3.14.10 ve Frappe 16.56.0 kullanıldı. Ansible, Telegram ve Stripe paket adayları içe aktarıldı. Press kaynak farkı boştu. Eski `TypedDict` tanımı ve kaldırılan `init_telemetry` işlevi modül açılışını engelledi. İnceleme, `press/api/cookies.py:7` satırında üçüncü kaynak engelini doğruladı. Frappe 16, `get_cookie_dict_from_headers` işlevini sunmuyor. `pyproject.toml` bağımlılık şartları da aday paketlerle karşılanmadı. `--no-deps` tanı kurulumu tam çözüm veya bağımlılık kilidi değildir. İnceleme sonrası başlangıç kaynağında 13 test çalıştı. Yedi test geçti ve altı test başarısız oldu. Kaynak bütünlüğü ve yama izi denetimleri geçti. `uv pip check`, 177 pakette 32 uyumsuzluk buldu. Site ve masa denemeleri çalıştırılmadı. Yama kaldırılmadı ve borç açık kaldı. [Press değişiklik önerisi](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Ardından 162 yeni etikette iki kaynak dosyası tarandı. İki dalın aynı dosyalara ait geçmişi de tarandı. `TypedDict` ve telemetri engelleri hepsinde korundu. Bu tarama çerez dosyasını veya bağımlılık çözümünü kapsamadı. Son develop commit koduyla ilk dar kapsamlı kabul testleri de başarısız oldu. [Sürüm taramasının kanıtı](docs/press-python314-version-audit.md) kaydedildi. Bu araştırma kolu kapatıldı. Kapanma koşulu borç tablosundadır. 23 Kasım 2026 Pazartesi günü O-52 kararı üretim imajı için açık bir yama dizisi kabul etti.
 - **O-19. Dallar sırayla birleşir.** Sıra şudur: kimlik-realm, platform-core-kimlik, identity-sync, press-tr, platform-core-kabuk, platform-core-yz, platform-core-gecit, erisim-kurali, platform-core-mobil, ilk-dikey-dilim, kimlik-tema, integration-e2e.
   - Her birleştirmeden önce bağımsız inceleme `pass` olur.
   - `hooks.py` dosyasını orkestratör birleştirir. Liste değerleri birleşir, hiçbiri silinmez. Örneğin iki dalın `override_whitelisted_methods` satırları yan yana kalır.
@@ -331,7 +331,18 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Testler MVP son test 3 raporundaki üç yaşam döngüsü testidir.
   - alpha ortamı için bu testler zorunlu değildir.
   - Testler TLS aracısı olan hazırlık ortamında koşar. TLS aracısı, şifreli bağlantıyı karşılayan ara sunucudur.
-- **O-51. Press üretim imajı açık bir yama dizisiyle derlenir.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+- **O-51. Giriş ürününün adı “AtonotA Login” olur. Giriş adresi `api.login.atonota.net` olur.** Proje sahibi bu kararı 23 Kasım 2026 Pazartesi günü verdi. Orkestratör ortam adlarına aynı gün karar verdi. Karar O-1'deki adresin yerine geçer.
+  - Ad tam olarak “AtonotA Login” yazılır. İlk ve son A büyük harftir.
+  - Giriş adresi prod'da `api.login.atonota.net` olur. alpha, beta ve rc ortamlarında adres `api.login.<ortam>.atonota.net` olur. Örneğin `api.login.alpha.atonota.net`.
+  - Eski `id.atonota.net` ve `id.<ortam>.atonota.net` adları kalkar. Ürün canlıda değildir. Bu yüzden yönlendirme ve takma ad gerekmez.
+  - Ortam değişkenlerinin adları değişmez. Örneğin `ATONOTA_ID_HOST` adı kalır. Yalnız değeri değişir.
+  - Keycloak'ta yalnız görünen ad değişir. Realm adı `platform` kalır. İstemci kimlikleri ve tema klasörünün adı da kalır. Realm adı değişirse bütün dönüş adresleri ve testler bozulur. Bu değişikliğin bir kazancı yoktur.
+  - Kullanıcı birçok platformla giriş yapabilir. Örneğin Google, Facebook, LinkedIn ve X kullanılabilir. Platform sayısı sınırlı değildir. Platform listesi realm verisinden gelir. Kodda sabit bir platform listesi olmaz. Testler de her platform kaydına aynı kuralı uygular.
+  - Platform kendi giriş sayfasını kendi adresinde açar. Örneğin Google `accounts.google.com` adresini kullanır. Sonra tarayıcı `https://api.login.atonota.net/realms/<realm>/broker/<platform>/endpoint` adresine döner.
+  - Ürün kodu MIT lisanslıdır (D-2). Keycloak'ın kendisi Apache-2.0 lisanslıdır. `identity/keycloak/event-listener/` klasörü Apache-2.0 lisanslı bir çataldır. Bu klasör kendi lisansını korur. Temadaki şablonlar da Keycloak şablonlarından türer. Bu yüzden şablonların başında kaynak notu kalır.
+  - Yeni platform eklemek ve ürünü paketlemek MVP sonrasıdır. MVP'de yalnız bu kararla çelişen yerler düzeltildi.
+  - DNS kayıtlarının yeni listesini DevOps sorumlusu hazırlar. Alan adı sorumlusu kayıtları girer. Ajan DNS'e dokunmaz.
+- **O-52. Press üretim imajı açık bir yama dizisiyle derlenir.** Karar 23 Kasım 2026 Pazartesi günü alındı.
   - Bu karar O-18'in "üretim imajına girmez" hükmünü değiştirir. O-18 geçerli kalır. `dev/press/patch-py314.sh` betiği yine yalnız geliştirme imajındadır.
   - Üretim imajı `deploy/images/press.Dockerfile` dosyasıdır. Press v0.154.1 commit koduyla doğrulanır.
   - Yamalar `deploy/images/press-patches/` klasöründedir. Her yamanın başında amacı ve Press'e önerisi yazılıdır.
@@ -355,6 +366,7 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 | G-57: Kiracıda kullanıcı “System User” olur. | Son kullanıcı “Website User” olur. | D-5, O-3 |
 | G-80: Tema Keycloakify ile yapılır. | Tema Keycloak'ın kendi tema yapısıyla yapılır. | O-4 |
 | Rail 4: Saatlik yoklama ve gece mutabakatı | Zamanlanmış iş yok. Mutabakat elle başlar. | D-6, O-11 |
+| Keycloak'ın sunucu adı `id.atonota.net` | Giriş ürününün adı “AtonotA Login”, adresi `api.login.atonota.net` | O-51 |
 
 ## Değişmeyen sınırlar
 
@@ -393,7 +405,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
-| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18). Üretim imajı da beş yamayla derlenir (O-51) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Üretim imajında bu üç engel ve Telegram engeli `deploy/images/press-patches/` yamalarıyla aşıldı. Bağımlılıklar kilitle kuruldu. `uv pip check` yalnız frappe-mcp'nin iki bilinen satırını bildiriyor. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Kabul edilen her düzeltmenin yaması silinir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
+| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18). Üretim imajı da beş yamayla derlenir (O-52) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Üretim imajında bu üç engel ve Telegram engeli `deploy/images/press-patches/` yamalarıyla aşıldı. Bağımlılıklar kilitle kuruldu. `uv pip check` yalnız frappe-mcp'nin iki bilinen satırını bildiriyor. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Kabul edilen her düzeltmenin yaması silinir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | Telefon paketi yok (O-26). Bu borç MVP'yi engellemez (O-49) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |

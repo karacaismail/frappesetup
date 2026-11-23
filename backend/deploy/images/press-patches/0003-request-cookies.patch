@@ -2,7 +2,7 @@ Press patch 0003: read the cookie_perms cookie from the request object.
 Purpose: Frappe 16 removed frappe.oauth.get_cookie_dict_from_headers, so press.api.cookies fails
 to import. Werkzeug's request.cookies returns the decoded string, so the .value access goes.
 Upstream: proposal 3 in backend/docs/press-python314-upstream.md.
-Remove when Press ships this change (decision O-51 in backend/PROJECT-RECORD.md).
+Remove when Press ships this change (decision O-52 in backend/PROJECT-RECORD.md).
 
 diff --git a/press/api/cookies.py b/press/api/cookies.py
 index 3f2b4f4..c281037 100644

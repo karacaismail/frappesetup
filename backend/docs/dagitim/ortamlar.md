@@ -16,7 +16,7 @@ Proje sahibi şu kararları 23 Kasım 2026 Pazartesi günü verdi:
 4. Ana dal güncellenince alpha ortamı kendiliğinden güncellenir.
 5. Sonraki ortamlara geçiş Jenkins'te elle basılan düğmeyle olur. Sıra alpha, beta, rc ve prod şeklindedir.
 6. alpha, beta ve rc birer alt alan adıdır. Prod ana alan adındadır: `atonota.net`.
-7. Keycloak'ın prod adresi `id.atonota.net` olarak kalır. Bu adres proje kaydındaki O-1 kararıdır.
+7. AtonotA Login giriş adresi prod'da `api.login.atonota.net` olur. AtonotA Login, Keycloak üzerinde çalışan giriş ürünüdür. Bu adres proje kaydındaki O-51 kararıdır.
 
 ## Sözlük
 
@@ -56,7 +56,7 @@ Kararım şudur: her ortamın bir temel adı vardır. Öteki adlar bu temel adı
 | Ad | alpha | beta | rc | prod |
 | --- | --- | --- | --- | --- |
 | Temel ad | `alpha.atonota.net` | `beta.atonota.net` | `rc.atonota.net` | `atonota.net` |
-| Keycloak | `id.alpha.atonota.net` | `id.beta.atonota.net` | `id.rc.atonota.net` | `id.atonota.net` |
+| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.beta.atonota.net` | `api.login.rc.atonota.net` | `api.login.atonota.net` |
 | Press | `press.alpha.atonota.net` | `press.beta.atonota.net` | `press.rc.atonota.net` | `press.atonota.net` |
 | Kiracı bölgesi | `*.app.alpha.atonota.net` | `*.app.beta.atonota.net` | `*.app.rc.atonota.net` | `*.app.atonota.net` |
 | İlk kiracı | `demo.app.alpha.atonota.net` | `demo.app.beta.atonota.net` | `demo.app.rc.atonota.net` | `demo.app.atonota.net` |
@@ -67,7 +67,7 @@ Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bild
 ### Gerekçe
 
 1. Her ortamda adların biçimi aynıdır. Ortam dosyası yalnız temel adı değiştirir.
-2. Keycloak'ın prod adı `id.atonota.net` olarak kalır. O-1 kararı bozulmaz.
+2. Giriş adresi `api.login.<ortam tabanı>` biçimindedir. Bu biçim öteki adların kuralını korur. Eski `id.` adları kalkar. Ürün canlıda olmadığı için yönlendirme gerekmez (O-51).
 3. Kiracı adları karar sitesindeki K-2 biçimini korur. K-2'de kiracılar `<kiracı>.app.<marka>` biçimindedir.
 4. Panel her kiracının kendi adresinde `/panel` yolundadır. Ayrı bir `panel.` adı açılmaz. Nedeni şudur: panel Frappe çerezini ve CSRF belirtecini aynı kökten okur (SZ-7). CSRF belirteci, sahte istekleri engelleyen tek kullanımlık koddur.
 5. Prod temel adı `atonota.net` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
