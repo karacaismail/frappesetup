@@ -153,8 +153,17 @@ def block_team_invitation(target, arguments):
 		deny_request()
 
 
+def reject_mismatched_command(path):
+	# Frappe 16 runs a "cmd" field before it reads the path (frappe/app.py). The edge proxy opens
+	# only a few paths to customers (O-54), so a "cmd" must name the method of its own path.
+	command = frappe.form_dict.get("cmd")
+	if command and path not in {prefix + str(command) for prefix in API_PREFIXES}:
+		deny_request()
+
+
 def before_request():
 	path = frappe.request.path.rstrip("/")
+	reject_mismatched_command(path)
 	if path == ACCOUNT_DELETION_PAGE:
 		frappe.local.no_cache = True
 		frappe.local.response_headers["Cache-Control"] = "private, no-store"

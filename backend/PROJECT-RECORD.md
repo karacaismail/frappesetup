@@ -353,6 +353,26 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
   - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
+- **O-54. Press'in `press.` adı yalnız özel ağa açıktır. Müşteriye yalnız hesap silme akışı açılır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - G-6, G-13 ve G-119 aynı kuralı yazar. Desk ve operatör adı yalnız Tailscale ya da özel ağdan açılır. Bu karar o kuralı kenar vekile işler.
+  - MVP'de müşterinin Press'te yaptığı tek iş hesap silme isteğidir (O-27). Mağaza, fatura ve takım ekranları G-13'e göre ayrı `panel.` adında açılır. O ad MVP'de yoktur.
+  - Kenar vekil müşteriye yalnız şu yolları açar:
+    1. `/account-deletion` hesap silme sayfasıdır.
+    2. `/assets/*` ve `/website_script.js` sayfanın dosyalarıdır.
+    3. `press_tr.api.auth.get_login_url` Keycloak girişini başlatır.
+    4. `press_tr.api.auth.keycloak_callback` Keycloak'tan dönüşü karşılar.
+    5. `press_tr.api.keycloak_backchannel_logout` Keycloak'ın oturum kapatma bildirimini alır. Bildirim imzalıdır. Keycloak bu bildirimi genel adresten gönderir.
+    6. `press_tr.api.account.request_deletion` silme isteğini alır.
+  - Üç API yolu `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
+  - Öteki bütün yollar yalnız Tailscale adreslerinden açılır. Örneğin `/app`, `/desk`, `/dashboard` ve `/api/resource/` böyledir. Tailscale adresleri `100.64.0.0/10` ve `fd7a:115c:a1e0::/48` aralıklarıdır. Başka istek 404 alır.
+  - Yerel ağ aralıkları özel sayılmaz. Gerekçe şudur. Docker, IPv6 ile gelen genel isteği `172.16.0.0/12` içinden bir adresle gösterebilir.
+  - Tailscale dışından gelen istekte iki ek ret vardır. Birincisi `cmd` sorgu alanıdır. Frappe 16 `cmd` alanını yoldan önce işler. Bu alan açık bir yoldan her yönteme ulaşırdı. İkincisi ham yoldaki `..`, `//`, `%2e`, `%2f` ve `%5c` dizileridir.
+  - Gövdedeki `cmd` alanını kenar vekil göremez. Bu yüzden `press_tr` de `cmd` alanını denetler. Alan yolun kendi yöntemini adlandırmazsa istek reddedilir.
+  - identity-sync, Press API'lerine kenar vekilden geçmez. `identity-press` ağından `http://<Press adı>:8080` adresine gider. Bu ağda yalnız identity-sync ve `press-frontend` vardır. Ağın internete çıkışı yoktur.
+  - Müşteriye yeni bir yol gerekirse yol bu listeye tek tek eklenir. Gerekçe bu karara yazılır. Joker yol eklenmez. `/assets/*` yalnız durağan dosyaları sunar.
+  - DevOps sorumlusu sunucunun genel ağ arayüzünde `100.64.0.0/10` kaynaklı paketleri düşürür. Bu kural G-6 güvenlik duvarının parçasıdır.
+  - Kural `deploy/compose/site.caddy.template` dosyasındadır. `deploy/tests/test_press_image.py` kuralı denetler.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:

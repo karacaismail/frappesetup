@@ -181,7 +181,8 @@ services:
       keycloak: {condition: service_healthy}
     # press-identity: press-web sends account deletion requests here. identity-sync does not join
     # press-internal, so it cannot reach the Press Redis.
-    networks: [internal, press-identity]
+    # identity-press: identity-sync calls the Press APIs at http://<Press host>:8080 (O-54).
+    networks: [internal, press-identity, identity-press]
 
   # Press image: deploy/images/press.Dockerfile. remote/apply turns this profile on only when the
   # release carries a press image. Every Press service has the profile.
@@ -259,9 +260,12 @@ services:
       PROXY_READ_TIMEOUT: "120"
       CLIENT_MAX_BODY_SIZE: 50m
     depends_on: [press-web, press-socket]
+    # identity-press: identity-sync calls the Press APIs here, because the edge opens only the
+    # customer paths of O-54. The alias lets nginx pick the Press site from the Host header.
     networks:
       press-internal: {}
       edge: {aliases: ["${ATONOTA_ENV:?}-press"]}
+      identity-press: {aliases: ["${ATONOTA_PRESS_HOST:?}"]}
 
 volumes:
   tenant-db:
@@ -279,6 +283,8 @@ networks:
   press-internal: {}
   # press-web and identity-sync only. "internal: true" gives the network no gateway.
   press-identity: {internal: true}
+  # identity-sync and press-frontend only, also without a gateway.
+  identity-press: {internal: true}
   # One edge network per environment (remote/apply creates it); the edge proxy joins each one.
   edge:
     name: atonota-edge-${ATONOTA_ENV:?}
