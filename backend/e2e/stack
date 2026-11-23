@@ -542,6 +542,51 @@ with NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
     )
 
 
+TENANT_SETTINGS = (
+    "KC_PUBLIC_URL",
+    "ATONOTA_SITE_TENANT1_URL",
+    "ATONOTA_SITE_TENANT1_SECRET",
+    "ATONOTA_SITE_TENANT1_SERVICE_SECRET",
+    "IDENTITY_BRAND_NAME",
+)
+# The apps of the tenant that Press is bound to. HRMS TR is part of the MVP (MVP test 2, row 5e).
+TENANT_APPS = ("erpnext", "platform_core", "hrms", "hrms_tr")
+
+
+def require_tenant_settings(environment):
+    """Name missing tenant settings without printing any value."""
+    missing = [key for key in TENANT_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Tenant setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
+def configure_tenant(compose, environment):
+    """Write the tenant's Keycloak settings (platform_core identity/README.md, site settings).
+
+    Builds on the sign-in settings of `configure_tenant_login`, so the Vite browser origin stays,
+    and adds the realm and the service client that identity-sync calls the tenant with.
+    """
+    require_tenant_settings(environment)
+    settings = {
+        **tenant_login_settings(environment),
+        "keycloak_realm": "platform",
+        "keycloak_service_client_id": "site-tenant1-service",
+        "keycloak_service_client_secret": environment["ATONOTA_SITE_TENANT1_SERVICE_SECRET"],
+        "identity_brand_name": environment["IDENTITY_BRAND_NAME"],
+    }
+    script = (BACKEND / "e2e/preview/configure-stack-tenant.py").read_text()
+    run(
+        [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(settings),
+        text=True,
+    )
+
+
 def stack_realm(realm, environment):
     origin = tenant_browser_origin(environment)
     if origin != environment["ATONOTA_SITE_TENANT1_URL"]:
@@ -601,6 +646,7 @@ def sync_realm(compose, environment):
 def up(engine, compose, environment):
     # Fail before any container work, not after a long startup.
     require_press_settings(environment)
+    require_tenant_settings(environment)
     require_realm_sync_settings(environment)
     if not environment.get("ATONOTA_SITE_TENANT1_SECRET"):
         raise ValueError("Tenant sign-in requires ATONOTA_SITE_TENANT1_SECRET in E2E_ENV_FILE.")
@@ -658,10 +704,7 @@ def up(engine, compose, environment):
             "env/bin/python",
             "/workspace/dev/bootstrap.py",
             "tenant1.localhost",
-            "--app",
-            "erpnext",
-            "--app",
-            "platform_core",
+            *(argument for app in TENANT_APPS for argument in ("--app", app)),
         ],
         environment,
     )
@@ -670,6 +713,7 @@ def up(engine, compose, environment):
         [*compose, "up", "-d", "--no-build", "tenant-web", "tenant-socket", "web"],
         environment,
     )
+    configure_tenant(compose, environment)
     run(
         [
             *compose,
@@ -776,9 +820,106 @@ def up(engine, compose, environment):
     )
 
 
+FIXTURE_NAME = re.compile(r"E2E_[A-Z0-9_]+")
+DELETION_SCRIPTS = {
+    name: BACKEND / "e2e/preview" / f"stack-deletion-{name}.py" for name in ("keycloak", "tenant", "press")
+}
+
+
+def seed_deletion(compose, environment):
+    """Prepare one synthetic account for the Press deletion chain test (MVP test 2, row 5e).
+
+    Keycloak gets the account and a read-only client. The tenant gets the identity link, a company
+    and an Employee with personal fields. Press gets the identity link. Every secret travels on
+    stdin and is returned only in the fixture mapping.
+    """
+    require_tenant_settings(environment)
+    require_realm_sync_settings(environment)
+    if not environment.get("ATONOTA_IDENTITY_SYNC_SECRET"):
+        raise ValueError("The deletion fixture needs ATONOTA_IDENTITY_SYNC_SECRET in E2E_ENV_FILE.")
+    email = f"e2e-delete-{secrets.token_hex(4)}@example.test"
+    password = "Aa9!" + secrets.token_urlsafe(24)
+    issuer = environment["KC_PUBLIC_URL"] + "/realms/platform"
+    account = _seed_output(
+        run(
+            [*compose, "run", "--rm", "--no-deps", "-T", "identity-sync", "python", "-I", "-c",
+             DELETION_SCRIPTS["keycloak"].read_text()],
+            environment,
+            input=json.dumps(
+                {
+                    "keycloak_url": environment["KC_PUBLIC_URL"],
+                    "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+                    "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+                    "identity_sync_secret": environment["ATONOTA_IDENTITY_SYNC_SECRET"],
+                    "email": email,
+                    "password": password,
+                }
+            ),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    identity = json.dumps({"issuer": issuer, "subject": account["subject"], "email": email})
+    tenant = _seed_output(
+        run(
+            [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c", DELETION_SCRIPTS["tenant"].read_text()],
+            environment,
+            input=identity,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    press = _seed_output(
+        run(
+            [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench", "web",
+             "env/bin/python", "-c", DELETION_SCRIPTS["press"].read_text()],
+            environment,
+            input=identity,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    return {
+        "E2E_PRESS_DELETION": "1",
+        "E2E_DELETE_EMAIL": email,
+        "E2E_DELETE_PASSWORD": password,
+        "E2E_DELETE_SUBJECT": account["subject"],
+        "E2E_LIFECYCLE_READER_CLIENT": account["reader_client"],
+        "E2E_LIFECYCLE_READER_SECRET": account["reader_secret"],
+        "E2E_DELETE_SERVICE_TOKEN": account["service_token"],
+        **tenant,
+        **press,
+    }
+
+
+def _seed_output(completed):
+    """The seed scripts print one JSON object as their last line. Earlier lines are Frappe output."""
+    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    if not lines:
+        raise ValueError("A seed script printed no result.")
+    result = json.loads(lines[-1])
+    if not isinstance(result, dict):
+        raise ValueError("A seed script printed an invalid result.")
+    return result
+
+
+def write_fixture(path, fixture):
+    """Write the test settings as a private dotenv file. Only E2E_ names, one line per value."""
+    for key, value in fixture.items():
+        if not FIXTURE_NAME.fullmatch(key) or not isinstance(value, str) or any(c in value for c in "\0\r\n"):
+            raise ValueError("The fixture holds a name or value that cannot be written.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.unlink(missing_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "w") as stream:
+        stream.write("".join(f"{key}={value}\n" for key, value in fixture.items()))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("config", "build", "up", "down", "check", "resources"))
+    parser.add_argument(
+        "action", choices=("config", "build", "up", "down", "check", "resources", "seed-deletion")
+    )
     args = parser.parse_args()
     try:
         environment, engine, compose = setup()
@@ -813,6 +954,12 @@ def main():
             run([*compose, "down"], environment)
         elif args.action == "check":
             check(compose, environment)
+        elif args.action == "seed-deletion":
+            assert_owner(engine, compose, environment)
+            path = env_file(os.environ.get("E2E_FIXTURE_FILE", REPOSITORY / ".pane/scratch/e2e-deletion.env"))
+            assert_ignored(path)
+            write_fixture(path, seed_deletion(compose, environment))
+            print(f"Deletion fixture written to {path}")
         else:
             resources(engine, environment)
     except ValueError as error:

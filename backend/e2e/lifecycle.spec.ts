@@ -3,69 +3,14 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from '@
 import { localUrl, required } from './local';
 import { previewMobileToken } from './mobile-fixture';
 import { postMobile } from './mobile-request';
+import { bearer, fixtureEmail, requestPressDeletion, resource, signIn, sites, tokenClaims } from './press-session';
 
 const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 
-const LOGIN_METHOD = '/api/method/platform_core.api.auth.get_login_url';
 const LOGGED_USER = '/api/method/frappe.auth.get_logged_user';
 const PRESS_ACCOUNT = '/api/method/press.api.account.get';
 const CALLBACK = '/api/method/platform_core.api.auth.keycloak_callback';
 const IDLE_MS = 60 * 60 * 1000;
-
-function sites() {
-  return {
-    tenant: localUrl('tenant1.localhost', 1),
-    identity: localUrl('identity.localhost', 0),
-    press: localUrl('press.localhost', 3),
-  };
-}
-
-function fixtureEmail(name: string, purpose: 'delete' | 'employee') {
-  const email = required(name);
-  if (!new RegExp(`^e2e-${purpose}-[a-z0-9-]+@example\\.test$`).test(email)) {
-    throw new Error('Use a dedicated synthetic account for this lifecycle test.');
-  }
-  return email;
-}
-
-function bearer(token: string) {
-  return { Authorization: 'Bearer ' + token };
-}
-
-function tokenClaims(token: string) {
-  const [, encoded] = token.split('.');
-  return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-}
-
-async function signIn(page: Page, email: string, password: string, site: 'tenant' | 'press' = 'tenant') {
-  const origins = sites();
-  const origin = origins[site];
-  const { identity } = origins;
-  await page.route('**/*', async (route) => {
-    const requestOrigin = new URL(route.request().url()).origin;
-    if (requestOrigin === origin || requestOrigin === identity) await route.continue();
-    else await route.abort();
-  });
-  const pressLogin = site === 'press';
-  const method = pressLogin ? '/api/method/press_tr.api.auth.get_login_url' : LOGIN_METHOD;
-  const response = await page.request.post(origin + method, {
-    data: pressLogin ? {} : { redirect_to: '/panel' }, maxRedirects: 0,
-  });
-  expect(response.status()).toBe(200);
-  const { message } = await response.json();
-  const login = new URL(pressLogin ? message.url : message.login_url);
-  expect(login.origin).toBe(identity);
-  await page.goto(login.href);
-  await enterCredentials(page, email, password);
-}
-
-async function enterCredentials(page: Page, email: string, password: string) {
-  await expect.poll(() => new URL(page.url()).origin).toBe(sites().identity);
-  const username = page.locator('#username');
-  if (await username.isVisible()) await username.fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('#kc-login').click();
-}
 
 async function loggedUser(request: APIRequestContext) {
   const response = await request.get(sites().tenant + LOGGED_USER, { maxRedirects: 0 });
@@ -94,14 +39,6 @@ function keycloakUser(request: APIRequestContext, subject: string, suffix = '') 
   return request.get(sites().identity + '/admin/realms/platform/users/' + encodeURIComponent(subject) + suffix, {
     headers: bearer(required('E2E_LIFECYCLE_KEYCLOAK_READER_TOKEN')), maxRedirects: 0,
   });
-}
-
-async function resource(request: APIRequestContext, origin: string, cookie: string, doctype: string, name: string) {
-  const response = await request.get(origin + '/api/resource/' + [doctype, name].map(encodeURIComponent).join('/'), {
-    headers: { Cookie: cookie }, maxRedirects: 0,
-  });
-  expect(response.status()).toBe(200);
-  return (await response.json()).data;
 }
 
 test.describe('Press account deletion', () => {
@@ -148,32 +85,7 @@ test.describe('Press account deletion', () => {
     expect(before).not.toEqual(anonymous);
 
     const password = required('E2E_DELETE_PASSWORD');
-    await signIn(page, email, password, 'press');
-    await expect.poll(() => new URL(page.url()).origin).toBe(press);
-    const deletionPage = press + '/account-deletion';
-    await page.goto(deletionPage);
-    const form = page.locator('#account-deletion');
-    await expect(form).toHaveAttribute('data-confirm', 'false');
-
-    const reauthentication = page.waitForRequest((request) => {
-      const url = new URL(request.url());
-      return url.origin === sites().identity && url.pathname.endsWith('/protocol/openid-connect/auth');
-    });
-    await form.locator('button[type=submit]').click();
-    const login = new URL((await reauthentication).url());
-    expect(login.searchParams.get('prompt')).toBe('login');
-    expect(login.searchParams.get('max_age')).toBe('0');
-    await enterCredentials(page, email, password);
-    await expect(form).toHaveAttribute('data-confirm', 'true');
-    expect(new URL(page.url()).origin).toBe(press);
-    const submission = page.waitForResponse((response) =>
-      response.url() === press + '/api/method/press_tr.api.account.request_deletion'
-      && response.request().method() === 'POST');
-    await form.locator('button[type=submit]').click();
-    const submitted = await submission;
-    expect(submitted.request().postDataJSON()).toMatchObject({ confirm: true });
-    expect(submitted.status()).toBe(200);
-    expect((await submitted.json()).message).toMatchObject({ submitted: true });
+    expect(await requestPressDeletion(page, email, password)).toMatchObject({ submitted: true });
 
     await expect.poll(async () => (await keycloakUser(request, subject)).status(), { timeout: 60_000 }).toBe(404);
     const pressAnonymous = required('E2E_DELETE_PRESS_ANONYMOUS_USER');
