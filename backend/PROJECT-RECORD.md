@@ -150,7 +150,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-11. Eşitleme olaylarının kaynağını identity-sync işi seçer.** İşçi T-2 notunda en yalın açık kaynak yolu seçer. Zamanlanmış yoklama yine yasaktır (D-6).
 - **O-12. `platform_core` MIT lisanslı kalır.** AGPL lisanslı bir bileşen `platform_core` içine alınmaz. Böyle bir bileşen gerekirse ayrı uygulama ya da ayrı servis olur.
 
-- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gecidi` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
+- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gecidi` olur. Kod klasörünün bugünkü adı `model_gateway` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
 - **O-14. Kayıt önce kiracı sitesindedir.** Her kiracı kendi sağlayıcılarını, hesaplarını ve API'lerini ekleyebilir. Platformun ortak hesapları sonraki turda Press'ten site ayarına gelir.
 - **O-15. Sağlık denetimi zamanlanmaz.** API'nin sağlığı gerçek çağrıların sonucundan çıkar. Elle başlatılan bağlantı denetimi de vardır (D-6).
 
@@ -243,13 +243,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Bu kural bütün işlerin ölçüm komutlarına uygulanır.
   - Veritabanını değiştiren ölçüm testleri yalnız `perf-` sitesinde koşar, öteki sitede açık nedenle atlanır. Ölçüm mantığının testleri sahte veriyle çalışır.
   - Adı `test-` ile başlayan siteler atılabilir deneme siteleridir. Ortak test sınıflarının bu sitelerdeki toplu temizliği kabul edilir.
-- **O-36. Servis belirteci kodu kimlik klasöründe durur.** Kiracı sitesi identity-sync için servis belirteci alır. Bu kod `kimlik/service_client.py` dosyasındadır. Kurallar şunlardır:
+- **O-36. Servis belirteci kodu kimlik klasöründe durur.** Kiracı sitesi identity-sync için servis belirteci alır. Bu kod `kimlik/service_client.py` dosyasındadır. Bugünkü yol `identity/service_client.py` olur. Kurallar şunlardır:
   - Dosyayı platform-core-mobil dalı yazdı. Orkestratör bu yazımı bir kez onayladı. Mobil dal birleşene kadar dosyayı mobil çalışanı düzeltir. Birleşmeden sonra dosyanın sahibi platform-core-kimlik işidir.
-  - Modülün açık yolu `platform_core.kimlik.service_client` olur. Yol `dev/modul-sinirlari.json` dosyasına eklendi.
+  - Modülün açık yolu `platform_core.kimlik.service_client` olur. Bugünkü yol `platform_core.identity.service_client` olur. Yol `dev/modul-sinirlari.json` dosyasına eklendi.
   - Belirteç adresi Keycloak ayarlarından türetilir. Önce `keycloak_internal_url`, yoksa `keycloak_public_url` kullanılır. `mobile_identity_sync_token_url` ayarı kullanılmaz.
   - Keycloak belirteç adresi her zaman HTTPS olmalıdır. integration-e2e işi geliştirme yığınında HTTPS iç adresi sağlar.
   - T-5. Kimlik servisi adresi üretimde HTTPS olmalıdır. Yerel HTTP için `developer_mode` ve `mobile_allow_development_http` birlikte açılır. Yeni ayar varsayılan olarak kapalıdır. Mobil modül adresi ve ayarları denetler.
-  - platform-core-kimlik dalı mobil dosyalarındaki değişikliklerini geri alır. Bu dosyalar `mobil/identity_sync_client.py`, onun testi ve `0007-mobil-esitleme.md` notudur.
+  - platform-core-kimlik dalı mobil dosyalarındaki değişikliklerini geri alır. Bu dosyalar `mobil/identity_sync_client.py` (bugünkü yol `mobile/identity_sync_client.py`), onun testi ve `0007-mobil-esitleme.md` notudur.
 - **O-37. Birleştirmede ortak dosya ve bağımlılık kuralları.** 22 Kasım 2026 Pazar günü bütün backend dalları birleşti. Kurallar şunlardır:
   - `oidc_verify` kitaplığı iki uygulamada da `oidc_verify==0.1.0` kuralıyla istenir. Kitaplık depodadır ve sürüm paketiyle birlikte kurulur. Kural değişince güvenlik kilidi `backend/dev/security/compile-lock` ile yeniden üretilir.
   - `hooks.py` içinde her kanca bir kez atanır. Örneğin `override_whitelisted_methods` sözlüğü hem kimlik giriş kapılarını hem erişim kuralının bağlantı aramasını taşır. İkinci atama birinciyi sileceği için yazılmaz.

@@ -90,7 +90,7 @@ Operatör, “Administrator” oturumuyla site konsolundan `hrms_tr.setup.remove
 
 ## Kurulum sırası ve kapalı HRMS yolları
 
-HRMS TR, `platform_core.erisim` kancalarına ve “Access Rule” kayıt türüne dayanır.
+HRMS TR, `platform_core.access` kancalarına ve “Access Rule” kayıt türüne dayanır.
 `erisim-kurali` dalı HRMS TR dalından önce birleşir.
 
 | HRMS yolu | Kapatma nedeni |
