@@ -403,6 +403,20 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tanıtım sayfası (G-165) site işidir. Bu iş site dosyalarına dokunmadı.
   - Bu karar önce O-54 numarasını taşıyordu. O-54 ve O-55 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-56 oldu.
 
+- **O-57. G-37 için yerel indirme ve sunucu devri ayrılır.**
+  - Ekip, AJA-105 kapsamında bu yerel sınırı seçti. Mimar AJA-140 görevinde sınırı inceledi.
+  - Müşteri kendi Press kimliğiyle şifreli yedeğini indirir.
+  - Araç `press.api.site.get_backup_link` işlevini kullanır. Yeni sunucu ucu açılmaz.
+  - Yalnız veritabanı, genel dosyalar ve özel dosyalar alınır. Site ayarları ayrı aktarılır.
+  - İndirme boyutu Press kaydıyla eşleşir. GnuPG şifre çözme ve bütünlük kontrolünü yapar.
+  - Dosya adı tek başına şifreleme kanıtı değildir. Açılmış veri diske yazılmaz.
+  - Veri kaybı sınırı en fazla 24 saattir. Plan ve gerçekleşen dış kopya ayrı denetlenir.
+  - Arşiv sonrası saklama en az 6 takvim ayıdır. Yerel araç yedek silmez.
+  - Aylık rapor ve üç aylık tam dönüş sunucu işidir.
+  - Teknik devir `docs/handoff/backup-restore.md` dosyasındadır. Yerel kanıt G-37'yi tamamen kapatmaz.
+  - Kontrol komutu `python3.14 -B -m unittest discover -s backend/deploy/tests -p 'test_backup_export*.py'` olur.
+  - Zamanlanmış iş kurulmaz. Canlı sunucuya ve canlı veriye dokunulmaz.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:

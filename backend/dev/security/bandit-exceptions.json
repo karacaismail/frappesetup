@@ -3261,5 +3261,68 @@
     "reason": "Runs the repository's own osv-setup script with bash and no shell string. The arguments are fixed test values, PATH points curl at a fake that writes only inside a temporary folder.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/backup_export.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for fixed GnuPG verification; no shell execution.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_backup_export.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for fixed GnuPG verification or isolated local regression subprocesses; no shell execution.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_backup_export_gpg.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for fixed GnuPG verification or isolated local regression subprocesses; no shell execution.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/backup_export.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "a429ff01723978a139a4ce6c05aa409d8db467fd4c1bfd2b83121acffa6a1654",
+    "reason": "GnuPG receives fixed flags, a private temporary ciphertext path and a passphrase on stdin; no shell, plaintext output or secret argv.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_backup_export.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "25bfb33a52b90b38594b6c4235d6d3723d31b1b32b18a8de53c3aa050ec20579",
+    "reason": "Regression test invokes the current Python executable and the fixed local CLI; no shell or external network.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_backup_export_gpg.py",
+    "code": "subprocess.run(",
+    "statementSha256": "fd3e9bc59e3955ce3560f4b9b7953c2245b2e4deaf85c14cca44ea29bb926909",
+    "reason": "Synthetic local GnuPG test invokes the installed executable with fixed options and passes the test-only key on stdin.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_backup_export_gpg.py",
+    "code": "subprocess.run(",
+    "statementSha256": "fd3e9bc59e3955ce3560f4b9b7953c2245b2e4deaf85c14cca44ea29bb926909",
+    "reason": "Synthetic local GnuPG test invokes the installed executable with fixed options and passes the test-only key on stdin.",
+    "owner": "backup-restore",
+    "ignoreUntil": "2027-02-23"
   }
 ]
