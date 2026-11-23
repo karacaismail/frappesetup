@@ -1,0 +1,205 @@
+G-5: send offsite backups to an S3-compatible endpoint (Hetzner Object Storage).
+
+Agent commit: 1956afb39613aafc88d821a9b1762ae397d4f588
+Agent repository: https://github.com/frappe/agent
+License: AGPL-3.0 (derived from Agent code)
+
+Press sends ENDPOINT_URL in the offsite auth (press/agent.py,
+_get_offsite_backup_config, Press v0.154.1). Unpatched Agent ignores it: the
+boto3 uploads go to AWS, and the streaming rclone path fixes the endpoint to
+s3.<region>.amazonaws.com. This patch adds agent/offsite_s3.py. Every offsite
+S3 client (site backups, binlogs, audit logs) now takes its settings from it.
+With ENDPOINT_URL set, boto3 gets endpoint_url and rclone gets
+--s3-provider Other and --s3-endpoint. Without it, behaviour is unchanged.
+Credentials still reach rclone only through the environment.
+
+Remove when: Agent upstream reads ENDPOINT_URL for offsite uploads. Then move
+the pinned Agent commit forward and delete this patch.
+Test: backend/deploy/tests/test_agent_patches.py
+
+diff --git a/agent/database_server.py b/agent/database_server.py
+index d96b6e7..f465344 100644
+--- a/agent/database_server.py
++++ b/agent/database_server.py
+@@ -15,6 +15,7 @@ from mariadb_binlog_indexer import Indexer as BinlogIndexer
+ from mariadb_table_usage import usage as calculate_table_usage
+ from peewee import MySQLDatabase
+ 
++from agent import offsite_s3
+ from agent.database import CustomPeeweeDB, Database
+ from agent.exceptions import AgentException
+ from agent.job import job, step
+@@ -1015,21 +1016,8 @@ WHERE `schema` IN (
+             offsite["auth"],
+             offsite["path"],
+         )
+-        region = auth.get("REGION")
+-
+-        if region:
+-            s3 = boto3.client(
+-                "s3",
+-                aws_access_key_id=auth["ACCESS_KEY"],
+-                aws_secret_access_key=auth["SECRET_KEY"],
+-                region_name=region,
+-            )
+-        else:
+-            s3 = boto3.client(
+-                "s3",
+-                aws_access_key_id=auth["ACCESS_KEY"],
+-                aws_secret_access_key=auth["SECRET_KEY"],
+-            )
++
++        s3 = boto3.client("s3", **offsite_s3.boto3_client_kwargs(auth))
+ 
+         tmp_folder = get_tmp_folder_path()
+         for binlog in binlogs:
+@@ -1151,21 +1139,8 @@ WHERE `schema` IN (
+             offsite["auth"],
+             offsite["path"],
+         )
+-        region = auth.get("REGION")
+-
+-        if region:
+-            s3 = boto3.client(
+-                "s3",
+-                aws_access_key_id=auth["ACCESS_KEY"],
+-                aws_secret_access_key=auth["SECRET_KEY"],
+-                region_name=region,
+-            )
+-        else:
+-            s3 = boto3.client(
+-                "s3",
+-                aws_access_key_id=auth["ACCESS_KEY"],
+-                aws_secret_access_key=auth["SECRET_KEY"],
+-            )
++
++        s3 = boto3.client("s3", **offsite_s3.boto3_client_kwargs(auth))
+ 
+         tmp_folder = get_tmp_folder_path()
+         for log in list_audit_logs(self.audit_log_pending_directory, AUDIT_LOG_STAGED_RE):
+diff --git a/agent/offsite_s3.py b/agent/offsite_s3.py
+new file mode 100644
+index 0000000..8bfffc5
+--- /dev/null
++++ b/agent/offsite_s3.py
+@@ -0,0 +1,58 @@
++"""S3 client settings for offsite backups, for AWS and S3-compatible storage.
++
++Press sends the offsite auth with ``ENDPOINT_URL`` (Backup Bucket ``endpoint_url``). When it is
++set, the backup goes to that S3-compatible endpoint (for example Hetzner Object Storage) instead
++of AWS. Without it, the settings are the same as before this change.
++
++Credentials are returned only as boto3 keyword arguments. rclone reads them from the environment
++(``--s3-env-auth``), so they never appear in its command line.
++"""
++
++from __future__ import annotations
++
++S3_COMPATIBLE = "S3 Compatible"
++
++
++def endpoint_url(auth: dict) -> str | None:
++    endpoint = auth.get("ENDPOINT_URL")
++    if not endpoint:
++        return None
++    if not endpoint.startswith("https://"):
++        raise KeyError("ENDPOINT_URL (must start with https://)")
++    return endpoint
++
++
++def boto3_client_kwargs(auth: dict) -> dict:
++    kwargs = {
++        "aws_access_key_id": auth["ACCESS_KEY"],
++        "aws_secret_access_key": auth["SECRET_KEY"],
++    }
++    if auth.get("REGION"):
++        kwargs["region_name"] = auth["REGION"]
++    endpoint = endpoint_url(auth)
++    if endpoint:
++        kwargs["endpoint_url"] = endpoint
++    return kwargs
++
++
++def rclone_s3_flags(auth: dict) -> list[str]:
++    """rclone flags for one offsite auth. Raises KeyError for a missing or unsupported key."""
++    region = auth["REGION"]
++    endpoint = endpoint_url(auth)
++    if endpoint:
++        provider = "Other"
++    elif auth.get("PROVIDER") == "AWS S3":
++        provider, endpoint = "AWS", f"s3.{region}.amazonaws.com"
++    elif auth.get("PROVIDER") == S3_COMPATIBLE:
++        raise KeyError("ENDPOINT_URL (required for S3 Compatible)")
++    else:
++        raise KeyError(f"PROVIDER {auth.get('PROVIDER')!r}")
++    return [
++        "--s3-provider",
++        provider,
++        "--s3-region",
++        region,
++        "--s3-endpoint",
++        endpoint,
++        "--s3-env-auth=true",
++    ]
+diff --git a/agent/site.py b/agent/site.py
+index 4fc0aff..1e40de1 100644
+--- a/agent/site.py
++++ b/agent/site.py
+@@ -16,6 +16,7 @@ from urllib.parse import urlparse
+ 
+ import requests
+ 
++from agent import offsite_s3
+ from agent.base import AgentException, Base
+ from agent.database import Database
+ from agent.job import job, step
+@@ -651,21 +652,8 @@ class Site(Base):
+                 offsite["auth"],
+                 offsite["path"],
+             )
+-            region = auth.get("REGION")
+-
+-            if region:
+-                s3 = boto3.client(
+-                    "s3",
+-                    aws_access_key_id=auth["ACCESS_KEY"],
+-                    aws_secret_access_key=auth["SECRET_KEY"],
+-                    region_name=region,
+-                )
+-            else:
+-                s3 = boto3.client(
+-                    "s3",
+-                    aws_access_key_id=auth["ACCESS_KEY"],
+-                    aws_secret_access_key=auth["SECRET_KEY"],
+-                )
++
++            s3 = boto3.client("s3", **offsite_s3.boto3_client_kwargs(auth))
+ 
+             for backup_file in backup_files.values():
+                 file_name = backup_file["file"].split(os.sep)[-1]
+@@ -1067,22 +1055,9 @@ print(">>>" + frappe.session.sid + "<<<")
+             # letting a raw KeyError abort it with an opaque traceback.
+             try:
+                 # press stores PROVIDER as a human label (e.g. "AWS S3"), not
+-                # rclone's provider name. Map the label to (rclone --s3-provider
+-                # value, endpoint). The boto3 (non-streaming) path ignores
+-                # PROVIDER entirely, so this mapping lives only here.
+-                providers = {
+-                    "AWS S3": ("AWS", f"s3.{auth['REGION']}.amazonaws.com"),
+-                }
+-                rclone_provider, endpoint = providers[auth["PROVIDER"]]
+-                s3_flags = [
+-                    "--s3-provider",
+-                    rclone_provider,
+-                    "--s3-region",
+-                    auth["REGION"],
+-                    "--s3-endpoint",
+-                    endpoint,
+-                    "--s3-env-auth=true",
+-                ]
++                # rclone's provider name. offsite_s3 maps it, and uses press's
++                # ENDPOINT_URL (S3-compatible storage such as Hetzner) when set.
++                s3_flags = offsite_s3.rclone_s3_flags(auth)
+                 # Credentials go via env (--s3-env-auth) instead of CLI flags so
+                 # they don't leak into the process table. GOMEMLIMIT/GOGC cap
+                 # rclone's Go heap so it stays a small earlyoom target. Built
