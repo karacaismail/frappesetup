@@ -64,6 +64,8 @@ Son koşuda bu senaryo uygulama yanıtına ulaşmadı.
 Komutları depo kökünden ve kendi Pane ortamınızda çalıştırın.
 Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
+`e2e/stack up` Keycloak hazır olunca realm eşitleme adımını çalıştırır. Bu adım realm dosyasındaki istemci ve kapsamları korunan veritabanına uygular. Adım kullanıcı ve oturum silmez. Ayrıntı `identity/keycloak/README.md` dosyasının "Korunan veritabanında realm eşitleme" bölümündedir.
+
 ### Colima profilleri
 
 - **Mevcut Factory ortamı.** Betik yalnız mevcut imajı ve siteyi yeniden kullanır. Factory diskinde en az 5 GiB boş alan gerekir.
