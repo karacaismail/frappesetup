@@ -70,7 +70,7 @@ class Platform:
     source: Path = field(default=Path(), compare=False)
 
 
-def _check_record(record: object, path: Path) -> Platform:
+def _check_record(record: object, path: Path, allow_local_http: bool) -> Platform:
     where = path.name
     if not isinstance(record, dict):
         raise RegistryError(f"{where}: the record must be a JSON object.")
@@ -110,7 +110,7 @@ def _check_record(record: object, path: Path) -> Platform:
             raise RegistryError(f"{where}: config {key}={value} turns off a safety check.")
         if "://" in value:
             address = urllib.parse.urlsplit(value)
-            local = address.scheme == "http" and LOCAL_HOST.fullmatch(address.hostname or "")
+            local = allow_local_http and address.scheme == "http" and LOCAL_HOST.fullmatch(address.hostname or "")
             if address.scheme != "https" and not local:
                 raise RegistryError(f"{where}: config {key} must use https.")
     active = record.get("active", True)
@@ -124,15 +124,20 @@ def _check_record(record: object, path: Path) -> Platform:
     return Platform(alias, record["providerId"], record["displayName"], host, dict(secrets), dict(config), active, path)
 
 
-def load_platforms(directory: Path = REGISTRY_DIR) -> list[Platform]:
-    """Read and check every platform record, sorted by alias."""
+def load_platforms(directory: Path = REGISTRY_DIR, *, allow_local_http: bool = False) -> list[Platform]:
+    """Read and check every platform record, sorted by alias.
+
+    Addresses must use https. ``allow_local_http`` also accepts http to a local name. Only the
+    development apply step may set it: in production Keycloak would look for that name on its own
+    machine (review 2, finding 2).
+    """
     found = []
     for path in sorted(Path(directory).glob("*.json")):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
         except ValueError as error:
             raise RegistryError(f"{path.name}: not valid JSON ({error.__class__.__name__}).") from None
-        found.append(_check_record(record, path))
+        found.append(_check_record(record, path, allow_local_http))
     names = [name for platform in found for name in platform.secrets.values()]
     duplicates = sorted({name for name in names if names.count(name) > 1})
     if duplicates:

@@ -116,7 +116,7 @@ def apply_registry(call: Callable, registry: list[Platform], environment: Mappin
             status, _ = call("POST", "/identity-provider/instances", state)
             action = "created"
         elif status == 200:
-            kept = {k: v for k, v in current.get("config", {}).items() if k not in platform.secrets}
+            kept = {k: v for k, v in (current.get("config") or {}).items() if k not in platform.secrets}
             merged = {**current, **state, "config": {**kept, **state["config"]}}
             status, _ = call("PUT", path, merged)
             action = "updated"
@@ -133,7 +133,8 @@ def apply_registry(call: Callable, registry: list[Platform], environment: Mappin
         if provider["alias"] not in known:
             # Not changed. A provider without the e-mail rule is named, because it can pre-hijack
             # an account through the shared first-login flow (review 1, important 3).
-            config = provider.get("config", {})
+            # Keycloak may return "config": null (review 2, finding 1).
+            config = provider.get("config") or {}
             safe = all(config.get(k) == v for k, v in platforms.VERIFIED_EMAIL_CLAIM.items())
             action = "not-in-registry" if safe else "not-in-registry-unverified-email"
             report.append({"alias": provider["alias"], "action": action, "enabled": provider.get("enabled")})

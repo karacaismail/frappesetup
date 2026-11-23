@@ -269,7 +269,8 @@ class LivePlatformTest(unittest.TestCase):
         output, errors = io.StringIO(), io.StringIO()
         try:
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
-                code = load_command().main(["--platforms-dir", str(cls.folder), "apply", "--from-env"])
+                code = load_command().main(
+                    ["--platforms-dir", str(cls.folder), "--allow-local-http", "apply", "--from-env"])
         finally:
             for name, value in saved.items():
                 if value is None:
