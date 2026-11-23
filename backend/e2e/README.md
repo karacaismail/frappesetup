@@ -78,6 +78,8 @@ Vite ayarında `VITE_DEV_SITE_NAME=tenant1.localhost` değerini kullanın.
 Keycloak aynı Vite adresine döner. Frappe oturum çerezini bu adreste açar.
 Frappe girişten sonra `http://localhost:5180/panel` adresine yönlendirir.
 `FS_STACK_VITE=1` yoksa giriş kiracı adresini kullanır.
+Vite kipi açıkken Frappe, tam bağlantıları Vite adresiyle kurar.
+Birleştirme önizlemesi ayrı bir yığında çalışır.
 
 ### Colima profilleri
 

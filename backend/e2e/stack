@@ -422,8 +422,7 @@ def tenant_browser_origin(environment):
 
 def tenant_login_settings(environment):
     origin = tenant_browser_origin(environment)
-    return {
-        "host_name": origin,
+    settings = {
         "keycloak_public_url": environment["KC_PUBLIC_URL"],
         "keycloak_internal_url": environment["KC_PUBLIC_URL"],
         "keycloak_client_id": "site-tenant1",
@@ -431,6 +430,9 @@ def tenant_login_settings(environment):
         "identity_brand_name": "Atonota",
         "platform_panel_url": origin + "/panel",
     }
+    if environment.get("FS_STACK_VITE") == "1":
+        settings["host_name"] = origin
+    return settings
 
 
 def configure_tenant_login(compose, environment):

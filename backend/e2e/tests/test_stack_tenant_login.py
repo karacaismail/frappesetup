@@ -4,6 +4,7 @@ import json
 import runpy
 import unittest
 from pathlib import Path
+from secrets import token_hex
 from unittest.mock import Mock, patch
 
 
@@ -16,7 +17,7 @@ class StackTenantLoginTest(unittest.TestCase):
         run = Mock()
         run.return_value.stdout = "platform-id"
         configure = Mock(side_effect=RuntimeError("stop after configuring tenant login"))
-        environment = {"ATONOTA_SITE_TENANT1_SECRET": "synthetic-client-secret"}
+        environment = {"ATONOTA_SITE_TENANT1_SECRET": token_hex(16)}
         dependencies = {
             name: Mock()
             for name in ("require_press_settings", "require_realm_sync_settings",
@@ -31,7 +32,7 @@ class StackTenantLoginTest(unittest.TestCase):
     def test_vite_redirect_is_explicit_and_keeps_the_tenant_backchannel(self):
         environment = {
             "ATONOTA_SITE_TENANT1_URL": "http://tenant1.localhost:7401",
-            "ATONOTA_SITE_TENANT1_SECRET": "synthetic-client-secret",
+            "ATONOTA_SITE_TENANT1_SECRET": token_hex(16),
             "KC_PUBLIC_URL": "http://identity.localhost:7400",
         }
         for vite, origin in (("0", environment["ATONOTA_SITE_TENANT1_URL"]), ("1", "http://localhost:5180")):
@@ -46,7 +47,10 @@ class StackTenantLoginTest(unittest.TestCase):
                 STACK["stack_realm"](realm, environment)
                 settings = STACK["tenant_login_settings"](environment)
 
-                self.assertEqual(settings["host_name"], origin)
+                if vite == "1":
+                    self.assertEqual(settings["host_name"], origin)
+                else:
+                    self.assertNotIn("host_name", settings)
                 self.assertEqual(settings["platform_panel_url"], origin + "/panel")
                 self.assertEqual(tenant["attributes"]["backchannel.logout.url"], backchannel)
                 expected = original_uris + ([origin + STACK["TENANT_CALLBACK"]] if vite == "1" else [])
