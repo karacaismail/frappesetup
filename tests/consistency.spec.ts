@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
@@ -16,11 +17,93 @@ const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
   .map((f) => ({ slug: f.replace(/\.md$/, ''), text: readFileSync(new URL(f, docsDir), 'utf8') }));
 const ids = new Set(reqs.map((r) => r.id));
+type TaskItem = { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[] } };
+type TaskBoard = {
+  epics: { id: string; title: string; goal: string }[];
+  statuses: { id: string; label: string; rule: string }[];
+  levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
+  items: Record<string, TaskItem>;
+};
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
 
 test.describe('content consistency', () => {
   test.beforeEach(({ browserName }) => {
     test.skip(browserName !== 'chromium', 'Dosya düzeyi denetim; tek motorda koşar.');
+  });
+
+  test('task board covers every requirement with a valid epic, status and level', () => {
+    // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
+    expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const itemIds = Object.keys(board.items);
+    expect(itemIds.filter((id) => !ids.has(id)), 'gereksinimde olmayan kimlik').toEqual([]);
+    expect(reqs.map((r) => r.id).filter((id) => !(id in board.items)), 'kaydı olmayan gereksinim').toEqual([]);
+    const epicIds = board.epics.map((e) => e.id);
+    expect(new Set(epicIds).size, 'epic kimliği tekil').toBe(epicIds.length);
+    expect(board.statuses.map((s) => s.id)).toEqual(['done', 'in-progress', 'not-started', 'unverified']);
+    expect(board.levels.map((l) => l.id)).toEqual(['poc', 'mvp', 'post-mvp', 'scale', 'enterprise']);
+    for (const e of board.epics) {
+      expect(e.title.trim(), e.id).not.toBe('');
+      expect(e.goal.trim(), `${e.id} amacı`).not.toBe('');
+      expect(itemIds.some((id) => board.items[id].epic === e.id), `${e.id} boş epic`).toBe(true);
+    }
+    for (const l of [...board.levels, ...board.statuses]) expect(l.rule.trim(), `${l.id} kuralı`).not.toBe('');
+    for (const [id, it] of Object.entries(board.items)) {
+      expect(epicIds, `${id} epic`).toContain(it.epic);
+      expect(board.statuses.map((s) => s.id), `${id} durum`).toContain(it.status);
+      expect(board.levels.map((l) => l.id), `${id} düzey`).toContain(it.level);
+      const allowed = ['epic', 'status', 'level', ...(it.status === 'done' ? ['evidence'] : [])];
+      expect(Object.keys(it).filter((k) => !allowed.includes(k)), `${id} fazla alan`).toEqual([]);
+    }
+  });
+
+  test('task board levels follow the written mapping rules', () => {
+    // Düzey elle seçilmez: sayfadaki kural (faz eşlemesi + adı yazılı istisna listesi) her kalemi tek düzeye bağlar.
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const byId = new Map<string, string>();
+    const byPhase = new Map<string, string>();
+    for (const l of board.levels) {
+      for (const id of l.ids ?? []) {
+        expect(byId.has(id), `${id} iki istisna listesinde`).toBe(false);
+        expect(ids.has(id), `${l.id} istisnasında bilinmeyen ${id}`).toBe(true);
+        byId.set(id, l.id);
+      }
+      for (const p of l.phases ?? []) {
+        expect(byPhase.has(p), `${p} iki düzeyde`).toBe(false);
+        byPhase.set(p, l.id);
+      }
+    }
+    expect([...byPhase.keys()].sort(), 'her faz bir düzeye bağlı').toEqual(phases.map((p) => p.id).sort());
+    const wrong = reqs
+      .map((r) => ({ id: r.id, want: byId.get(r.id) ?? byPhase.get(r.phase), got: board.items[r.id].level }))
+      .filter((x) => x.want !== x.got)
+      .map((x) => `${x.id}: ${x.got} (kural ${x.want})`);
+    expect(wrong).toEqual([]);
+    // MVP kapsam kararı: P2 ödeme katmanı ve P4 kendi kendine deneme ve etkinleştirme MVP dışındadır.
+    for (const r of reqs.filter((x) => x.phase === 'P2')) expect(board.items[r.id].level, r.id).not.toBe('mvp');
+    for (const id of ['G-31', 'G-95']) expect(board.items[id].level, id).toBe('post-mvp');
+  });
+
+  test('every done task carries evidence that exists in the repository', () => {
+    // "Bitti" yalnız kanıtla yazılır: denetim commit'i depoda olmalı, test dosyası yolu gerçek olmalı.
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const done = Object.entries(board.items).filter(([, it]) => it.status === 'done');
+    expect(done.length, 'en az bir bitti kaydı').toBeGreaterThan(0);
+    for (const [id, it] of done) {
+      expect(it.evidence, `${id} kanıt`).toBeTruthy();
+      const ev = it.evidence!;
+      expect(ev.commit, `${id} commit`).toMatch(/^[0-9a-f]{7,40}$/);
+      expect(ev.tests.length, `${id} test listesi boş`).toBeGreaterThan(0);
+      for (const t of ev.tests) expect(existsSync(new URL(t, root)), `${id} test dosyası ${t}`).toBe(true);
+    }
+    const commits = new Set(done.map(([, it]) => it.evidence!.commit));
+    for (const c of commits) {
+      expect(() => execFileSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: fileURLToPath(root), stdio: 'ignore' }), `commit ${c}`).not.toThrow();
+    }
+    // Denetlenmemiş kalem bitti ya da sürüyor sayılmaz: denetim yalnız P0..P4 MUST kalemlerini okudu.
+    const audited = (r: Req) => r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase);
+    const claimed = reqs.filter((r) => !audited(r) && board.items[r.id].status !== 'unverified').map((r) => r.id);
+    expect(claimed, 'denetim dışı kalemde durum iddiası').toEqual([]);
   });
 
   test('requirement ids are unique, contiguous and well formed', () => {

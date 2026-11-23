@@ -5,13 +5,16 @@ import Site from '../layouts/Site.astro';
 import Mermaid from '../components/Mermaid.tsx';
 import PhaseTable from '../components/PhaseTable.astro';
 import PressAiDownloads from '../components/PressAiDownloads.astro';
-import RequirementsExplorer, { toRequirementRow } from '../components/RequirementsExplorer.tsx';
+import RequirementsExplorer, { toBoardMeta, toRequirementRow } from '../components/RequirementsExplorer.tsx';
+import TaskBoardRules from '../components/TaskBoardRules.astro';
 import Rails from '../components/Rails.astro';
 import RequirementSummary from '../components/RequirementSummary.astro';
 import Timeline from '../components/Timeline.astro';
 import { sectionIcon } from '../components/icons';
 import { SECTIONS } from '../data/sections';
 import requirements from '../data/requirements.json';
+import taskBoard from '../data/task-board.json';
+import phases from '../data/phases.json';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
@@ -37,7 +40,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
 const EMBEDS: Record<string, string[]> = {
   raylar: ['rails'],
   'yol-haritasi': ['phase-table', 'timeline'],
-  gereksinimler: ['req-summary'],
+  gereksinimler: ['req-summary', 'task-rules'],
   // press-ai indirme blokları (dl-<grup>): statik bağlantılar, dosyalar derlemede üretilir.
   'ai-mcp': ['dl-mcp'],
   'ai-skills': ['dl-skills'],
@@ -85,6 +88,13 @@ const embeds = EMBEDS[entry.id] ?? [];
         </div>
       )
     }
+    {
+      embeds.includes('task-rules') && (
+        <div data-embed-source="task-rules" class="prose">
+          <TaskBoardRules />
+        </div>
+      )
+    }
 
     {
       embeds
@@ -99,7 +109,11 @@ const embeds = EMBEDS[entry.id] ?? [];
     {
       entry.id === 'gereksinimler' && (
         <div class="explorer">
-          <RequirementsExplorer client:visible rowsJson={JSON.stringify(requirements.map(toRequirementRow))} />
+          <RequirementsExplorer
+            client:visible
+            rowsJson={JSON.stringify(requirements.map((r) => toRequirementRow(r, taskBoard)))}
+            metaJson={JSON.stringify(toBoardMeta(taskBoard, phases))}
+          />
         </div>
       )
     }
