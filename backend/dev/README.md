@@ -189,6 +189,8 @@ backend/dev/bin/ruff
 backend/dev/bin/stop
 ```
 
+`bin/test` testleri `test-<uygulama>.localhost` adlı ayrı bir sitede koşar. Bu sitede `allow_tests` açıktır. `tenant1.localhost` sitesinde `allow_tests` bilerek kapalıdır. Testler kayıt açar ve siler. Kapalı sitede Frappe'nin `run-tests` komutu "Testing is disabled" yazar ve 0 koduyla biter. Bu davranış Frappe'nin `frappe/commands/testing.py` dosyasındadır. Bu yüzden `bin/test` önce sitenin ayarını okur. `allow_tests` açık değilse komut 3 koduyla durur.
+
 ## Kod denetimleri
 
 Bu komutlar modül sınırlarını, yapay zekâ kurallarını ve betik testlerini denetler.
