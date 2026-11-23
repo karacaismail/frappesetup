@@ -93,8 +93,8 @@ def handle_logout_token(logout_token: object) -> dict:
 
 def _validate_logout_claims(claims: dict) -> None:
 	"""OpenID Connect Back-Channel Logout 1.0, section 2.4: exp and jti are required, the event value
-	is a JSON object and sid, when present, is a string. The shared library does not enforce these yet.
-	BORC(mvp): owner kimlik-realm. Closes when `oidc_verify` enforces these claims for logout tokens."""
+	is a JSON object and sid, when present, is a string. `oidc_verify.verify_logout_token` enforces these
+	claims too; this second check stays as defence in depth."""
 	if not isinstance(claims.get("exp"), int | float) or isinstance(claims.get("exp"), bool):
 		_reject(_("Logout token rejected: {0}", context="platform_core.identity").format("missing_exp"))
 	jti = claims.get("jti")
