@@ -9,7 +9,7 @@ provide a synthetic account through `PANEL_TEST_USERNAME` and
 Run from the repository root with its installed dependencies and browser engines.
 
 ```sh
-node_modules/.bin/playwright test --config backend/apps/platform_core/platform_core/kabuk/browser_tests/playwright.config.ts
+node_modules/.bin/playwright test --config backend/apps/platform_core/platform_core/shell/browser_tests/playwright.config.ts
 ```
 
 The suite runs Chromium and WebKit. It saves screenshots under

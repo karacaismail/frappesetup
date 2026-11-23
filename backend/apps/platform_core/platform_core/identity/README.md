@@ -1,6 +1,6 @@
 # Kimlik modülü
 
-Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belirtecini doğrular. identity-sync için kullanıcı uçlarını verir. Sahibi platform-core-kimlik işidir. Uçların sözleşmesi `backend/contracts/platform_core-kimlik.openapi.yaml` dosyasındadır.
+Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belirtecini doğrular. identity-sync için kullanıcı uçlarını verir. Sahibi platform-core-kimlik işidir. Uçların sözleşmesi `backend/contracts/platform_core-identity.openapi.yaml` dosyasındadır.
 
 ## Dosyalar
 
@@ -82,7 +82,7 @@ Sunucu, istemci sırrını yalnız `site_config.json` dosyasından okur.
 Site ayarlarını yazdıktan sonra şu komut “Social Login Key” kaydını kurar:
 
 ```bash
-bench --site <site> execute platform_core.kimlik.provider_setup.ensure_social_login_key
+bench --site <site> execute platform_core.identity.provider_setup.ensure_social_login_key
 ```
 
 Aynı iş HTTP ile de yapılır. Uç `platform_core.api.auth.setup_keycloak_login` olur. Yalnız System Manager çağırır.

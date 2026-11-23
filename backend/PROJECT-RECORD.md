@@ -150,7 +150,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-11. Eşitleme olaylarının kaynağını identity-sync işi seçer.** İşçi T-2 notunda en yalın açık kaynak yolu seçer. Zamanlanmış yoklama yine yasaktır (D-6).
 - **O-12. `platform_core` MIT lisanslı kalır.** AGPL lisanslı bir bileşen `platform_core` içine alınmaz. Böyle bir bileşen gerekirse ayrı uygulama ya da ayrı servis olur.
 
-- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gecidi` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
+- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gecidi` olur. Kod klasörünün bugünkü adı `model_gateway` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
 - **O-14. Kayıt önce kiracı sitesindedir.** Her kiracı kendi sağlayıcılarını, hesaplarını ve API'lerini ekleyebilir. Platformun ortak hesapları sonraki turda Press'ten site ayarına gelir.
 - **O-15. Sağlık denetimi zamanlanmaz.** API'nin sağlığı gerçek çağrıların sonucundan çıkar. Elle başlatılan bağlantı denetimi de vardır (D-6).
 
@@ -243,13 +243,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Bu kural bütün işlerin ölçüm komutlarına uygulanır.
   - Veritabanını değiştiren ölçüm testleri yalnız `perf-` sitesinde koşar, öteki sitede açık nedenle atlanır. Ölçüm mantığının testleri sahte veriyle çalışır.
   - Adı `test-` ile başlayan siteler atılabilir deneme siteleridir. Ortak test sınıflarının bu sitelerdeki toplu temizliği kabul edilir.
-- **O-36. Servis belirteci kodu kimlik klasöründe durur.** Kiracı sitesi identity-sync için servis belirteci alır. Bu kod `kimlik/service_client.py` dosyasındadır. Kurallar şunlardır:
+- **O-36. Servis belirteci kodu kimlik klasöründe durur.** Kiracı sitesi identity-sync için servis belirteci alır. Bu kod `kimlik/service_client.py` dosyasındadır. Bugünkü yol `identity/service_client.py` olur. Kurallar şunlardır:
   - Dosyayı platform-core-mobil dalı yazdı. Orkestratör bu yazımı bir kez onayladı. Mobil dal birleşene kadar dosyayı mobil çalışanı düzeltir. Birleşmeden sonra dosyanın sahibi platform-core-kimlik işidir.
-  - Modülün açık yolu `platform_core.kimlik.service_client` olur. Yol `dev/modul-sinirlari.json` dosyasına eklendi.
+  - Modülün açık yolu `platform_core.kimlik.service_client` olur. Bugünkü yol `platform_core.identity.service_client` olur. Yol `dev/modul-sinirlari.json` dosyasına eklendi.
   - Belirteç adresi Keycloak ayarlarından türetilir. Önce `keycloak_internal_url`, yoksa `keycloak_public_url` kullanılır. `mobile_identity_sync_token_url` ayarı kullanılmaz.
   - Keycloak belirteç adresi her zaman HTTPS olmalıdır. integration-e2e işi geliştirme yığınında HTTPS iç adresi sağlar.
   - T-5. Kimlik servisi adresi üretimde HTTPS olmalıdır. Yerel HTTP için `developer_mode` ve `mobile_allow_development_http` birlikte açılır. Yeni ayar varsayılan olarak kapalıdır. Mobil modül adresi ve ayarları denetler.
-  - platform-core-kimlik dalı mobil dosyalarındaki değişikliklerini geri alır. Bu dosyalar `mobil/identity_sync_client.py`, onun testi ve `0007-mobil-esitleme.md` notudur.
+  - platform-core-kimlik dalı mobil dosyalarındaki değişikliklerini geri alır. Bu dosyalar `mobil/identity_sync_client.py` (bugünkü yol `mobile/identity_sync_client.py`), onun testi ve `0007-mobil-esitleme.md` notudur.
 - **O-37. Birleştirmede ortak dosya ve bağımlılık kuralları.** 22 Kasım 2026 Pazar günü bütün backend dalları birleşti. Kurallar şunlardır:
   - `oidc_verify` kitaplığı iki uygulamada da `oidc_verify==0.1.0` kuralıyla istenir. Kitaplık depodadır ve sürüm paketiyle birlikte kurulur. Kural değişince güvenlik kilidi `backend/dev/security/compile-lock` ile yeniden üretilir.
   - `hooks.py` içinde her kanca bir kez atanır. Örneğin `override_whitelisted_methods` sözlüğü hem kimlik giriş kapılarını hem erişim kuralının bağlantı aramasını taşır. İkinci atama birinciyi sileceği için yazılmaz.
@@ -360,6 +360,27 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Depo testi eksik kayıtları ve boş alanları yakalar.
   - Geçici geliştirme betiği değişirse dosya özeti de değişir. Test kayıt incelemesini ister.
   - Bu karar G-7 kapsamındaki takibi sağlar. O-18 borcu açık kalır.
+
+- **O-55. Press'in `press.` adı yalnız özel ağa açıktır. Müşteriye yalnız hesap silme akışı açılır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - G-6, G-13 ve G-119 aynı kuralı yazar. Desk ve operatör adı yalnız Tailscale ya da özel ağdan açılır. Bu karar o kuralı kenar vekile işler.
+  - MVP'de müşterinin Press'te yaptığı tek iş hesap silme isteğidir (O-27). Mağaza, fatura ve takım ekranları G-13'e göre ayrı `panel.` adında açılır. O ad MVP'de yoktur.
+  - Kenar vekil müşteriye yalnız şu yolları açar:
+    1. `/account-deletion` hesap silme sayfasıdır.
+    2. `/assets/*` ve `/website_script.js` sayfanın dosyalarıdır.
+    3. `press_tr.api.auth.get_login_url` Keycloak girişini başlatır.
+    4. `press_tr.api.auth.keycloak_callback` Keycloak'tan dönüşü karşılar.
+    5. `press_tr.api.keycloak_backchannel_logout` Keycloak'ın oturum kapatma bildirimini alır. Bildirim imzalıdır. Keycloak bu bildirimi genel adresten gönderir.
+    6. `press_tr.api.account.request_deletion` silme isteğini alır.
+  - Üç API yolu `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
+  - Öteki bütün yollar yalnız Tailscale adreslerinden açılır. Örneğin `/app`, `/desk`, `/dashboard` ve `/api/resource/` böyledir. Tailscale adresleri `100.64.0.0/10` ve `fd7a:115c:a1e0::/48` aralıklarıdır. Başka istek 404 alır.
+  - Yerel ağ aralıkları özel sayılmaz. Gerekçe şudur. Docker, IPv6 ile gelen genel isteği `172.16.0.0/12` içinden bir adresle gösterebilir.
+  - Tailscale dışından gelen istekte iki ek ret vardır. Birincisi `cmd` sorgu alanıdır. Frappe 16 `cmd` alanını yoldan önce işler. Bu alan açık bir yoldan her yönteme ulaşırdı. İkincisi ham yoldaki `..`, `//`, `%2e`, `%2f` ve `%5c` dizileridir.
+  - Gövdedeki `cmd` alanını kenar vekil göremez. Bu yüzden `press_tr` de `cmd` alanını denetler. Alan yolun kendi yöntemini adlandırmazsa istek reddedilir.
+  - Bu denetim Tailscale içinde de çalışır. Eski biçimde `/` adresine `cmd` gönderen bir masa ekranı bozulabilir. Bu yüzden DevOps sorumlusu alpha'da masayı Tailscale'den dener. Sonuç E-2 satırına yazılır.
+  - identity-sync, Press API'lerine kenar vekilden geçmez. `identity-press` ağından `http://<Press adı>:8080` adresine gider. Bu ağda yalnız identity-sync ve `press-frontend` vardır. Ağın internete çıkışı yoktur.
+  - Müşteriye yeni bir yol gerekirse yol bu listeye tek tek eklenir. Gerekçe bu karara yazılır. Joker yol eklenmez. `/assets/*` yalnız durağan dosyaları sunar.
+  - DevOps sorumlusu sunucunun genel ağ arayüzünde `100.64.0.0/10` kaynaklı paketleri düşürür. Bu kural G-6 güvenlik duvarının parçasıdır.
+  - Kural `deploy/compose/site.caddy.template` dosyasındadır. `deploy/tests/test_press_image.py` kuralı denetler. Test bütün şablonu da tarar. Press kabına giden satır yalnız Press bloğunda olabilir.
 
 - **O-56. AtonotA Login ürününün geliştirmesi başladı.** Proje sahibi bu kararı 23 Kasım 2026 Pazartesi günü verdi. Proje sahibinin sözü şudur: "AtonotA Login geliştirmeleri bitsin."
   - Bu karar O-51'in son iki hükmünü değiştirir. O-51 geçerli kalır. Değişen hükümler "yeni platform eklemek MVP sonrasıdır" ve "MVP'de yalnız çelişen yerler düzeltildi" hükümleridir.

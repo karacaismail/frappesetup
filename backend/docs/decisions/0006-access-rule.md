@@ -186,7 +186,7 @@ Karar sitesi `permissions.py:491` ve `db_query.py:1166` satırlarını gösterir
 `hooks.py` dosyasına tek satır eklenir:
 
 ```python
-permission_query_conditions = {"*": "platform_core.erisim.hooks.query_conditions"}
+permission_query_conditions = {"*": "platform_core.access.hooks.query_conditions"}
 ```
 
 İşlev şu adımları izler:
@@ -206,7 +206,7 @@ Motor koşulu Frappe'nin sorgu kurucusuyla yazar. Değerler sorguya kaçışlı 
 `hooks.py` dosyasına tek satır eklenir:
 
 ```python
-has_permission = {"*": "platform_core.erisim.hooks.has_permission"}
+has_permission = {"*": "platform_core.access.hooks.has_permission"}
 ```
 
 İşlev şu adımları izler:
@@ -401,7 +401,7 @@ Döngünün uzunluğu sonucu değiştirmez. İki raporluk döngü de 200 raporlu
 
 Çözülen bir rapor burada hiç reddedilmez. Bozuk bir rapor da açılabilir ve kaydedilebilir. Böylece yönetici bozuk başvuruyu düzeltebilir. Bir test bunu sınar.
 
-Başka modüller kapıyı `platform_core.erisim.api.report_guard` işleviyle de sorabilir. Yapay zekâ katmanı raporu çalıştırmadan önce bu işlevi çağırır. Bu erken bir cevaptır. Asıl denetim rapor çalışırken yine yapılır.
+Başka modüller kapıyı `platform_core.access.api.report_guard` işleviyle de sorabilir. Yapay zekâ katmanı raporu çalıştırmadan önce bu işlevi çağırır. Bu erken bir cevaptır. Asıl denetim rapor çalışırken yine yapılır.
 
 #### Kurallar
 
@@ -554,7 +554,7 @@ Kural HTTP ucunda kendiliğinden çalışır. Python kodu Frappe'nin arama işle
 
 Bu yüzden iki önlem vardır:
 
-- Python kodu aramayı `platform_core.erisim.api.search_link` ile yapar. Bu işlev aynı kurala uyar. Yalnız denetim isteyen kod `link_search_guard` işlevini çağırır.
+- Python kodu aramayı `platform_core.access.api.search_link` ile yapar. Bu işlev aynı kurala uyar. Yalnız denetim isteyen kod `link_search_guard` işlevini çağırır.
 - Bir test `platform_core` paketini tarar. Frappe'nin arama işlevini doğrudan çağıran dosya bulursa test başarısız olur.
 
 Bu tarama yalnız `platform_core` paketini kapsar. Başka uygulamaların kodu taranmaz.
@@ -614,14 +614,14 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 | `list_documents` | `frappe.get_list` | Liste kancası çalışır. |
 | `get_document` | `check_permission("read")` ve alan silme | Kayıt kancası ve izin seviyesi çalışır. |
 | Yazma araçları | Onaydan sonra kaydın `save` yolu | Kayıt kancası çalışır. |
-| `run_report` | `frappe.desk.query_report.run`, Python'dan | Rapor kapısı çalışır. Kapı “Report” kaydının içindedir. Katman önce `erisim.api.report_guard` işlevini de çağırır. |
+| `run_report` | `frappe.desk.query_report.run`, Python'dan | Rapor kapısı çalışır. Kapı “Report” kaydının içindedir. Katman önce `access.api.report_guard` işlevini de çağırır. |
 
-- `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` modülü yalnız `platform_core.erisim.api` yolunu çağırır. Öteki bağ Frappe'nin kancalarıdır.
+- `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` modülü yalnız `platform_core.access.api` yolunu çağırır. Öteki bağ Frappe'nin kancalarıdır.
 - Yapay zekâ kuralları yalnız motorun kendi araçlarıyla değiştirir. Araçlar aşağıdaki tablodadır. Genel yazma araçları “Access Rule” türüne kapalıdır (O-28). Yazma yine öneri ve insan onayı ister.
 - Yapay zekâ alan seviyesini `yapay_zeka` modülünün yönetim araçlarıyla değiştirir. O dalda `set_field_property` ve `set_role_permission` araçları vardır.
 ### Motorun kendi araçları
 
-Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `erisim/ai_tools.py` dosyasındadır. Bildirim biçimi yapay zekâ sözleşmesinin `x-ai-tools-hook` bölümünden alındı.
+Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `access/ai_tools.py` dosyasındadır. Bildirim biçimi yapay zekâ sözleşmesinin `x-ai-tools-hook` bölümünden alındı.
 
 | Araç | Türü | İşi |
 | --- | --- | --- |
@@ -674,7 +674,7 @@ Bedeli şudur: Kural değiştiren istek her izin denetiminde 1 sorgu daha açar.
 
 ## 13. Uçlar
 
-Sözleşme `contracts/platform_core-erisim.openapi.yaml` dosyasındadır. Uç dosyası `api/access.py` olur. İş kuralı `erisim` klasöründe durur.
+Sözleşme `contracts/platform_core-access.openapi.yaml` dosyasındadır. Uç dosyası `api/access.py` olur. İş kuralı `erisim` klasöründe durur. Klasörün bugünkü adı `access` olur.
 
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
@@ -695,7 +695,7 @@ Açıklama ucu kayıt varlığını ele verebilir. Bu yüzden yanıt çağırana
 
 ## 14. Testler
 
-Testler `erisim/tests/` klasöründedir. Testler isteği Frappe'nin WSGI uygulamasından geçirir (D-6). Bu yol `yapay_zeka` testlerinin yoluyla aynıdır (A-2).
+Testler `access/tests/` klasöründedir. Testler isteği Frappe'nin WSGI uygulamasından geçirir (D-6). Bu yol `yapay_zeka` testlerinin yoluyla aynıdır (A-2).
 
 Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 
@@ -719,8 +719,8 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:
 
 - `api/test_access.py` dört ucun misafir ve yabancı veri reddini sınar.
-- `erisim/test_reports.py` sorgu raporu kapısını sınar.
-- `erisim/test_link_search.py` bağlantı araması süzgecini sınar.
+- `access/test_reports.py` sorgu raporu kapısını sınar.
+- `access/test_link_search.py` bağlantı araması süzgecini sınar.
 
 Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen nedenle başarısız oldu (D-2). Örneğin çalışan bütün kayıtları gördü ve başkasının kaydı 200 döndü. Kancalar açılınca testler geçti.
 
@@ -803,7 +803,7 @@ Kod adları bu işte değişmedi. Örneğin `erisim` klasörünün adı aynıdı
 
 ## 17. Bağımlılık ve sınırlar
 
-- `erisim` modülü öteki `platform_core` modüllerini içe aktarmaz. Öteki modüller yalnız `platform_core.erisim.api` yolunu çağırır. Bu yön proje kaydındadır.
+- `erisim` modülü öteki `platform_core` modüllerini içe aktarmaz. Öteki modüller yalnız `platform_core.access.api` yolunu çağırır. Bu yön proje kaydındadır.
 - Motor “Employee”, “Department” ve “Company” kayıt türlerini adla kullanır. Bu türler ERPNext'ten gelir. Kiracı sitesi ERPNext taşır (proje kaydı, sürümler tablosu).
 - ERPNext kurulu değilse çalışana bağlı kapsam kaydedilemez. `own` kapsamı `owner` alanıyla yine çalışır.
 - Motor Frappe'nin ve ERPNext'in kodunu değiştirmez (M-4).
@@ -817,9 +817,9 @@ B-6 kuralı ortak işlev değişince kullanan yerlerin bulunmasını ister. List
 | --- | --- | --- |
 | `hooks.py` | Motorun kanca işlevleri ve sınıf ekleri | Bağlama |
 | `api/access.py` | `explain` ve `field_level` modülleri | Motorun kendi uçları |
-| `yapay_zeka` modülü | `platform_core.erisim.api.report_guard` | Açık yol |
-| `kabuk/native_metadata.py` | `platform_core.erisim.link_search.search_link` adı, metin olarak | İç yol |
-| `e2e/preview/site-seed.py` | `platform_core.erisim.tests.base` içindeki örnek veri | Test yardımcısı |
+| `yapay_zeka` modülü | `platform_core.access.api.report_guard` | Açık yol |
+| `shell/native_metadata.py` | `platform_core.access.link_search.search_link` adı, metin olarak | İç yol |
+| `e2e/preview/site-seed.py` | `platform_core.access.tests.base` içindeki örnek veri | Test yardımcısı |
 
 İç yolu kullanan tek yer kabuk modülüdür. Kabuk, Website User için izinli yöntem listesinde sarmalayıcının adını yazar. Modül sınırı denetimi metni görmez. Bu yüzden bir test paketi tarar. Açık yol dışında yeni bir kullanım çıkarsa test başarısız olur. Sarmalayıcının adı değişirse kabuk dosyası da değişmelidir.
 
@@ -834,7 +834,7 @@ S-1 kuralı yeni sınıflarda ilkelerin incelenmesini ister. Motorun sınıflar�
 | Tek görev | Uyar | Her modülün bir işi var. `rules` kuralı okur, `engine` koşulu kurar, `reports` rapor kapısıdır, `link_search` arama kapısıdır. |
 | Genişlemeye açıklık | Uyar | Yeni kapsam `SCOPES` ve `engine.scope_criterion` içine eklenir. Var olan kapsamların kodu değişmez. |
 | Yerine geçebilirlik | Uyar | Dört sınıf eki her yöntemde `super()` çağırır ve aynı değeri döner. Frappe'nin sınıfı beklenen gibi çalışır. Kanıt 9. bölümdedir. |
-| Dar arayüz | Uyar | Öteki modüller yalnız `erisim.api` içindeki üç işlevi görür. |
+| Dar arayüz | Uyar | Öteki modüller yalnız `access.api` içindeki üç işlevi görür. |
 | Bağımlılık yönü | Uyar | Motor öteki `platform_core` modüllerini içe aktarmaz. Modül sınırı denetimi bunu sınar. |
 
 Bilinen bir taviz vardır. `reports.py` dört sınıf ekini ve kapı işlevlerini tek dosyada tutar. Dosya 360 satırı geçti. Hepsi aynı kuralı uygular, bu yüzden bölünmedi. Yeni bir yüzey eklenirse dosya bölünmelidir. Bu taviz veri ya da yetki ihlali değildir.
@@ -885,7 +885,7 @@ Sınır sunucu süresinin p95 değeri içindir. p95, ölçümlerin yüzde 95'ini
 Ölçümü elle başlatılan bir komut yapar:
 
 ```bash
-bench --site <site> execute platform_core.erisim.tests.performance.measure
+bench --site <site> execute platform_core.access.tests.performance.measure
 ```
 
 - Komut 200 çalışan ve 2.000 kayıt kurar. Sonra her ucu 50 kez çağırır. Sonunda örnek veriyi siler.
