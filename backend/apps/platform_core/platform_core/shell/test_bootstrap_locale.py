@@ -43,10 +43,11 @@ class TestBootstrapLocale(IntegrationTestCase):
 		self.assertTrue(
 			frappe.db.exists("Language", DISABLED_SAMPLE), "The sample language record must exist."
 		)
+		previous_enabled = frappe.db.get_value("Language", DISABLED_SAMPLE, "enabled")
+		self.addCleanup(_clear_language_caches)
+		self.addCleanup(frappe.db.set_value, "Language", DISABLED_SAMPLE, "enabled", previous_enabled)
 		frappe.db.set_value("Language", DISABLED_SAMPLE, "enabled", 0)
 		_clear_language_caches()
-		self.addCleanup(_clear_language_caches)
-		self.addCleanup(frappe.db.set_value, "Language", DISABLED_SAMPLE, "enabled", 1)
 		languages = get_bootstrap(frappe.session.user)["languages"]
 		enabled = frappe.get_all("Language", fields=["name", "language_name"], filters={"enabled": 1})
 		self.assertEqual(
