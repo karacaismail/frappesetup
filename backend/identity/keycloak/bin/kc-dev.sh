@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manages the Keycloak development environment. Owned by the kimlik-realm workstream.
-# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-reload|realm-delete-only|delete-realm>
+# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|realm-reload|realm-delete-only|delete-realm>
 # Keycloak uses PANE_PORT. The Mailpit UI uses PANE_PORT + 6.
 set -euo pipefail
 
@@ -257,6 +257,12 @@ case "$command" in
     (cd "$SCRIPT_DIR/tests" && PROD_KC_URL="http://127.0.0.1:$prod_port" PROD_KC_PORT="$prod_port" PROD_HTTP_REFUSED="$PROD_HTTP_REFUSED" \
       python3 -I -m unittest discover -s . -p 'test_production_image.py' -v "$@")
     ;;
+  realm-sync)
+    # Applies the realm file's clients and scopes to the kept database without deleting data (T-11).
+    # --import-realm skips an existing realm. Development only: the script refuses a non-local Keycloak.
+    # Keycloak must be reachable from this Mac (see "tunnel").
+    python3 -I "$SCRIPT_DIR/bin/sync-dev-realm.py" --from-env
+    ;;
   realm-reload)
     # Loads the realm file without an image build: the file is copied into the running container, the
     # realm is deleted and the container restarts, so --import-realm imports the file again.
@@ -303,7 +309,7 @@ case "$command" in
     compose up -d --force-recreate --wait keycloak
     ;;
   *)
-    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-reload|realm-delete-only|delete-realm>" >&2
+    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|realm-reload|realm-delete-only|delete-realm>" >&2
     exit 2
     ;;
 esac

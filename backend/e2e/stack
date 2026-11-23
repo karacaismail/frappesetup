@@ -410,6 +410,34 @@ def configure_press(compose, environment):
     )
 
 
+REALM_SYNC = BACKEND / "identity/keycloak/bin/sync-dev-realm.py"
+REALM_FILE = BACKEND / "identity/keycloak/realm/platform-realm.json"
+
+
+def sync_realm(compose, environment):
+    """Apply the realm file's clients and scopes to a kept Keycloak database (finding T-11).
+
+    --import-realm skips an existing realm. The sync runs in the stack network, so it reaches only
+    this stack's Keycloak. Secrets travel on stdin, never on the command line.
+    """
+    realm_text = REALM_FILE.read_text()
+    names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)", realm_text))
+    payload = {
+        "keycloak_url": environment["KC_PUBLIC_URL"],
+        "realm": json.loads(realm_text),
+        "values": {name: environment[name] for name in sorted(names) if name in environment},
+        "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+        "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+    }
+    run(
+        [*compose, "run", "--rm", "--no-deps", "-T", "identity-sync", "python", "-I", "-c",
+         REALM_SYNC.read_text(), "--stdin"],
+        environment,
+        input=json.dumps(payload),
+        text=True,
+    )
+
+
 def up(engine, compose, environment):
     # Fail before any container work, not after a long startup.
     require_press_settings(environment)
@@ -434,6 +462,7 @@ def up(engine, compose, environment):
         ],
         environment,
     )
+    sync_realm(compose, environment)
     realm_id = run(
         [
             *compose,
