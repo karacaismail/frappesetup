@@ -63,6 +63,9 @@ load_environment() {
   # is the value, with no shell quoting. So a value with a space, like "AtonotA Login", stays whole.
   # Quotes and a trailing "# comment" stay in the value, as with docker. A final "\r" (CRLF file) is
   # removed. Blank lines and lines starting with "#" are skipped. Any other line must be KEY=value.
+  # Two differences from docker make this reader stricter, never silently different:
+  # a key with leading spaces ("  KEY=1") is rejected, while docker strips the spaces;
+  # a bare "KEY" line is rejected, while docker copies KEY from the host environment.
   local line key number=0
   while IFS= read -r line || [ -n "$line" ]; do
     number=$((number + 1))
@@ -72,7 +75,7 @@ load_environment() {
     esac
     key="${line%%=*}"
     if [ "$key" = "$line" ] || ! [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-      printf '%s:%s: expected KEY=value. Write the value without quotes and without "export".\n' \
+      printf '%s:%s: expected KEY=value, without "export".\n' \
         "$ENV_FILE" "$number" >&2
       exit 2
     fi

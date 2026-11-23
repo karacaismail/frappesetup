@@ -23,6 +23,10 @@ from helpers import DIRECTORY
 
 SCRIPT = DIRECTORY / "bin" / "kc-dev.sh"
 
+# A full path to bash keeps the call free of a PATH lookup (Bandit B607).
+# Without bash the test cannot run the script, so it stops with a clear error instead of skipping.
+BASH = shutil.which("bash")
+
 # The stand-in docker writes the environment it receives to a JSON file and exits.
 STAND_IN = f"""#!{sys.executable}
 import json, os
@@ -33,6 +37,8 @@ with open(os.environ["ENV_DUMP"], "w", encoding="utf-8") as file:
 
 class EnvFileReadingTest(unittest.TestCase):
     def setUp(self):
+        if not BASH:
+            self.fail("bash was not found on PATH; these tests need bash to run bin/kc-dev.sh.")
         self.dir = Path(tempfile.mkdtemp(prefix="kc-dev-env-"))
         root = self.dir / "backend" / "identity" / "keycloak"
         (root / "bin").mkdir(parents=True)
@@ -62,7 +68,7 @@ class EnvFileReadingTest(unittest.TestCase):
     def run_script(self, content: bytes) -> subprocess.CompletedProcess:
         self.env_file.write_bytes(content)
         return subprocess.run(
-            ["bash", str(self.script), "config", "--quiet"],
+            [BASH, str(self.script), "config", "--quiet"],
             env=self.env,
             capture_output=True,
             text=True,
@@ -116,7 +122,7 @@ class EnvFileReadingTest(unittest.TestCase):
         result = self.run_script(content)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn(f"{self.env_file}:{line_number}", result.stderr)
-        self.assertIn("KEY=value", result.stderr)
+        self.assertIn("expected KEY=value, without \"export\"", result.stderr)
         self.assertFalse(self.dump.exists(), "docker must not run after a bad line")
 
     def test_export_line_gives_a_clear_error(self):
