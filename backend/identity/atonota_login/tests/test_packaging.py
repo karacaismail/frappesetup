@@ -56,6 +56,12 @@ class PackagingTest(unittest.TestCase):
         self.assertNotIn("frappe", names)
         self.assertNotIn("__import__", names)
 
+    def test_verification_inbox_has_no_frappe_import(self):
+        # AJA-231: the Frappe store lives in platform_core. The inbox rules stay free of Frappe.
+        names = imported_names(PACKAGE / "verification_inbox.py")
+        self.assertNotIn("frappe", names)
+        self.assertNotIn("__import__", names)
+
 
 if __name__ == "__main__":
     unittest.main()
