@@ -127,7 +127,11 @@ class AccountBacklogLiveTest(unittest.TestCase):
 
     def test_disabled_providers_are_not_on_the_login_page(self):
         status, _, html = _open(_cookie_opener(), tenant_authorize_url())
-        for alias in ("google", "apple"):
+        # O-51: the list of disabled providers comes from the server, not from a fixed list.
+        providers = admin("/identity-provider/instances", self.admin_token).json()
+        disabled = [p["alias"] for p in providers if not p["enabled"]]
+        self.assertTrue(disabled)
+        for alias in disabled:
             self.assertFalse(f"/broker/{alias}/login" in html, f"HTTP {status}")
             self.assertFalse(f'id="social-{alias}"' in html, f"HTTP {status}")
 

@@ -59,10 +59,14 @@ prepare_env() {
 
 load_environment() {
   prepare_env
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
+  # The file is read the way "docker run --env-file" and e2e/stack read it: the rest of the line
+  # is the value, with no shell quoting. So a value with a space, like "AtonotA Login", stays whole.
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      [A-Za-z_]*=*) export "${line%%=*}=${line#*=}" ;;
+    esac
+  done < "$ENV_FILE"
   export KC_PORT="$PANE_PORT"
   export KC_PUBLIC_URL="http://identity.localhost:$PANE_PORT"
   export MAILPIT_UI_PORT="$((PANE_PORT + 6))"

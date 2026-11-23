@@ -537,7 +537,7 @@ def tenant_login_settings(environment):
         "keycloak_internal_url": environment["KC_PUBLIC_URL"],
         "keycloak_client_id": "site-tenant1",
         "keycloak_client_secret": environment["ATONOTA_SITE_TENANT1_SECRET"],
-        "identity_brand_name": "Atonota",
+        "identity_brand_name": "AtonotA Login",
         "platform_panel_url": origin + "/panel",
     }
     if environment.get("FS_STACK_VITE") == "1":
