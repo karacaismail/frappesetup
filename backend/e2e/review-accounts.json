@@ -1,0 +1,39 @@
+{
+  "note": "Local review accounts for the development stack only. backend/e2e/stack review-accounts creates or updates them on a localhost stack. The project owner chose this shared password on 23 November 2026 for local development and review. It is not a service secret and is never used outside the local stack.",
+  "password": "Karaca.20",
+  "accounts": [
+    {
+      "username": "inceleme-panel@example.test",
+      "realm": "platform",
+      "purpose": "Headless panel review at http://localhost:5180 as a tenant employee with HR roles.",
+      "first_name": "Review",
+      "last_name": "Panel",
+      "tenant_roles": ["Employee", "HR User"],
+      "employee": true
+    },
+    {
+      "username": "inceleme-yonetici@example.test",
+      "realm": "platform",
+      "purpose": "Tenant administrator review.",
+      "first_name": "Review",
+      "last_name": "Administrator",
+      "tenant_roles": ["System Manager"]
+    },
+    {
+      "username": "inceleme-yerel-yonetici",
+      "realm": "master",
+      "purpose": "Keycloak administration console of the local stack.",
+      "first_name": "Review",
+      "last_name": "Keycloak",
+      "master_roles": ["admin"]
+    },
+    {
+      "username": "inceleme-press@example.test",
+      "realm": "platform",
+      "purpose": "Press user review.",
+      "first_name": "Review",
+      "last_name": "Press",
+      "press": true
+    }
+  ]
+}
