@@ -39,6 +39,7 @@ Komutların hepsi `PANE_PORT` değişkenini ister.
 | `bin/kc-dev.sh close-tunnel` | Tüneli kapatır. |
 | `bin/kc-dev.sh prod-check` | Üretim imajını Compose ayarı olmadan açar. Keycloak hazırsa testleri çalıştırır. Sonra geçici container'ları siler. |
 | `bin/kc-dev.sh realm-sync` | Realm dosyasındaki istemci ve kapsamları var olan veritabanına uygular. Veri silmez. |
+| `bin/kc-dev.sh platforms` | Sırları dolu giriş platformlarını açar, ötekileri kapatır. Liste `../atonota_login/platforms/` klasöründedir. |
 | `bin/kc-dev.sh realm-reload --yes` | Realm dosyasını imaj derlemeden yükler. Realm verisini siler. |
 | `bin/kc-dev.sh realm-delete-only --yes` | Yalnız realm'i siler. |
 | `bin/kc-dev.sh delete-realm --yes` | Realm'i siler ve imajdaki realm dosyasını yeniden içe alır. |
