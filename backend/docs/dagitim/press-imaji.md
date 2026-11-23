@@ -148,7 +148,7 @@ Denemede dört şey daha görüldü:
 1. Press'in `migrate` adımı kendi denetimini de çalıştırır. Denetim internetten chromedriver indirmeye çalışır. İmajda `unzip` olmadığı için denetim bir uyarıyla durdu. `migrate` yine başarılı bitti.
 2. Press'in `hooks.py` dosyası açılırken veritabanını okur. Bu yüzden `bench build` sitesiz derlemede kanca adımında düşer. Dockerfile bu yüzden derlemenin iki adımını doğrudan çalıştırır. Hiçbir uygulamada derleme sonrası kanca yoktur. Kanca eklenirse derleme durur.
 3. Press'in Telegram kuyruğu Frappe 16'da çalışmaz. `TelegramMessage.get_one` sıralamada `FIELD(priority, ...)` ifadesini kullanır. Frappe 16 bu ifadeyi reddeder. Bu engel Telegram paketinden ayrıdır. Bu imajda Telegram zaten kapalıdır.
-4. Press sitesinde `/login` adresi 403 döner. Press girişi Keycloak ile yapılır.
+4. Press sitesinde `/login` adresi 403 döner. Bu beklenen davranıştır. `press_tr` yerel girişi kapatır. Kural `press_tr/press_identity/request_policy.py` dosyasındaki `block_native_login` işlevidir. Giriş Keycloak ile yapılır.
 
 ## Kalan iş
 
