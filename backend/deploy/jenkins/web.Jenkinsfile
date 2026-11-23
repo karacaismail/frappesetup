@@ -1,54 +1,63 @@
 // Web delivery line of karacaismail/atonota-web. Design: backend/docs/dagitim/ortamlar.md.
 //
 // Same shape as backend.Jenkinsfile: a push to atonota-web main builds one bundle, deploys it to
-// alpha and checks alpha; beta, rc and prod wait for the button and move the same bundle.
+// alpha and checks alpha; beta waits for the button and moves the same bundle. rc and prod move
+// with the job "atonota-release/atonota-promote" (promote.Jenkinsfile).
 // The bundle is the built "dist" folder as a tar.gz with its SHA-256 in release.json.
 //
-// Jenkins setup (DevOps owner): Pipeline job whose SCM is karacaismail/frappesetup, branch */main,
-// script path backend/deploy/jenkins/web.Jenkinsfile, "GitHub hook trigger" on. The job checks
-// out atonota-web itself, so a push to either repository starts it. The "Skip unchanged" stage
-// stops a run whose atonota-web commit already runs in alpha.
-// Agents with label atonota-build need Node 24 and the Playwright system packages.
-
-def webBundle() {
-    return sh(returnStdout: true, script: '''python3 -I -c 'import json; print(json.load(open("release/release.json"))["components"]["panel"]["file"])' ''').trim()
-}
+// Jenkins setup (DevOps owner): Pipeline job "atonota-delivery/atonota-web" whose SCM is
+// karacaismail/frappesetup, branch */main, script path backend/deploy/jenkins/web.Jenkinsfile,
+// "GitHub hook trigger" on. The job checks out atonota-web itself, so a push to either repository
+// starts it. The "Skip unchanged" stage stops a run whose atonota-web commit already runs in alpha.
+// Credentials and plugins as in backend.Jenkinsfile. Agents with label atonota-build need Node 24
+// and the Playwright system packages.
 
 // DEPLOYING names the environment whose deployment has started. A failure before that point
 // (for example a refused promotion check) must not roll back an environment that did not change.
 def deployAndCheck(String target) {
     env.DEPLOYING = target
-    sshagent(credentials: ['atonota-deploy-ssh']) {
+    sshagent(credentials: ["atonota-deploy-ssh-${target}"]) {
         sh "backend/deploy/bin/deploy ${target} release"
         sh "backend/deploy/bin/health ${target} release"
     }
     env.DEPLOYING = ''
 }
 
+// The server undoes only the bundle named here, and only if it became current.
 def rollbackAfterFailure(String target) {
     if (env.DEPLOYING != target) {
         echo "No deployment started in ${target}; nothing to roll back."
         return
     }
-    sshagent(credentials: ['atonota-deploy-ssh']) {
-        sh "backend/deploy/bin/rollback ${target} web"
+    sshagent(credentials: ["atonota-deploy-ssh-${target}"]) {
+        sh "backend/deploy/bin/rollback ${target} web --failed ${env.RELEASE_ID}"
     }
 }
 
-def promote(String target, String source) {
+def useStashes() {
+    deleteDir()
+    unstash 'deploy'
     unstash 'release'
-    sshagent(credentials: ['atonota-deploy-ssh']) {
+    sh "test \"\$(python3 -I backend/deploy/release.py field release/release.json commit)\" = '${env.WEB_COMMIT}'"
+}
+
+def promote(String target, String source) {
+    useStashes()
+    sshagent(credentials: ["atonota-deploy-ssh-${source}"]) {
         sh "rm -rf source && backend/deploy/bin/fetch-current ${source} web source"
-        sh "python3 -I backend/deploy/release.py promote-check release/release.json --target ${target} --source-record source/source-record.json"
     }
+    sh "python3 -I backend/deploy/release.py promote-check release/release.json --target ${target} --source-record source/source-record.json"
     deployAndCheck(target)
 }
 
 pipeline {
     agent none
     options {
+        skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '100', artifactNumToKeepStr: '100'))
         timestamps()
+        // The promotion jobs compare a server copy with this build's archived bundle.
+        copyArtifactPermission('/atonota-delivery/atonota-promote,/atonota-release/atonota-promote')
     }
     triggers {
         githubPush()
@@ -57,19 +66,24 @@ pipeline {
         stage('Build and alpha') {
             agent { label 'atonota-build' }
             stages {
-                stage('Checkout atonota-web') {
+                stage('Checkout') {
                     steps {
+                        checkout scm
+                        stash name: 'deploy', includes: 'backend/deploy/**'
                         dir('web') {
                             git url: 'https://github.com/karacaismail/atonota-web.git', branch: 'main'
+                        }
+                        script {
+                            env.WEB_COMMIT = sh(returnStdout: true, script: 'git -C web rev-parse HEAD').trim()
                         }
                     }
                 }
                 stage('Skip unchanged') {
                     steps {
                         script {
-                            def commit = sh(returnStdout: true, script: 'git -C web rev-parse HEAD').trim()
                             def running = ''
-                            sshagent(credentials: ['atonota-deploy-ssh']) {
+                            def source = 'alpha'
+                            sshagent(credentials: ["atonota-deploy-ssh-${source}"]) {
                                 running = sh(returnStdout: true, script: '''
                                     rm -rf alpha-web
                                     if backend/deploy/bin/fetch-current alpha web alpha-web >/dev/null 2>&1; then
@@ -77,7 +91,7 @@ pipeline {
                                     fi
                                 ''').trim()
                             }
-                            env.WEB_UNCHANGED = (running == commit) ? 'true' : 'false'
+                            env.WEB_UNCHANGED = (running == env.WEB_COMMIT) ? 'true' : 'false'
                         }
                     }
                 }
@@ -98,6 +112,10 @@ pipeline {
                     when { environment name: 'WEB_UNCHANGED', value: 'false' }
                     steps {
                         sh 'rm -rf release && backend/deploy/bin/build-web web release'
+                        script {
+                            env.RELEASE_ID = sh(returnStdout: true,
+                                script: 'python3 -I backend/deploy/release.py field release/release.json release_id').trim()
+                        }
                         archiveArtifacts artifacts: 'release/**', fingerprint: true
                         stash name: 'release', includes: 'release/**'
                     }
@@ -121,6 +139,7 @@ pipeline {
                 beforeInput true
                 environment name: 'WEB_UNCHANGED', value: 'false'
             }
+            // The input directive waits before the agent is taken, so no agent sits idle.
             input {
                 message 'Move this web bundle from alpha to beta?'
                 ok 'Move to beta'
@@ -135,48 +154,6 @@ pipeline {
             }
             post {
                 failure { rollbackAfterFailure('beta') }
-            }
-        }
-        stage('Move to rc') {
-            when {
-                beforeInput true
-                environment name: 'WEB_UNCHANGED', value: 'false'
-            }
-            input {
-                message 'Move this web bundle from beta to rc?'
-                ok 'Move to rc'
-                submitter 'atonota-deployers'
-            }
-            agent { label 'atonota-build' }
-            steps {
-                milestone(3)
-                lock(resource: 'atonota-rc') {
-                    promote('rc', 'beta')
-                }
-            }
-            post {
-                failure { rollbackAfterFailure('rc') }
-            }
-        }
-        stage('Move to prod') {
-            when {
-                beforeInput true
-                environment name: 'WEB_UNCHANGED', value: 'false'
-            }
-            input {
-                message 'Move this web bundle from rc to prod?'
-                ok 'Move to prod'
-                submitter 'atonota-release-managers'
-            }
-            agent { label 'atonota-build' }
-            steps {
-                milestone(4)
-                lock(resource: 'atonota-prod') {
-                    promote('prod', 'rc')
-                }
-            }
-            post {
-                failure { rollbackAfterFailure('prod') }
             }
         }
     }

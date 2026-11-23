@@ -95,7 +95,9 @@ Her ortamın kendi veritabanı, kendi birimleri ve kendi iç ağı vardır. Orta
 
 Her sunucuda tek bir ön vekil vardır. Ön vekil 80 ve 443 portlarını açar. Öteki hiçbir servis port açmaz.
 
-Ön vekil servislere `atonota-edge` ağından ulaşır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press. Veritabanları bu ağda değildir.
+Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press. Veritabanları bu ağda değildir.
+
+Ortamlar aynı ağı paylaşmaz. Bu yüzden alpha'daki bir konteyner beta'nın Keycloak'ına doğrudan ulaşamaz. `remote/apply` betiği ağı açar. Betik ön vekilin ağ listesini de `networks.yaml` dosyasına yazar.
 
 Dosyalar şunlardır:
 
@@ -167,9 +169,26 @@ Bugün `/panel` sayfası arayüz dosyalarını yüklemiyor. Bu bir engeldir (E-3
 
 | Dosya | Ne yapar | Nasıl başlar |
 | --- | --- | --- |
-| `backend.Jenkinsfile` | Arka uç paketini derler ve taşır | Ana dala push |
-| `web.Jenkinsfile` | Arayüz paketini derler ve taşır | `atonota-web` ana dalına push |
-| `promote.Jenkinsfile` | Eski bir paketi taşır ya da geri döner | Elle |
+| `backend.Jenkinsfile` | Arka uç paketini derler. Paketi alpha'ya ve beta'ya koyar | Ana dala push |
+| `web.Jenkinsfile` | Arayüz paketini derler. Paketi alpha'ya ve beta'ya koyar | `atonota-web` ana dalına push |
+| `promote.Jenkinsfile` | Paketi rc'ye ya da prod'a taşır. Bir ortamı geri döndürür | Elle |
+
+### Jenkins klasörleri ve anahtarlar
+
+Her ortamın kendi SSH anahtarı vardır. Her ortamın sunucuda kendi kullanıcısı da vardır. Kullanıcının adı `deploy-<ortam>` olur. Örneğin alpha'nın kullanıcısı `deploy-alpha` olur.
+
+Jenkins'te iki klasör vardır. Bir klasördeki iş yalnız o klasörün anahtarlarını görür.
+
+| Klasör | İşler | Anahtarlar |
+| --- | --- | --- |
+| `atonota-delivery` | `atonota-backend`, `atonota-web`, `atonota-promote` | alpha ve beta |
+| `atonota-release` | `atonota-promote` | beta, rc ve prod |
+
+Ana dala gelen bir değişiklik `atonota-delivery` klasöründe çalışır. Bu klasörde rc ve prod anahtarı yoktur. Bu yüzden değişiklik prod'a kendiliğinden bağlanamaz.
+
+`atonota-release` klasöründeki iş kendiliğinden başlamaz. İşi bir kişi başlatır. Sonra onay düğmesine yetkili biri basar.
+
+Sunucuda her anahtarın önünde `restrict` ve `from=` kısıtı vardır. Kısıt yönlendirmeyi kapatır. Kısıt bağlantıyı yalnız Jenkins ajanının adresinden kabul eder. Ayrıntı devir notundadır.
 
 ### Ana hat
 
@@ -180,11 +199,31 @@ Ana hatta adımlar şu sıradadır:
 3. Jenkins imajları derler ve yükler. Sonra `release.json` dosyasını yazar.
 4. Jenkins paketi alpha'ya dağıtır.
 5. Jenkins alpha'nın sağlık denetimini koşar. Denetim geçerse sunucuya sağlık kaydı yazar.
-6. Hat "Move to beta" düğmesinde bekler.
+6. Hat "Move to beta" düğmesinde bekler. Beklerken bir Jenkins ajanını tutmaz.
 7. Biri düğmeye basarsa Jenkins taşıma denetimini koşar. Sonra paketi beta'ya dağıtır ve denetler.
-8. rc ve prod için aynı adımlar tekrarlanır.
+8. rc ve prod için `atonota-release/atonota-promote` işi kullanılır. İş önceki ortamda çalışan paketi taşır.
+
+Onaydan sonraki aşama ilk aşamanın dosyalarını kullanır. Jenkins ilk aşamada dağıtım betiklerini ve paketi saklar. Sonraki aşama bu saklanan kopyaları alır. Aşama ana daldan yeni kod almaz. Böylece onay günler sonra verilse de aynı commit ve aynı imaj özeti dağıtılır.
+
+### Elle taşıma
+
+`promote.Jenkinsfile` şu sırayla çalışır:
+
+1. İş önceki ortamın sunucusundan iki dosya alır: o an çalışan paketin `release.json` dosyası ve sağlık kaydı.
+2. İş paketin derleme numarasını okur. Sonra o derlemenin Jenkins arşivindeki `release.json` dosyasını alır.
+3. Sunucudaki kopya arşivdeki kopyayla aynı olmalıdır. Değilse iş durur.
+4. İş taşıma denetimini koşar.
+5. İş onay düğmesinde bekler. Beklerken bir Jenkins ajanını tutmaz.
+6. Onaydan sonra iş 1. adımdan 4. adıma kadar denetimi yeniden koşar. Önceki ortam bu arada değiştiyse iş durur.
+7. İş arşivdeki kopyayı hedef ortama dağıtır.
+
+Böylece sunucu yalnız hangi paketin çalıştığını söyler. Dağıtılan dosyalar Jenkins'in kendi arşivinden gelir. Ele geçen bir alt ortam sunucusu prod'a başka bir imaj taşıtamaz.
+
+Jenkins arşivi son 100 derlemeyi tutar. Daha eski bir paket taşınamaz.
 
 Taşıma denetimi `backend/deploy/release.py` dosyasındadır. Denetim şu durumlarda taşımayı reddeder:
+
+- Paket dosyasının biçimi bozuksa. Örneğin derleme numarası tam sayı değilse.
 
 - Paket önceki ortamda çalışan paket değilse.
 - Önceki ortamın sağlık kaydı bu paket için yoksa.
@@ -209,16 +248,23 @@ Her ortamın bir kilidi vardır. Örneğin `atonota-beta`. İki iş aynı ortama
 
 Sunucudaki `backend/deploy/remote/apply` betiği arka uç paketini şu sırayla kurar:
 
-1. Betik yeni imajları indirir. Eski sürüm bu sırada çalışmaya devam eder.
-2. Betik yedek alır. Yedekte kiracı siteleri, Keycloak veritabanı ve eşitleme servisinin veritabanı vardır.
-3. Betik siteleri bakım kipine alır. Sonra Frappe süreçlerini durdurur.
-4. Betik yeni Keycloak'ı başlatır. Keycloak kendi veritabanını açılışta günceller.
-5. Betik her site için `bench migrate` komutunu koşar.
-6. Betik bütün servisleri başlatır. Servisler sağlıklı olunca bakım kipini kapatır.
-7. Betik ön vekilin ayarını yazar ve yeniden yükler.
-8. Betik "şu anki sürüm" bağını yeni pakete çevirir.
+1. Betik paketi "bekleyen sürüm" bağına yazar. Bağın adı `backend-pending` olur. Sonra paketin dosyalarını kopyalar.
+2. Betik yeni imajları indirir. Eski sürüm bu sırada çalışmaya devam eder.
+3. Betik siteleri bakım kipine alır. Sonra veri yazan bütün süreçleri durdurur. Bu süreçler Frappe ön yüzü, işçiler, soket sunucusu, Keycloak ve eşitleme servisidir.
+4. Betik yedek alır. Yedekte kiracı siteleri, Keycloak veritabanı ve eşitleme servisinin veritabanı vardır. Bu sırada hiçbir süreç veri yazmaz. Bu yüzden yedekten sonra veri kaybolmaz.
+5. Betik yeni Keycloak'ı başlatır. Keycloak kendi veritabanını açılışta günceller.
+6. Betik her site için `bench migrate` komutunu koşar.
+7. Betik bütün servisleri başlatır. Servisler sağlıklı olunca bakım kipini kapatır.
+8. Betik ön vekilin ayarını yazar ve yeniden yükler.
+9. Betik "şu anki sürüm" bağını yeni pakete çevirir. Sonra "bekleyen sürüm" bağını siler.
 
 Bir adım başarısız olursa betik durur. Yeni paket "şu anki sürüm" olmaz.
+
+Betik her adımda paketin `phase` dosyasına aşamanın adını yazar. Geri dönüş bu adı okur. Aşamalar sırasıyla şunlardır: `preparing`, `pulling`, `stopping`, `backing-up`, `migrating`, `migrated`, `starting` ve `done`.
+
+prod ve rc sunucu dışı yedek ister. Yedeğin ayar dosyası yoksa betik bakım kipine girmeden durur.
+
+Bir paket bekleyen sürümken yeni paket kurulmaz. Önce bekleyen paket geri alınır.
 
 İlk kurulumda çalışan sürüm yoktur. Bu durumda betik yalnız `ATONOTA_FIRST_INSTALL=1` ile çalışır. İlk kurulum adımları devir notundadır.
 
@@ -251,17 +297,40 @@ Elle yedek almak için DevOps sorumlusu sunucuda şu komutu çalıştırır:
 
 ### Geri dönüş
 
-Geri dönüşün iki biçimi vardır:
+Geri dönüşün komutu şudur:
 
-| Komut | Ne yapar | Ne zaman |
+```sh
+rollback <ortam> <backend|web> [--failed <paket kimliği>] [--restore-backup]
+```
+
+Komutun seçenekleri şunlardır:
+
+| Seçenek | Ne yapar |
+| --- | --- |
+| `--failed <paket kimliği>` | Yalnız bu paketi geri alır. Jenkins bir dağıtım başarısız olunca bu seçeneği kullanır. |
+| Seçenek yok | Bir kişi geri dönüş istedi. Bekleyen paket varsa o geri alınır. Yoksa şu anki paket önceki pakete döner. |
+| `--restore-backup` | Geri alınan paketten önceki yedeği de geri yükler. Yalnız arka uçta çalışır. |
+
+Jenkins yalnız başarısız olan paketi geri alır. Sağlıklı çalışan paket hiç geri alınmaz. Kurallar şunlardır:
+
+1. Başarısız paket bekleyen sürüm değilse ve şu anki sürüm de değilse hiçbir şey yapılmaz. Örneğin dosya kopyası yarıda kaldıysa çalışan paket olduğu gibi kalır.
+2. Başarısız paket şu anki sürümse ve sağlık kaydı varsa hiçbir şey yapılmaz.
+3. Başarısız paket şu anki sürümse ve sağlık kaydı yoksa paket geri alınır. Bu durum sağlık denetimi başarısız olunca oluşur.
+
+Bekleyen bir paket ulaştığı aşamaya göre geri alınır:
+
+| Aşama | Veritabanı | Geri dönüş ne yapar |
 | --- | --- | --- |
-| `rollback <ortam> backend` | Önceki imajları başlatır. Veritabanına dokunmaz. | Taşıma kuralı tuttuysa |
-| `rollback <ortam> backend --restore-backup` | Dağıtımdan önceki yedeği geri yükler. Sonra önceki imajları başlatır. | Taşıma yarıda kaldıysa ya da kural tutmadıysa |
-| `rollback <ortam> web` | Önceki arayüz paketine döner | Arayüz bozulduysa |
+| `preparing`, `pulling` | Değişmedi | Hiçbir şey yapmaz. Eski paket zaten çalışıyor. |
+| `stopping`, `backing-up` | Değişmedi | Eski paketi yeniden başlatır. Bakım kipini kapatır. Yedeği geri yüklemez. |
+| `migrating` | Yarıda kalmış olabilir | `--restore-backup` varsa yedeği geri yükler. Yoksa ortam bakım kipinde kalır ve komut hata verir. Kararı bir kişi verir. |
+| `migrated`, `starting` | Yeni şemada | Eski paketi başlatır. Taşıma kuralı sayesinde eski kod yeni şemada çalışır. |
 
-Jenkins bir ortamda hata görürse geri dönüşü kendiliğinden başlatır. Yalnız dağıtım başladıysa başlatır. Örneğin taşıma denetimi reddettiyse hiçbir şey geri dönmez.
+Yedek yoksa veritabanı geri yüklenmez. Bu durumda komut hiçbir servisi durdurmaz. Ortam olduğu gibi açık kalır. Komut hatayı açıkça yazar.
 
-alpha'da geri dönüş yedeği de geri yükler. Öteki ortamlarda yalnız imajlar geri döner. Yedeği geri yükleme kararını DevOps sorumlusu verir. Bunun için `promote.Jenkinsfile` işinde `rollback-restore` seçilir.
+Geri alınan paket `backend-failed` bağına yazılır. Bu paket hiç "önceki sürüm" olmaz. Bu yüzden ikinci bir geri dönüş başarısız pakete dönemez. İkinci geri dönüşü bir kişi elle seçer.
+
+alpha'da Jenkins yedeği de kendiliğinden geri yükler. Öteki ortamlarda Jenkins yalnız imajları geri döndürür. Yedeği geri yükleme kararını DevOps sorumlusu verir. Bunun için `promote.Jenkinsfile` işinde `rollback-restore` seçilir.
 
 `--restore-backup` yedekten sonra yazılan veriyi siler. prod'da önce bu kaybı onaylayın. Sonra komutu çalıştırın.
 
@@ -271,7 +340,7 @@ Depoda sır yoktur. Sırlar iki yerde durur:
 
 | Yer | İçinde ne var | Kim yazar |
 | --- | --- | --- |
-| Jenkins kimlik bilgileri | `atonota-deploy-ssh` SSH anahtarı ve `atonota-registry` GHCR belirteci | DevOps sorumlusu |
+| Jenkins kimlik bilgileri | Her ortamın kendi SSH anahtarı (`atonota-deploy-ssh-<ortam>`) ve `atonota-registry` GHCR belirteci | DevOps sorumlusu |
 | Sunucuda `/etc/atonota/<ortam>/<servis>.env` | Veritabanı parolaları, Keycloak istemci sırları, SMTP parolası | DevOps sorumlusu |
 
 Sunucudaki sır dosyaları şunlardır:
@@ -283,11 +352,19 @@ Sunucudaki sır dosyaları şunlardır:
 - `offsite.env` dosyası sunucu dışı yedeğin `rclone` adresini tutar.
 - `/etc/atonota/edge.env` dosyası sertifika uyarısının gideceği e-posta adresini tutar.
 
-Her dosyanın izni `0600` olur. Dosyanın sahibi `root` olur.
+Her dosyanın izni `0600` olur. Dosyanın sahibi o ortamın kullanıcısıdır. Örneğin alpha'nın dosyalarının sahibi `deploy-alpha` olur. Docker Compose bu dosyaları dağıtım kullanıcısıyla okur. Bu yüzden sahip `root` olamaz.
 
 Jenkins uygulama sırlarını hiç görmez. Jenkins yalnız sunucuya bağlanır ve imaj yükler. Böylece Jenkins'in ele geçmesi veritabanı parolasını açmaz.
 
-`deploy` kullanıcısı `docker` grubundadır. Bu grup sunucuda root yetkisine denktir. Bu yüzden `deploy` kullanıcısının anahtarı yalnız Jenkins'te durur.
+Dağıtım kullanıcıları `docker` grubundadır. Bu grup sunucuda root yetkisine denktir. Bu yüzden asıl sınır sunucudur. prod ve rc kendi sunucusundadır. alpha ve beta aynı sunucuyu paylaşır. Bu iki ortamın kullanıcıları ayrıdır. İki kullanıcı da o sunucuda root yetkisine denktir.
+
+Alt ortamın sunucusu üst ortamda komut çalıştıramaz. Bunu üç kural sağlar:
+
+1. Sunucuda Jenkins anahtarı durmaz. Jenkins anahtarı ajan yönlendirmesi olmadan kullanır.
+2. Jenkins sunucudan aldığı dosyayı komuta koymadan önce denetler. Uzak komutun her sözcüğü tırnaklanır.
+3. Taşınan paket Jenkins arşivinden gelir. Sunucudaki kopya yalnız karşılaştırılır.
+
+Frappe'nin geri yükleme komutu veritabanı kök parolasını komut satırında ister. Sunucudaki öteki kullanıcılar bu satırı `ps` ile göremez. Bunun için `/proc` dizini `hidepid=invisible` seçeneğiyle bağlanır. Ayrıntı devir notundadır.
 
 Her ortamın sırları ayrıdır. alpha'nın parolası prod'da kullanılmaz.
 
@@ -355,6 +432,8 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 
 - `backend/deploy/tests/test_release.py` dosyası paket kurallarını ve taşıma denetimini sınar.
 - `backend/deploy/tests/test_remote.py` dosyası sunucu betiklerini sınar. Test sahte bir `docker` komutu kullanır. Test dağıtım sırasını, bağları ve geri dönüşü denetler. Test Linux'ta koşar.
+- Geri dönüş testleri her aşamadaki hatayı ayrı sınar. Örneğin eksik dosya, imaj indirme hatası, yedek hatası, yarım taşıma ve sağlık hatası sınanır.
+- `backend/deploy/tests/test_jenkins_side.py` dosyası Jenkins tarafını sınar. Test sahte `ssh` ve `scp` komutları kullanır. Test uzak komutun tırnaklandığını denetler. Test Jenkins dosyalarının anahtar ve aşama kurallarını da denetler.
 - Üretim kiracı imajı yerelde derlendi. İçinde `panel.bundle.css` ve `panel-focus.bundle.js` dosyaları var.
 - Jenkins dosyaları Jenkins'in kendi denetleyicisinden geçti.
 
@@ -364,3 +443,4 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 - Gerçek veritabanında geri yükleme.
 - Keycloak ve identity-sync imajlarının üretim derlemesi.
 - Ön vekilin gerçek sertifika alması.
+- Gerçek Jenkins'te onay, saklanan kopya ve arşivden kopya alma adımları. Jenkins denetleyicisi yalnız sözdizimini sınar.

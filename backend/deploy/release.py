@@ -22,6 +22,7 @@ ENV_KEYS = {
     "ATONOTA_ENV",
     "ATONOTA_PREVIOUS_ENV",
     "ATONOTA_SSH_HOST",
+    "ATONOTA_SSH_USER",
     "ATONOTA_BASE_HOST",
     "ATONOTA_ID_HOST",
     "ATONOTA_PRESS_HOST",
@@ -36,6 +37,8 @@ COMMIT = re.compile(r"[0-9a-f]{40}")
 IMAGE = re.compile(r"[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 WEB_FILE = re.compile(r"atonota-web-[0-9a-f]{12}\.tar\.gz")
+# Remote scripts put the release id into paths and commands, so it holds only these characters.
+RELEASE_ID = re.compile(r"(?:backend|web)-[0-9a-f]{12}-b[1-9][0-9]*")
 
 
 class ReleaseError(ValueError):
@@ -69,13 +72,18 @@ def release_id(kind, commit, build):
     return f"{kind}-{commit[:12]}-b{build}"
 
 
+def check_build(build):
+    # bool is a subclass of int in Python; a JSON true must not pass as build 1.
+    if type(build) is not int or build < 1:
+        raise ReleaseError("build must be a positive Jenkins build number")
+
+
 def new_manifest(kind, commit, build, components):
     if kind not in REQUIRED:
         raise ReleaseError(f"unknown release kind {kind!r}")
     if not COMMIT.fullmatch(commit or ""):
         raise ReleaseError("commit must be a full 40 character Git hash")
-    if not isinstance(build, int) or build < 1:
-        raise ReleaseError("build must be a positive Jenkins build number")
+    check_build(build)
     return {
         "schema": 1,
         "kind": kind,
@@ -104,8 +112,11 @@ def check_manifest(manifest, environment):
     kind = manifest["kind"]
     if not COMMIT.fullmatch(str(manifest.get("commit", ""))):
         raise ReleaseError("commit must be a full 40 character Git hash")
-    if manifest.get("release_id") != release_id(kind, manifest["commit"], manifest.get("build")):
+    check_build(manifest.get("build"))
+    if manifest.get("release_id") != release_id(kind, manifest["commit"], manifest["build"]):
         raise ReleaseError("release_id does not match commit and build")
+    if not RELEASE_ID.fullmatch(manifest["release_id"]):
+        raise ReleaseError("release_id has an unexpected form")
     components = manifest.get("components")
     if not isinstance(components, dict) or not components:
         raise ReleaseError("manifest has no component")
@@ -147,6 +158,12 @@ def check_promotion(manifest, target, source_record):
     check_manifest(manifest, target)
 
 
+def check_same_release(archived, server):
+    """The copy on a server must equal the copy Jenkins archived when it built the release."""
+    if archived != server:
+        raise ReleaseError("the server copy of the release differs from the Jenkins archive")
+
+
 def read_json(path):
     try:
         return json.loads(Path(path).read_text())
@@ -180,6 +197,9 @@ def main(argv=None):
     promote.add_argument("manifest")
     promote.add_argument("--target", required=True)
     promote.add_argument("--source-record", required=True)
+    same = commands.add_parser("same-release", help="refuse a server copy that differs from the archive")
+    same.add_argument("archived")
+    same.add_argument("server")
     field = commands.add_parser("field", help="print one top level field")
     field.add_argument("manifest")
     field.add_argument("name")
@@ -209,6 +229,8 @@ def main(argv=None):
             check_promotion(
                 read_json(arguments.manifest), arguments.target, read_json(arguments.source_record)
             )
+        elif arguments.command == "same-release":
+            check_same_release(read_json(arguments.archived), read_json(arguments.server))
         elif arguments.command == "field":
             print(read_json(arguments.manifest)[arguments.name])
         elif arguments.command == "env-check":

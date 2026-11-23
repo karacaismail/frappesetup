@@ -1,60 +1,156 @@
 #!/usr/bin/env bash
-# Return one environment to its previous release.
-# Usage: rollback <env> <backend|web> [--restore-backup]
+# Return one environment to the release before a failed one.
+# Usage: rollback <env> <backend|web> [--failed <release id>] [--restore-backup]
 #
-# web:      move the "current" link back to "previous". No restart; the next request uses it.
-# backend:  start the previous release's images with the previous release's compose files.
-#           Migrations are written so the previous release still runs on the new schema
-#           (expand and contract rule, docs/dagitim/ortamlar.md). When that does not hold, or the
-#           failed release stopped in the middle of a migration, use --restore-backup: it restores
-#           the backup taken right before the failed release, then starts the previous release.
+# --failed <id>     Jenkins passes it after a failed deployment. Only that release is undone:
+#                   the pending backend release with that id, or a current release with that id
+#                   whose health check has not passed. Anything else is left alone, because the
+#                   failure happened before the release changed the environment.
+# no --failed       A person asked for it (promote.Jenkinsfile). A pending backend release is
+#                   undone first; without one, the current release goes back to the previous one.
+# --restore-backup  Backend only. Restore the backup taken right before the undone release.
+#                   Without a backup nothing is stopped or restored and the script fails.
+#
+# A pending backend release is undone by the phase it reached (remote/apply):
+#   preparing, pulling    the old release still runs untouched: nothing to do
+#   stopping, backing-up  the database is unchanged: start the old release, end maintenance mode
+#   migrating             the database may be half migrated: without --restore-backup the
+#                         environment stays in maintenance mode and a person decides
+#   migrated, starting    migrations follow the expand and contract rule (docs/dagitim/ortamlar.md),
+#                         so the old release runs on the new schema
+# The undone release is written to the "failed" link and never becomes "previous", so a second
+# rollback cannot return to it.
 set -euo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
 . "$here/common.sh"
 
-env="${1:?usage: rollback <env> <kind> [--restore-backup]}"
-kind="${2:?usage: rollback <env> <kind> [--restore-backup]}"
-mode="${3:-}"
+usage="usage: rollback <env> <backend|web> [--failed <release id>] [--restore-backup]"
+env="${1:?$usage}"
+kind="${2:?$usage}"
+shift 2
+failed_id=""
+restore=0
+while (($#)); do
+    case "$1" in
+    --failed)
+        failed_id="${2:?$usage}"
+        shift 2
+        ;;
+    --restore-backup)
+        restore=1
+        shift
+        ;;
+    *) fail "$usage" ;;
+    esac
+done
 check_env_name "$env"
+if [[ -n "$failed_id" && ! "$failed_id" =~ ^(backend|web)-[0-9a-f]{12}-b[1-9][0-9]*$ ]]; then
+    fail "bad release id: $failed_id"
+fi
+ATONOTA_ENV="$env"
 base="$ATONOTA_ROOT/$env"
 
+nothing() {
+    say "nothing to roll back in $env: $*"
+    exit 0
+}
+
+name_of() {
+    [[ -L "$1" ]] && basename "$(readlink "$1")"
+}
+
 if [[ "$kind" == web ]]; then
+    [[ "$restore" == 0 ]] || fail "--restore-backup applies to backend releases only"
     web="$ATONOTA_ROOT/web/$env"
+    running="$(name_of "$web/current" || true)"
+    if [[ -n "$failed_id" ]]; then
+        [[ "$running" == "$failed_id" ]] || nothing "web release $failed_id never became current"
+        ! health_passed web "$failed_id" || nothing "web release $failed_id passed its health check"
+    fi
     [[ -L "$web/previous" ]] || fail "$env has no previous web release"
-    failed="$(readlink "$web/current")"
+    [[ "$(name_of "$web/previous")" != "$(name_of "$web/failed" || true)" ]] ||
+        fail "the previous web release is the one that failed before"
     switch_link "$(readlink "$web/previous")" "$web/current"
-    switch_link "$failed" "$web/previous"
-    rm -f "$base/health/web.json"
-    say "web of $env is back on $(readlink "$web/current")"
+    switch_link "releases/$running" "$web/failed"
+    rm -f "$web/previous" "$base/health/web.json"
+    say "web of $env is back on $(name_of "$web/current")"
     exit 0
 fi
 [[ "$kind" == backend ]] || fail "unknown kind: $kind"
 
-# A release still in progress is named by backend-pending; it never became current.
-# Without it, the current release is the one to undo.
-if [[ -L "$base/backend-pending" ]]; then
-    failed="$base/$(readlink "$base/backend-pending")"
-    target="$base/backend-current"
+pending_id="$(name_of "$base/backend-pending" || true)"
+current_id="$(name_of "$base/backend-current" || true)"
+if [[ -n "$failed_id" ]]; then
+    if [[ "$pending_id" == "$failed_id" ]]; then
+        undo=pending
+    elif [[ "$current_id" == "$failed_id" ]] && ! health_passed backend "$failed_id"; then
+        undo=current
+    else
+        nothing "release $failed_id did not change the running release"
+    fi
+elif [[ -n "$pending_id" ]]; then
+    undo=pending
 else
-    failed="$base/$(readlink "$base/backend-current")"
-    target="$base/backend-previous"
+    undo=current
 fi
-[[ -L "$target" ]] || fail "$env has no release to return to"
-target="$base/$(readlink "$target")"
-[[ "$target" != "$failed" ]] || fail "previous and failed release are the same"
-load_host_env "$target/host.env"
 
-stack "$failed" down --remove-orphans || true
-if [[ "$mode" == --restore-backup ]]; then
-    backup="$(cat "$failed/backup-before" 2>/dev/null)" || fail "the failed release has no backup"
+if [[ "$undo" == pending ]]; then
+    failed="$base/releases/$pending_id"
+    reached="$(cat "$failed/phase" 2>/dev/null || printf 'preparing')"
+    case "$reached" in
+    preparing | pulling)
+        rm -f "$base/backend-pending"
+        printf 'abandoned %s\n' "$pending_id" >"$base/phase"
+        nothing "release $pending_id stopped in phase $reached, before it changed the running release"
+        ;;
+    stopping | backing-up)
+        # The database did not change; a restore is never needed here.
+        restore=0
+        ;;
+    migrating)
+        [[ "$restore" == 1 ]] || fail "release $pending_id stopped while migrating. $env stays in" \
+            "maintenance mode; a person decides: restore the backup with rollback-restore, or" \
+            "finish the migration by hand (docs/dagitim/ortamlar.md)"
+        ;;
+    migrated | starting) ;;
+    *) fail "release $pending_id is in an unknown phase: $reached" ;;
+    esac
+    [[ -n "$current_id" ]] || fail "$env has no release to return to"
+    target="$base/releases/$current_id"
+else
+    [[ -n "$current_id" ]] || fail "$env has no backend release"
+    failed="$base/releases/$current_id"
+    previous_id="$(name_of "$base/backend-previous" || true)"
+    [[ -n "$previous_id" ]] || fail "$env has no release to return to"
+    [[ "$previous_id" != "$(name_of "$base/backend-failed" || true)" ]] ||
+        fail "the previous release $previous_id is the one that failed before"
+    target="$base/releases/$previous_id"
+fi
+[[ "$target" != "$failed" ]] || fail "previous and failed release are the same"
+
+# Check the backup before anything stops, so a missing backup leaves the environment as it is.
+if [[ "$restore" == 1 ]]; then
+    backup="$(cat "$failed/backup-before" 2>/dev/null)" ||
+        fail "release $(basename "$failed") has no backup; nothing was stopped or restored"
+    if [[ ! -f "$backup/SHA256SUMS" ]] || ! (cd "$backup" && sha256sum --quiet --check SHA256SUMS); then
+        fail "backup $backup is missing or damaged; nothing was stopped or restored"
+    fi
+fi
+
+load_host_env "$target/host.env"
+if [[ "$restore" == 1 ]]; then
+    stack "$failed" down --remove-orphans
     "$target/bin/restore" "$env" "$target" "$backup"
 fi
 stack "$target" up --detach --wait --wait-timeout 600 --remove-orphans
 stack "$target" exec -T tenant-web bench --site all set-maintenance-mode off
 switch_link "releases/$(basename "$target")" "$base/backend-current"
-switch_link "releases/$(basename "$failed")" "$base/backend-previous"
-rm -f "$base/backend-pending"
-rm -f "$base/health/backend.json"
-phase rolled-back
+switch_link "releases/$(basename "$failed")" "$base/backend-failed"
+if [[ "$undo" == current ]]; then
+    # The release before the target is not known here; a second rollback needs a person.
+    rm -f "$base/backend-previous"
+fi
+rm -f "$base/backend-pending" "$base/health/backend.json"
+printf 'rolled-back %s\n' "$(basename "$failed")" >"$base/phase"
 say "backend of $env is back on $(basename "$target")"

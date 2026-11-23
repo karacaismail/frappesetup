@@ -14,7 +14,7 @@ Bu klasördeki kod henüz gerçek sunucuda çalışmadı.
 | `compose/` | Bir ortamın servisleri ve ön vekil |
 | `images/` | Üretim imajlarının derleme dosyaları |
 | `environments/` | Dört ortamın sır içermeyen ayarı |
-| `tests/` | Paket kuralı ve sunucu betiği testleri |
+| `tests/` | Paket kuralı, sunucu betiği ve Jenkins tarafı testleri |
 
 ## Testler
 
@@ -39,3 +39,6 @@ shellcheck -x -P backend/deploy/bin:backend/deploy/remote backend/deploy/bin/* b
 - Taşımada kodu yeniden derlemeyin.
 - Veritabanı değişikliğini "genişlet, sonra daralt" kuralıyla yazın.
 - Zamanlanmış iş eklemeyin. Yedek yalnız dağıtımda ya da elle alınır.
+- Her ortam kendi SSH anahtarını ve kendi sunucu kullanıcısını kullanır. Kullanıcı `deploy-<ortam>` adını taşır.
+- Uzak komutu `bin/lib.sh` içindeki `remote` işleviyle çalıştırın. İşlev her sözcüğü tırnaklar.
+- Otomatik geri dönüşe başarısız paketin kimliğini verin: `--failed <paket kimliği>`. Sağlıklı paket geri alınmaz.

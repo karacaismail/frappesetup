@@ -13,6 +13,7 @@ manifest="$folder/release.json"
 release_py check "$manifest" --env "$env" || fail "release is not valid for $env"
 kind="$(release_py field "$manifest" kind)"
 id="$(release_py field "$manifest" release_id)"
+check_release_id "$id"
 
 files=("$manifest" "$DEPLOY_DIR/environments/$env.env")
 if [[ "$kind" == web ]]; then
@@ -24,7 +25,8 @@ else
 fi
 files+=("$DEPLOY_DIR"/remote/*)
 
-incoming="/srv/atonota/incoming/$env-$id"
+# Each environment has its own incoming folder, owned by its own server user.
+incoming="/srv/atonota/$env/incoming/$id"
 remote install -d -m 0750 "$incoming"
 copy_to_remote "$incoming/" "${files[@]}"
 remote "$incoming/apply" "$env" "$incoming"

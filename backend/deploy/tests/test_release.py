@@ -76,6 +76,12 @@ class EnvironmentFiles(unittest.TestCase):
         self.assertNotIn(environments["prod"]["ATONOTA_SSH_HOST"], others)
         self.assertNotEqual(environments["rc"]["ATONOTA_SSH_HOST"], environments["beta"]["ATONOTA_SSH_HOST"])
 
+    def test_each_environment_has_its_own_server_user(self):
+        # A key of one environment never logs in as the user of another (review 1, finding 6).
+        environments = release.load_environments()
+        for name, settings in environments.items():
+            self.assertEqual(settings["ATONOTA_SSH_USER"], f"deploy-{name}")
+
     def test_environment_files_hold_no_secret(self):
         for path in sorted((DEPLOY / "environments").glob("*.env")):
             for key in release.parse_env_file(path):
@@ -123,6 +129,20 @@ class Manifest(unittest.TestCase):
     def test_release_id_must_match_commit_and_build(self):
         manifest = backend_manifest(release_id="backend-ffffffffffff-b7")
         with self.assertRaisesRegex(release.ReleaseError, "release_id"):
+            release.check_manifest(manifest, "alpha")
+
+    def test_build_must_be_a_positive_whole_number(self):
+        # A build field like "1;touch${IFS}/tmp/pwned" once passed, because release_id was only
+        # rebuilt from the same fields (review 1, finding 1).
+        for build in ("1;touch${IFS}/tmp/pwned", "7", True, 0, -1, 7.0):
+            manifest = backend_manifest(build=build)
+            manifest["release_id"] = release.release_id("backend", COMMIT, build)
+            with self.subTest(build=build), self.assertRaisesRegex(release.ReleaseError, "build"):
+                release.check_manifest(manifest, "beta")
+
+    def test_release_id_must_be_plain(self):
+        manifest = backend_manifest(release_id=f"backend-{COMMIT[:12]}-b7 x")
+        with self.assertRaises(release.ReleaseError):
             release.check_manifest(manifest, "alpha")
 
     def test_commit_must_be_full(self):
@@ -200,6 +220,22 @@ class CommandLine(unittest.TestCase):
             skipped = self.run_cli("promote-check", str(path), "--target", "rc", "--source-record", str(record))
             self.assertEqual(skipped.returncode, 1)
             self.assertIn("beta", skipped.stderr)
+
+    def test_same_release_accepts_only_an_identical_manifest(self):
+        # promote.Jenkinsfile compares the server copy with the copy Jenkins archived (finding 1).
+        with tempfile.TemporaryDirectory() as folder:
+            archived = Path(folder) / "archived.json"
+            server = Path(folder) / "server.json"
+            archived.write_text(json.dumps(backend_manifest(), indent=2))
+            server.write_text(json.dumps(backend_manifest()))
+            same = self.run_cli("same-release", str(archived), str(server))
+            self.assertEqual(same.returncode, 0, same.stderr)
+            changed = backend_manifest()
+            changed["components"]["tenant"]["image"] = image("tenant").replace("a" * 64, "c" * 64)
+            server.write_text(json.dumps(changed))
+            other = self.run_cli("same-release", str(archived), str(server))
+            self.assertEqual(other.returncode, 1)
+            self.assertIn("differs", other.stderr)
 
     def test_field_prints_one_value(self):
         with tempfile.TemporaryDirectory() as folder:

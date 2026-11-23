@@ -1,8 +1,9 @@
 # Edge proxy of one Hetzner server. It is the only service with public ports (80, 443).
 # remote/apply runs it as project "atonota-edge". It writes one Caddy file per environment into
 # /srv/atonota/edge/sites/ and reloads Caddy. Caddy gets one certificate per host name (HTTP-01).
-# Environments on the same server reach the edge through the shared network "atonota-edge".
-# Only edge-facing services join it (tenant-frontend, keycloak, press), each with an env prefix.
+# Each environment has its own network "atonota-edge-<env>". remote/apply writes networks.yaml beside
+# this file, so Caddy joins the network of every environment on the server. Only edge-facing
+# services join those networks (tenant-frontend, keycloak, press), each with an env prefix.
 services:
   caddy:
     image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
@@ -17,11 +18,6 @@ services:
     environment:
       # Address for certificate expiry mail. Set in /etc/atonota/edge.env on the server.
       ATONOTA_ACME_EMAIL: ${ATONOTA_ACME_EMAIL:?set in /etc/atonota/edge.env}
-    networks: [edge]
 volumes:
   caddy-data:
   caddy-config:
-networks:
-  edge:
-    name: atonota-edge
-    external: true

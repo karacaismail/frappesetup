@@ -4,7 +4,10 @@
 #   /srv/atonota/<env>/releases/<id>/   backend release: release.json, release.env, compose files
 #   /srv/atonota/<env>/backend-current  relative link to the running backend release
 #   /srv/atonota/<env>/backend-previous relative link to the release before it
-#   /srv/atonota/web/<env>/releases/<id>/ and current, previous: web releases
+#   /srv/atonota/<env>/backend-pending  relative link to the release being applied (until it is current)
+#   /srv/atonota/<env>/backend-failed   relative link to the last release that was rolled back
+#   /srv/atonota/<env>/incoming/<id>/   files that Jenkins sent for one release
+#   /srv/atonota/web/<env>/releases/<id>/ and current, previous, failed: web releases
 #   /srv/atonota/<env>/backups/<time>/  backups taken before each backend release
 #   /srv/atonota/<env>/health/<kind>.json health record written by the Jenkins health step
 #   /etc/atonota/<env>/*.env            secrets, mode 0600, created by the DevOps owner
@@ -58,6 +61,15 @@ for k in sys.argv[2:]: d=d[k]
 print(d)' "$@"
 }
 
+# phase <release folder> <name>: how far a backend release got. rollback reads the folder copy.
+# Names in order: preparing, pulling, stopping, backing-up, migrating, migrated, starting, done.
 phase() {
-    printf '%s\n' "$1" >"$ATONOTA_ROOT/$ATONOTA_ENV/phase"
+    printf '%s\n' "$2" >"$1/phase"
+    printf '%s %s\n' "$2" "$(basename "$1")" >"$ATONOTA_ROOT/$ATONOTA_ENV/phase"
+}
+
+# health_passed <kind> <release id>: true when the Jenkins health step stored a record for it.
+health_passed() {
+    local record="$ATONOTA_ROOT/$ATONOTA_ENV/health/$1.json"
+    [[ -f "$record" && "$(json_field "$record" release_id 2>/dev/null)" == "$2" ]]
 }

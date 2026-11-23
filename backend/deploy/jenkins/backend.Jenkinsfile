@@ -1,58 +1,70 @@
 // Backend delivery line of karacaismail/frappesetup. Design: backend/docs/dagitim/ortamlar.md.
 //
 // A push to main builds one release (images pinned by digest), deploys it to alpha and checks
-// alpha. beta, rc and prod each wait for a person to press the button. Each step moves the same
-// release that is current and healthy in the previous environment; nothing is rebuilt.
+// alpha. beta waits for a person to press the button and moves the same release. rc and prod are
+// not in this job: the job "atonota-release/atonota-promote" (promote.Jenkinsfile) moves them,
+// because the rc and prod keys live only in that Jenkins folder.
 //
-// Jenkins setup (DevOps owner): Pipeline job, SCM branch */main, script path
-// backend/deploy/jenkins/backend.Jenkinsfile, "GitHub hook trigger" on. Plugins: Pipeline,
-// Git, GitHub, SSH Agent, Lockable Resources, Pipeline: Milestone Step, Credentials Binding.
-// Credentials: atonota-deploy-ssh (SSH key of user "deploy"), atonota-registry (GHCR user and token).
-// Agents with label atonota-build: Docker, Python 3.9+, uv, ssh on the Tailscale network.
+// Jenkins setup (DevOps owner): Pipeline job "atonota-delivery/atonota-backend", SCM branch */main,
+// script path backend/deploy/jenkins/backend.Jenkinsfile, "GitHub hook trigger" on. Plugins:
+// Pipeline, Git, GitHub, SSH Agent, Lockable Resources, Pipeline: Milestone Step, Credentials
+// Binding, Copy Artifact, Timestamper. Credentials of the folder "atonota-delivery":
+// atonota-deploy-ssh-alpha and atonota-deploy-ssh-beta (one key per environment and server user),
+// atonota-registry (GHCR user and token). Agents with label atonota-build: Docker, Python 3.9+, uv,
+// ssh on the Tailscale network.
+//
+// Every stage after the first one starts from an empty workspace and takes the scripts and the
+// release from this build's stashes. A later stage never checks out a newer main.
 
 // DEPLOYING names the environment whose deployment has started. A failure before that point
 // (for example a refused promotion check) must not roll back an environment that did not change.
 def deployAndCheck(String target) {
     env.DEPLOYING = target
-    sshagent(credentials: ['atonota-deploy-ssh']) {
+    sshagent(credentials: ["atonota-deploy-ssh-${target}"]) {
         sh "backend/deploy/bin/deploy ${target} release"
         sh "backend/deploy/bin/health ${target} release"
     }
     env.DEPLOYING = ''
 }
 
+// The server undoes only the release named here, and only if it changed the environment.
 def rollbackAfterFailure(String target) {
     if (env.DEPLOYING != target) {
         echo "No deployment started in ${target}; nothing to roll back."
         return
     }
-    sshagent(credentials: ['atonota-deploy-ssh']) {
-        sh """
-            set -eu
-            . backend/deploy/environments/${target}.env
-            if [ "\$ATONOTA_AUTO_RESTORE_ON_FAILURE" = 1 ]; then
-                backend/deploy/bin/rollback ${target} backend --restore-backup
-            else
-                backend/deploy/bin/rollback ${target} backend
-            fi
-        """
+    def restore = sh(returnStdout: true,
+        script: "sed -n 's/^ATONOTA_AUTO_RESTORE_ON_FAILURE=//p' backend/deploy/environments/${target}.env").trim()
+    def extra = restore == '1' ? ' --restore-backup' : ''
+    sshagent(credentials: ["atonota-deploy-ssh-${target}"]) {
+        sh "backend/deploy/bin/rollback ${target} backend --failed ${env.RELEASE_ID}${extra}"
     }
 }
 
-def promote(String target, String source) {
+def useStashes() {
+    deleteDir()
+    unstash 'deploy'
     unstash 'release'
-    sshagent(credentials: ['atonota-deploy-ssh']) {
+    sh "test \"\$(python3 -I backend/deploy/release.py field release/release.json commit)\" = '${env.DEPLOY_COMMIT}'"
+}
+
+def promote(String target, String source) {
+    useStashes()
+    sshagent(credentials: ["atonota-deploy-ssh-${source}"]) {
         sh "rm -rf source && backend/deploy/bin/fetch-current ${source} backend source"
-        sh "python3 -I backend/deploy/release.py promote-check release/release.json --target ${target} --source-record source/source-record.json"
     }
+    sh "python3 -I backend/deploy/release.py promote-check release/release.json --target ${target} --source-record source/source-record.json"
     deployAndCheck(target)
 }
 
 pipeline {
     agent none
     options {
+        skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '100', artifactNumToKeepStr: '100'))
         timestamps()
+        // The promotion jobs compare a server copy with this build's archived release.json.
+        copyArtifactPermission('/atonota-delivery/atonota-promote,/atonota-release/atonota-promote')
     }
     triggers {
         githubPush()
@@ -64,6 +76,15 @@ pipeline {
         stage('Build and alpha') {
             agent { label 'atonota-build' }
             stages {
+                stage('Checkout') {
+                    steps {
+                        script {
+                            def scmVars = checkout scm
+                            env.DEPLOY_COMMIT = scmVars.GIT_COMMIT
+                        }
+                        stash name: 'deploy', includes: 'backend/deploy/**'
+                    }
+                }
                 stage('Gates') {
                     steps {
                         sh 'python3 -I -m unittest discover -s backend/deploy/tests'
@@ -79,7 +100,11 @@ pipeline {
                                 usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_TOKEN')]) {
                             sh 'printf %s "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin'
                         }
-                        sh 'rm -rf release && backend/deploy/bin/build-release release/release.json'
+                        sh 'rm -rf release && GIT_COMMIT="$DEPLOY_COMMIT" backend/deploy/bin/build-release release/release.json'
+                        script {
+                            env.RELEASE_ID = sh(returnStdout: true,
+                                script: 'python3 -I backend/deploy/release.py field release/release.json release_id').trim()
+                        }
                         archiveArtifacts artifacts: 'release/release.json', fingerprint: true
                         stash name: 'release', includes: 'release/**'
                     }
@@ -101,6 +126,7 @@ pipeline {
             }
         }
         stage('Move to beta') {
+            // The input directive waits before the agent is taken, so no agent sits idle.
             input {
                 message 'Move this release from alpha to beta?'
                 ok 'Move to beta'
@@ -115,40 +141,6 @@ pipeline {
             }
             post {
                 failure { rollbackAfterFailure('beta') }
-            }
-        }
-        stage('Move to rc') {
-            input {
-                message 'Move this release from beta to rc?'
-                ok 'Move to rc'
-                submitter 'atonota-deployers'
-            }
-            agent { label 'atonota-build' }
-            steps {
-                milestone(3)
-                lock(resource: 'atonota-rc') {
-                    promote('rc', 'beta')
-                }
-            }
-            post {
-                failure { rollbackAfterFailure('rc') }
-            }
-        }
-        stage('Move to prod') {
-            input {
-                message 'Move this release from rc to prod?'
-                ok 'Move to prod'
-                submitter 'atonota-release-managers'
-            }
-            agent { label 'atonota-build' }
-            steps {
-                milestone(4)
-                lock(resource: 'atonota-prod') {
-                    promote('prod', 'rc')
-                }
-            }
-            post {
-                failure { rollbackAfterFailure('prod') }
             }
         }
     }

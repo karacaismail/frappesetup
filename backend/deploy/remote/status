@@ -15,8 +15,15 @@ backend)
     current="$ATONOTA_ROOT/$env/backend-current"
     [[ -L "$current" ]] || fail "$env has no backend release"
     load_host_env "$current/host.env"
-    stack "$current" ps --format '{{.Service}} {{.State}} {{.Health}}' | while read -r service state health; do
-        [[ "$state" == running && ( -z "$health" || "$health" == healthy ) ]] ||
+    # Every service the release defines must run. "ps --all" also lists stopped containers, and a
+    # service without any container is missing from it.
+    services="$(stack "$current" config --services)"
+    states="$(stack "$current" ps --all --format '{{.Service}} {{.State}} {{.Health}}')"
+    for service in $services; do
+        line="$(awk -v name="$service" '$1 == name' <<<"$states")"
+        [[ -n "$line" ]] || fail "$service has no container"
+        read -r _ state health <<<"$line"
+        [[ "$state" == running && (-z "$health" || "$health" == healthy) ]] ||
             fail "$service is $state $health"
     done
     json_field "$current/release.json" release_id

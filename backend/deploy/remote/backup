@@ -2,6 +2,7 @@
 # Back up one environment from its running release and print the backup folder.
 # Usage: backup <env> <release folder>
 # Holds: every tenant site (database and files), the Keycloak database, the identity-sync database.
+# Needs running: tenant-web and keycloak-db. identity-sync may be stopped (remote/apply stops it first).
 # With ATONOTA_REQUIRE_OFFSITE_BACKUP=1 the copy to the offsite store must succeed too.
 # This script runs only when a person or a deployment starts it. It is not scheduled.
 set -euo pipefail
@@ -25,9 +26,15 @@ install -d -m 0700 "$out"
         stack "$folder" exec -T tenant-web rm -rf "$inside"
     done
     stack "$folder" exec -T keycloak-db pg_dump --username keycloak --format custom keycloak >"$out/keycloak.dump"
-    stack "$folder" exec -T identity-sync python -c \
-        'import sqlite3,sys; s=sqlite3.connect("/data/identity_sync.sqlite3"); d=sqlite3.connect("/tmp/backup.sqlite3"); s.backup(d); d.close()'
-    stack "$folder" exec -T identity-sync cat /tmp/backup.sqlite3 >"$out/identity-sync.sqlite3"
+    # A one-off container reads the identity-sync volume, so the service itself can stay stopped.
+    stack "$folder" run --rm --no-deps -T --entrypoint python identity-sync -c '
+import sqlite3, sys
+source = sqlite3.connect("file:/data/identity_sync.sqlite3?mode=ro", uri=True)
+copy = sqlite3.connect("/tmp/backup.sqlite3")
+source.backup(copy)
+copy.close()
+with open("/tmp/backup.sqlite3", "rb") as data:
+    sys.stdout.buffer.write(data.read())' >"$out/identity-sync.sqlite3"
     json_field "$folder/release.json" release_id >"$out/release-id"
     (cd "$out" && find . -type f -print0 | sort -z | xargs -0 sha256sum >"$out.sums" && mv "$out.sums" SHA256SUMS)
 } >&2

@@ -4,7 +4,8 @@
 #   host.env     the non-secret environment file of deploy/environments/<env>.env
 # Secrets live only on the server in /etc/atonota/<env>/<service>.env (mode 0600). Nothing here
 # publishes a host port. The edge proxy (edge.yaml) reaches tenant-frontend, keycloak and press over
-# the shared network "atonota-edge" by the aliases <env>-tenant, <env>-keycloak and <env>-press.
+# the network "atonota-edge-<env>" by the aliases <env>-tenant, <env>-keycloak and <env>-press.
+# Each environment has its own edge network, so alpha containers cannot reach beta services.
 
 x-tenant: &tenant
   image: ${ATONOTA_IMAGE_TENANT:?release.env is missing}
@@ -178,6 +179,7 @@ volumes:
 
 networks:
   internal: {}
+  # One edge network per environment (remote/apply creates it); the edge proxy joins each one.
   edge:
-    name: atonota-edge
+    name: atonota-edge-${ATONOTA_ENV:?}
     external: true
