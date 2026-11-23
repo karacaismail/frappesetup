@@ -6,17 +6,18 @@ which record fields a definition may write to. Model names never appear here.
 
 import json
 import re
-from functools import cache
+from functools import cache, wraps
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import now
 from frappe.utils.password import get_decrypted_password
 
 from platform_core.model_gateway import adapters, gateway, policy
-from platform_core.model_gateway.doctype.validation import validate_url
+from platform_core.model_gateway.doctype.validation import is_valid_url
 from platform_core.model_gateway.policy import Denied
 
 CATALOG_FILE = Path(__file__).with_name("provider_catalog.json")
@@ -37,7 +38,13 @@ COMMON_FIELDS = (
 	("account_name", "Account name", "account", "Name of the provider account in this site."),
 	("api_name", "Connection name", "api", "Name of this API connection."),
 )
+# The gateway sends these values as HTTP headers, so they stay plain ASCII tokens.
+HEADER_TARGETS = {"account.organization_id", "account.project_id"}
+HEADER_VALUE = re.compile(r"[A-Za-z0-9_-]{1,140}\Z")
 MAX_LENGTH = {"secret": 4096, "text": 140, "url": 2048}
+# Requests per user and endpoint in one window, for saving and for the live check.
+RATE_LIMIT = 10
+RATE_WINDOW = 60
 CHECK_TIMEOUT = 10
 CHECK_CONNECT_TIMEOUT = 5
 CHECK_STATUS = {
@@ -211,24 +218,39 @@ def provider_definition(provider_id):
 	raise Denied(400, "unknown_provider")
 
 
-def _valid_url(value):
-	try:
-		validate_url(value, "Base URL")
-	except frappe.ValidationError:
-		return False
-	finally:
-		frappe.clear_messages()
-	return True
-
-
-def _valid_value(kind, value):
+def _valid_value(kind, value, target):
 	if not isinstance(value, str) or len(value) > MAX_LENGTH[kind] or value.strip() != value:
 		return False
+	if target in HEADER_TARGETS:
+		return bool(HEADER_VALUE.fullmatch(value))
 	if kind == "secret":
 		return value.isprintable() and not any(character.isspace() for character in value)
 	if kind == "url":
-		return _valid_url(value)
+		return is_valid_url(value)
 	return value.isprintable()
+
+
+def _per_user_limit(function):
+	"""Allow RATE_LIMIT calls per user in RATE_WINDOW seconds inside an HTTP request."""
+	limited = rate_limit(
+		limit=lambda: RATE_LIMIT,
+		seconds=RATE_WINDOW,
+		ip_based=False,
+		user_based=True,
+		endpoint=f"{__name__}.{function.__name__}",
+	)(function)
+
+	@wraps(function)
+	def wrapper(*args, **kwargs):
+		messages = len(frappe.local.message_log)
+		try:
+			return limited(*args, **kwargs)
+		except frappe.RateLimitExceededError:
+			# Keep the fixed error code. Drop only the limiter's own message.
+			del frappe.local.message_log[messages:]
+			raise Denied(429, "gateway_busy") from None
+
+	return wrapper
 
 
 def parse_fields(definition, fields, *, new_account):
@@ -244,7 +266,7 @@ def parse_fields(definition, fields, *, new_account):
 			if field["required"]:
 				invalid.add(name)
 			continue
-		if not _valid_value(field["kind"], value) or (
+		if not _valid_value(field["kind"], value, field["target"]) or (
 			not new_account and field["target"].startswith("account.")
 		):
 			invalid.add(name)
@@ -299,6 +321,7 @@ def _existing_account(name, provider):
 	return account.name
 
 
+@_per_user_limit
 def save_connection(provider, api_name, fields, account=None, account_name=None):
 	"""Create an API connection from a catalog definition. Returns no secret."""
 	policy.require_user(managers_only=True)
@@ -396,6 +419,7 @@ def _probe(api, account, provider):
 	return "connected", count
 
 
+@_per_user_limit
 def check_connection(api):
 	"""Send one model-list request and record the result on the API connection."""
 	policy.require_user(managers_only=True)

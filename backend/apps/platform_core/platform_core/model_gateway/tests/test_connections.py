@@ -5,6 +5,7 @@ import json
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -213,6 +214,35 @@ class FieldTests(unittest.TestCase):
 			connections.parse_fields(self.openai, ["api_key"], new_account=True)
 		self.assertEqual(failure.exception.code, "invalid_request")
 
+	def test_header_identifiers_are_ascii_tokens(self):
+		# The gateway sends these values as HTTP headers. requests cannot send non-ASCII headers.
+		credential = _credential()
+		values = connections.parse_fields(
+			self.openai,
+			{"api_key": credential, "organization_id": "org-Fixture_1", "project_id": "proj_FIXTURE-2"},
+			new_account=True,
+		)
+		self.assertEqual(values["account.project_id"], "proj_FIXTURE-2")
+		for value in ("org-ş", "org fixture", "org.fixture", "org:fixture", "x" * 141):
+			with self.subTest(value=value):
+				self.assert_field_error(
+					self.openai,
+					{"api_key": credential, "organization_id": value, "project_id": value},
+					["organization_id", "project_id"],
+				)
+
+	def test_url_validation_keeps_earlier_messages(self):
+		frappe.clear_messages()
+		frappe.msgprint("Earlier fixture message")
+		try:
+			self.assert_field_error(self.ollama, {"base_url": "ftp://fixture.example"}, ["base_url"])
+			connections.parse_fields(self.ollama, {"base_url": "http://fixture.example"}, new_account=True)
+			self.assertEqual(
+				[message.message for message in frappe.local.message_log], ["Earlier fixture message"]
+			)
+		finally:
+			frappe.clear_messages()
+
 	def test_account_fields_need_a_new_account(self):
 		self.assert_field_error(
 			self.openai,
@@ -396,6 +426,47 @@ class ConnectionRecordTests(IntegrationTestCase):
 			frappe.db.get_value("PLT AI Provider", result["provider"], "catalog_provider"),
 			"openai_compatible",
 		)
+
+	def in_request(self):
+		# Frappe applies rate limits only inside an HTTP request.
+		return patch.object(frappe.local, "request", SimpleNamespace(method="POST"), create=True)
+
+	def clear_rate_counters(self):
+		frappe.cache.delete_keys("rl:platform_core.model_gateway.connections.")
+
+	def test_connection_rate_limit_rule(self):
+		self.assertEqual((connections.RATE_LIMIT, connections.RATE_WINDOW), (10, 60))
+
+	def test_checks_are_limited_per_user(self):
+		saved = self.save("ollama", {"base_url": self.provider.url})
+		self.clear_rate_counters()
+		self.addCleanup(self.clear_rate_counters)
+		with self.approve(), self.in_request(), patch.object(connections, "RATE_LIMIT", 2):
+			for _attempt in range(2):
+				self.assertEqual(connections.check_connection(saved["api"])["status"], "connected")
+				frappe.db.commit()
+			messages = list(frappe.local.message_log)
+			with self.assertRaises(Denied) as failure:
+				connections.check_connection(saved["api"])
+			self.assertEqual((failure.exception.status, failure.exception.code), (429, "gateway_busy"))
+			self.assertEqual(frappe.local.message_log, messages)
+			self.assertEqual(len(self.provider.requests), 2)
+			# Another manager has an own counter.
+			frappe.set_user("Administrator")
+			self.assertEqual(connections.check_connection(saved["api"])["status"], "connected")
+
+	def test_saves_are_limited_per_user(self):
+		self.clear_rate_counters()
+		self.addCleanup(self.clear_rate_counters)
+		with self.in_request(), patch.object(connections, "RATE_LIMIT", 1):
+			self.save("ollama", {"base_url": self.provider.url})
+			apis = frappe.db.count("PLT AI API")
+			with self.assertRaises(Denied) as failure:
+				connections.save_connection(
+					"ollama", api_name="Limited", account_name="Limited", fields={"base_url": self.provider.url}
+				)
+		self.assertEqual((failure.exception.status, failure.exception.code), (429, "gateway_busy"))
+		self.assertEqual(frappe.db.count("PLT AI API"), apis)
 
 	def test_save_reuses_the_provider_record_and_an_existing_account(self):
 		first = self.save("ollama", {"base_url": self.provider.url})

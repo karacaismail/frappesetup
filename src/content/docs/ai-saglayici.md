@@ -124,6 +124,8 @@ Model listesi isteği token harcamaz. Bu yüzden deneme ücret doğurmaz. Deneme
 
 Aynı bağlantı için iki deneme aynı anda çalışmaz. İkinci deneme 429 kodu alır.
 
+Her kullanıcı deneme ucunu 60 saniyede en çok 10 kez çağırabilir. Kaydetme ucunda da aynı sınır vardır. Sayaç her kullanıcı ve her uç için ayrıdır. Kullanıcı sınırı aşarsa sunucu 429 kodu ve `gateway_busy` hatasını döner. Bu durumda sağlayıcıya istek gitmez. Kaydetme ucu da kayıt açmaz. Bu sınır sağlayıcının anahtarı kısıtlamasını önler. Çalınmış bir yönetici oturumu da sınırsız istek gönderemez.
+
 ### Süre sınırı
 
 Geçit bağlantı kurmak için en çok 5 saniye bekler. Geçit yanıt için en çok 10 saniye bekler. Süre dolarsa sonuç "ağ hatası" olur.
@@ -139,11 +141,23 @@ Deneme her durumda HTTP 200 döner. Sonuç `status` alanındadır. Panel her son
 | `permission_denied` | Anahtarın bu işe izni yok. | Sağlayıcıda anahtarın iznini açın. |
 | `quota_exceeded` | Kota doldu ya da hız sınırı aşıldı. | Kotayı denetleyin. Sonra yeniden deneyin. |
 | `network_error` | Sağlayıcıya ulaşılamadı. | Adresi denetleyin. Sonra yeniden deneyin. |
-| `provider_error` | Sağlayıcı beklenmeyen bir yanıt verdi. | Adresi denetleyin. Sorun sürerse destek isteyin. |
+| `provider_error` | Sağlayıcı beklenmeyen bir yanıt verdi. | Adresi ve hesabın kredisini denetleyin. Sorun sürerse destek isteyin. |
 | `endpoint_not_approved` | Bu adres onaylı değil. | Platform operatöründen adres onayı isteyin. |
 | `configuration_error` | Kayıt eksik. | Bağlantının alanlarını tamamlayın. |
 
-Yanıtta sağlayıcının kendi iletisi yoktur. Yanıtta model adı da yoktur. Yanıt yalnız görülen model sayısını taşır.
+Yanıtta sağlayıcının kendi iletisi yoktur. Yanıtta model adı da yoktur. Yanıt yalnız görülen model sayısını taşır. Bu sayı yalnız ilk sayfadaki modelleri sayar. Bazı sağlayıcılar listeyi sayfa sayfa verir. Örneğin Anthropic ilk sayfada 20 model verir. Gerçek model sayısı daha büyük olabilir.
+
+### "Bağlandı" sonucunun sınırı
+
+"Bağlandı" sonucu anahtarın geçerli olduğunu gösterir. Bu sonuç kalan kotayı göstermez. Kalan krediyi de göstermez. Model listesi isteği kota dolunca da çoğu zaman başarılı olur. Bu yüzden kota sorunu ilk gerçek istekte görünür.
+
+Örneğin bir OpenAI hesabının kredisi bitmiş olabilir. Deneme yine "Bağlandı" der. İlk gerçek istek ise kota hatası alır.
+
+Anthropic kredi bitince 400 kodu dönebilir. Deneme bu yanıtı `provider_error` sonucuna çevirir. `quota_exceeded` sonucu yalnız 429 yanıtında çıkar.
+
+Panel bu sınırı yöneticiye kısa bir notla göstermelidir. Not "Bağlandı" sonucunun yanında durur. Örnek not şudur: "Anahtar geçerli. Kalan kota bu denemede görünmez."
+
+Kotayı gerçekten sınamak için tek tokenlık bir deneme gerekir. Bu deneme ücret doğurur. Bu seçenek bu işte yoktur. Seçenek sonraki bir işte tartışılacak.
 
 Bağlandı sonucu bağlantının sağlık durumunu "sağlıklı" yapar. "Anahtar geçersiz" sonucu bağlantıyı yol seçiminden çıkarır. Yönetici anahtarı ya da adresi değiştirirse sonuç "denenmedi" olur.
 

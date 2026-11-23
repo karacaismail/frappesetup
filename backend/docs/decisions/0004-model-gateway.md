@@ -58,8 +58,8 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | HTTP | `platform_core.api.model.purge_usage` | Silinecek kayıtları gösterir veya onaylı önizlemeye göre siler. |
 | HTTP | `platform_core.api.model.clear_api_credential` | Kapalı bağlantının anahtarını siler. |
 | HTTP | `platform_core.api.model.provider_catalog` | Bağlantı formunun sağlayıcı tanımlarını ve alanlarını verir. |
-| HTTP | `platform_core.api.model.save_connection` | Alanları tanıma göre denetler. Yeni bağlantıyı kaydeder. Anahtarı şifreli alana yazar. |
-| HTTP | `platform_core.api.model.check_connection` | Model listesini okuyarak canlı deneme yapar. Sonucu kayda yazar. |
+| HTTP | `platform_core.api.model.save_connection` | Alanları tanıma göre denetler. Yeni bağlantıyı kaydeder. Anahtarı şifreli alana yazar. Kullanıcı başına 60 saniyede 10 isteği kabul eder. |
+| HTTP | `platform_core.api.model.check_connection` | Model listesini okuyarak canlı deneme yapar. Sonucu kayda yazar. Kullanıcı başına 60 saniyede 10 isteği kabul eder. |
 | Bench | `platform_core.model_gateway.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
 | Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` ve `reconcile_stale_pending` araçlarını bildirir. |
 | Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |

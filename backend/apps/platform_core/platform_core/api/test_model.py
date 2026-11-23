@@ -34,6 +34,8 @@ class TestModelHTTP(unittest.TestCase):
 		for api in (self.fixture["first_api"], self.fixture["second_api"]):
 			frappe.cache.delete(self._cooldown_key(api))
 			frappe.db.delete("PLT AI Usage Log", {"api": api})
+		# Connection form endpoints count requests per user. Each test starts with fresh counters.
+		frappe.cache.delete_keys("rl:platform_core.model_gateway.connections.")
 		frappe.db.commit()
 		self.fixture["provider_status"]["/first/api/chat"] = 429
 
@@ -549,6 +551,23 @@ class TestModelHTTP(unittest.TestCase):
 		record = self.request("manager", "GET", self.resource("PLT AI API", api))
 		self.assertEqual(record.json()["data"]["connection_status"], "connected")
 		self.assertNotIn(credential, record.text)
+
+	def test_connection_endpoints_answer_gateway_busy_over_the_rate_limit(self):
+		saved = self._save_connection("manager").json()["message"]
+		user = self.fixture["users"]["manager"]
+		requests_before = len(self.fixture["list_requests"])
+		for endpoint, payload in (
+			("check_connection", {"api": saved["api"]}),
+			("save_connection", self._connection_payload()),
+		):
+			with self.subTest(endpoint=endpoint):
+				counter = f"rl:platform_core.model_gateway.connections.{endpoint}:{user}"
+				frappe.cache.setex(frappe.cache.make_key(counter) + b":60", 60, 10)
+				response = self._maintenance("manager", endpoint, payload)
+				self.assertEqual(response.status_code, 429, response.text)
+				self.assertEqual(response.json()["message"], {"error": "gateway_busy"})
+				self.assertNotIn("_server_messages", response.json())
+		self.assertEqual(len(self.fixture["list_requests"]), requests_before)
 
 	def test_check_connection_reports_an_invalid_key(self):
 		saved = self._save_connection(

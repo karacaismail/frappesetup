@@ -388,6 +388,8 @@ paths:
         a new account or uses an existing account, and always a new API connection. Writes secrets only
         to the encrypted password field. The response never returns a secret. Sends no provider request.
         The connection status starts as not_checked; call check_connection next.
+        Each user may call this endpoint 10 times in 60 seconds; the next call answers 429 gateway_busy
+        and saves nothing.
       operationId: saveProviderConnection
       security:
         - session: []
@@ -433,6 +435,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '417':
           $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/Busy'
         '503':
           $ref: '#/components/responses/Unavailable'
   /api/method/platform_core.api.model.check_connection:
@@ -444,7 +448,11 @@ paths:
         provider may still count it against its rate limit. Writes the result and time to the API
         record and returns them. A failed check still answers with HTTP 200 and a status code. The
         response holds no credentials, no provider message and no model names. The deployment must
-        approve the address in model_gateway_endpoints first.
+        approve the address in model_gateway_endpoints first. connected proves only that the provider
+        accepted the credential; the model list does not show the remaining quota or credit, so a spent
+        quota may appear only on the first billable request. Each user may call this endpoint 10 times
+        in 60 seconds. The next call, or a check while another check of the same connection runs,
+        answers 429 gateway_busy and sends no provider request.
       operationId: checkProviderConnection
       security:
         - session: []
@@ -490,7 +498,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
         '429':
-          $ref: '#/components/responses/QuotaError'
+          $ref: '#/components/responses/Busy'
         '503':
           $ref: '#/components/responses/Unavailable'
 components:
@@ -571,6 +579,14 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             message: {error: quota_exceeded}
+    Busy:
+      description: The per-user rate limit is spent or the same connection check is already running
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: gateway_busy}
     Unavailable:
       description: Gateway or provider unavailable
       content:
@@ -829,6 +845,8 @@ components:
           description: >
             connected means the provider accepted the credential. invalid_credentials means HTTP 401.
             permission_denied means HTTP 403. quota_exceeded means HTTP 429 for a rate limit or a spent quota.
+            Many providers still answer the model list when the credit is spent, so connected does not
+            rule out a spent quota. Anthropic may answer a spent credit with HTTP 400, which becomes provider_error.
             network_error means the connection failed or timed out. provider_error means another
             provider answer. endpoint_not_approved means the deployment has not approved the address.
             configuration_error means the saved record is incomplete.

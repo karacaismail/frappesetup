@@ -30,21 +30,24 @@ def encode_identifiers(value, label):
 	return json.dumps(items, separators=(",", ":"))
 
 
-def validate_url(value, label, *, https_only=False):
-	if not value:
-		return
+def is_valid_url(value, *, https_only=False):
+	"""Return whether a non-empty address passes the registry URL rules. Writes no message."""
 	schemes = {"https"} if https_only else {"http", "https"}
-	if isinstance(value, str) and not any(
+	if not isinstance(value, str) or any(
 		character.isspace() or ord(character) < 32 or character in "?#\\" for character in value
 	):
-		try:
-			url = urlsplit(value)
-			port = url.port
-		except ValueError:
-			pass
-		else:
-			if url.scheme in schemes and url.hostname and url.username is None and port != 0:
-				return
+		return False
+	try:
+		url = urlsplit(value)
+		port = url.port
+	except ValueError:
+		return False
+	return bool(url.scheme in schemes and url.hostname and url.username is None and port != 0)
+
+
+def validate_url(value, label, *, https_only=False):
+	if not value or is_valid_url(value, https_only=https_only):
+		return
 	if https_only:
 		frappe.throw(
 			_("{0} must be an HTTPS address without credentials, a query, or a fragment.").format(_(label))
