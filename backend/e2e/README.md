@@ -146,9 +146,13 @@ Zincir şöyle ilerler:
 1. Müşteri Press'te hesabını silmek ister. Press, Keycloak'ta yeni bir giriş ister.
 2. Press, isteği kimlik eşitleme servisine gönderir.
 3. Servis Press'i ve kiracıyı sırayla kapatır ve anonim yapar.
-4. Servis en son Keycloak hesabını siler. Test bu silmeyi bekler. Silme, önceki adımların bittiğini gösterir.
-5. Test kiracının anonim yapma ucunu servis belirteciyle yeniden çağırır. Kiracı 200 ile `anonymized: true`, `found: true`, anonim kullanıcı adı ve “Anonymized” durumunu döner (O-44). Tekrar çağrı aynı gövdeyi verir.
-6. Test kiracıdaki “User”, “Employee”, silme kaydı ve kimlik bağı kayıtlarını okur. Kişisel alanlar temizlenmiş, bağ silinmiş olmalıdır.
+4. Servis en son Keycloak hesabını siler. Test bu silmeyi bekler.
+5. Test kiracıyı yalnız okur. Servisin açtığı silme kaydı “Anonymized” olmalıdır. Eski kullanıcı yok, anonim kullanıcı kapalı olmalıdır. Kimlik bağı silinmiş, çalışan kaydının kişisel alanları temizlenmiş olmalıdır. Bu okumalar geçmeden test ilerlemez.
+6. Test en son tekrar çağrı sözleşmesini sınar. Kiracının anonim yapma ucunu servis belirteciyle çağırır. Kiracı 200 ile `anonymized: true`, `found: true`, anonim kullanıcı adı ve “Anonymized” durumunu döner. Yeni silme kaydı açılmaz.
+
+Aynı dosyada bir negatif test vardır. Test taze deneme hesabıyla çalışır. Bu hesapta servis kiracıya hiç dokunmamıştır.
+Negatif test 5. adımdaki okumaların bu durumda kaldığını doğrular. Servis kiracıyı atlarsa asıl test aynı yerde kalır.
+Negatif test yalnız okur. İki test aynı deneme hesabını sırayla kullanır.
 
 Komutları depo kökünden çalıştırın.
 

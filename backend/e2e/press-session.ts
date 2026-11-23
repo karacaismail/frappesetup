@@ -114,8 +114,16 @@ export async function keycloakReaderToken(request: APIRequestContext) {
   return token;
 }
 
-/** Closes a fixture session on a Frappe site. The seed opened it for one test run. */
+/**
+ * Closes a fixture session on a Frappe site. The seed opened it for one test run.
+ * Returns the HTTP status, or 0 when the site did not answer. It never throws, so a caller
+ * can close every session and check the results after its own assertions.
+ */
 export async function closeSession(request: APIRequestContext, origin: string, cookie: string) {
-  const response = await request.post(origin + '/api/method/logout', { headers: { Cookie: cookie }, maxRedirects: 0 });
-  expect(response.status(), 'close fixture session on ' + origin).toBe(200);
+  try {
+    const response = await request.post(origin + '/api/method/logout', { headers: { Cookie: cookie }, maxRedirects: 0 });
+    return response.status();
+  } catch {
+    return 0;
+  }
 }
