@@ -395,7 +395,7 @@ Depoda sır yoktur. Sırlar iki yerde durur:
 Sunucudaki sır dosyaları şunlardır:
 
 - `tenant.env` ve `tenant-db.env` dosyaları kiracı sitesinin ve MariaDB'nin sırlarını tutar.
-- `keycloak.env` ve `keycloak-db.env` dosyaları Keycloak'ın ve PostgreSQL'in sırlarını tutar. Anahtar adları `backend/identity/keycloak/production.env.example` dosyasındadır.
+- `keycloak.env` ve `keycloak-db.env` dosyaları Keycloak'ın ve PostgreSQL'in sırlarını tutar.
 - `identity-sync.env` dosyası eşitleme servisinin sırlarını tutar.
 - `press.env` dosyası Press'in sırlarını tutar. Bu dosya Press imajı gelince gerekir.
 - `offsite.env` dosyası sunucu dışı yedeğin `rclone` adresini tutar.
@@ -420,6 +420,98 @@ Frappe'nin geri yükleme komutu veritabanı kök parolasını komut satırında 
 `hidepid` yalnız `docker` grubunda olmayan kullanıcıları korur. `docker` grubundaki kullanıcı bir konteyner açıp sunucunun bütün süreçlerini görebilir. Bu yüzden ayar, aynı sunucudaki öteki ortamın kullanıcısına karşı işe yaramaz. Bu iki ortam için sınır yine sunucudur.
 
 Her ortamın sırları ayrıdır. alpha'nın parolası prod'da kullanılmaz.
+
+## Üretim ayarları
+
+Bu bölüm E-4 engelinin çözümüdür. Her sır dosyasının bir anahtar listesi vardır.
+
+### Listeler nerede
+
+Listeler `backend/deploy/settings/` klasöründedir. Her listenin adı `<servis>.production.env.example` biçimindedir.
+
+Listede gerçek değer yoktur. Her satırda anahtar adı ve değerin biçimi vardır. Örnek:
+
+```text
+ATONOTA_SITE_TENANT1_SECRET=<kiracı tarayıcı istemcisi sırrı, en az 32 karakter>
+```
+
+`<` ile `>` arasındaki metin yer tutucudur. Yer tutucu, gerçek değerin yerine yazılan açıklamadır.
+
+| Liste | Sunucudaki yeri | Ne zaman gerekir |
+| --- | --- | --- |
+| `tenant` | `/etc/atonota/<ortam>/tenant.env` | Her arka uç dağıtımında |
+| `tenant-db` | `/etc/atonota/<ortam>/tenant-db.env` | Her arka uç dağıtımında |
+| `tenant-site` | Her kiracı sitesinin `site_config.json` dosyası | Her arka uç dağıtımında |
+| `keycloak` | `/etc/atonota/<ortam>/keycloak.env` | Her arka uç dağıtımında |
+| `keycloak-db` | `/etc/atonota/<ortam>/keycloak-db.env` | Her arka uç dağıtımında |
+| `identity-sync` | `/etc/atonota/<ortam>/identity-sync.env` | Her arka uç dağıtımında |
+| `press` | `/etc/atonota/<ortam>/press.env` | Pakette Press imajı varsa |
+| `press-site` | Press sitesinin `site_config.json` dosyası | Press imajı gelince (E-2) |
+| `offsite` | `/etc/atonota/<ortam>/offsite.env` | rc ve prod'da her zaman. Öteki ortamlarda dosya varsa |
+| `edge` | `/etc/atonota/edge.env` | Her arka uç dağıtımında |
+
+Keycloak listesinin asıl dosyası `backend/identity/keycloak/production.env.example` dosyasıdır. `settings/` klasöründeki Keycloak listesi bu dosyaya bağdır. Böylece tek liste vardır.
+
+Bir yorum satırı listedeki anahtarın kuralını söyleyebilir:
+
+- `[isteğe bağlı]` etiketli anahtar boş kalabilir.
+- `[sabit]` etiketli anahtarın değeri listedeki değerle aynı olur. Örneğin `ATONOTA_SSL_REQUIRED=all` böyledir.
+- Etiketsiz anahtar zorunludur.
+
+### Sırlar nereye konur
+
+Sırlar yalnız sunucuda durur. Depoya, Jenkins'e ve sohbet kayıtlarına yazılmaz.
+
+DevOps sorumlusu her ortam için şu adımları uygular:
+
+1. Sunucuda `/etc/atonota/<ortam>/` klasörünü açar.
+2. Her liste için listedeki adla bir dosya yazar. Örneğin `keycloak.env` yazar.
+3. Her yer tutucunun yerine gerçek değeri yazar.
+4. Dosyanın iznini `0600` yapar. Dosyanın sahibi `deploy-<ortam>` kullanıcısı olur.
+5. Kiracı sitesinin ayarlarını sitenin içinde yazar. Örnek komut: `bench --site <site> set-config keycloak_client_id site-tenant1`.
+
+Aynı değerin iki yerde durduğu anahtarlar vardır. Örneğin `KC_DB_PASSWORD` ile `POSTGRES_PASSWORD` aynıdır. Listedeki yorum bu eşleri söyler.
+
+### Dağıtım eksik ayarı nasıl yakalar
+
+Jenkins sırları görmez. Bu yüzden denetimi sunucudaki `remote/apply` betiği yapar.
+
+1. Betik önce sır dosyalarını paketteki listelerle karşılaştırır. Bunu `remote/settings.py` yapar.
+2. Bir dosya yoksa ya da bir anahtar eksikse betik durur. Sunucuda hiçbir şey değişmez.
+3. Betik yeni imajları indirir. Eski sürüm bu sırada çalışmaya devam eder.
+4. Betik yeni kiracı imajıyla her sitenin `site_config.json` dosyasını okur. Bunu `remote/site-probe.py` yapar.
+5. Bir site ayarı eksikse betik durur. Eski sürüm durdurulmaz ve çalışmaya devam eder.
+
+Betik eksik anahtarın adını ve dosyanın yolunu yazar. Değeri hiçbir zaman yazmaz. Örnek çıktı:
+
+```text
+settings: /etc/atonota/prod/keycloak.env: KC_DB_PASSWORD (missing)
+remote: settings of prod are incomplete; nothing changed; fill the settings, then deploy again
+```
+
+Betik şu durumları da reddeder:
+
+- Değer yer tutucu olarak kalmışsa.
+- `[sabit]` etiketli değer farklıysa.
+- Ortamın sır dosyasının izni `0600` değilse.
+
+Site denetimi kapsayıcıdan yalnız anahtar adlarını alır. Sitenin değerleri kapsayıcıdan çıkmaz.
+
+Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan listeyle denetlenir.
+
+### Listenin eksiksiz kalması
+
+`backend/deploy/tests/test_settings.py` dosyası kodu tarar. Kodda okunan bir ayar listede yoksa test düşer. Tarananlar şunlardır:
+
+- Keycloak realm dosyasındaki `${...}` yer tutucuları,
+- Keycloak eklentilerinin ayarları,
+- identity-sync servisinin `config.py` dosyası,
+- `platform_core`, `hrms_tr` ve `press_tr` uygulamalarının site ayarı okumaları,
+- `stack.yaml`, `edge.yaml` ve sunucu betiklerindeki değişkenler.
+
+Kod bir ayarı değişken adıyla okuyabilir. Tarama bu adı çözemez. Bu okumalar testteki `INDIRECT_SITE_READS` tablosunda yazılıdır. Yeni bir okuma bu tabloya eklenmeden test geçmez.
+
+Test, sır taşıyan her anahtarın değerinin yer tutucu olduğunu da denetler.
 
 ## Kabul ölçütleri
 
@@ -468,7 +560,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
 | E-2 | Press'in üretim imajı yok. Press bugün açılışta kurulur. Python 3.14 yaması da açık (O-18) | press-tr işi `backend/deploy/images/press.Dockerfile` dosyasını yazar. Dosya gelince `build-release` Press'i pakete ekler | press-tr işi |
 | E-3 | `/panel` sayfası arayüz dosyalarını yüklemiyor. Sayfa yer tutucu metin gösteriyor | `panel.html`, arayüz paketinin Vite listesini okur. Sonra `/panel/assets/` dosyalarını yükler. İçerik güvenlik politikası bu yola izin verir | platform-core-kabuk işi |
-| E-4 | Üretim ayarlarının listesi yok. Örneğin Keycloak istemci sırları, sitenin kimlik ayarları ve eşitleme servisinin kiracı listesi | Her servis için üretim anahtar listesi yazılır. Liste `production.env.example` biçiminde olur | kimlik-realm işi ve DevOps sorumlusu |
+| E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-7 | Zamanlanmış iş yasağı var. Bu yüzden Frappe zamanlayıcısı kapalıdır. Düzenli yedek de yoktur | Proje sahibi karar verir. Zamanlayıcı `COMPOSE_PROFILES=scheduler` ile açılır | Proje sahibi |
@@ -480,6 +572,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-13 | Arayüz ve arka uç ayrı taşınır. Bir ortamda uyumsuz ikili oluşabilir | Bir ortamda önce arka uç taşınır. Arayüz arka ucun sözleşmesini aşmaz | Orkestratör |
 | E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | prod'a gerçek veri girmeden önce hukuk onayı alınır | Hukuk ve ürün sahibi |
 | E-15 | Üretim imajları Mac'te arm64 ile denendi. Hetzner sunucuları amd64 olabilir | Derleme ajanı sunucularla aynı mimaride olur | DevOps sorumlusu |
+| E-16 | identity-sync üretimde yalnız iç ağda HTTP ile açılır. Üç bağlantı ise HTTPS ister. Bunlar Keycloak olayları, telefonun oturum kapatma isteği ve Press'in silme isteğidir. Bu yüzden `KC_SPI_EVENTS_LISTENER__WEBHOOK__URL`, `mobile_identity_sync_url` ve `identity_sync_url` için geçerli değer yok | identity-sync için iç ağda TLS tasarlanır. Başka bir yol da ön vekilde yalnız iç ağa açık bir addır | identity-sync işi ve DevOps sorumlusu |
 
 ## Neler sınandı
 
@@ -491,6 +584,8 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 - Sunucuya giden her dosyanın paketten geldiği sınanır. Değişmiş, eksik ya da başka commit'ten gelen dağıtım dosyası iş bağlanmadan reddedilir.
 - Üretim kiracı imajı yerelde derlendi. İçinde `panel.bundle.css` ve `panel-focus.bundle.js` dosyaları var.
 - Jenkins dosyaları Jenkins'in kendi denetleyicisinden geçti.
+- `backend/deploy/tests/test_settings.py` dosyası listelerin eksiksiz olduğunu ve sunucu denetimini sınar.
+- Sunucu betiği testleri eksik sır dosyasını, eksik anahtarı ve eksik site ayarını sınar. Eksik sırda hiçbir `docker` komutu çalışmaz. Eksik site ayarında eski sürüm durmaz.
 
 Şunlar sınanmadı:
 
