@@ -618,134 +618,6 @@ paths:
         "417":
           description: Invalid input.
 
-x-replaced-endpoints:
-  description: |
-    The engine puts its own function in place of three Frappe endpoints: the two search endpoints and link validation.
-    The addresses do not change. The client uses the same address and the same inputs.
-    The changed behaviour is below. This is a behaviour change of an existing endpoint.
-  endpoints:
-    - path: /api/method/frappe.desk.search.search_link
-      replaced_by: platform_core.access.link_search.search_link
-      methods: [GET, POST]
-    - path: /api/method/frappe.desk.search.search_widget
-      replaced_by: platform_core.access.link_search.search_widget
-      methods: [GET, POST]
-    - path: /api/method/frappe.client.validate_link_and_fetch
-      replaced_by: platform_core.access.link_search.validate_link_and_fetch
-      methods: [GET, POST]
-  behaviour:
-    - The caller must have `select` or `read` permission on the searched document type. Otherwise the endpoint returns 403.
-    - Frappe's standard search does not change. The result passes through the list rule and the field level.
-    - On a governed document type only Frappe's standard search runs. Every custom search function returns 403.
-    - A custom search function comes through the `query` input or through the `standard_queries` hook. Both follow the same rule.
-    - There is no allow list. Whether a search function reads with permissions cannot be verified from its code.
-    - This denial is for all users. There is no exception, not for the “System Manager” role and not for the “Administrator” user.
-    - On a document type that is not governed, a custom search runs with Frappe's usual behaviour.
-    - An unknown input name is rejected. The wrappers accept every input of the Frappe function they replace. A test compares the two.
-    - "`search_link` keeps the browser cache header of Frappe's endpoint: 60 seconds."
-    - "Not covered: `frappe.contacts.doctype.address.address.address_query` calls the search from Python for the “Address” type. It matters only if “Address” is governed and an app also sets a `standard_queries` function for it."
-
-x-hooks:
-  description: Hooks the engine writes in `hooks.py` for other modules.
-  hooks:
-    - name: ai_write_closed_doctypes
-      shape: '["PLT Access Rule"]'
-      description: |
-        The AI layer reads this hook. The engine lists the “PLT Access Rule” document type in it (O-28).
-        The generic write tools cannot change this type. For example `create_document` and `update_document` are refused.
-        A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
-    - name: ai_tools
-      shape: '["platform_core.access.ai_tools.declare"]'
-      description: Declares the four AI tools listed in `x-ai-tools`.
-  removed:
-    - name: access_rule_report_scopes
-      description: |
-        Removed. It let an app declare what a script report reads, together with a static check of the
-        report code. Reviews found ways around the check, and such a check can never be complete.
-        Declaring this hook has no effect.
-    - name: access_rule_aware_reports
-      description: |
-        Removed. It let an app name a script report as reading with permissions, backed by the same
-        static check. Declaring this hook has no effect.
-    - name: access_rule_allowed_queries
-      description: |
-        Removed. It let an app allow a custom link search function on a governed document type,
-        with the same static check. Declaring this hook has no effect.
-
-x-report-rules:
-  description: |
-    The report endpoints are Frappe's own endpoints. The engine extends the Report record.
-    The rules below apply while the site has at least one governed document type.
-  rules:
-    - A list report (“Report Builder”) runs. Its data passes the record rules and the field levels.
-    - A query report (“Query Report”) runs only for the “System Manager” role. Everyone else gets 403.
-    - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
-    - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
-    - The gate decides on the report Frappe really runs. Frappe follows `reference_report` only for a report of type “Custom Report”, and so does the gate. A report of another type is judged by its own type, also when that field still holds an old value.
-    - "A custom report whose references form a loop: running it, exporting it and reading its script return 403 for every user. Frappe follows the references before it asks the gate. So the engine follows the chain itself as soon as Frappe loads the second report of a chain, keeps a list of the reports it has seen, and refuses at the first repeat. The length of the loop does not matter. Without this the request would end in a server error."
-    - "A custom report whose reference cannot be found: running it and exporting it return 404 for every user. This is Frappe's own answer for the missing report, given before any data is read."
-    - "A report with a loop or a missing reference can still be opened and saved, so that an administrator can repair it."
-    - "The gate function itself (`report_guard`, Prepared Report, Auto Email Report) refuses both cases with a permission error. On a site with a governed document type such a report also counts as touching governed data."
-    - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
-    - A prepared report queued before a rule existed is refused when its job starts, before any report code runs. This holds for list, query and script reports. The record ends in status Error and no file is written.
-    - A scheduled email report (“Auto Email Report”) that touches governed data is switched off for everyone, the “System Manager” role and the “Administrator” user included.
-    - Such a record cannot be created and an existing one cannot be enabled. Saving returns 403.
-    - Such a record cannot be downloaded or sent, by hand or by the scheduler. The scheduler works as “Administrator”; that session opens nothing here.
-    - An existing “Auto Email Report” record can still be saved while it stays switched off, and it can be deleted.
-    - After install and after migrate the engine switches off (`enabled = 0`) every enabled “Auto Email Report” that touches governed data.
-    - "The engine does not switch the session user. On data that is not governed Frappe's own behaviour applies: a list report is read with the user named on the record, a query report or script report runs as the session user. In a scheduled run that session user is “Administrator”."
-    - When the site has no governed document type, the gate checks only the field levels of the report's own document type.
-  exemptions:
-    - The “System Manager” role is exempt from the query report and script report rule by design. A site needs someone who can run these reports, and this role already manages the rules. The role is not exempt from the prepared report closure, from the “Auto Email Report” closure, from the link search rule or from record rules.
-    - The “Administrator” user is exempt from record rules and from the report gate. Frappe never asks permission hooks for this user. The user is not exempt from the prepared report closure, from the “Auto Email Report” closure or from the link search rule.
-
-x-ai-tools:
-  description: |
-    The engine declares four AI tools through the `ai_tools` hook.
-    The declaration format is in the `x-ai-tools-hook` section of the file `platform_core-ai.openapi.yaml`.
-    The layer adds the app name to the start of the tool name. For example it becomes `platform_core_list_access_rules`.
-    The declaration function is `platform_core.access.ai_tools.declare`.
-
-    The tools take only structured fields. No tool takes SQL text or a raw condition.
-    The input models reject an unknown field. The filter rows pass the same validation as the rule record.
-    The writing tools do not change the record. The tool opens a proposal. A human approves the preview.
-  tools:
-    - name: list_access_rules
-      kind: read
-      roles: [System Manager]
-      description: |
-        It lists the access rules. The inputs are `document_type`, `role` and `include_inactive`.
-        The caller must have read permission on the “PLT Access Rule” type. At most 200 rules return.
-    - name: explain_access
-      kind: read
-      description: |
-        It explains why a user can or cannot do an operation on a record.
-        Its behaviour is the same as the `explain_permission` endpoint. An ordinary user asks only about themselves
-        and sees a single denial reason. The rule detail returns only to the “System Manager” role.
-    - name: propose_access_rule
-      kind: write
-      destructive: true
-      roles: [System Manager]
-      description: |
-        It proposes a new rule. The inputs are the fields in the `AccessRule` schema. The `filters` field
-        is a list of `{field, operator, value}` rows.
-        The preview returns the summary, the field changes and the roles that will lose access.
-        When the first rule is written for a document type, the roles that have no rule lose access.
-        This is why the tool carries the `destructive` flag.
-        The `target_version` value of the preview is a digest of all the rules of that document type.
-        If another rule changes before the approval, the layer rejects the approval.
-    - name: propose_access_rule_change
-      kind: write
-      destructive: true
-      versioned: true
-      roles: [System Manager]
-      description: |
-        It proposes a change to a saved rule. Turning a rule off is also done with this tool.
-        The input is the `name` value of the rule and the fields to change. A field that is not given does not change.
-        The preview returns `target_name` and `target_version`. `target_version` is the `modified` value of the record.
-        The layer compares the version again just before it executes.
-        Narrowing a rule removes access. This is why the tool carries the `destructive` flag.
-
   /platform_core.api.access.create_record_link:
     post:
       operationId: createRecordLink
@@ -930,6 +802,134 @@ x-ai-tools:
                       status: {type: string, const: "received"}
         "429":
           description: The caller exceeded ten requests per minute.
+
+x-replaced-endpoints:
+  description: |
+    The engine puts its own function in place of three Frappe endpoints: the two search endpoints and link validation.
+    The addresses do not change. The client uses the same address and the same inputs.
+    The changed behaviour is below. This is a behaviour change of an existing endpoint.
+  endpoints:
+    - path: /api/method/frappe.desk.search.search_link
+      replaced_by: platform_core.access.link_search.search_link
+      methods: [GET, POST]
+    - path: /api/method/frappe.desk.search.search_widget
+      replaced_by: platform_core.access.link_search.search_widget
+      methods: [GET, POST]
+    - path: /api/method/frappe.client.validate_link_and_fetch
+      replaced_by: platform_core.access.link_search.validate_link_and_fetch
+      methods: [GET, POST]
+  behaviour:
+    - The caller must have `select` or `read` permission on the searched document type. Otherwise the endpoint returns 403.
+    - Frappe's standard search does not change. The result passes through the list rule and the field level.
+    - On a governed document type only Frappe's standard search runs. Every custom search function returns 403.
+    - A custom search function comes through the `query` input or through the `standard_queries` hook. Both follow the same rule.
+    - There is no allow list. Whether a search function reads with permissions cannot be verified from its code.
+    - This denial is for all users. There is no exception, not for the “System Manager” role and not for the “Administrator” user.
+    - On a document type that is not governed, a custom search runs with Frappe's usual behaviour.
+    - An unknown input name is rejected. The wrappers accept every input of the Frappe function they replace. A test compares the two.
+    - "`search_link` keeps the browser cache header of Frappe's endpoint: 60 seconds."
+    - "Not covered: `frappe.contacts.doctype.address.address.address_query` calls the search from Python for the “Address” type. It matters only if “Address” is governed and an app also sets a `standard_queries` function for it."
+
+x-hooks:
+  description: Hooks the engine writes in `hooks.py` for other modules.
+  hooks:
+    - name: ai_write_closed_doctypes
+      shape: '["PLT Access Rule"]'
+      description: |
+        The AI layer reads this hook. The engine lists the “PLT Access Rule” document type in it (O-28).
+        The generic write tools cannot change this type. For example `create_document` and `update_document` are refused.
+        A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
+    - name: ai_tools
+      shape: '["platform_core.access.ai_tools.declare"]'
+      description: Declares the four AI tools listed in `x-ai-tools`.
+  removed:
+    - name: access_rule_report_scopes
+      description: |
+        Removed. It let an app declare what a script report reads, together with a static check of the
+        report code. Reviews found ways around the check, and such a check can never be complete.
+        Declaring this hook has no effect.
+    - name: access_rule_aware_reports
+      description: |
+        Removed. It let an app name a script report as reading with permissions, backed by the same
+        static check. Declaring this hook has no effect.
+    - name: access_rule_allowed_queries
+      description: |
+        Removed. It let an app allow a custom link search function on a governed document type,
+        with the same static check. Declaring this hook has no effect.
+
+x-report-rules:
+  description: |
+    The report endpoints are Frappe's own endpoints. The engine extends the Report record.
+    The rules below apply while the site has at least one governed document type.
+  rules:
+    - A list report (“Report Builder”) runs. Its data passes the record rules and the field levels.
+    - A query report (“Query Report”) runs only for the “System Manager” role. Everyone else gets 403.
+    - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
+    - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
+    - The gate decides on the report Frappe really runs. Frappe follows `reference_report` only for a report of type “Custom Report”, and so does the gate. A report of another type is judged by its own type, also when that field still holds an old value.
+    - "A custom report whose references form a loop: running it, exporting it and reading its script return 403 for every user. Frappe follows the references before it asks the gate. So the engine follows the chain itself as soon as Frappe loads the second report of a chain, keeps a list of the reports it has seen, and refuses at the first repeat. The length of the loop does not matter. Without this the request would end in a server error."
+    - "A custom report whose reference cannot be found: running it and exporting it return 404 for every user. This is Frappe's own answer for the missing report, given before any data is read."
+    - "A report with a loop or a missing reference can still be opened and saved, so that an administrator can repair it."
+    - "The gate function itself (`report_guard`, Prepared Report, Auto Email Report) refuses both cases with a permission error. On a site with a governed document type such a report also counts as touching governed data."
+    - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
+    - A prepared report queued before a rule existed is refused when its job starts, before any report code runs. This holds for list, query and script reports. The record ends in status Error and no file is written.
+    - A scheduled email report (“Auto Email Report”) that touches governed data is switched off for everyone, the “System Manager” role and the “Administrator” user included.
+    - Such a record cannot be created and an existing one cannot be enabled. Saving returns 403.
+    - Such a record cannot be downloaded or sent, by hand or by the scheduler. The scheduler works as “Administrator”; that session opens nothing here.
+    - An existing “Auto Email Report” record can still be saved while it stays switched off, and it can be deleted.
+    - After install and after migrate the engine switches off (`enabled = 0`) every enabled “Auto Email Report” that touches governed data.
+    - "The engine does not switch the session user. On data that is not governed Frappe's own behaviour applies: a list report is read with the user named on the record, a query report or script report runs as the session user. In a scheduled run that session user is “Administrator”."
+    - When the site has no governed document type, the gate checks only the field levels of the report's own document type.
+  exemptions:
+    - The “System Manager” role is exempt from the query report and script report rule by design. A site needs someone who can run these reports, and this role already manages the rules. The role is not exempt from the prepared report closure, from the “Auto Email Report” closure, from the link search rule or from record rules.
+    - The “Administrator” user is exempt from record rules and from the report gate. Frappe never asks permission hooks for this user. The user is not exempt from the prepared report closure, from the “Auto Email Report” closure or from the link search rule.
+
+x-ai-tools:
+  description: |
+    The engine declares four AI tools through the `ai_tools` hook.
+    The declaration format is in the `x-ai-tools-hook` section of the file `platform_core-ai.openapi.yaml`.
+    The layer adds the app name to the start of the tool name. For example it becomes `platform_core_list_access_rules`.
+    The declaration function is `platform_core.access.ai_tools.declare`.
+
+    The tools take only structured fields. No tool takes SQL text or a raw condition.
+    The input models reject an unknown field. The filter rows pass the same validation as the rule record.
+    The writing tools do not change the record. The tool opens a proposal. A human approves the preview.
+  tools:
+    - name: list_access_rules
+      kind: read
+      roles: [System Manager]
+      description: |
+        It lists the access rules. The inputs are `document_type`, `role` and `include_inactive`.
+        The caller must have read permission on the “PLT Access Rule” type. At most 200 rules return.
+    - name: explain_access
+      kind: read
+      description: |
+        It explains why a user can or cannot do an operation on a record.
+        Its behaviour is the same as the `explain_permission` endpoint. An ordinary user asks only about themselves
+        and sees a single denial reason. The rule detail returns only to the “System Manager” role.
+    - name: propose_access_rule
+      kind: write
+      destructive: true
+      roles: [System Manager]
+      description: |
+        It proposes a new rule. The inputs are the fields in the `AccessRule` schema. The `filters` field
+        is a list of `{field, operator, value}` rows.
+        The preview returns the summary, the field changes and the roles that will lose access.
+        When the first rule is written for a document type, the roles that have no rule lose access.
+        This is why the tool carries the `destructive` flag.
+        The `target_version` value of the preview is a digest of all the rules of that document type.
+        If another rule changes before the approval, the layer rejects the approval.
+    - name: propose_access_rule_change
+      kind: write
+      destructive: true
+      versioned: true
+      roles: [System Manager]
+      description: |
+        It proposes a change to a saved rule. Turning a rule off is also done with this tool.
+        The input is the `name` value of the rule and the fields to change. A field that is not given does not change.
+        The preview returns `target_name` and `target_version`. `target_version` is the `modified` value of the record.
+        The layer compares the version again just before it executes.
+        Narrowing a rule removes access. This is why the tool carries the `destructive` flag.
 
 components:
   responses:
