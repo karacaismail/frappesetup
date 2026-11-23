@@ -76,7 +76,14 @@ frappe-mcp artık bakımı bırakılmış bir pakettir. Frappe 16'nın kendi MCP
 | `press-redis-cache` | Press'in önbelleğidir. |
 | `press-redis-queue` | Press'in iş kuyruğudur. |
 
-Bu servislerin hepsi `press` profilindedir. `remote/apply` betiği profili yalnız sürüm paketinde Press imajı varsa açar.
+Bu servislerin hepsi `press` profilindedir. `remote/apply` betiği profili iki koşul birlikte sağlanınca açar:
+
+1. Sürüm paketinde Press imajı vardır. `build-release` imajı her pakete koyar.
+2. Ortam dosyasında `ATONOTA_PRESS_ENABLED=1` yazılıdır.
+
+Anahtar bütün ortamlarda bugün 0'dır. Press sitesi açılmadan profil açılırsa `press-web` sağlıklı olmaz. O zaman dağıtım düşer. rc ve prod'da anahtar 1 olamaz. `release.py` bunu reddeder. Nedeni şudur: dağıtım betikleri Press sitesini henüz yedeklemez (E-2).
+
+Sağlık denetimi aynı kuralı kullanır. Anahtar 0 ise Press denetimi `not_run` yazar.
 
 Press'in veritabanı kiracıların MariaDB sunucusundadır. Press'in veritabanı ve kullanıcısı ayrıdır. Bunları `bench new-site` komutu açar.
 
@@ -88,14 +95,18 @@ Press'in site adı, Press'in alan adıyla aynı olmalıdır. Ön yüz siteyi ist
 
 ## İlk kurulum
 
-Press sitesini DevOps sorumlusu ilk kurulumda elle açar. Adımlar sunucuda henüz denenmedi. Komutlar `atonota-<ortam>` Compose projesinde çalışır.
+Press sitesini DevOps sorumlusu elle açar. Adımlar sunucuda henüz denenmedi. Yalnız alpha ve beta'da yapılabilir.
 
-1. `/etc/atonota/<ortam>/press.env` dosyasını `0600` izniyle açın. Dosya boş olabilir.
+Komutlar `atonota-<ortam>` Compose projesinde çalışır. Anahtar 0 iken profil kapalıdır. Bu yüzden her komuta `--profile press` ekleyin. Örnek: `docker compose ... --profile press run --rm press-web bench --site <Press alan adı> list-apps`.
+
+1. `/etc/atonota/<ortam>/press.env` dosyasını `0600` izniyle açın. Kapsayıcı bu dosyadan anahtar okumaz. Dosya boş olabilir.
 2. Press'in ortak ayarına veritabanı adresini yazın. Örnek: `bench set-config -g db_host tenant-db`.
 3. Redis adreslerini yazın. Önbellek `redis://press-redis-cache:6379`, kuyruk `redis://press-redis-queue:6379` olur. `redis_socketio` da kuyruk adresini alır.
 4. Siteyi Press alan adıyla açın ve Press'i kurun: `bench new-site <Press alan adı> --install-app press`.
 5. `press_tr` uygulamasını kurun: `bench --site <Press alan adı> install-app press_tr`.
 6. Zamanlayıcıyı kapalı tutun: `bench --site <Press alan adı> disable-scheduler`. Proje sahibi zamanlanmış iş istemedi.
+7. Press sitesinin ayarlarını `press-site.production.env.example` listesine göre yazın.
+8. Ortam dosyasında `ATONOTA_PRESS_ENABLED=1` yazın. Bu değişiklik commit ile gelir. Sonraki dağıtım Press servislerini açar.
 
 `bench new-site` veritabanı kök parolasını ister. Parolayı komut satırına yazmayın. Komutu terminalli `exec` ile çalıştırın. Komut parolayı sorar. Parola `tenant-db.env` dosyasındadır. Frappe bu soruyu `frappe/database/mariadb/setup_db.py` dosyasının 140. satırında sorar.
 
@@ -142,7 +153,9 @@ Kalan iş dağıtım belgesindeki E-2 satırındadır. Özeti şudur:
 
 1. `remote/backup` ve `remote/restore` Press sitesini kapsamaz.
 2. `remote/apply` Press sitesinde `migrate` çalıştırmaz.
-3. Bu iki iş bitmeden rc ve prod'a Press'li paket taşınmaz.
-4. Press'in chromedriver denetimi kapatılmadı.
-5. İmaj amd64'te ve sunucuda denenmedi (E-15).
-6. Press'in sunucu kurma akışı ayrı bir engeldir (E-1).
+3. Bu iki iş bitmeden rc ve prod'da Press açılmaz. `release.py` bu kuralı uygular.
+4. `remote/site-probe.py` Press sitesinin ayarlarını henüz denetlemez. Liste hazırdır: `press-site.production.env.example`.
+5. Eski bir sürüme geri dönüşte Press servislerinin ne olacağı denenmedi.
+6. Press'in chromedriver denetimi kapatılmadı.
+7. İmaj amd64'te ve sunucuda denenmedi (E-15).
+8. Press'in sunucu kurma akışı ayrı bir engeldir (E-1).

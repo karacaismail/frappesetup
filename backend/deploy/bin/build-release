@@ -31,7 +31,8 @@ for entry in "${components[@]}"; do
     if [[ -n "$target" ]]; then
         build_arguments+=(--target "$target")
     fi
-    docker build "${build_arguments[@]}" "$context"
+    # BuildKit reads <Dockerfile>.dockerignore; the legacy builder would send .env files too.
+    DOCKER_BUILDKIT=1 docker build "${build_arguments[@]}" "$context"
     docker push "$repository:$tag"
     digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repository:$tag" |
         grep -m1 "^$repository@sha256:")" || fail "no registry digest for $repository:$tag"

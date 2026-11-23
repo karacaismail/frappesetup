@@ -14,6 +14,7 @@ Bu klasördeki kod henüz gerçek sunucuda çalışmadı.
 | `compose/` | Bir ortamın servisleri ve ön vekil |
 | `images/` | Üretim imajlarının derleme dosyaları |
 | `environments/` | Dört ortamın sır içermeyen ayarı |
+| `settings/` | Sunucudaki sır dosyalarının anahtar listeleri. Değer yoktur |
 | `tests/` | Paket kuralı, sunucu betiği ve Jenkins tarafı testleri |
 
 ## Testler
@@ -35,6 +36,8 @@ shellcheck -x -P backend/deploy/bin:backend/deploy/remote backend/deploy/bin/* b
 ## Kurallar
 
 - Depoya sır yazmayın. Sırlar sunucuda `/etc/atonota/<ortam>/` klasöründe durur.
+- Kod yeni bir üretim ayarı okursa ayarı `settings/` listesine ekleyin. Liste eksikse `tests/test_settings.py` düşer.
+- Sunucuda bir ayar eksikse `remote/apply` hiçbir şeyi değiştirmeden durur ve eksik anahtarı yazar.
 - İmajı etiketle değil, özetle çağırın.
 - Taşımada kodu yeniden derlemeyin.
 - Veritabanı değişikliğini "genişlet, sonra daralt" kuralıyla yazın.

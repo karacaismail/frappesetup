@@ -126,7 +126,7 @@ Bu işlev doğrudan yerine konmamalıdır.
 Bakımcılar Frappe 16 testlerini çalıştırmalıdır.
 Telemetri kapalıyken modül açılmalı ve dış istek oluşmamalıdır.
 Telemetri açıkken olay ve takma ad testleri geçmelidir.
-Bu öneri kaynak dosyalarına uygulanmadı. Telemetri davranışı henüz değiştirilmedi.
+22 Kasım 2026 Pazar günü bu öneri kaynak dosyalarına uygulanmamıştı. 23 Kasım 2026 Pazartesi günü üretim imajı öneriyi `0002-press-telemetry-helper.patch` yamasıyla uyguladı. Telemetri açıkken olay testleri yine denenmedi.
 
 [Press kaynak dosyası](https://github.com/frappe/press/blob/v0.154.1/press/saas/doctype/product_trial_request/product_trial_request.py)
 [Press içindeki hazır yardımcı](https://github.com/frappe/press/blob/v0.154.1/press/utils/telemetry.py#L14-L26)
@@ -153,7 +153,7 @@ Bu yol metin döndürür. Eski çağrıdaki `.value` erişimi ayrıca kaldırıl
 Bakımcılar boş, kodlanmış ve bozuk çerez değerlerini sınamalıdır.
 Analitik izni değişince kayıt oluştuğunu da sınamalıdır.
 Eksik işlevi paket kurarak geri getirmek mümkün değildir.
-Bu öneri uygulanmadı. Çerez davranışının uyumu henüz doğrulanmadı.
+22 Kasım 2026 Pazar günü bu öneri uygulanmamıştı. 23 Kasım 2026 Pazartesi günü üretim imajı öneriyi `0003-request-cookies.patch` yamasıyla uyguladı. Değişen ve değişmeyen izin durumu imajda denendi. Bozuk çerez değeri denenmedi.
 
 [Press çerez kaynağı](https://github.com/frappe/press/blob/v0.154.1/press/api/cookies.py#L1-L33)
 [Frappe OAuth kaynağı](https://github.com/frappe/frappe/blob/v16.56.0/frappe/oauth.py)
@@ -163,7 +163,7 @@ Bu öneri uygulanmadı. Çerez davranışının uyumu henüz doğrulanmadı.
 `Dockerfile.unpatched`, Press paketini `--no-deps` seçeneğiyle kurar.
 Bu seçim, hataları ayrı incelemek içindir. Tam kurulum başarısı değildir.
 `pyproject.toml:25-60` içindeki sürüm şartları ayrıca karşılanmalıdır.
-Örneğin Press Ansible `3.4.0` ister. Aday Ansible `14.0.0` kullanır.
+Örneğin Press Ansible `3.4.0` ister. Deneme adayı Ansible `14.0.0` kullandı. Üretim imajı `14.6.0` kullanır (karar 0018).
 Press Stripe `~=2.56.0` ister. Aday Stripe `3.1.0` kullanır.
 Telegram raw paketi de `python-telegram-bot==13.15` şartını paket adı bakımından karşılamaz.
 Eksik paketler ve diğer sürüm çelişkileri de bağımlılık denetiminde görünür.

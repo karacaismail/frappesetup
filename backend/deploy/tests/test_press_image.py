@@ -103,7 +103,9 @@ class PressDockerfile(unittest.TestCase):
         self.assertIn("bundle('production', apps='press,press_tr')", text)
         self.assertIn("compile_translations(app) for app in ('press', 'press_tr')", text)
         # The build skips the after_build hook runner only while no app declares such a hook.
-        self.assertIn("! grep -lE '^[[:space:]]*after_(app_)?build[[:space:]]*=' apps/*/*/hooks.py", text)
+        self.assertIn("! grep -lE '^[[:space:]]*after_(app_)?build[[:space:]]*(\\+?=|:)' apps/*/*/hooks.py", text)
+        self.assertIn("('desk.bundle.js', 'erpnext.bundle.js', 'press.bundle.js')", text)
+        self.assertIn("ARG UV_NO_CACHE=1", text)
         self.assertIn("printf '\\npress\\npress_tr\\n' >> sites/apps.txt", text)
 
     def test_build_tools_leave_the_image(self):
@@ -220,8 +222,15 @@ class ReleaseCarriesPress(unittest.TestCase):
             r"^ghcr\.io/karacaismail/atonota-press@sha256:[0-9a-f]{64}$",
         )
         self.assertEqual(set(manifest["components"]), set(release.REQUIRED["backend"]))
-        for name in ("rc", "prod"):
-            release.check_manifest(manifest, name)
+
+    def test_apply_and_health_decide_on_press_the_same_way(self):
+        # Press runs only with its image in the release and ATONOTA_PRESS_ENABLED=1 (review B1, M2).
+        apply = (DEPLOY / "remote" / "apply").read_text()
+        health = (DEPLOY / "bin" / "health").read_text()
+        rule = 'press_on "$ATONOTA_PRESS_ENABLED"'
+        self.assertIn(rule, apply)
+        self.assertIn(rule, health)
+        self.assertNotIn("grep -q '^ATONOTA_IMAGE_PRESS='", apply)
 
     def test_press_is_built_from_the_backend_folder(self):
         self.build_release()

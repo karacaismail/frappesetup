@@ -25,6 +25,8 @@ RUN set -eu; mkdir -p /wheels; \
     PATH="/usr/local/go/bin:$PATH" GO111MODULE=off uv build --wheel --out-dir /wheels /tmp/dockerfile-3.2.0.tar.gz
 
 FROM frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84 AS press
+# uv keeps no download cache in the layers. An ARG reaches every RUN but not the final image.
+ARG UV_NO_CACHE=1
 ARG PRESS_TAG=v0.154.1
 ARG PRESS_COMMIT=7a4384d5eec9f0f0dce4124e9dd48b106e51222f
 ARG FRAPPE_MCP_COMMIT=b5c9730d18401c85d4b3ea68d20e2ba6f2bb7e7c
@@ -78,6 +80,7 @@ RUN set -eu; \
 # database at import (press/api/account.py get_frappe_io_auth_url), and the build has no site.
 # No app declares after_build or after_app_build (the grep below fails the build if one does),
 # so the same two steps of "bench build" run here directly: bundle and compile translations.
+# The desk bundles of frappe and erpnext must stay in assets.json next to the Press bundle.
 # The dashboard build reads socketio_port from common_site_config.json (dashboard/src/socket.js);
 # 9000 is the port of the press-socket service. It holds no secret.
 # node_modules are build tools only and leave the image after the build.
@@ -85,7 +88,7 @@ RUN ln -s ../assets sites/assets \
     && bench set-config -gp socketio_port 9000 \
     && (cd apps/press/dashboard && yarn install --frozen-lockfile --non-interactive) \
     && (cd apps/press && yarn install --frozen-lockfile --non-interactive) \
-    && ! grep -lE '^[[:space:]]*after_(app_)?build[[:space:]]*=' apps/*/*/hooks.py \
+    && ! grep -lE '^[[:space:]]*after_(app_)?build[[:space:]]*(\+?=|:)' apps/*/*/hooks.py \
     && cd sites \
     && /home/frappe/frappe-bench/env/bin/python -c "import frappe, frappe.commands; frappe.init(''); \
 from frappe.bundler import bundle; bundle('production', apps='press,press_tr'); \
@@ -93,6 +96,8 @@ from frappe.gettext.translate import compile_translations; \
 [compile_translations(app) for app in ('press', 'press_tr')]" \
     && cd .. \
     && test -f apps/press/press/public/dashboard/index.html \
+    && python3 -c "import json, sys; bundles = json.load(open('assets/assets.json')); \
+sys.exit(not all(name in bundles for name in ('desk.bundle.js', 'erpnext.bundle.js', 'press.bundle.js')))" \
     && rm -rf apps/press/node_modules apps/press/dashboard/node_modules \
     && yarn cache clean
 

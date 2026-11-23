@@ -20,6 +20,21 @@ Sayılar derleme anında `requirements.json` dosyasından hesaplanır.
 
 <div data-embed="req-summary"></div>
 
+## Görev panosu
+
+Yukarıdaki pano her gereksinimi bir görev olarak gösterir. Gereksinim kaydı değişmez. Görevin durumu, olgunluk düzeyi ve epiği ayrı bir dosyadadır. Bu dosya `src/data/task-board.json` dosyasıdır. Aşağıdaki tablolar bu dosyadan derleme anında üretilir.
+
+Panonun iki görünümü vardır:
+
+1. "Tablo" görünümünde her satır bir görevdir. Dar ekranda satırlar kart olarak alt alta dizilir.
+2. "Gruplu" görünümde görevler önce faza, sonra epiğe göre gruplanır. Her grubun başında biten görev sayısı ve toplam görev sayısı yazar.
+
+Biten görevin başlığının üstü çizilir. Görevin yanında "Bitti" etiketi de görünür. Bitti görevin kanıtı da yazar. Kanıt, denetim commit'i ve test dosyasıdır. Kanıtı olmayan iş bitti sayılmaz.
+
+Epicler görevlerin amacına göre kümelendi. Ray ile fazın kesişimi de bir seçenekti. Bu seçenek çok sayıda küçük grup üretirdi. Aynı amaçlı işler de farklı gruplara dağılırdı.
+
+<div data-embed="task-rules"></div>
+
 ## Çapraz boşluk kalemlerinin ana listeye bağlanması
 
 Eleştiri turunda tespit edilen çapraz boşluklar (X-01..X-21) yeni numara almadan mevcut G-kalemlerine dağıtılmıştır; aşağıdaki eşleme izlenebilirlik içindir:
