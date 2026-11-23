@@ -666,6 +666,19 @@ class RemoteScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("COMPOSE_PROFILES=\n", self.release_env("alpha", 1))
 
+    def test_server_refuses_the_press_switch_in_rc_and_prod(self):
+        # Review 1, finding 5: release.py refuses ATONOTA_PRESS_ENABLED=1 in rc and prod on the
+        # Jenkins side. A person may run apply on the server by hand, so the server checks again.
+        for env in ("rc", "prod"):
+            with self.subTest(env=env):
+                # Every other setting is complete, so only the Press switch can stop the release.
+                test_settings.fill_server(self.etc, env, press=True, offsite=True)
+                result = self.apply(env, self.backend(1, env), press_enabled=1, ATONOTA_FIRST_INSTALL="1")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"ATONOTA_PRESS_ENABLED=1 is refused in {env}", result.stderr)
+                self.assertEqual(self.calls(), [])
+                self.assertFalse((self.root / env / "releases").exists())
+
     def test_missing_site_setting_stops_while_the_old_release_runs(self):
         self.first_install()
         keys = [key for key in test_settings.required("tenant-site") if key != "keycloak_client_secret"]

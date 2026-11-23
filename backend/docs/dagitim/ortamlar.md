@@ -97,6 +97,8 @@ Her sunucuda tek bir ön vekil vardır. Ön vekil 80 ve 443 portlarını açar. 
 
 Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press ön yüzü. Veritabanları bu ağda değildir.
 
+Press'in kendi iç ağı vardır. Ağın adı `press-internal` olur. Press servisleri yalnız bu ağdadır. Kiracı kapları bu yüzden Press'in Redis kaplarına ulaşamaz. `press-web:8000` adresine de ulaşamaz. Yalnız veritabanı iki ağdadır. Press ön yüzü ayrıca ortamın kenar ağındadır. Kural `test_press_image.py` dosyasındaki bir testle denetlenir.
+
 Ortamlar aynı ağı paylaşmaz. Bu yüzden alpha'daki bir konteyner beta'nın Keycloak'ına doğrudan ulaşamaz. `remote/apply` betiği ağı açar. Betik ön vekilin ağ listesini de `networks.yaml` dosyasına yazar.
 
 Dosyalar şunlardır:
@@ -126,6 +128,8 @@ Arka uç paketinde dört imaj vardır:
 - `atonota-keycloak` imajı Keycloak'ı taşır. İmajı `backend/identity/keycloak/Dockerfile` dosyasının `prod` hedefi derler.
 - `atonota-identity-sync` imajı kullanıcı eşitleme servisini taşır. İmajı `backend/identity/identity_sync/Dockerfile` dosyası derler.
 - `atonota-press` imajı Press'i taşır. İçinde Press v0.154.1, `press_tr` ve `oidc_verify` vardır. İmajı `backend/deploy/images/press.Dockerfile` dosyası derler. Ayrıntı [Press imajı belgesindedir](press-imaji.md).
+
+`build-release` betiği bütün imajları `linux/amd64` için derler. Derleme ajanının mimarisi sonucu değiştirmez (E-15).
 
 Press'in sunucu tarafı işleri henüz tam değildir. Kalan iş E-2 satırındadır.
 
@@ -601,7 +605,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | No | Engel | Önerilen çözüm | Sahibi |
 | --- | --- | --- | --- |
 | E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. 23 Kasım 2026 Pazartesi günü üretim imajında ansible-core 2.21.6 yerel bir oyunu çalıştırdı. Gerçek sunucu kurma denenmedi | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
-| E-2 | Press üretim imajı yazıldı ve Colima'da denendi ([Press imajı belgesi](press-imaji.md)). Press yalnız `ATONOTA_PRESS_ENABLED=1` olan ortamda açılır. Anahtar bütün ortamlarda bugün 0'dır. Kalan iş şudur: `remote/backup`, `remote/restore` ve `remote/apply` Press sitesini yedeklemez, geri yüklemez ve Press sitesinde `migrate` çalıştırmaz. `remote/site-probe.py` Press sitesinin ayarlarını denetlemez. Press'in migrate adımı Press'in kendi denetimi için internetten chromedriver indirmeye çalışır. İmaj sunucuda ve amd64'te denenmedi | press-tr işi betiklere Press sitesini ekler. Ekleme bitmeden `release.py` rc ve prod'da anahtarı reddeder. DevOps sorumlusu Press sitesini alpha'da elle açar | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi ([Press imajı belgesi](press-imaji.md)). Press yalnız `ATONOTA_PRESS_ENABLED=1` olan ortamda açılır. Anahtar bütün ortamlarda bugün 0'dır. Kalan iş şudur: `remote/backup`, `remote/restore` ve `remote/apply` Press sitesini yedeklemez, geri yüklemez ve Press sitesinde `migrate` çalıştırmaz. `remote/site-probe.py` Press sitesinin ayarlarını denetlemez. Press'in migrate adımı Press'in kendi denetimi için internetten chromedriver indirmeye çalışır. İmaj sunucuda ve amd64'te denenmedi. Telegram yaması (0004) Press'in uyarılarını kapatır. Uyarı yalnız hata kaydına düşer. Örneğin bir sunucu düşerse kimse uyarıyı görmez | press-tr işi betiklere Press sitesini ekler. Ekleme bitmeden `release.py` rc ve prod'da anahtarı reddeder. Sunucudaki `remote/apply` de aynı kuralı yeniden denetler. Press açılmadan önce başka bir uyarı kanalı belirlenir. Kanal belirlenmeden hiçbir ortamda `ATONOTA_PRESS_ENABLED=1` yazılmaz. DevOps sorumlusu Press sitesini alpha'da elle açar | press-tr işi ve DevOps sorumlusu. Uyarı kanalının sahibi DevOps sorumlusudur |
 | E-3 | Arka uç tarafı hazır. `/panel` sayfası Vite listesini okur ve `/panel/assets/` dosyalarını yükler. Arayüz henüz bu adrese göre ayarlanmadı | atonota-web işi altı ayar yapar. (1) Yönlendiricinin kök yolu `/panel` olur. (2) Ant Design `ConfigProvider` nonce'u `csp-nonce` öğesinin `.nonce` özelliğinden alır. (3) Küçük dosyalar `data:` adresine çevrilmez. Gerekirse `build.assetsInlineLimit: 0` verilir. (4) Kök öğenin kimliği `root` olur. (5) `public/` klasörü kullanılmaz. Ön vekil `/panel/<ad>` adresini sunmaz. (6) Yerel derleme de `--base=/panel/ --manifest` kullanır. Jenkins bu seçenekleri zaten verir. Ayrıca atonota-web işi tarayıcıda politika ihlali olup olmadığını denetler. Örneğin `setAttribute('style', ...)` ile yazılan stil engellenir | atonota-web işi |
 | E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
@@ -614,7 +618,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-12 | E-posta aktarma sunucusu seçilmedi (G-47) | SMTP sağlayıcısı seçilir. Sırlar `keycloak.env` dosyasına yazılır | DevOps sorumlusu |
 | E-13 | Arayüz ve arka uç ayrı taşınır. Bir ortamda uyumsuz ikili oluşabilir | Bir ortamda önce arka uç taşınır. Arayüz arka ucun sözleşmesini aşmaz | Orkestratör |
 | E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | prod'a gerçek veri girmeden önce hukuk onayı alınır | Hukuk ve ürün sahibi |
-| E-15 | Üretim imajları Mac'te arm64 ile denendi. Hetzner sunucuları amd64 olabilir | Derleme ajanı sunucularla aynı mimaride olur | DevOps sorumlusu |
+| E-15 | Üretim imajları Mac'te arm64 ile denendi. Hetzner sunucuları amd64 olabilir | `build-release` bütün imajları `linux/amd64` için derler. arm64 derleme ajanı QEMU öykünmesiyle derler. Sunucular amd64 olur. arm64 sunucu seçilirse önce Go bağımlılıkları sabitlenir. Ayrıntı [Press imajı belgesindedir](press-imaji.md) | DevOps sorumlusu |
 | E-16 | identity-sync üretimde yalnız iç ağda HTTP ile açılır. Üç bağlantı ise HTTPS ister. Bunlar Keycloak olayları, telefonun oturum kapatma isteği ve Press'in silme isteğidir. Bu yüzden `KC_SPI_EVENTS_LISTENER__WEBHOOK__URL`, `mobile_identity_sync_url` ve `identity_sync_url` için geçerli değer yok | identity-sync için iç ağda TLS tasarlanır. Başka bir yol da ön vekilde yalnız iç ağa açık bir addır | identity-sync işi ve DevOps sorumlusu |
 
 ## Neler sınandı

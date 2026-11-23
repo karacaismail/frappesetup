@@ -81,20 +81,11 @@
     "ignoreUntil": "2027-02-22"
   },
   {
-    "rule": "B607",
-    "file": "backend/dev/security/scans.py",
-    "code": "output = subprocess.check_output([\"osv-scanner\", \"--version\"], text=True, cwd=ROOT)",
-    "statementSha256": "9f60b237c084f57bd3259f151a6bbc5f1f9a6c5acfff51af37d9d890a0d4be72",
-    "reason": "The only arguments are the configured OSV executable and its version flag.",
-    "owner": "security-tooling",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "code": "output = subprocess.check_output([\"osv-scanner\", \"--version\"], text=True, cwd=ROOT)",
-    "statementSha256": "9f60b237c084f57bd3259f151a6bbc5f1f9a6c5acfff51af37d9d890a0d4be72",
-    "reason": "The only arguments are the configured OSV executable and its version flag.",
+    "code": "return subprocess.check_output([scanner, \"--version\"], text=True, cwd=ROOT)",
+    "statementSha256": "b283c755d6ee94700162e4498d11fbf7dc50ffd441462c1f19d2fa81c4e18265",
+    "reason": "The only arguments are the OSV executable found by osv_scanner() and its version flag.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   },

@@ -55,6 +55,84 @@ class SecurityScanTests(unittest.TestCase):
                  "backend/dev/security/fixtures/requirements.txt"]
         self.assertEqual(scans.dependency_locks(files), files[:2])
 
+    def test_dependency_locks_include_the_press_image_lock(self):
+        # Review 1, finding 3: the Press image lock has its own file name.
+        files = ["backend/deploy/images/press-requirements.lock.txt", "backend/deploy/images/press-requirements.in"]
+        self.assertEqual(scans.dependency_locks(files), files[:1])
+        self.assertEqual(scans.osv_lockfile(files[0]), f"requirements.txt:{files[0]}")
+        self.assertEqual(scans.osv_lockfile("package-lock.json"), "package-lock.json")
+
+    def test_security_gate_scans_the_press_lock(self):
+        gate = (scans.ROOT / "backend/dev/bin/security-audit").read_text()
+        self.assertIn("backend/dev/security/scans.py press-lock", gate)
+        self.assertEqual(str(scans.PRESS_LOCK), "backend/deploy/images/press-requirements.lock.txt")
+        self.assertTrue((scans.ROOT / scans.PRESS_LOCK).is_file())
+
+    def press_lock_scan(self, report_code, report, scanner="/opt/osv-scanner"):
+        fixture = {"results": [{"packages": [{"vulnerabilities": [{"id": "GHSA-hmr4-m2h5-33qx"}]}]}]}
+        calls = []
+
+        def run_json(command):
+            calls.append(command)
+            return (1, fixture) if str(scans.FIXTURES / "requirements.txt") in command else (report_code, report)
+
+        with patch.object(scans, "osv_scanner", return_value=scanner), \
+                patch.object(scans.subprocess, "check_output", return_value=f"osv-scanner version: {scans.OSV}\n"), \
+                patch.object(scans, "validate_osv_inputs"), \
+                patch.object(scans, "run_json", side_effect=run_json):
+            result = scans.scan_press_lock()
+        return result, calls
+
+    def test_press_lock_scan_fails_on_a_finding(self):
+        report = {"results": [{"source": {"path": str(scans.ROOT / scans.PRESS_LOCK)}, "packages": [
+            {"package": {"name": "paramiko", "version": "3.3.1"}, "vulnerabilities": [{"id": "PYSEC-2026-1758"}]}]}]}
+        result, calls = self.press_lock_scan(1, report)
+        self.assertEqual(result.status, "fail")
+        self.assertIn(f"{scans.PRESS_LOCK} · paramiko 3.3.1 · PYSEC-2026-1758", result.findings)
+        scan = calls[-1]
+        self.assertEqual(scan[0], "/opt/osv-scanner")
+        self.assertIn("--offline", scan)
+        self.assertEqual(scan[scan.index("--config") + 1], str(scans.OSV_CONFIG))
+        self.assertEqual(scan[scan.index("--lockfile") + 1], f"requirements.txt:{scans.PRESS_LOCK}")
+
+    def test_press_lock_scan_passes_without_findings(self):
+        result, _ = self.press_lock_scan(0, {"results": []})
+        self.assertEqual(result.status, "pass")
+
+    def test_press_lock_scan_fails_without_the_scanner(self):
+        # The gate must not pass a scan that did not run.
+        with patch.object(scans, "osv_scanner", return_value=None):
+            self.assertEqual(scans.scan_press_lock().status, "fail")
+
+    def test_osv_exception_names_its_owner_in_the_reason(self):
+        # OSV-Scanner 2.7.1 refuses unknown keys such as "owner", so the owner opens the reason.
+        item = {"id": "GHSA-53pm-wgxf-c6qf", "reason": "Owner: press-tr. Not reachable.",
+                "ignoreUntil": "2027-02-23", "effectiveUntil": "2027-02-23"}
+        today = date(2026, 11, 23)
+        self.assertTrue(scans.osv_exception_valid(item, today))
+        self.assertFalse(scans.osv_exception_valid({**item, "reason": "Not reachable."}, today))
+        self.assertFalse(scans.osv_exception_valid({**item, "reason": "Owner: press-tr."}, today))
+        self.assertFalse(scans.osv_exception_valid({**item, "owner": "press-tr"}, today))
+        self.assertFalse(scans.osv_exception_valid({**item, "effectiveUntil": "2027-03-01"}, today))
+        self.assertFalse(scans.osv_exception_valid(item, date(2027, 2, 24)))
+
+    def test_repository_osv_exceptions_are_valid_and_readable_by_the_scanner(self):
+        import tomllib
+
+        config = tomllib.loads((scans.ROOT / scans.OSV_CONFIG).read_text())
+        for item in config.get("IgnoredVulns", []):
+            with self.subTest(id=item.get("id")):
+                self.assertTrue(scans.osv_exception_valid(item, date.today()))
+        scanner = scans.osv_scanner()
+        if scanner is None:
+            self.skipTest("OSV-Scanner is not installed (backend/dev/security/osv-setup)")
+        process = scans.subprocess.run(
+            [scanner, "scan", "source", "--offline", "--no-resolve", "--format", "json", "--config",
+             str(scans.OSV_CONFIG), "--lockfile", str(scans.FIXTURES / "requirements.txt")],
+            cwd=scans.ROOT, capture_output=True, text=True,
+            env={**scans.os.environ, "OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY": str(scans.OSV_HOME / "db")})
+        self.assertNotIn("config file", process.stderr)
+
     def test_local_check_does_not_follow_redirects(self):
         requests = []
 

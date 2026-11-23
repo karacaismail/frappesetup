@@ -25,6 +25,10 @@ x-tenant: &tenant
 # Press runs on the same MariaDB server as the tenants (its own database and user, created by
 # "bench new-site" in the first install steps). It has its own Redis, because both benches live in
 # /home/frappe/frappe-bench: with a shared queue the tenant worker would take Press jobs.
+# Press services join only the network press-internal (review 1, finding 1). A tenant container
+# cannot reach the Press Redis (it has no password) or press-web:8000 past the front proxy. Only
+# tenant-db joins both networks. Press reaches Keycloak and identity-sync by their public HTTPS
+# addresses, so keycloak_internal_url stays empty in production.
 x-press: &press
   image: ${ATONOTA_IMAGE_PRESS:-unset}
   restart: unless-stopped
@@ -32,7 +36,7 @@ x-press: &press
   volumes:
     - press-sites:/home/frappe/frappe-bench/sites
     - press-logs:/home/frappe/frappe-bench/logs
-  networks: [internal]
+  networks: [press-internal]
 
 services:
   tenant-db:
@@ -46,7 +50,8 @@ services:
       timeout: 5s
       retries: 30
     volumes: [tenant-db:/var/lib/mysql]
-    networks: [internal]
+    # Press keeps its own database and user on this server, so the database joins press-internal.
+    networks: [internal, press-internal]
 
   tenant-redis-cache:
     image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
@@ -181,7 +186,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 20}
-    networks: [internal]
+    networks: [press-internal]
 
   press-redis-queue:
     image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
@@ -190,7 +195,7 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 20}
     volumes: [press-redis-queue:/data]
-    networks: [internal]
+    networks: [press-internal]
 
   press-web:
     <<: *press
@@ -247,7 +252,7 @@ services:
       CLIENT_MAX_BODY_SIZE: 50m
     depends_on: [press-web, press-socket]
     networks:
-      internal: {}
+      press-internal: {}
       edge: {aliases: ["${ATONOTA_ENV:?}-press"]}
 
 volumes:
@@ -263,6 +268,7 @@ volumes:
 
 networks:
   internal: {}
+  press-internal: {}
   # One edge network per environment (remote/apply creates it); the edge proxy joins each one.
   edge:
     name: atonota-edge-${ATONOTA_ENV:?}

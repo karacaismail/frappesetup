@@ -24,6 +24,8 @@ Factory profilinde yeni imaj derlemeyin ve yeni site açmayın.
 [OSV-Scanner 2.7.1 Linux amd64](https://github.com/google/osv-scanner/releases/download/v2.7.1/osv-scanner_linux_amd64) dosyasını indirin.
 Dosyanın SHA-256 özeti `fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8` olmalı.
 Dosyayı çalıştırılabilir yapın ve PATH üzerine `osv-scanner` adıyla koyun.
+Yerelde `backend/dev/security/osv-setup` aynı dosyayı özetiyle indirir. Betik veritabanlarını da indirir.
+`security-audit` kapısı Press kilidini tarar. Kapı aracı ve veritabanını bulamazsa düşer.
 Komut aracı bulamazsa OSV adımını `not_run` olarak kaydeder.
 Bu durumda `security-full`, yerelde ve CI kipinde 1 ile çıkar.
 `OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY` değişkenine yerel önbellek klasörünü verin.

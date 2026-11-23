@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Download the pinned OSV-Scanner and the open vulnerability database for the offline scans.
+# This is the only step that needs the network. The security gate (backend/dev/bin/security-audit,
+# "scans.py press-lock") and security-full then scan without it. The database must be at most
+# seven days old, so run this again at least once a week.
+# Files: ${XDG_CACHE_HOME:-~/.cache}/frappesetup-osv/bin/osv-scanner and .../db/osv-scalibr/<ecosystem>/all.zip
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tool-versions.env
+source "$here/tool-versions.env"
+
+home="${XDG_CACHE_HOME:-$HOME/.cache}/frappesetup-osv"
+db="${OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY:-$home/db}"
+
+# SHA-256 of the release files of OSV-Scanner 2.7.1 (osv-scanner_SHA256SUMS of the release).
+case "$(uname -s)-$(uname -m)" in
+Darwin-arm64) asset=darwin_arm64 sum=b22c02877a811c8f78956e8643efa554932b7378f590d13f8e97d4e9448a29f3 ;;
+Linux-x86_64) asset=linux_amd64 sum=fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8 ;;
+Linux-aarch64) asset=linux_arm64 sum=983d22fbad9724514e3fcc6acc83b5fa64c5ffa6b0d9f510028f22c1b223ff81 ;;
+*) printf 'osv-setup: no pinned OSV-Scanner for %s\n' "$(uname -sm)" >&2; exit 1 ;;
+esac
+[[ "$OSV_VERSION" == 2.7.1 ]] || { printf 'osv-setup: update the checksums for OSV %s\n' "$OSV_VERSION" >&2; exit 1; }
+
+sha256() {
+    if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
+
+mkdir -p "$home/bin"
+scanner="$home/bin/osv-scanner"
+if [[ ! -x "$scanner" || "$(sha256 "$scanner")" != "$sum" ]]; then
+    curl -fsSLo "$scanner.new" "https://github.com/google/osv-scanner/releases/download/v$OSV_VERSION/osv-scanner_$asset"
+    [[ "$(sha256 "$scanner.new")" == "$sum" ]] || { rm -f "$scanner.new"; printf 'osv-setup: checksum differs\n' >&2; exit 1; }
+    chmod 0755 "$scanner.new"
+    mv "$scanner.new" "$scanner"
+fi
+
+for ecosystem in PyPI npm; do
+    folder="$db/osv-scalibr/$ecosystem"
+    mkdir -p "$folder"
+    curl -fsSLo "$folder/all.zip.new" "https://osv-vulnerabilities.storage.googleapis.com/$ecosystem/all.zip"
+    mv "$folder/all.zip.new" "$folder/all.zip"
+done
+"$scanner" --version | head -1
+printf 'osv-setup: scanner %s, database %s\n' "$scanner" "$db"
