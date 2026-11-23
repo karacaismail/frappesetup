@@ -148,3 +148,44 @@ class TestApprovalContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFrappeResponses(unittest.TestCase):
+    """Match responses that Frappe 16 sends before or around the HRMS TR code."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+        cls.schemas = cls.contract["components"]["schemas"]
+
+    def validator(self, schema):
+        return Draft202012Validator({**schema, "components": self.contract["components"]})
+
+    def test_list_items_hold_only_requested_fields(self):
+        # frappe/api/v1.py document_list passes ``fields`` to frappe.get_list unchanged.
+        list_schema = self.schemas["LeaveApplicationListResponse"]
+        self.validator(list_schema).validate({"data": [{"modified": "2026-11-23 11:42:51.896988"}]})
+
+    def test_single_record_still_requires_name(self):
+        record_schema = self.schemas["LeaveApplicationResponse"]
+        self.assertFalse(self.validator(record_schema).is_valid({"data": {"modified": "2026-11-23"}}))
+
+    def test_denied_routes_document_rejected_credentials(self):
+        # Frappe checks the sid cookie and the Authorization header before it routes the request.
+        for path in (
+            "/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query",
+            "/v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/",
+        ):
+            for method in ("get", "post"):
+                with self.subTest(path=path, method=method):
+                    self.assertIn("401", self.contract["paths"][path][method]["responses"])
+
+    def test_attendance_warning_route_documents_unmatched_names(self):
+        # frappe/api/v2.py uses <path:name>. Werkzeug does not match a name with a line break.
+        route = "/v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/"
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                self.assertEqual(
+                    self.contract["paths"][route][method]["responses"]["404"],
+                    {"$ref": "#/components/responses/NotFoundV2"},
+                )

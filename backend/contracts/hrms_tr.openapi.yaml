@@ -295,6 +295,8 @@ paths:
       summary: Deny access to an unsupported legacy leave endpoint.
       description: Denies the request without reading leave data.
       responses:
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
         "403":
           $ref: "#/components/responses/PermissionDenied"
     post:
@@ -312,6 +314,8 @@ paths:
       summary: Deny access to an unsupported legacy leave endpoint.
       description: Denies the request without reading leave data.
       responses:
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
         "403":
           $ref: "#/components/responses/PermissionDenied"
   /v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/:
@@ -325,13 +329,21 @@ paths:
     get:
       summary: Deny requests for legacy attendance warnings.
       responses:
+        "401":
+          $ref: "#/components/responses/AuthenticationFailedV2"
         "403":
           $ref: "#/components/responses/PermissionDeniedV2"
+        "404":
+          $ref: "#/components/responses/NotFoundV2"
     post:
       summary: Deny requests for legacy attendance warnings.
       responses:
+        "401":
+          $ref: "#/components/responses/AuthenticationFailedV2"
         "403":
           $ref: "#/components/responses/PermissionDeniedV2"
+        "404":
+          $ref: "#/components/responses/NotFoundV2"
 x-ai-tool:
   name: hrt_approve_leave
   kind: write
@@ -416,6 +428,26 @@ components:
             errors:
               - type: PermissionError
                 message: You are not permitted to call this method.
+    AuthenticationFailedV2:
+      description: Frappe rejected the supplied session cookie or API token before it ran the method.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FrappeV2Error"
+          example:
+            errors:
+              - type: AuthenticationError
+    NotFoundV2:
+      description: |
+        Frappe found no route for the requested path. For example, a record name with a line break
+        does not match the v2 document route.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FrappeV2Error"
+          example:
+            errors:
+              - type: DoesNotExistError
   schemas:
     LeaveName:
       type: object
@@ -436,9 +468,15 @@ components:
           description: The modified value returned when reading the leave application.
           example: "2026-11-22 09:00:00.000001"
     LeaveApplication:
-      type: object
-      description: A leave application can include additional fields that the user has permission to read.
+      description: A full leave application record always includes its name.
+      allOf:
+        - $ref: "#/components/schemas/LeaveApplicationFields"
       required: [name]
+    LeaveApplicationFields:
+      type: object
+      description: |
+        Leave application fields the user has permission to read. A list item holds only the fields
+        that the request names in the fields parameter. Frappe passes those fields to frappe.get_list.
       properties:
         name:
           type: string
@@ -467,9 +505,9 @@ components:
       properties:
         data:
           type: array
-          description: Page of readable leave applications.
+          description: Page of readable leave applications. Each item holds only the requested fields.
           items:
-            $ref: "#/components/schemas/LeaveApplication"
+            $ref: "#/components/schemas/LeaveApplicationFields"
       examples:
         - data:
             - name: HR-LAP-TEST-01

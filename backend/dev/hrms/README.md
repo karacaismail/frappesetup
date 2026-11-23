@@ -54,7 +54,25 @@ Yeni ortam gerekiyorsa aşağıdaki adımları izleyin.
    Yapay zekâ katmanı eksikse `--with-ai` seçeneğini çıkarın.
    Test, taslak durumunu değiştirir. Her tam koşu için boş test sitesi kullanın.
 
-6. Deneme bitince yalnız bu işin geçici sitesini ve veri birimlerini silin.
+6. Schemathesis sözleşme denetimini çalıştırın.
+   Schemathesis, API'yi sözleşmeye göre deneyen bir araçtır.
+   Komutu depo kökünde ve bilgisayarda çalıştırın.
+
+   ```sh
+   UV_OFFLINE=1 python3 -B backend/dev/hrms/contract.py --site test-hrms-tr.localhost
+   ```
+
+   Komut önce deneme çalışanıyla oturum açar. Sonra aynı uçları misafir olarak dener.
+   Oturum, Frappe'nin olağan giriş ucuyla açılır.
+   Parola web konteynerindeki `HRT_TEST_PASSWORD` değişkeninden okunur.
+   Bu yığının ağı kapalıdır ve bilgisayara port açmaz.
+   Bu yüzden komut bilgisayarda yerel bir aktarıcı açar.
+   Aktarıcı her bağlantıyı `compose exec` ile sitenin kendi portuna taşır.
+   Komut yalnız GET uçlarını dener ve veri değiştirmez.
+   Bulgu çıkarsa veya hiçbir uç denenmezse komut başarısız olur.
+   Başka bir Compose sarmalayıcısı kullanıyorsanız yolunu `--compose` ile verin.
+
+7. Deneme bitince yalnız bu işin geçici sitesini ve veri birimlerini silin.
    Komut bu Compose projesinin test verisini siler. Aynı anda bir test sitesi açık tutun.
 
    ```sh

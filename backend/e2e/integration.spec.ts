@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import { expect, test, request as apiRequest, type APIRequestContext } from '@playwright/test';
 import { localUrl, required } from './local';
+import { provisionUnlinkedSyncUser } from './sync-fixture';
 
 function sessionHeaders(role: 'operator' | 'reader') {
   const prefix = `E2E_${role.toUpperCase()}`;
@@ -104,17 +105,19 @@ async function resource(request: APIRequestContext, doctype: string, name?: stri
 }
 
 test('identity sync provisions a Website User', async ({ request }) => {
-  const syncAccount = required('E2E_SYNC_EMAIL');
-  if (!/^e2e-sync(?:-[a-z0-9-]+)?@example\.test$/.test(syncAccount)) {
-    throw new Error('E2E_SYNC_EMAIL must be a synthetic identity sync account.');
-  }
+  const { email: syncAccount, subject } = await provisionUnlinkedSyncUser({
+    identityOrigin: localUrl('identity.localhost', 0),
+    syncOrigin: localUrl('127.0.0.1', 5),
+    clientId: required('E2E_SYNC_KEYCLOAK_CLIENT'),
+    clientSecret: required('E2E_SYNC_KEYCLOAK_SECRET'),
+  });
   const before = await resource(request, 'User', syncAccount, 'operator');
   expect(before.status()).toBe(404);
   const now = Date.now();
   const timestamp = Math.floor(now / 1000);
   const data = JSON.stringify({
     id: randomUUID(), kind: 'user', type: 'VERIFY_EMAIL', realm: 'platform',
-    time: now, user_id: required('E2E_SYNC_SUBJECT'),
+    time: now, user_id: subject,
   });
   const signature = createHmac('sha256', required('IDENTITY_SYNC_WEBHOOK_SECRET'))
     .update(`${timestamp}.execute.${data}`).digest('hex');

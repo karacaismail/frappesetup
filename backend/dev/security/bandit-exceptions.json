@@ -3072,5 +3072,41 @@
     "reason": "Only a fixed count of question-mark placeholders is interpolated. All data values are passed as query parameters.",
     "owner": "identity-sync",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/hrms/contract.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "ilk-dikey-dilim",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/hrms/contract.py",
+    "code": "return subprocess.run([*prefix, *args], check=True, text=True, capture_output=True, **kwargs).stdout",
+    "statementSha256": "7075b27c1e56782384d7bdcebb556ae631f23b464281a247ffd19142e12fd0f5",
+    "reason": "Runs the reviewed Compose wrapper with separate argument tokens and without a host shell.",
+    "owner": "ilk-dikey-dilim",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/hrms/contract.py",
+    "code": "process = subprocess.Popen(",
+    "statementSha256": "01e8d8c0cdb5ec8d45e11a1761c3de420e6e11aab4de5114eb3ec26a62e7277b",
+    "reason": "Starts the loopback relay through the reviewed Compose wrapper with fixed arguments and no host shell.",
+    "owner": "ilk-dikey-dilim",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B108",
+    "file": "backend/dev/hrms/contract.py",
+    "code": "default=\"/tmp/hrms_tr-manifest.json\",",
+    "statementSha256": "b79379ef6070fc2330d4c362f9b4bcc21b673c8cfaf495678c768fbac74db49a",
+    "reason": "Default seed manifest path inside the web container, as written by seed.py; the host never writes it.",
+    "owner": "ilk-dikey-dilim",
+    "ignoreUntil": "2027-02-22"
   }
 ]

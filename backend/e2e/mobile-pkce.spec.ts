@@ -34,8 +34,6 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
     const password = required('E2E_MOBILE_PASSWORD');
     const expired = fullPreview ? (await previewMobileToken(browser, context, email, password,
       required('E2E_MOBILE_EXPIRED_CLIENT_ID'))).access : required('E2E_MOBILE_EXPIRED_TOKEN');
-    const wrong = fullPreview ? (await previewMobileToken(browser, context, email, password, clientId,
-      'openid mobile')).access : required('E2E_MOBILE_WRONG_AUDIENCE_TOKEN');
 
     const authorize = () => authorizeMobile(browser, clientId, redirect, email, password, required('E2E_MOBILE_SCOPE'));
     const mismatch = await authorize();
@@ -70,6 +68,12 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
     }
     expect(expiredClaims.iss === payload.iss && [expiredClaims.aud].flat().includes(audience)
       && expiredClaims.exp < Math.floor(Date.now() / 1000) - 60).toBe(true);
+    const wrongResponse = await exchange(
+      await authorizeMobile(browser, clientId, redirect, email, password, 'openid mobile'),
+    );
+    expect(wrongResponse.status()).toBe(200);
+    const { access_token: wrong } = await wrongResponse.json();
+    expect(typeof wrong).toBe('string');
     const wrongClaims = claims(wrong);
     expect(wrongClaims.iss === payload.iss && ![wrongClaims.aud].flat().includes(audience)
       && wrongClaims.exp > Math.floor(Date.now() / 1000)).toBe(true);
