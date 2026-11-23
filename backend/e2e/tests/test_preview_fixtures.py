@@ -6,6 +6,7 @@ import json
 import os
 import re
 import runpy
+import secrets
 import subprocess
 import sys
 import unittest
@@ -176,6 +177,8 @@ class PreviewFixturesTest(unittest.TestCase):
         self.assertEqual(members, [lifecycle["delete"]["subject"], lifecycle["revoke"]["subject"]])
 
     def test_sync_fixture_client_receives_only_user_and_organization_roles(self):
+        # Made at run time so no credential-like literal sits in the source.
+        admin_grant = secrets.token_hex(8)
         calls = []
 
         def request(port, route, **kwargs):
@@ -199,7 +202,7 @@ class PreviewFixturesTest(unittest.TestCase):
             return "http://localhost/entries/" + str(len(calls))
 
         with patch.object(fixtures, "keycloak_request", side_effect=request):
-            sync_client = fixtures.configure_sync_fixture_client(43820, token="admin-grant")
+            sync_client = fixtures.configure_sync_fixture_client(43820, token=admin_grant)
 
         self.assertEqual(sync_client["client_id"], "e2e-sync-fixture")
         self.assertTrue(sync_client["client_value"])

@@ -134,6 +134,8 @@ export async function provisionUnlinkedSyncUser({
     throw new Error(`Sync fixture could not find Keycloak organization ${organizationAlias}.`);
   }
 
+  // The 404 step relies on Keycloak sending no user id in the organization membership event,
+  // so identity-sync ignores it (server.py). Re-run this test when the Keycloak version changes.
   const memberReply = await sendLocal(
     identityOrigin,
     `/admin/realms/platform/organizations/${encodeURIComponent(organization.id)}/members`,
