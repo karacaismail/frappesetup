@@ -186,14 +186,14 @@ Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcı
 
 Ürünün bir tanıtım sayfası olur. Sayfa bu işte yapılmadı. Sayfanın içeriği ve kuralları aşağıdadır (G-165).
 
-Sayfa şu değer önerilerini anlatır:
+Sayfa şu değer önerilerini anlatır. Her öneri, yeteneği kurulunca tanıtım sayfasına girer:
 
 - **Tek giriş kapısı.** Kullanıcı tek hesapla birçok uygulamaya girer.
 - **Birçok platform.** Kullanıcı Google, Facebook, LinkedIn, X ve başka platformlarla girer. Yeni platform kod değişmeden eklenir.
 - **Giriş ile yetki ayrıdır.** Giriş yapan kişi her işlemi yapamaz. Her işlemin koşulu ayrı denetlenir.
 - **Güçlü giriş.** Geçiş anahtarı ve donanım anahtarı desteklenir.
 - **Açık kaynak temel.** Ürün Keycloak üzerine kuruludur. Ürünün kodu MIT lisanslıdır.
-- **Veri Hetzner'de durur.** Bu kural platformun veri kararından gelir.
+- **Platform verisi Hetzner'de durur.** Bu kural platformun veri kararından gelir. Dış doğrulama sağlayıcısının verisi ayrıdır. Bu verinin bölgesi sağlayıcı seçilince belli olur (G-167).
 
 Sayfanın kuralları şunlardır:
 

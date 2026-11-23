@@ -176,6 +176,12 @@ DEPLOY_PATTERNS = (
     "compose/site.caddy.template",
     "environments/*.env",
     "remote/*",
+    "settings/*.production.env.example",
+)
+# Production setting lists (blocker E-4). remote/apply checks the server against them.
+SETTING_LISTS = (
+    "tenant", "tenant-db", "tenant-site", "keycloak", "keycloak-db", "identity-sync", "press",
+    "press-site", "offsite", "edge",
 )
 NEEDED = (
     "compose/stack.yaml",
@@ -188,7 +194,11 @@ NEEDED = (
     "remote/restore",
     "remote/status",
     "remote/rollback",
-) + tuple(f"environments/{name}.env" for name in ORDER)
+    "remote/settings.py",
+    "remote/site-probe.py",
+) + tuple(f"environments/{name}.env" for name in ORDER) + tuple(
+    f"settings/{name}.production.env.example" for name in SETTING_LISTS
+)
 
 
 def sha256_of(path):

@@ -21,6 +21,7 @@ DEPLOY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(DEPLOY))
 
 import release  # noqa: E402
+import test_settings  # noqa: E402
 
 FAKE_DOCKER = r"""#!/usr/bin/env bash
 printf '%s\n' "$*" >>"$FAKE_LOG"
@@ -33,6 +34,7 @@ case "$*" in
 *" config --services"*) printf '%s\n' ${FAKE_SERVICES:-tenant-web keycloak identity-sync} ;;
 *" ps --all --format"*) printf '%b' "${FAKE_PS:-tenant-web running healthy\nkeycloak running healthy\nidentity-sync running \n}" ;;
 *"tar -C"*"-cf -"*) tar -cf - -T /dev/null ;;
+*"site-settings-probe"*) printf '%s\n' "$FAKE_SITE_KEYS" ;;
 *"pg_dump"*) printf 'dump\n' ;;
 *"cat /tmp/backup.sqlite3"*) printf 'sqlite\n' ;;
 esac
@@ -67,7 +69,16 @@ class RemoteScripts(unittest.TestCase):
             "FAKE_LOG": str(self.log),
             "ATONOTA_ROOT": str(self.root),
             "ATONOTA_ETC": str(self.etc),
+            # The tenant image reports every site with every required setting (site-probe.py).
+            "FAKE_SITE_KEYS": json.dumps({
+                site: {"set": sorted(test_settings.required("tenant-site")), "differs": []}
+                for settings in release.load_environments().values()
+                for site in settings["ATONOTA_TENANT_SITES"].split()
+            }),
         }
+        # The DevOps owner wrote every secret file of every environment (blocker E-4).
+        for env in release.ORDER:
+            test_settings.fill_server(self.etc, env, press=True)
 
     def incoming(self, env, manifest, bundle=None, drop=()):
         folder = self.folder / f"incoming-{env}-{manifest['release_id']}"
@@ -79,7 +90,10 @@ class RemoteScripts(unittest.TestCase):
         for name in ("stack.yaml", "edge.yaml", "Caddyfile", "site.caddy.template"):
             shutil.copy(DEPLOY / "compose" / name, folder)
         for script in (DEPLOY / "remote").iterdir():
-            shutil.copy(script, folder)
+            if script.is_file():
+                shutil.copy(script, folder)
+        for listing in (DEPLOY / "settings").glob("*.production.env.example"):
+            shutil.copy(listing, folder)
         if bundle:
             name, data = bundle
             (folder / name).write_bytes(data)
@@ -483,7 +497,10 @@ class RemoteScripts(unittest.TestCase):
         self.assertIn("name: atonota-edge-${ATONOTA_ENV:?}", stack)
 
     def test_prod_refuses_a_release_without_offsite_backup(self):
+        offsite = self.etc / "prod" / "offsite.env"
+        test_settings.write_env(offsite, test_settings.filled("offsite"))
         self.first_install("prod")
+        offsite.unlink()
         result = self.apply("prod", self.backend(2, "prod"))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("offsite", result.stderr)
@@ -584,6 +601,83 @@ class RemoteScripts(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("checksum", result.stderr)
         self.assertFalse((self.root / "web" / "alpha" / "current").is_symlink())
+
+    # Production settings (blocker E-4): a missing setting stops the release before any change.
+
+    def test_missing_secret_key_stops_before_any_change(self):
+        self.first_install()
+        values = test_settings.filled("keycloak")
+        del values["KC_DB_PASSWORD"]
+        test_settings.write_env(self.etc / "alpha" / "keycloak.env", values)
+        result = self.apply("alpha", self.backend(2))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("keycloak.env: KC_DB_PASSWORD (missing)", result.stderr)
+        self.assertIn("nothing changed", result.stderr)
+        self.assertNotIn("fake-value-for-tests", result.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertFalse((self.root / "alpha" / "backend-pending").is_symlink())
+        self.assertFalse((self.root / "alpha" / "releases" / self.release_id(2)).exists())
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(1))
+
+    def test_missing_secret_file_stops_the_first_install(self):
+        (self.etc / "alpha" / "tenant.env").unlink()
+        result = self.apply("alpha", self.backend(1), ATONOTA_FIRST_INSTALL="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f"{self.etc}/alpha/tenant.env: file is missing", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_release_with_press_needs_the_press_file(self):
+        (self.etc / "rc" / "press.env").unlink()
+        test_settings.write_env(self.etc / "rc" / "offsite.env", test_settings.filled("offsite"))
+        result = self.apply("rc", self.backend(1, "rc"), ATONOTA_FIRST_INSTALL="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("press.env: file is missing", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_missing_site_setting_stops_while_the_old_release_runs(self):
+        self.first_install()
+        keys = [key for key in test_settings.required("tenant-site") if key != "keycloak_client_secret"]
+        result = self.apply("alpha", self.backend(2),
+                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": {"set": keys, "differs": []}}))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("demo.app.alpha.atonota.net, site_config.json: keycloak_client_secret (missing)",
+                      result.stderr)
+        self.assertLess(self.index(" pull --quiet"), self.index("site-settings-probe"))
+        self.assertFalse(any("set-maintenance-mode" in line or " stop " in line for line in self.calls()))
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(1))
+        # The release stopped in phase pulling, so the automatic rollback leaves the old one alone.
+        self.log.unlink()
+        rolled = self.run_remote("alpha", "rollback", "backend", "--failed", self.release_id(2))
+        self.assertEqual(rolled.returncode, 0, rolled.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_developer_mode_on_a_site_stops_while_the_old_release_runs(self):
+        self.first_install()
+        report = {"set": sorted(test_settings.required("tenant-site")), "differs": ["developer_mode"]}
+        result = self.apply("alpha", self.backend(2),
+                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": report}))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("developer_mode (must be 0)", result.stderr)
+        probe = self.calls()[self.index("site-settings-probe")]
+        self.assertIn('"developer_mode": "0"', probe)
+        # The image entrypoint prints to stdout and relinks the assets of the running release.
+        self.assertIn("--entrypoint /home/frappe/frappe-bench/env/bin/python tenant-web -I -", probe)
+        self.assertFalse(any("set-maintenance-mode" in line for line in self.calls()))
+
+    def test_missing_site_after_the_first_install_stops_before_the_old_release_stops(self):
+        self.first_install()
+        result = self.apply("alpha", self.backend(2), FAKE_SITE_KEYS="{}")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("does not exist", result.stderr)
+        self.assertFalse(any("set-maintenance-mode" in line for line in self.calls()))
+
+    def test_release_keeps_the_lists_it_was_checked_with(self):
+        self.first_install()
+        folder = self.root / "alpha" / "releases" / self.release_id(1)
+        names = {path.name for path in (folder / "settings").iterdir()}
+        self.assertIn("keycloak.production.env.example", names)
+        probe = json.loads((folder / "site-settings.json").read_text())
+        self.assertIn("demo.app.alpha.atonota.net", probe)
 
 
 if __name__ == "__main__":

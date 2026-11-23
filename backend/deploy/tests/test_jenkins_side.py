@@ -125,6 +125,9 @@ class DeployScript(unittest.TestCase):
         self.assertIn(self.release / "deploy" / "compose" / "stack.yaml", sent)
         self.assertIn(self.release / "deploy" / "remote" / "apply", sent)
         self.assertIn(self.release / "deploy" / "environments" / "beta.env", sent)
+        # The server checks its secret files against the lists of the release (blocker E-4).
+        self.assertIn(self.release / "deploy" / "settings" / "keycloak.production.env.example", sent)
+        self.assertIn(self.release / "deploy" / "remote" / "settings.py", sent)
         for name in sent:
             self.assertTrue(str(name).startswith(str(self.release)), name)
         stack = (self.release / "deploy" / "compose" / "stack.yaml").read_text()
