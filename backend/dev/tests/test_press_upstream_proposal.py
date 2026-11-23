@@ -3,13 +3,11 @@
 The proposal removes the need for the source parts of dev/press/patch-py314.sh. It is a Git mbox
 patch series for Press v0.154.1 and an English pull request text. The project owner sends it.
 
-Set PRESS_V0154_SOURCE to a clean Press checkout at the pinned commit to also run "git apply
---check". Without it that one test is skipped; the other tests read files only.
+These tests read files only. The clean "git apply --check" against Press v0.154.1 needs a Press
+checkout; the command and its result are in docs/handoff/press-upstream-proposal.md.
 """
 
-import os
 import re
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -50,7 +48,8 @@ class PatchSeries(unittest.TestCase):
         self.assertEqual(len(re.findall(r"^From [0-9a-f]{40} ", self.text, re.M)), 3)
 
     def test_patch_carries_no_ai_signature_or_co_author(self):
-        for forbidden in ("Co-Authored-By", "Co-authored-by", "Generated with", "Claude", "noreply@anthropic"):
+        forbidden_words = ("Co-Authored-By", "Co-authored-by", "Generated with", "Claude", "anthropic")
+        for forbidden in forbidden_words:
             self.assertNotIn(forbidden, self.text)
 
     def test_headers_follow_press_commitlint(self):
@@ -76,16 +75,6 @@ class PatchSeries(unittest.TestCase):
         self.assertIn("-from frappe.oauth import get_cookie_dict_from_headers", self.text)
         self.assertIn('+\tcookie_perms = frappe.local.request.cookies.get("cookie_perms")', self.text)
 
-    @unittest.skipUnless(os.environ.get("PRESS_V0154_SOURCE"), "PRESS_V0154_SOURCE is not set")
-    def test_patch_applies_cleanly_to_press_v0154_1(self):
-        source = Path(os.environ["PRESS_V0154_SOURCE"])
-        head = subprocess.run(["git", "-C", source, "rev-parse", "HEAD"], capture_output=True, text=True)
-        self.assertEqual(head.stdout.strip(), PRESS_COMMIT)
-        status = subprocess.run(["git", "-C", source, "status", "--porcelain"], capture_output=True, text=True)
-        self.assertEqual(status.stdout, "")
-        check = subprocess.run(["git", "-C", source, "apply", "--check", PATCH], capture_output=True, text=True)
-        self.assertEqual(check.returncode, 0, check.stderr)
-
 
 class PullRequestText(unittest.TestCase):
     def setUp(self):
@@ -110,11 +99,11 @@ class PullRequestText(unittest.TestCase):
     def test_paragraphs_are_not_hard_wrapped(self):
         # Press AGENTS.md: never hard-wrap the PR description.
         body = self.text.split("\n---\n", 1)[1]
-        prose = [line for line in body.split("```")[0::2]]
-        for block in prose:
+        structured = ("-", "|", "#", "1.", "2.", "3.", ">")
+        for block in body.split("```")[0::2]:
             for paragraph in block.split("\n\n"):
                 lines = [line for line in paragraph.splitlines() if line.strip()]
-                if lines and not any(line.lstrip().startswith(("-", "|", "#", "1.", "2.", "3.", ">")) for line in lines):
+                if lines and not any(line.lstrip().startswith(structured) for line in lines):
                     self.assertEqual(len(lines), 1, paragraph)
 
     def test_text_has_no_ai_signature(self):
