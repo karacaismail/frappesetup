@@ -10,13 +10,16 @@ Design: backend/docs/handoff/offsite-backup.md and backend/deploy/images/agent-p
 Credentials in this file are fixture words, not real keys.
 """
 
+import ast
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import sys
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 DEPLOY = Path(__file__).resolve().parents[1]
@@ -47,6 +50,13 @@ def helper_module():
     return module
 
 
+PATCHED_FILES = ("agent/site.py", "agent/database_server.py", "agent/snapshot_recovery.py")
+
+
+def patched_paths():
+    return re.findall(r"^diff --git a/(\S+) b/", patch_text(), flags=re.MULTILINE)
+
+
 def auth(**extra):
     return {"ACCESS_KEY": "fixture-id", "SECRET_KEY": "fixture-secret", **extra}
 
@@ -61,10 +71,17 @@ class AgentPatchFileTest(unittest.TestCase):
         self.assertIn(AGENT_COMMIT, readme)
         self.assertIn(PATCH.name, readme)
 
+    def test_header_names_every_patched_file(self):
+        header = patch_text().split("diff --git", 1)[0]
+        for path in patched_paths():
+            with self.subTest(path=path):
+                self.assertIn(path, header)
+
     def test_every_offsite_client_uses_the_helper(self):
         for path, uses in (
             ("agent/site.py", ("boto3_client_kwargs", "rclone_s3_flags")),
             ("agent/database_server.py", ("boto3_client_kwargs",)),
+            ("agent/snapshot_recovery.py", ("boto3_client_kwargs",)),
         ):
             diff = file_diff(path)
             added = "\n".join(l for l in diff.splitlines() if l.startswith("+"))
@@ -158,12 +175,67 @@ class AgentPatchAppliesTest(unittest.TestCase):
             subprocess.run(["git", "init", "-q", copy], check=True)
             subprocess.run(["git", "-C", copy, "apply", "--check", PATCH], check=True)
             subprocess.run(["git", "-C", copy, "apply", PATCH], check=True)
-            for path in ("agent/site.py", "agent/database_server.py"):
+            for path in PATCHED_FILES:
                 text = (copy / path).read_text(encoding="utf-8")
                 with self.subTest(path=path):
-                    self.assertNotIn('aws_secret_access_key=auth["SECRET_KEY"]', text)
                     compile(text, path, "exec")
+            for path in sorted((copy / "agent").rglob("*.py")):
+                text = path.read_text(encoding="utf-8")
+                with self.subTest(path=str(path.relative_to(copy))):
+                    self.assertNotIn('aws_secret_access_key=auth["SECRET_KEY"]', text)
             self.assertNotIn("amazonaws.com", (copy / "agent/site.py").read_text(encoding="utf-8"))
+            self.snapshot_upload = snapshot_upload_function(copy)
+            self.check_snapshot_upload()
+
+    def check_snapshot_upload(self):
+        for extra, endpoint in (
+            ({"REGION": "fsn1", "ENDPOINT_URL": HETZNER}, HETZNER),
+            ({"REGION": "eu-central-1"}, None),
+            ({}, None),
+        ):
+            with self.subTest(snapshot_auth=sorted(extra)):
+                kwargs, uploads = run_snapshot_upload(self.snapshot_upload, auth(**extra))
+                self.assertEqual(kwargs.get("endpoint_url"), endpoint)
+                self.assertEqual(kwargs.get("region_name"), extra.get("REGION"))
+                self.assertEqual(uploads, [("bucket", "prefix/site.sql.gz")])
+
+
+def snapshot_upload_function(copy):
+    """upload_backup_files_to_s3 from the patched snapshot_recovery.py, without Agent's imports."""
+    path = copy / "agent/snapshot_recovery.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "upload_backup_files_to_s3"
+    )
+    function.decorator_list = []
+    namespace = {"os": os, "offsite_s3": helper_module()}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(path), "exec"), namespace)
+    return namespace["upload_backup_files_to_s3"]
+
+
+def run_snapshot_upload(upload, snapshot_auth):
+    calls, uploads = [], []
+
+    class FakeClient:
+        def upload_fileobj(self, data, bucket, key):
+            uploads.append((bucket, key))
+
+    def client(service, **kwargs):
+        calls.append((service, kwargs))
+        return FakeClient()
+
+    with tempfile.TemporaryDirectory() as folder:
+        backup = Path(folder) / "site.sql.gz"
+        backup.write_bytes(b"fixture")
+        files = {"database": {"file": str(backup), "path": str(backup)}}
+        offsite = {"bucket": "bucket", "auth": snapshot_auth, "path": "prefix"}
+        with mock.patch.dict(sys.modules, {"boto3": types.SimpleNamespace(client=client)}):
+            upload(None, files, offsite)
+    [(service, kwargs)] = calls
+    assert service == "s3"
+    return kwargs, uploads
 
 
 if __name__ == "__main__":
