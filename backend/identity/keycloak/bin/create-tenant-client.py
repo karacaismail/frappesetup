@@ -18,6 +18,7 @@ HTTPS_ORIGIN = re.compile(r"https://[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?(?:
 TENANT_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 SERVICE_CLIENTS = ("identity-sync", "press-service")
 ADMIN_PATH = "/admin/realms/platform"
+LOGOUT_ATTRIBUTE = "post.logout.redirect.uris"
 
 
 def https_origin(value):
@@ -115,7 +116,19 @@ def check_other_bindings(request, scope_name):
             return
 
 
-def ensure_client(request, client):
+def redirect_addresses(representation):
+    """The login callback list and the Keycloak `##`-joined logout return list of a client."""
+    attributes = representation.get("attributes") or {}
+    logout = [address for address in (attributes.get(LOGOUT_ATTRIBUTE) or "").split("##") if address]
+    return {"redirectUris": list(representation.get("redirectUris") or []), LOGOUT_ATTRIBUTE: logout}
+
+
+def ensure_client(request, client, update_redirects=False):
+    """Create a missing client or verify an existing one. Return the redirect addresses added.
+
+    A client made before a return address entered the template lacks that address. The missing
+    addresses are reported and, only with `update_redirects`, appended. Nothing else is written.
+    """
     client_id = client["clientId"]
     existing = find_client(request, client_id)
     if existing is None:
@@ -126,7 +139,6 @@ def ensure_client(request, client):
         "publicClient",
         "clientAuthenticatorType",
         "rootUrl",
-        "redirectUris",
         "standardFlowEnabled",
         "directAccessGrantsEnabled",
         "implicitFlowEnabled",
@@ -158,9 +170,36 @@ def ensure_client(request, client):
     ):
         raise ProvisioningError(f"Client {client_id} has an unexpected default service scope.")
 
+    wanted = redirect_addresses(client)
+    current = redirect_addresses(existing)
+    if any(set(current[key]) - set(wanted[key]) for key in wanted):
+        raise ProvisioningError(f"Existing client {client_id} does not match the requested tenant.")
+    missing = {key: [address for address in wanted[key] if address not in current[key]] for key in wanted}
+    added = [address for addresses in missing.values() for address in addresses]
+    if not added:
+        return []
+    if not update_redirects:
+        raise ProvisioningError(
+            f"Existing client {client_id} is missing redirect addresses: "
+            + ", ".join(added)
+            + ". Run the command again with --update-redirects to add only these addresses."
+        )
+    payload = {key: value for key, value in existing.items() if key != "secret"}
+    payload["redirectUris"] = current["redirectUris"] + missing["redirectUris"]
+    payload["attributes"] = {
+        **(existing.get("attributes") or {}),
+        LOGOUT_ATTRIBUTE: "##".join(current[LOGOUT_ATTRIBUTE] + missing[LOGOUT_ATTRIBUTE]),
+    }
+    request("PUT", f"/clients/{urllib.parse.quote(existing['id'], safe='')}", payload=payload, expected=(204,))
+    return added
 
-def provision_tenant(request, client, scope, service_client):
-    """Create missing resources and add only optional mappings. Never update a tenant client."""
+
+def provision_tenant(request, client, scope, service_client, update_redirects=False):
+    """Create missing resources and add only optional mappings.
+
+    An existing tenant client is updated only for missing redirect addresses and only with
+    `update_redirects`. Return the addresses added.
+    """
     service_paths = []
     for name in SERVICE_CLIENTS:
         service = find_client(request, name)
@@ -168,8 +207,8 @@ def provision_tenant(request, client, scope, service_client):
             raise ProvisioningError(f"Required client {name} is missing.")
         service_paths.append(f"/clients/{urllib.parse.quote(service['id'], safe='')}")
 
-    ensure_client(request, client)
-    ensure_client(request, service_client)
+    added = ensure_client(request, client, update_redirects)
+    added += ensure_client(request, service_client, update_redirects)
 
     scope_name = scope["name"]
     existing_scope = next((item for item in request("GET", "/client-scopes") if item["name"] == scope_name), None)
@@ -210,6 +249,7 @@ def provision_tenant(request, client, scope, service_client):
         optional = request("GET", optional_path)
         if not any(item["id"] == existing_scope["id"] for item in optional):
             request("PUT", f"{optional_path}/{scope_id}", expected=(204,))
+    return added
 
 
 def main():
@@ -218,6 +258,11 @@ def main():
     parser.add_argument("site_url", type=https_origin, help="Tenant site HTTPS origin")
     parser.add_argument("keycloak_url", type=https_origin, help="Keycloak HTTPS origin")
     parser.add_argument("--preview", action="store_true", help="Show the request without creating the client")
+    parser.add_argument(
+        "--update-redirects",
+        action="store_true",
+        help="Add redirect addresses the template has and an existing client lacks. Change nothing else.",
+    )
     args = parser.parse_args()
     if len(args.tenant) > 63 or not TENANT_SLUG.fullmatch(args.tenant):
         parser.error("Use up to 63 lowercase letters, digits, and single hyphens for the tenant slug.")
@@ -262,13 +307,17 @@ def main():
         return 2
 
     try:
-        provision_tenant(make_admin_request(args.keycloak_url, token), client, scope, service_client)
+        added = provision_tenant(
+            make_admin_request(args.keycloak_url, token), client, scope, service_client, args.update_redirects
+        )
     except ProvisioningError as error:
         print(error, file=sys.stderr)
         return 1
     except (OSError, ValueError, KeyError, TypeError):
         print("Keycloak request failed. Check the tenant and scope before retrying.", file=sys.stderr)
         return 1
+    if added:
+        print("Added redirect addresses: " + ", ".join(added))
     print(f"Ready: {client_id}, {service_client['clientId']} and {scope['name']}.")
     return 0
 

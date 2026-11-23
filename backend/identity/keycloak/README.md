@@ -231,5 +231,26 @@ Kurulum yarıda kalırsa aynı komutu yeniden çalıştırın.
 Komut mevcut istemci sırrını korur ve eksik adımları tamamlar.
 Mevcut ayar şablonla çelişirse komut durur. Keycloak yöneticisi çelişen ayarı inceleyebilir.
 
+### Var olan kiracı istemcisine yeni dönüş adresi ekleme
+
+Dönüş adresi, Keycloak'ın tarayıcıyı geri gönderdiği adrestir.
+Şablon zamanla yeni dönüş adresi alabilir. Örneğin “Başka hesapla oturum aç” bağlantısı için çıkış dönüş adresi eklendi.
+Daha önce açılmış kiracı istemcisi bu adresi bilmez. Kullanıcı bu bağlantıya basınca Keycloak hata sayfası gösterir.
+Yerel yığın bu adımı kendisi yapar. Üretimde bu adımı Keycloak yöneticisi yapar.
+
+1. Aynı kiracı için komutu `--preview` olmadan yeniden çalıştırın.
+2. İstemcide eksik dönüş adresi varsa komut durur. Komut eksik adresleri yazar ve `--update-redirects` seçeneğini önerir.
+3. Yazılan adresleri kontrol edin. Adresler kiracı sitesinin adresiyle başlamalıdır.
+4. Komutu `--update-redirects` ile yeniden çalıştırın.
+
+   ```bash
+   bin/create-tenant-client.py acme https://tenant.example.test https://identity.example.test --update-redirects
+   ```
+
+5. Komut “Added redirect addresses” satırında eklenen adresleri yazar.
+
+Bu seçenek yalnız eksik dönüş adreslerini ekler. İstemcinin öteki ayarlarına ve sırrına dokunmaz.
+İstemcide şablonda olmayan bir dönüş adresi varsa komut yine durur. Keycloak yöneticisi bu adresi önce inceler.
+
 Tarayıcı istemcisinin servis hesabı kapalıdır. Servis istemcisinin tarayıcı girişi kapalıdır.
 Eski bir kayıt iki akışı birden açıyorsa komut durur. Yönetici bu kaydı önce ayırmalıdır.

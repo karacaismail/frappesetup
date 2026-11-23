@@ -59,6 +59,11 @@ class FakeKeycloak:
             status, data = 200, {}
         elif method == "GET" and path in ("/default-default-client-scopes", "/default-optional-client-scopes"):
             status, data = 200, []
+        elif method == "PUT" and path.count("/") == 2 and path.startswith("/clients/"):
+            client = path.rsplit("/", 1)[1]
+            stored = self.clients[client]
+            self.clients[client] = {**stored, **body, "id": stored["id"], "secret": stored["secret"]}
+            status, data = 204, None
         elif path.startswith("/clients/"):
             _, _, client, kind, *rest = path.split("/")
             if method == "GET":
@@ -194,6 +199,85 @@ class CreateTenantClientTest(unittest.TestCase):
         posts = [urlsplit(call.full_url).path for call in server.calls if call.get_method() == "POST"]
         self.assertEqual(posts, ["/admin/realms/platform/client-scopes"])
         self.assertEqual(server.optional, {"sync": {"scope"}, "press-service": {"scope"}})
+
+    SWITCH_ADDRESS = "https://tenant.example.test/api/method/platform_core.api.auth.start_login?switch_account=1"
+
+    def provision_client_without_switch_address(self, server):
+        """A tenant client created before the account-switch return address existed."""
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        attributes = server.clients["site-acme"]["attributes"]
+        addresses = attributes["post.logout.redirect.uris"].split("##")
+        self.assertIn(self.SWITCH_ADDRESS, addresses)
+        addresses.remove(self.SWITCH_ADDRESS)
+        attributes["post.logout.redirect.uris"] = "##".join(addresses)
+        server.calls.clear()
+        return dict(server.clients["site-acme"])
+
+    def test_missing_logout_address_is_reported_without_changing_the_client(self):
+        server = FakeKeycloak()
+        before = self.provision_client_without_switch_address(server)
+
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 1)
+        report = str(output.call_args_list)
+        self.assertIn("missing", report)
+        self.assertIn(self.SWITCH_ADDRESS, report)
+        self.assertIn("--update-redirects", report)
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_update_redirects_adds_only_the_missing_address(self):
+        server = FakeKeycloak()
+        before = self.provision_client_without_switch_address(server)
+        expected_logout = before["attributes"]["post.logout.redirect.uris"] + "##" + self.SWITCH_ADDRESS
+
+        code, _, output, _ = self.run_command([*ARGS, "--update-redirects"], server=server)
+        self.assertEqual(code, 0)
+        after = server.clients["site-acme"]
+        self.assertEqual(after["attributes"]["post.logout.redirect.uris"], expected_logout)
+        self.assertEqual(after["secret"], before["secret"])
+        self.assertNotIn(before["secret"], str(output.call_args_list))
+        untouched = lambda client: {**client, "attributes": {**client["attributes"], "post.logout.redirect.uris": None}}
+        self.assertEqual(untouched(after), untouched(before))
+        writes = [(call.get_method(), urlsplit(call.full_url).path) for call in server.calls if call.get_method() != "GET"]
+        self.assertEqual(writes, [("PUT", "/admin/realms/platform/clients/site-acme")])
+        self.assertNotIn("secret", json.loads(next(call.data for call in server.calls if call.get_method() == "PUT")))
+        self.assertIn(self.SWITCH_ADDRESS, str(output.call_args_list))
+
+    def test_update_redirects_adds_a_missing_login_callback_too(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        (callback,) = server.clients["site-acme"]["redirectUris"]
+        server.clients["site-acme"]["redirectUris"] = []
+        server.calls.clear()
+
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertEqual(server.clients["site-acme"]["redirectUris"], [])
+        self.assertEqual(self.run_command([*ARGS, "--update-redirects"], server=server)[0], 0)
+        self.assertEqual(server.clients["site-acme"]["redirectUris"], [callback])
+
+    def test_update_redirects_refuses_an_address_outside_the_template(self):
+        server = FakeKeycloak()
+        before = self.provision_client_without_switch_address(server)
+        attributes = server.clients["site-acme"]["attributes"]
+        attributes["post.logout.redirect.uris"] += "##https://other.example.test/panel"
+        before = dict(server.clients["site-acme"])
+
+        code, _, output, _ = self.run_command([*ARGS, "--update-redirects"], server=server)
+        self.assertEqual(code, 1)
+        self.assertIn("does not match the requested tenant", str(output.call_args_list))
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_update_redirects_without_a_missing_address_writes_nothing(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        before = dict(server.clients["site-acme"])
+        server.calls.clear()
+
+        self.assertEqual(self.run_command([*ARGS, "--update-redirects"], server=server)[0], 0)
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
 
     def test_rejects_a_conflicting_default_binding_before_writing_optional_bindings(self):
         server = FakeKeycloak()
