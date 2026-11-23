@@ -105,7 +105,10 @@ pipeline {
                             env.RELEASE_ID = sh(returnStdout: true,
                                 script: 'python3 -I backend/deploy/release.py field release/release.json release_id').trim()
                         }
-                        archiveArtifacts artifacts: 'release/release.json', fingerprint: true
+                        // The release carries the compose files and server scripts of its own commit;
+                        // a promotion to rc or prod sends exactly this copy (docs/dagitim/ortamlar.md).
+                        sh 'python3 -I backend/deploy/release.py pack-deploy --commit "$DEPLOY_COMMIT" release'
+                        archiveArtifacts artifacts: 'release/**', fingerprint: true
                         stash name: 'release', includes: 'release/**'
                     }
                     post {

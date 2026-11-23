@@ -42,3 +42,5 @@ shellcheck -x -P backend/deploy/bin:backend/deploy/remote backend/deploy/bin/* b
 - Her ortam kendi SSH anahtarını ve kendi sunucu kullanıcısını kullanır. Kullanıcı `deploy-<ortam>` adını taşır.
 - Uzak komutu `bin/lib.sh` içindeki `remote` işleviyle çalıştırın. İşlev her sözcüğü tırnaklar.
 - Otomatik geri dönüşe başarısız paketin kimliğini verin: `--failed <paket kimliği>`. Sağlıklı paket geri alınmaz.
+- Paket kendi commit'inin dağıtım dosyalarını taşır. Derleme işi `release.py pack-deploy` komutunu çalıştırır. `bin/deploy` sunucuya yalnız bu kopyayı gönderir.
+- Yarım kalan taşımada aynı paketi yeniden taşımayın. Taşımayı elle bitirin ve `resume` eylemini kullanın. Ya da `rollback-restore` seçin.

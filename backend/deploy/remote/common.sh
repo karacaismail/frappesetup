@@ -7,7 +7,9 @@
 #   /srv/atonota/<env>/backend-pending  relative link to the release being applied (until it is current)
 #   /srv/atonota/<env>/backend-failed   relative link to the last release that was rolled back
 #   /srv/atonota/<env>/incoming/<id>/   files that Jenkins sent for one release
+#   /srv/atonota/<env>/bin/             scripts of the last applied backend release
 #   /srv/atonota/web/<env>/releases/<id>/ and current, previous, failed: web releases
+#   /srv/atonota/web/<env>/bin/         scripts of the last applied web release
 #   /srv/atonota/<env>/backups/<time>/  backups taken before each backend release
 #   /srv/atonota/<env>/health/<kind>.json health record written by the Jenkins health step
 #   /etc/atonota/<env>/*.env            secrets, mode 0600, created by the DevOps owner
@@ -63,7 +65,26 @@ print(d)' "$@"
 
 # phase <release folder> <name>: how far a backend release got. rollback reads the folder copy.
 # Names in order: preparing, pulling, stopping, backing-up, migrating, migrated, starting, done.
+# rollback ends a release with "abandoned" or "rolled-back"; after those and "done" it may start
+# again. Between stopping and starting the phase never goes back: a lower name would hide that
+# the old release is stopped or that the database may be half migrated (review 2, finding E3).
+phase_rank() {
+    case "$1" in
+    preparing) printf 0 ;; pulling) printf 1 ;; stopping) printf 2 ;; backing-up) printf 3 ;;
+    migrating) printf 4 ;; migrated) printf 5 ;; starting) printf 6 ;; done) printf 7 ;;
+    *) printf -- -1 ;;
+    esac
+}
+
 phase() {
+    local old
+    old="$(cat "$1/phase" 2>/dev/null || true)"
+    case "$old" in
+    stopping | backing-up | migrating | migrated | starting)
+        (($(phase_rank "$2") >= $(phase_rank "$old"))) ||
+            fail "phase of $(basename "$1") would go back from $old to $2"
+        ;;
+    esac
     printf '%s\n' "$2" >"$1/phase"
     printf '%s %s\n' "$2" "$(basename "$1")" >"$ATONOTA_ROOT/$ATONOTA_ENV/phase"
 }

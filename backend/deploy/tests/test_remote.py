@@ -71,6 +71,8 @@ class RemoteScripts(unittest.TestCase):
 
     def incoming(self, env, manifest, bundle=None, drop=()):
         folder = self.folder / f"incoming-{env}-{manifest['release_id']}"
+        # Jenkins sends the files again on every attempt.
+        shutil.rmtree(folder, ignore_errors=True)
         folder.mkdir()
         (folder / "release.json").write_text(json.dumps(manifest))
         shutil.copy(DEPLOY / "environments" / f"{env}.env", folder)
@@ -85,24 +87,24 @@ class RemoteScripts(unittest.TestCase):
             (folder / name).unlink()
         return folder
 
-    def apply(self, env, manifest, bundle=None, drop=(), **extra):
-        folder = self.incoming(env, manifest, bundle, drop)
+    def run_script(self, path, *arguments, **extra):
         return subprocess.run(
-            [str(folder / "apply"), env, str(folder)],
+            [str(path), *arguments],
             env={**self.environment, **extra},
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
         )
 
+    def apply(self, env, manifest, bundle=None, drop=(), **extra):
+        folder = self.incoming(env, manifest, bundle, drop)
+        return self.run_script(folder / "apply", env, str(folder), **extra)
+
     def run_remote(self, env, script, *arguments, **extra):
-        return subprocess.run(
-            [str(self.root / env / "bin" / script), env, *arguments],
-            env={**self.environment, **extra},
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-        )
+        # Server copies: backend scripts in <env>/bin, web scripts in web/<env>/bin.
+        kind = arguments[0] if arguments else ""
+        scripts = self.root / "web" / env / "bin" if kind.startswith("web") else self.root / env / "bin"
+        return self.run_script(scripts / script, env, *arguments, **extra)
 
     def backend(self, number, env="alpha"):
         components = {
@@ -175,6 +177,18 @@ class RemoteScripts(unittest.TestCase):
 
     def release_id(self, number):
         return f"backend-{commit(number)[:12]}-b{number}"
+
+    def test_first_install_starts_again_after_the_site_was_created(self):
+        # First install stops at "site does not exist"; the person creates the site and runs the
+        # same command again. No release runs yet, so there is nothing to protect.
+        first = self.apply("alpha", self.backend(1), ATONOTA_FIRST_INSTALL="1", FAKE_FAIL="list-apps")
+        self.assertNotEqual(first.returncode, 0)
+        self.assertIn("does not exist", first.stderr)
+        # The first install steps also remove backend-pending before the second run.
+        (self.root / "alpha" / "backend-pending").unlink()
+        again = self.apply("alpha", self.backend(1), ATONOTA_FIRST_INSTALL="1")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(1))
 
     def test_next_release_stops_writers_before_the_backup(self):
         # Writes between the backup and the stop were lost on restore (review 1, finding 3).
@@ -332,6 +346,103 @@ class RemoteScripts(unittest.TestCase):
         self.assertNotEqual(again.returncode, 0)
         self.assertEqual(self.link("alpha", "backend-current"), self.release_link(1))
 
+    def resume(self, env, **extra):
+        return self.run_script(self.root / env / "backend-pending" / "bin" / "apply", env, "--resume", **extra)
+
+    def folder_phase(self, env, number):
+        return (self.root / env / "releases" / self.release_id(number) / "phase").read_text().strip()
+
+    def test_same_release_again_after_a_failed_migration_waits_for_a_person(self):
+        # A retry rewrote "migrating" to "preparing"; rollback then opened the old release on a
+        # half migrated database (review 2, finding E3). The stopped tenant-web fails "exec".
+        self.first_install("beta")
+        self.apply("beta", self.backend(2, "beta"), FAKE_FAIL=" migrate")
+        self.log.unlink()
+        again = self.apply("beta", self.backend(2, "beta"), FAKE_FAIL="set-maintenance-mode on")
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("person", again.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.folder_phase("beta", 2), "migrating")
+        rolled = self.run_remote("beta", "rollback", "backend", "--failed", self.release_id(2))
+        self.assertNotEqual(rolled.returncode, 0)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.link("beta", "backend-pending"), self.release_link(2))
+
+    def test_failed_retry_never_frees_the_next_release(self):
+        # A retry that failed while pulling let rollback drop the pending link (finding E3).
+        self.first_install("beta")
+        self.apply("beta", self.backend(2, "beta"), FAKE_FAIL=" migrate")
+        self.apply("beta", self.backend(2, "beta"), FAKE_FAIL=" pull --quiet")
+        self.run_remote("beta", "rollback", "backend", "--failed", self.release_id(2))
+        self.assertEqual(self.link("beta", "backend-pending"), self.release_link(2))
+        self.assertEqual(self.folder_phase("beta", 2), "migrating")
+        self.log.unlink()
+        third = self.apply("beta", self.backend(3, "beta"))
+        self.assertNotEqual(third.returncode, 0)
+        self.assertIn("pending", third.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_retry_after_a_pull_failure_runs_again(self):
+        # Before "stopping" the old release runs untouched, so the same release may start again.
+        self.first_install()
+        self.apply("alpha", self.backend(2), FAKE_FAIL=" pull --quiet")
+        result = self.apply("alpha", self.backend(2))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(2))
+
+    def test_resume_migrates_again_and_starts_the_pending_release(self):
+        # The way out after a person finished or fixed the migration (finding E3).
+        self.first_install()
+        self.apply("alpha", self.backend(2), FAKE_FAIL=" migrate")
+        backup = (self.root / "alpha" / "releases" / self.release_id(2) / "backup-before").read_text()
+        self.log.unlink()
+        result = self.resume("alpha")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        self.assertFalse(any(" stop " in line or "backup" in line or " pull" in line for line in calls), calls)
+        self.assertFalse(any("set-maintenance-mode on" in line for line in calls), calls)
+        migrate = self.index("bench --site demo.app.alpha.atonota.net migrate")
+        self.assertIn(self.release_id(2), calls[migrate])
+        start = self.index("--wait-timeout 600 --remove-orphans")
+        self.assertLess(migrate, start)
+        self.assertLess(start, self.index("set-maintenance-mode off"))
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(2))
+        self.assertEqual(self.link("alpha", "backend-previous"), self.release_link(1))
+        self.assertFalse((self.root / "alpha" / "backend-pending").is_symlink())
+        kept = (self.root / "alpha" / "releases" / self.release_id(2) / "backup-before").read_text()
+        self.assertEqual(kept, backup)
+
+    def test_resume_after_a_failed_start_skips_the_migration(self):
+        self.first_install()
+        self.apply("alpha", self.backend(2), FAKE_FAIL="--wait-timeout 600 --remove-orphans")
+        self.log.unlink()
+        result = self.resume("alpha")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(" migrate" in line for line in self.calls()), self.calls())
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(2))
+
+    def test_resume_refuses_a_release_that_stopped_before_its_backup(self):
+        # Without a backup the migration must not start; rollback starts the old release instead.
+        self.first_install()
+        self.apply("alpha", self.backend(2), FAKE_FAIL="backup --with-files")
+        self.log.unlink()
+        result = self.resume("alpha")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("rollback", result.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.folder_phase("alpha", 2), "backing-up")
+
+    def test_rolled_back_release_can_be_applied_again(self):
+        # After a restore the database matches the backup, so a new attempt starts from the top.
+        self.first_install()
+        self.apply("alpha", self.backend(2), FAKE_FAIL=" migrate")
+        rolled = self.run_remote("alpha", "rollback", "backend", "--failed", self.release_id(2), "--restore-backup")
+        self.assertEqual(rolled.returncode, 0, rolled.stderr)
+        self.assertEqual(self.folder_phase("alpha", 2), "rolled-back")
+        result = self.apply("alpha", self.backend(2))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.link("alpha", "backend-current"), self.release_link(2))
+
     def test_new_release_waits_while_another_one_is_pending(self):
         self.first_install("beta")
         self.apply("beta", self.backend(2, "beta"), FAKE_FAIL=" migrate")
@@ -399,6 +510,17 @@ class RemoteScripts(unittest.TestCase):
         self.assertEqual(rolled.returncode, 0, rolled.stderr)
         self.assertEqual(os.readlink(web / "current"), f"releases/{first['release_id']}")
         self.assertEqual(self.calls(), [])
+
+    def test_web_release_keeps_the_backend_scripts_of_the_server(self):
+        # Scripts come from each release's own commit (Ö8). An older web release must not put its
+        # older rollback where the backend rollback runs from.
+        self.first_install()
+        backend_rollback = self.root / "alpha" / "bin" / "rollback"
+        backend_rollback.write_text(backend_rollback.read_text() + "# backend copy\n")
+        manifest, bundle = self.web(1)
+        self.assertEqual(self.apply("alpha", manifest, bundle).returncode, 0)
+        self.assertTrue(backend_rollback.read_text().endswith("# backend copy\n"))
+        self.assertTrue((self.root / "web" / "alpha" / "bin" / "rollback").is_file())
 
     def test_web_release_with_a_wrong_checksum_is_refused(self):
         manifest, (name, _) = self.web(1)

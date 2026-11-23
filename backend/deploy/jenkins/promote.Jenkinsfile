@@ -1,8 +1,8 @@
-// Manual promotion and rollback of any release kind. Design: backend/docs/dagitim/ortamlar.md.
+// Manual promotion, rollback and resume of any release kind. Design: backend/docs/dagitim/ortamlar.md.
 //
 // Two Jenkins jobs run this file, each in its own folder with its own keys:
-//   atonota-delivery/atonota-promote  keys alpha and beta: promote to beta, roll back alpha or beta
-//   atonota-release/atonota-promote   keys beta, rc and prod: promote to rc or prod, roll back rc or prod
+//   atonota-delivery/atonota-promote  keys alpha and beta: promote to beta, roll back or resume alpha or beta
+//   atonota-release/atonota-promote   keys beta, rc and prod: promote to rc or prod, roll back or resume rc or prod
 // A request for an environment whose key the folder does not hold fails at its first ssh step.
 // Jenkins setup (DevOps owner): Pipeline job, SCM karacaismail/frappesetup branch */main,
 // script path backend/deploy/jenkins/promote.Jenkinsfile, no trigger.
@@ -10,7 +10,13 @@
 // Promotion moves the release that is current and healthy in the previous environment. The server
 // only names that release: the files deployed are the copy that Jenkins archived when it built the
 // release, and the server copy must be identical to it. The check runs again after the approval,
-// because the source environment may change while the request waits.
+// because the source environment may change while the request waits. The archived copy also holds
+// the compose files and server scripts of the release commit (release.py pack-deploy), so this
+// job's own checkout gives only the Jenkins side scripts and the connection settings.
+//
+// resume: a backend release stopped while migrating and a person finished the migration by hand.
+// The server runs the apply script of that pending release (remote/apply --resume), then the
+// health check runs as after a promotion.
 
 @groovy.transform.Field
 final Map SOURCES = [beta: 'alpha', rc: 'beta', prod: 'rc']
@@ -47,10 +53,10 @@ pipeline {
         disableConcurrentBuilds()
     }
     parameters {
-        choice(name: 'ACTION', choices: ['promote', 'rollback', 'rollback-restore'],
-            description: 'promote: move the previous environment\'s current release. rollback: previous images or web files. rollback-restore: also restore the backup taken before the undone backend release.')
+        choice(name: 'ACTION', choices: ['promote', 'rollback', 'rollback-restore', 'resume'],
+            description: 'promote: move the previous environment\'s current release. rollback: previous images or web files. rollback-restore: also restore the backup taken before the undone backend release. resume: start the pending backend release after its migration was finished by hand.')
         choice(name: 'KIND', choices: ['backend', 'web'], description: 'Which release line.')
-        choice(name: 'ENVIRONMENT', choices: ['beta', 'rc', 'prod', 'alpha'], description: 'Target environment. alpha accepts rollback only.')
+        choice(name: 'ENVIRONMENT', choices: ['beta', 'rc', 'prod', 'alpha'], description: 'Target environment. alpha accepts rollback and resume only.')
     }
     stages {
         stage('Check request') {
@@ -60,8 +66,8 @@ pipeline {
                     if (params.ACTION == 'promote' && params.ENVIRONMENT == 'alpha') {
                         error('alpha is filled from main only.')
                     }
-                    if (params.ACTION == 'rollback-restore' && params.KIND != 'backend') {
-                        error('rollback-restore applies to backend releases only.')
+                    if (['rollback-restore', 'resume'].contains(params.ACTION) && params.KIND != 'backend') {
+                        error("${params.ACTION} applies to backend releases only.")
                     }
                     env.APPROVERS = params.ENVIRONMENT == 'prod' ? 'atonota-release-managers' : 'atonota-deployers'
                     checkout scm
@@ -135,7 +141,7 @@ pipeline {
             }
             input {
                 message "${params.ACTION} ${params.KIND} in ${params.ENVIRONMENT}?"
-                ok 'Roll back'
+                ok 'Run'
                 submitter "${env.APPROVERS}"
             }
             steps {
@@ -143,13 +149,45 @@ pipeline {
             }
         }
         stage('Roll back') {
-            when { expression { params.ACTION != 'promote' } }
+            when { expression { ['rollback', 'rollback-restore'].contains(params.ACTION) } }
             agent { label 'atonota-build' }
             steps {
                 useStash()
                 lock(resource: "atonota-${params.ENVIRONMENT}") {
                     sshagent(credentials: ["atonota-deploy-ssh-${params.ENVIRONMENT}"]) {
                         sh "backend/deploy/bin/rollback ${params.ENVIRONMENT} ${params.KIND}${params.ACTION == 'rollback-restore' ? ' --restore-backup' : ''}"
+                    }
+                }
+            }
+        }
+        stage('Resume') {
+            when { expression { params.ACTION == 'resume' } }
+            agent { label 'atonota-build' }
+            steps {
+                useStash()
+                lock(resource: "atonota-${params.ENVIRONMENT}") {
+                    script {
+                        sshagent(credentials: ["atonota-deploy-ssh-${params.ENVIRONMENT}"]) {
+                            sh "rm -rf resumed && backend/deploy/bin/resume ${params.ENVIRONMENT} resumed"
+                            env.RELEASE_ID = sh(returnStdout: true,
+                                script: 'python3 -I backend/deploy/release.py field resumed/release.json release_id').trim()
+                            env.DEPLOYING = params.ENVIRONMENT
+                            sh "backend/deploy/bin/health ${params.ENVIRONMENT} resumed"
+                        }
+                        env.DEPLOYING = ''
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        // A failed resume leaves the release pending for a person. Only a failed
+                        // health check after it rolls back, as after a promotion.
+                        if (env.DEPLOYING == params.ENVIRONMENT) {
+                            sshagent(credentials: ["atonota-deploy-ssh-${params.ENVIRONMENT}"]) {
+                                sh "backend/deploy/bin/rollback ${params.ENVIRONMENT} backend --failed ${env.RELEASE_ID}"
+                            }
+                        }
                     }
                 }
             }

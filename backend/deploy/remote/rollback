@@ -15,7 +15,8 @@
 #   preparing, pulling    the old release still runs untouched: nothing to do
 #   stopping, backing-up  the database is unchanged: start the old release, end maintenance mode
 #   migrating             the database may be half migrated: without --restore-backup the
-#                         environment stays in maintenance mode and a person decides
+#                         environment stays in maintenance mode and a person decides; after a
+#                         migration finished by hand, "apply <env> --resume" goes on (remote/apply)
 #   migrated, starting    migrations follow the expand and contract rule (docs/dagitim/ortamlar.md),
 #                         so the old release runs on the new schema
 # The undone release is written to the "failed" link and never becomes "previous", so a second
@@ -101,6 +102,7 @@ if [[ "$undo" == pending ]]; then
     case "$reached" in
     preparing | pulling)
         rm -f "$base/backend-pending"
+        printf 'abandoned\n' >"$failed/phase"
         printf 'abandoned %s\n' "$pending_id" >"$base/phase"
         nothing "release $pending_id stopped in phase $reached, before it changed the running release"
         ;;
@@ -111,7 +113,7 @@ if [[ "$undo" == pending ]]; then
     migrating)
         [[ "$restore" == 1 ]] || fail "release $pending_id stopped while migrating. $env stays in" \
             "maintenance mode; a person decides: restore the backup with rollback-restore, or" \
-            "finish the migration by hand (docs/dagitim/ortamlar.md)"
+            "finish the migration by hand and resume (docs/dagitim/ortamlar.md)"
         ;;
     migrated | starting) ;;
     *) fail "release $pending_id is in an unknown phase: $reached" ;;
@@ -152,5 +154,6 @@ if [[ "$undo" == current ]]; then
     rm -f "$base/backend-previous"
 fi
 rm -f "$base/backend-pending" "$base/health/backend.json"
+printf 'rolled-back\n' >"$failed/phase"
 printf 'rolled-back %s\n' "$(basename "$failed")" >"$base/phase"
 say "backend of $env is back on $(basename "$target")"

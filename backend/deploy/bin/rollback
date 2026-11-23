@@ -30,4 +30,4 @@ while (($#)); do
     *) fail "$usage" ;;
     esac
 done
-remote "/srv/atonota/$env/bin/rollback" "$env" "$kind" ${options[@]+"${options[@]}"}
+remote "$(server_bin "$env" "$kind")/rollback" "$env" "$kind" ${options[@]+"${options[@]}"}

@@ -3149,16 +3149,7 @@
     "rule": "B603",
     "file": "backend/deploy/tests/test_remote.py",
     "code": "return subprocess.run(",
-    "statementSha256": "b50985a0ced19839ffbff12b5286fb22ed54fcd5ead5c90062c9fe4442a9507e",
-    "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
-    "owner": "canli-dagitim",
-    "ignoreUntil": "2027-02-23"
-  },
-  {
-    "rule": "B603",
-    "file": "backend/deploy/tests/test_remote.py",
-    "code": "return subprocess.run(",
-    "statementSha256": "df314478acad96f883690c790ea650665176bd22f173b8139f6607257b40371a",
+    "statementSha256": "8235bab1df48705a979ff35b7814a546725aa24b2da7e8655b749d2c84fe6bd9",
     "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
     "owner": "canli-dagitim",
     "ignoreUntil": "2027-02-23"
@@ -3185,8 +3176,8 @@
     "rule": "B603",
     "file": "backend/deploy/tests/test_jenkins_side.py",
     "code": "return subprocess.run(",
-    "statementSha256": "9780325323ab1bff92e2b9c38f82f0a20e032c05dcce90bedd617728237b1d9a",
-    "reason": "Test runs the repository's own deploy script with a fake ssh and fixed arguments, no shell.",
+    "statementSha256": "b8f1b7ccd56d5dfd4fc1840d07a159aa4b003f63f0e8e11fa78ca85623ef3c36",
+    "reason": "Test runs the repository's own deploy scripts and release.py with a fake ssh and fixed arguments, no shell.",
     "owner": "canli-dagitim",
     "ignoreUntil": "2027-02-23"
   }

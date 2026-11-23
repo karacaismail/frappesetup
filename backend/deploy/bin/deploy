@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Send one release to one environment and apply it there.
 # Usage: deploy <env> <release folder>
-# The release folder holds release.json (and the web bundle for a web release).
+# The release folder holds release.json, deploy/ (release.py pack-deploy) and, for a web
+# release, the bundle.
 set -euo pipefail
 # shellcheck source=lib.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
@@ -15,15 +16,20 @@ kind="$(release_py field "$manifest" kind)"
 id="$(release_py field "$manifest" release_id)"
 check_release_id "$id"
 
-files=("$manifest" "$DEPLOY_DIR/environments/$env.env")
+# Everything sent to the server comes from the release folder: the manifest and the deploy files
+# that the build job packed from the release commit (release.py pack-deploy). Only the connection
+# settings above come from this checkout (review 2, finding Ö8).
+release_py check-deploy "$folder" || fail "deploy files of the release are not valid"
+packed="$folder/deploy"
+files=("$manifest" "$packed/environments/$env.env")
 if [[ "$kind" == web ]]; then
     bundle="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["components"]["panel"]["file"])' "$manifest")"
     files+=("$folder/$bundle")
 else
-    files+=("$DEPLOY_DIR/compose/stack.yaml" "$DEPLOY_DIR/compose/edge.yaml"
-        "$DEPLOY_DIR/compose/Caddyfile" "$DEPLOY_DIR/compose/site.caddy.template")
+    files+=("$packed/compose/stack.yaml" "$packed/compose/edge.yaml"
+        "$packed/compose/Caddyfile" "$packed/compose/site.caddy.template")
 fi
-files+=("$DEPLOY_DIR"/remote/*)
+files+=("$packed"/remote/*)
 
 # Each environment has its own incoming folder, owned by its own server user.
 incoming="/srv/atonota/$env/incoming/$id"

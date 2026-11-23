@@ -49,6 +49,16 @@ copy_from_remote() {
     scp -q "${ssh_options[@]}" -- "$ATONOTA_SSH_USER@$ATONOTA_SSH_HOST:$source" "$destination"
 }
 
+# Server copies of the remote scripts: each kind keeps the scripts of its last applied release.
+server_bin() {
+    local env="$1" kind="$2"
+    case "$kind" in
+    backend) printf '/srv/atonota/%s/bin' "$env" ;;
+    web | web-asset) printf '/srv/atonota/web/%s/bin' "$env" ;;
+    *) fail "unknown kind: $kind" ;;
+    esac
+}
+
 # A release id goes into server paths; release.py checks it too. This is the second fence.
 check_release_id() {
     [[ "$1" =~ ^(backend|web)-[0-9a-f]{12}-b[1-9][0-9]*$ ]] || fail "bad release id: $1"

@@ -68,7 +68,10 @@ pipeline {
             stages {
                 stage('Checkout') {
                     steps {
-                        checkout scm
+                        script {
+                            def scmVars = checkout scm
+                            env.DEPLOY_COMMIT = scmVars.GIT_COMMIT
+                        }
                         stash name: 'deploy', includes: 'backend/deploy/**'
                         dir('web') {
                             git url: 'https://github.com/karacaismail/atonota-web.git', branch: 'main'
@@ -112,6 +115,9 @@ pipeline {
                     when { environment name: 'WEB_UNCHANGED', value: 'false' }
                     steps {
                         sh 'rm -rf release && backend/deploy/bin/build-web web release'
+                        // The release carries the server scripts of this checkout; a promotion
+                        // sends exactly this copy (docs/dagitim/ortamlar.md).
+                        sh 'python3 -I backend/deploy/release.py pack-deploy --commit "$DEPLOY_COMMIT" release'
                         script {
                             env.RELEASE_ID = sh(returnStdout: true,
                                 script: 'python3 -I backend/deploy/release.py field release/release.json release_id').trim()

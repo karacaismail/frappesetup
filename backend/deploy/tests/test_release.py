@@ -245,5 +245,44 @@ class CommandLine(unittest.TestCase):
             self.assertEqual(printed.stdout.strip(), f"backend-{COMMIT[:12]}-b7")
 
 
+class DeployFiles(unittest.TestCase):
+    """The release carries the compose files and scripts of its own commit (review 2, Ö8)."""
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, self.folder)
+        release.write_json(backend_manifest(), self.folder / "release.json")
+
+    def test_pack_then_check_passes(self):
+        release.pack_deploy(DEPLOY, self.folder, COMMIT)
+        listed = release.read_json(self.folder / "deploy" / "files.json")["files"]
+        for name in ("compose/stack.yaml", "compose/Caddyfile", "remote/apply", "environments/prod.env"):
+            self.assertIn(name, listed)
+        self.assertFalse(any(name.startswith("tests/") for name in listed))
+        self.assertTrue((self.folder / "deploy" / "remote" / "apply").stat().st_mode & 0o100)
+        release.check_deploy(self.folder)
+
+    def test_extra_file_is_refused(self):
+        release.pack_deploy(DEPLOY, self.folder, COMMIT)
+        (self.folder / "deploy" / "remote" / "extra").write_text("echo\n")
+        with self.assertRaisesRegex(release.ReleaseError, "extra"):
+            release.check_deploy(self.folder)
+
+    def test_missing_file_is_refused(self):
+        release.pack_deploy(DEPLOY, self.folder, COMMIT)
+        (self.folder / "deploy" / "compose" / "edge.yaml").unlink()
+        with self.assertRaisesRegex(release.ReleaseError, "edge.yaml"):
+            release.check_deploy(self.folder)
+
+    def test_list_without_a_needed_file_is_refused(self):
+        release.pack_deploy(DEPLOY, self.folder, COMMIT)
+        listing = release.read_json(self.folder / "deploy" / "files.json")
+        del listing["files"]["remote/rollback"]
+        (self.folder / "deploy" / "remote" / "rollback").unlink()
+        release.write_json(listing, self.folder / "deploy" / "files.json")
+        with self.assertRaisesRegex(release.ReleaseError, "remote/rollback"):
+            release.check_deploy(self.folder)
+
+
 if __name__ == "__main__":
     unittest.main()

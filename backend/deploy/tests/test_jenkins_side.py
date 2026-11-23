@@ -54,14 +54,26 @@ class DeployScript(unittest.TestCase):
         self.release = self.folder / "release"
         self.release.mkdir()
 
-    def deploy(self, data, env="alpha"):
-        (self.release / "release.json").write_text(json.dumps(data))
+    def run_command(self, *command):
         return subprocess.run(
-            [str(DEPLOY / "bin" / "deploy"), env, str(self.release)],
+            [str(part) for part in command],
             env=self.environment,
             capture_output=True,
             text=True,
         )
+
+    def pack(self, data, source=DEPLOY):
+        (self.release / "release.json").write_text(json.dumps(data))
+        shutil.rmtree(self.release / "deploy", ignore_errors=True)
+        return self.run_command(sys.executable, "-I", DEPLOY / "release.py", "pack-deploy", "--from", source,
+                        "--commit", data["commit"], self.release)
+
+    def deploy(self, data, env="alpha", pack=True):
+        if pack:
+            packed = self.pack(data)
+            self.assertEqual(packed.returncode, 0, packed.stderr)
+        (self.release / "release.json").write_text(json.dumps(data))
+        return self.run_command(DEPLOY / "bin" / "deploy", env, self.release)
 
     def calls(self):
         if not self.log.exists():
@@ -95,6 +107,59 @@ class DeployScript(unittest.TestCase):
         result = self.deploy(data, "beta")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls(), [])
+
+    def sent_files(self):
+        return [Path(name) for call in self.calls() if call[0] == "scp" for name in call[1:-1]
+                if not name.startswith("-") and name not in ("BatchMode=yes", "StrictHostKeyChecking=yes")]
+
+    def test_files_sent_to_the_server_come_from_the_release(self):
+        # rc and prod got the compose files of the newest main, not of the release (review 2, Ö8).
+        source = self.folder / "deploy-at-release-commit"
+        shutil.copytree(DEPLOY, source, ignore=shutil.ignore_patterns("__pycache__", "tests"))
+        (source / "compose" / "stack.yaml").write_text("# stack.yaml of the release commit\n")
+        packed = self.pack(manifest(), source)
+        self.assertEqual(packed.returncode, 0, packed.stderr)
+        result = self.deploy(manifest(), "beta", pack=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sent = self.sent_files()
+        self.assertIn(self.release / "deploy" / "compose" / "stack.yaml", sent)
+        self.assertIn(self.release / "deploy" / "remote" / "apply", sent)
+        self.assertIn(self.release / "deploy" / "environments" / "beta.env", sent)
+        for name in sent:
+            self.assertTrue(str(name).startswith(str(self.release)), name)
+        stack = (self.release / "deploy" / "compose" / "stack.yaml").read_text()
+        self.assertEqual(stack, "# stack.yaml of the release commit\n")
+
+    def test_release_without_its_deploy_files_stops_before_any_connection(self):
+        result = self.deploy(manifest(), pack=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("deploy files", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_changed_deploy_file_stops_before_any_connection(self):
+        self.assertEqual(self.pack(manifest()).returncode, 0)
+        with open(self.release / "deploy" / "compose" / "stack.yaml", "a") as handle:
+            handle.write("# changed after the build\n")
+        result = self.deploy(manifest(), pack=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stack.yaml", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_backend_deploy_files_must_come_from_the_release_commit(self):
+        other = "f" * 40
+        self.assertEqual(self.pack(manifest(commit=other, release_id=release.release_id("backend", other, 7))).returncode, 0)
+        result = self.deploy(manifest(), pack=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_resume_runs_the_apply_script_of_the_pending_release(self):
+        result = self.run_command(DEPLOY / "bin" / "resume", "beta", self.folder / "out")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = [shlex.split(call[-1]) for call in self.calls() if call[0] == "ssh"]
+        self.assertEqual(commands[0], ["/srv/atonota/beta/backend-pending/bin/apply", "beta", "--resume"])
+        copies = [call for call in self.calls() if call[0] == "scp"]
+        self.assertEqual(copies[-1][-2], "deploy-beta@atonota-nonprod:/srv/atonota/beta/backend-current/release.json")
 
 
 def jenkinsfile(name):
@@ -158,14 +223,34 @@ class Jenkinsfiles(unittest.TestCase):
         for name in self.AUTOMATIC:
             self.assertIn("copyArtifactPermission(", jenkinsfile(name), name)
 
+    def test_build_jobs_archive_the_deploy_files_with_the_release(self):
+        # The promotion job deploys the archive, so the archive holds the compose files (Ö8).
+        for name in self.AUTOMATIC:
+            text = jenkinsfile(name)
+            self.assertIn("release.py pack-deploy", text, name)
+            self.assertIn("archiveArtifacts artifacts: 'release/**'", text, name)
+            self.assertLess(text.index("pack-deploy"), text.index("archiveArtifacts"), name)
+        backend = jenkinsfile("backend.Jenkinsfile")
+        self.assertIn("--commit \"$DEPLOY_COMMIT\"", backend)
+
+    def test_promotion_deploys_the_archive_and_offers_resume(self):
+        text = jenkinsfile("promote.Jenkinsfile")
+        self.assertIn("bin/deploy ${params.ENVIRONMENT} archive/release", text)
+        self.assertNotRegex(text, r"bin/deploy \$\{params.ENVIRONMENT\} (?!archive/release)")
+        self.assertIn("'resume'", text)
+        self.assertIn("bin/resume", text)
+
 
 class EdgeHeaders(unittest.TestCase):
     def test_every_host_refuses_framing_by_other_sites(self):
         # Static panel files and Keycloak got only three headers from the edge (finding K3).
         caddyfile = (DEPLOY / "compose" / "Caddyfile").read_text()
         block = caddyfile[caddyfile.index("(security_headers)"):caddyfile.index("import /etc/caddy/sites")]
-        self.assertIn("?X-Frame-Options SAMEORIGIN", block)
-        self.assertIn("?Content-Security-Policy \"frame-ancestors 'self'\"", block)
+        # Each "?" header is its own handler. In one header block both shared one condition, so a
+        # service that sent only one of them got neither from the edge (review 2, finding K9).
+        lines = [line.strip() for line in block.splitlines()]
+        self.assertIn("header ?X-Frame-Options SAMEORIGIN", lines)
+        self.assertIn("header ?Content-Security-Policy \"frame-ancestors 'self'\"", lines)
         template = (DEPLOY / "compose" / "site.caddy.template").read_text()
         hosts = [line for line in template.splitlines() if line.endswith("{") and line.startswith("__")]
         self.assertEqual(template.count("import security_headers"), len(hosts))

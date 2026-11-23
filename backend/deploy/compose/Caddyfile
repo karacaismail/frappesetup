@@ -11,16 +11,18 @@
 # HSTS leaves out includeSubDomains on purpose: other names under atonota.net (mail, outside
 # services in the DNS zone) may not serve HTTPS. Every host this edge serves sets HSTS itself.
 # "?" sets a header only when the service did not: Frappe and Keycloak keep their own policy, and
-# static files and redirects still refuse framing by other sites.
+# static files and redirects still refuse framing by other sites. Each "?" header has its own
+# header line: in one block both shared one condition, and a service that sent only one of them
+# got neither.
 (security_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
-		?X-Frame-Options SAMEORIGIN
-		?Content-Security-Policy "frame-ancestors 'self'"
 		-Server
 	}
+	header ?X-Frame-Options SAMEORIGIN
+	header ?Content-Security-Policy "frame-ancestors 'self'"
 }
 
 import /etc/caddy/sites/*.caddy

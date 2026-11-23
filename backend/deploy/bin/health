@@ -15,7 +15,7 @@ id="$(release_py field "$manifest" release_id)"
 check_release_id "$id"
 
 # The server must report the same release as current, with every container healthy.
-running="$(remote "/srv/atonota/$env/bin/status" "$env" "$kind")"
+running="$(remote "$(server_bin "$env" "$kind")/status" "$env" "$kind")"
 [[ "$running" == "$id" ]] || fail "$env runs $running, expected $id"
 
 probe() {
@@ -53,7 +53,7 @@ if [[ "$kind" == backend ]]; then
     fi
 else
     # Every file the bundle's index.html names must be served from /panel/assets/.
-    asset="$(remote "/srv/atonota/$env/bin/status" "$env" web-asset)"
+    asset="$(remote "$(server_bin "$env" web)/status" "$env" web-asset)"
     for site in $ATONOTA_TENANT_SITES; do
         curl --fail --silent --show-error --max-time 15 --proto '=https' -o /dev/null \
             "https://$site/panel/assets/$asset" || fail "panel asset $asset is not served on $site"

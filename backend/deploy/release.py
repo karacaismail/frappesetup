@@ -7,8 +7,10 @@ Design: backend/docs/dagitim/ortamlar.md. Python 3.9+, standard library only.
 """
 
 import argparse
+import hashlib
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -164,6 +166,89 @@ def check_same_release(archived, server):
         raise ReleaseError("the server copy of the release differs from the Jenkins archive")
 
 
+# Files a release carries beside its manifest (review 2, finding Ö8). Promotion sends exactly
+# these copies, so rc and prod run the compose files and scripts of the release commit, not the
+# newest main. Paths are relative to backend/deploy.
+DEPLOY_PATTERNS = (
+    "compose/stack.yaml",
+    "compose/edge.yaml",
+    "compose/Caddyfile",
+    "compose/site.caddy.template",
+    "environments/*.env",
+    "remote/*",
+)
+NEEDED = (
+    "compose/stack.yaml",
+    "compose/edge.yaml",
+    "compose/Caddyfile",
+    "compose/site.caddy.template",
+    "remote/apply",
+    "remote/common.sh",
+    "remote/backup",
+    "remote/restore",
+    "remote/status",
+    "remote/rollback",
+) + tuple(f"environments/{name}.env" for name in ORDER)
+
+
+def sha256_of(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def pack_deploy(source, release_folder, commit):
+    """Copy the deploy files of one checkout into <release folder>/deploy with a checksum list."""
+    if not COMMIT.fullmatch(commit):
+        raise ReleaseError(f"bad commit: {commit}")
+    source = Path(source)
+    out = Path(release_folder) / "deploy"
+    if out.exists():
+        raise ReleaseError(f"{out} already exists")
+    files = {}
+    for pattern in DEPLOY_PATTERNS:
+        for path in sorted(source.glob(pattern)):
+            if path.is_file():
+                name = path.relative_to(source).as_posix()
+                (out / name).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, out / name)
+                files[name] = sha256_of(path)
+    missing = [name for name in NEEDED if name not in files]
+    if missing:
+        raise ReleaseError(f"deploy files missing in {source}: {', '.join(missing)}")
+    write_json({"commit": commit, "files": files}, out / "files.json")
+
+
+def check_deploy(release_folder):
+    """Refuse deploy files that differ from the list written at build time."""
+    folder = Path(release_folder) / "deploy"
+    listing_path = folder / "files.json"
+    if not listing_path.is_file():
+        raise ReleaseError(f"the release has no deploy files ({listing_path}); build it again")
+    listing = read_json(listing_path)
+    files = listing.get("files", {})
+    missing = [name for name in NEEDED if name not in files]
+    if missing:
+        raise ReleaseError(f"deploy files are not listed: {', '.join(missing)}")
+    for name, digest in files.items():
+        path = folder / name
+        if ".." in Path(name).parts or not path.is_file():
+            raise ReleaseError(f"deploy file is missing: {name}")
+        if sha256_of(path) != digest:
+            raise ReleaseError(f"deploy file differs from the build: {name}")
+    present = {
+        path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file()
+    } - {"files.json"}
+    extra = sorted(present - set(files))
+    if extra:
+        raise ReleaseError(f"extra deploy files: {', '.join(extra)}")
+    manifest = read_json(Path(release_folder) / "release.json")
+    # A backend release and its deploy files come from one commit. A web release comes from the
+    # atonota-web repository; its deploy files come from this repository at build time.
+    if manifest.get("kind") == "backend" and listing.get("commit") != manifest.get("commit"):
+        raise ReleaseError(
+            f"deploy files are from commit {listing.get('commit')}, the release from {manifest.get('commit')}"
+        )
+
+
 def read_json(path):
     try:
         return json.loads(Path(path).read_text())
@@ -207,6 +292,12 @@ def main(argv=None):
     env_check.add_argument("env", choices=ORDER)
     images = commands.add_parser("images", help="print name=image lines")
     images.add_argument("manifest")
+    pack = commands.add_parser("pack-deploy", help="copy the deploy files into a release folder")
+    pack.add_argument("--from", dest="source", default=str(DEPLOY))
+    pack.add_argument("--commit", required=True)
+    pack.add_argument("release_folder")
+    check_files = commands.add_parser("check-deploy", help="refuse changed or missing deploy files")
+    check_files.add_argument("release_folder")
     arguments = parser.parse_args(argv)
     try:
         if arguments.command == "new":
@@ -235,11 +326,15 @@ def main(argv=None):
             print(read_json(arguments.manifest)[arguments.name])
         elif arguments.command == "env-check":
             load_environments()
+        elif arguments.command == "pack-deploy":
+            pack_deploy(arguments.source, arguments.release_folder, arguments.commit)
+        elif arguments.command == "check-deploy":
+            check_deploy(arguments.release_folder)
         elif arguments.command == "images":
             for name, component in sorted(read_json(arguments.manifest)["components"].items()):
                 if "image" in component:
                     print(f"{name}={component['image']}")
-    except (ReleaseError, KeyError) as error:
+    except (ReleaseError, KeyError, OSError) as error:
         print(f"release: {error}", file=sys.stderr)
         return 1
     return 0

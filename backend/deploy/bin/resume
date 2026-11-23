@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Go on with a pending backend release after a person finished its migration by hand.
+# Usage: resume <env> <out folder>
+# The server runs the apply script of the pending release itself (remote/apply --resume), so the
+# scripts and compose files are the ones of that release. Then the manifest of the new current
+# release is copied to <out folder>, so that bin/health can check it.
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+env="${1:?usage: resume <env> <out folder>}"
+out="${2:?usage: resume <env> <out folder>}"
+load_env "$env"
+remote "/srv/atonota/$env/backend-pending/bin/apply" "$env" --resume
+mkdir -p "$out"
+copy_from_remote "/srv/atonota/$env/backend-current/release.json" "$out/release.json"
