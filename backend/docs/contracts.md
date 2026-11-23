@@ -225,6 +225,24 @@ Adres biçimi `/api/method/<yol>` olur.
 - Sunucu alanları ve alt tablo tanımlarını çıkarır. Telefon bu tanımı çevrimdışı saklayamaz.
 - Sunucu `ETag` değerini dönecek veriden üretir.
 
+### Dil ve biçim
+
+- Açılış verisi kullanıcının dilini `user.language` alanında döner.
+- Oturum açmış kullanıcıda sunucu dili Frappe 16 sırasıyla bulur. Önce `_lang` değerine bakar. Sonra kullanıcının diline bakar. Sonra site ayarındaki dile bakar. En son `en` dilini seçer.
+- Oturum açmış kullanıcıda `Accept-Language` başlığı kullanılmaz.
+- `formatting` alanı tarih biçimini (`date_format`) taşır.
+- `formatting` alanı saat biçimini (`time_format`) taşır.
+- `formatting` alanı haftanın ilk gününü (`first_day_of_the_week`) taşır.
+- Bu üç değer önce dilin “Language” kaydından gelir. Kayıtta değer yoksa site ayarı kullanılır.
+- `languages` alanı sitede açık olan dilleri listeler. Her öğe dil kodunu (`code`) ve dilin adını (`name`) taşır.
+- Kısa açılış yanıtında da `languages` listesi kalır.
+- Açılış verisi en çok 60 saniye önbellekte kalır. Yönetici dil kaydını değiştirebilir. Bu durumda eski dil listesi ve eski biçim 60 saniye dönebilir.
+- Hesap yok sayfası dili isteğin dilinden alır. Sayfa `lang` özniteliğini bu dile göre yazar.
+- Kullanıcının Frappe dili boş olabilir. Bu durumda giriş ucu belirteçteki `locale` değerini kullanıcıya yazar.
+- `locale` değeri açık diller listesinde yoksa giriş ucu dili yazmaz. Kullanıcının seçtiği dil de değişmez.
+
+Yedek dil, kullanıcının dili bilinmeyince seçilen dildir. Yedek dil MVP'de iki tarafta farklıdır. Arayüzün yedek dili `tr` değeridir. Backend'in son yedeği `en` değeridir. Bu fark bilinçli bir MVP kararıdır. Açılış verisinde `user.language` her zaman doludur. Arayüz bu değeri kullanırsa iki taraf aynı dili gösterir. Varsayılan dil işi iki yedeği birlikte değiştirir.
+
 ### Website User için yöntem izin listesi
 
 - Website User yalnız izin listesindeki yöntemleri çağırabilir. Öteki her yöntem 403 döner. Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsine uygulanır.

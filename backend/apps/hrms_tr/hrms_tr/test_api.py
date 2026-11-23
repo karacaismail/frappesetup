@@ -83,7 +83,7 @@ class ApprovalEndpointTest(TestCase):
 		doc = Mock(employee="EMP-0001", docstatus=0, status="Open", modified="2026-11-22 12:00:01")
 		with (
 			patch.object(leave, "frappe") as fake,
-			patch.object(leave, "_", side_effect=lambda message: message),
+			patch.object(leave, "_", side_effect=lambda message, context=None: message),
 		):
 			fake.get_roles.return_value = ["HRT Manager"]
 			fake.session.user = "manager@example.test"
@@ -123,7 +123,7 @@ class ApprovalEndpointTest(TestCase):
 
 		with (
 			patch.object(frappe, "_", side_effect=lambda message: message),
-			patch.object(api, "_", create=True, side_effect=lambda message: message),
+			patch.object(api, "_", create=True, side_effect=lambda message, context=None: message),
 			patch.object(frappe, "throw", side_effect=raise_permission_error),
 			patch.object(leave, "approve") as approve,
 		):

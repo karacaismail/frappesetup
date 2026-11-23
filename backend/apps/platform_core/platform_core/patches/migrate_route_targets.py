@@ -21,7 +21,7 @@ def execute():
 
 def migrate_route(name, legacy_json):
 	link = {"parent": name, "parenttype": "PLT AI Route", "parentfield": "targets"}
-	targets = parse_records(legacy_json, "Targets")
+	targets = parse_records(legacy_json, "Targets", "PLT AI Route")
 	if not targets:
 		return
 	for entry in targets:

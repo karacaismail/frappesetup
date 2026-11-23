@@ -215,22 +215,30 @@ def fake_exchange(token: str | None = None, **token_response):
 	return patch("platform_core.identity.sign_in.exchange_code", side_effect=exchange)
 
 
-def finish_login(client, query: dict, token: str, code: str = "test-code", state: str | None = None):
+def finish_login(
+	client,
+	query: dict,
+	token: str,
+	code: str = "test-code",
+	state: str | None = None,
+	headers: dict | None = None,
+):
 	"""Calls the callback with the fake token exchange in place."""
 	with fake_exchange(token):
 		return request(
 			client.get,
 			CALLBACK,
 			query_string={"code": code, "state": state if state is not None else query.get("state")},
+			headers=headers or {},
 		)
 
 
-def login_with_keycloak(client, claims: dict, redirect_to: str | None = None):
+def login_with_keycloak(client, claims: dict, redirect_to: str | None = None, headers: dict | None = None):
 	"""Full sign-in through this app's own callback. Only Keycloak itself is faked (token exchange)."""
-	started, query = start_login(client, redirect_to)
+	started, query = start_login(client, redirect_to, headers=headers)
 	if started.status_code != 200:
 		return started
-	return finish_login(client, query, id_token(query, claims))
+	return finish_login(client, query, id_token(query, claims), headers=headers)
 
 
 def logged_user(client) -> str:

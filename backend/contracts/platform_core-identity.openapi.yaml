@@ -432,6 +432,8 @@ paths:
            A request is a background request if it carries the `X-Platform-Background: 1` header,
            or if it calls `frappe.realtime.*`, `frappe.desk.notifications.*`, `frappe.auth.get_logged_user` or `frappe.sessions.get*`.
            Frappe's own idle limit of 1 hour (`session_expiry`) also stays.
+           If the Frappe user has no language, the server writes the verified ID token `locale` claim to it.
+           The value must be an enabled Language record code. Otherwise nothing is written. A chosen language never changes.
         9. The server redirects the browser to the `redirect_to` path. If the record has no path, it redirects to the `platform_panel_url` address.
 
         If the code exchange fails or the key list cannot be fetched, it returns 503.
@@ -506,7 +508,7 @@ paths:
             - the user is disabled.
 
             The page does not give the reason in detail. The page tells the user to contact their admin.
-            If the user does not exist on this site, the page is the `tenant_account_missing` template. It offers a “Sign in with another account” link.
+            If the user does not exist on this site, the page is the `tenant_account_missing` template. It offers a “Sign in with another account” link. The page uses the request language and writes it to the `lang` attribute.
             The link opens the Keycloak logout page. Keycloak returns to `start_login` with `switch_account=1`. The first `redirect_to` path is dropped.
             The template has no standalone address. A direct request of `/tenant_account_missing` gets the 404 page.
           content:
@@ -2352,7 +2354,7 @@ components:
           type: string
           description: |
             Label of the sign-in button. The English source text is `Sign in with {0}`. The brand name fills `{0}`.
-            The Turkish text comes from `translations/tr.csv` with the context `platform_core.kimlik`.
+            The Turkish text comes from `translations/tr.csv` with the context `platform_core.identity`.
 
     LogoutUrl:
       type: object
