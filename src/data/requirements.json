@@ -1012,7 +1012,7 @@
  {
   "id": "G-102",
   "title": "Backend uygulama iskeleti ve yayın kontrol listesi",
-  "detail": "`bench new-app` tabanlı şablon: pyproject + frappe-dependencies, hooks (after_install idempotent, `setup_wizard_complete`, after_migrate, fixtures filtre ön eki), Module Def, locale/main.pot + tr.po (CI'da `generate-pot-file/update-po-files/compile-po-to-mo`), testler (`bench run-tests`), ruff, Marketplace App metadata, after_install_script, CHANGELOG; yayın: version-16 dalı, semver etiket, App Release → staging Release Group → E2E aktivasyon testi → prod zamanlanmış deploy; `bench --site X install-app` idempotent çalışır.",
+  "detail": "`bench new-app` tabanlı şablon: pyproject + frappe-dependencies, hooks (after_install idempotent, `setup_wizard_complete`, after_migrate, fixtures filtre ön eki), Module Def, çeviri dosyası `translations/tr.csv` (`.po` geçişi G-73'e bağlıdır ve sonraya kalır), testler (`bench run-tests`), ruff, Marketplace App metadata, after_install_script, CHANGELOG; yayın: version-16 dalı, semver etiket, App Release → staging Release Group → E2E aktivasyon testi → prod zamanlanmış deploy; `bench --site X install-app` idempotent çalışır.",
   "rail": "App çerçevesi",
   "priority": "MUST",
   "phase": "P4",
@@ -1978,5 +1978,25 @@
   "phase": "P6",
   "source": "develop",
   "owner": "Platform ekibi + Frontend ekibi"
+ },
+ {
+  "id": "G-155",
+  "title": "AI sağlayıcı bağlantısı: veriyle tanımlı form, şifreli anahtar ve canlı deneme",
+  "detail": "Panelde akış şöyledir: \"API ekle\", kategori, sağlayıcı, alanlar, \"Kaydet\", canlı deneme ve \"Bağlandı\" bildirimi. Sağlayıcı tanımı ve alan şeması veri dosyasından gelir; kodda sağlayıcı listesi ve model adı yoktur (O-13). Bir sağlayıcıda n hesap, bir hesapta n API bağlantısı açılabilir (D-11). Anahtar yalnız sunucuda şifreli alanda durur; arayüze, kayıt okumasına ve günlüğe dönmez. Yalnız AI Manager ve System Manager rolleri bağlantı ekler ve dener. Canlı deneme sağlayıcının model listesini okur; token harcamaz ve sonucu kayda yazar: bağlandı, anahtar geçersiz, izin yok, kota doldu, ağ hatası, sağlayıcı hatası, adres onaysız, kayıt eksik. \"Bağlandı\" yalnız anahtarın geçerli olduğunu gösterir, kalan kotayı göstermez; panel bunu kısa bir notla söyler. Kaydetme ve deneme uçları kullanıcı başına 60 saniyede 10 istek kabul eder; fazlası 429 ve gateway_busy alır. Kabul: sahte sağlayıcı sunucusuyla her sonuç sınanır; yanıtta anahtar yoktur; yetkisiz kullanıcı 403 alır; onaysız adrese istek çıkmaz.",
+  "rail": "R5 AI",
+  "priority": "MUST",
+  "phase": "P3",
+  "source": "develop",
+  "owner": "Platform ekibi (backend)"
+ },
+ {
+  "id": "G-156",
+  "title": "Büyük dosya: sunucuda metne çevirme, parçalama ve hesaplara dağıtma",
+  "detail": "300 MB ile 1 GB arası PDF sağlayıcıya bütün olarak gönderilmez. Sunucu dosyadan sayfa sayfa metin çıkarır; taranmış sayfada yazı tanıma yalnız platform sunucusunda çalışır. Metin sayfa sınırından ve model kaydındaki bağlam boyuna göre parçalara bölünür; parça boyu kodda sabit değildir. Her parça geçitten örtülerek gider (G-90) ve yolun hesapları arasında öncelik, ağırlık, bekleme süresi, dakikalık istek ve token sınırı ile aylık bütçeye göre dağıtılır. Sağlayıcının dosya API'si bu aşamada kullanılmaz: ikili dosya örtülemez ve dosya tek hesaba bağlanır. İş kullanıcının başlattığı kuyruk işidir, zamanlanmış iş değildir. Kabul: iş başlamadan parça sayısı ve tahmini maliyet görünür; her parça kullanım kaydına dosya işi kimliği ve parça sırasıyla yazılır; 429 alan hesaptaki parça başka hesaba gider; başarısız parça tek başına yeniden denenir.",
+  "rail": "R5 AI",
+  "priority": "MUST",
+  "phase": "P3",
+  "source": "develop",
+  "owner": "Platform ekibi (backend)"
  }
 ]

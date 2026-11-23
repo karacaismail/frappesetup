@@ -57,6 +57,9 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | HTTP | `platform_core.api.model.reconcile_stale_pending` | Yönetici oturumuyla takılı kayıt grubunu kapatır. |
 | HTTP | `platform_core.api.model.purge_usage` | Silinecek kayıtları gösterir veya onaylı önizlemeye göre siler. |
 | HTTP | `platform_core.api.model.clear_api_credential` | Kapalı bağlantının anahtarını siler. |
+| HTTP | `platform_core.api.model.provider_catalog` | Bağlantı formunun sağlayıcı tanımlarını ve alanlarını verir. |
+| HTTP | `platform_core.api.model.save_connection` | Alanları tanıma göre denetler. Yeni bağlantıyı kaydeder. Anahtarı şifreli alana yazar. Kullanıcı başına 60 saniyede 10 isteği kabul eder. |
+| HTTP | `platform_core.api.model.check_connection` | Model listesini okuyarak canlı deneme yapar. Sonucu kayda yazar. Kullanıcı başına 60 saniyede 10 isteği kabul eder. |
 | Bench | `platform_core.model_gateway.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
 | Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` ve `reconcile_stale_pending` araçlarını bildirir. |
 | Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |
@@ -219,3 +222,13 @@ bench --site SITE execute platform_core.model_gateway.api.purge_usage_logs --kwa
 ```sh
 bench --site SITE execute platform_core.model_gateway.api.purge_usage_logs --kwargs '{"names":["ONAYLANAN-KAYIT-ADI"]}'
 ```
+
+## Bağlantı formu ve canlı deneme
+
+Bu bölüm 23 Kasım 2026 Pazartesi günü eklendi. Ayrıntı karar sitesinin `ai-saglayici.md` sayfasındadır.
+
+Sağlayıcı tanımları `model_gateway/provider_catalog.json` dosyasındadır. Kodda sağlayıcı listesi yoktur. Kod yalnız alanın yazılabileceği kayıt alanlarını bilir. Gizli anahtar yalnız şifreli `api_key` alanına yazılır.
+
+Canlı deneme model listesini okur. Bu istek token harcamaz. Bu yüzden deneme kullanım kaydına satır yazmaz. Sonuç `PLT AI API` kaydının `connection_status` alanına yazılır.
+
+Büyük dosya sağlayıcıya bütün olarak gönderilmez. Sunucu dosyayı metne çevirir ve parçalara böler. Sağlayıcının dosya API'si bu aşamada kullanılmaz. Neden şudur: İkili dosya örtülemez ve dosya tek hesaba bağlanır.

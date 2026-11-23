@@ -8,7 +8,8 @@
   "provider_name",
   "adapter",
   "default_url",
-  "enabled"
+  "enabled",
+  "catalog_provider"
  ],
  "fields": [
   {
@@ -43,6 +44,13 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
+  },
+  {
+   "description": "Provider definition id from the shipped catalog. The connection form sets it; empty for providers added by hand.",
+   "fieldname": "catalog_provider",
+   "fieldtype": "Data",
+   "label": "Catalog Provider",
+   "read_only": 1
   }
  ],
  "links": [],

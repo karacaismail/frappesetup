@@ -61,6 +61,21 @@ class ProviderHandler(BaseHTTPRequestHandler):
 			# A deadline test intentionally disconnects before the provider replies.
 			pass
 
+	def do_GET(self):
+		"""Answer connection checks with a fixture model list."""
+		self.server.list_requests.append((self.path, self.headers.get("Authorization")))
+		lists = {
+			"/second/api/tags": {"models": [{"name": "fixture-a"}]},
+			"/second/v1/models": {"data": [{"id": "fixture-a"}, {"id": "fixture-b"}]},
+		}
+		status = self.server.provider_status.get(self.path, 200 if self.path in lists else 404)
+		payload = json.dumps(lists.get(self.path, {}) if status == 200 else {"error": "fixture"}).encode()
+		self.send_response(status)
+		self.send_header("Content-Type", "application/json")
+		self.send_header("Content-Length", str(len(payload)))
+		self.end_headers()
+		self.wfile.write(payload)
+
 	def _stall_headers(self, release):
 		"""Keep the socket active while leaving the HTTP headers incomplete."""
 		try:
@@ -297,6 +312,7 @@ def _gateway_fixture(wrap_app=None):
 					ThreadingHTTPServer(("127.0.0.1", FIXTURE_PORT), ProviderHandler)
 				)
 				server.attempts = []
+				server.list_requests = []
 				server.provider_status = {}
 				server.provider_gate = None
 				server.provider_payloads = []
@@ -310,6 +326,7 @@ def _gateway_fixture(wrap_app=None):
 					base=base,
 					users=users,
 					attempts=server.attempts,
+					list_requests=server.list_requests,
 					provider_status=server.provider_status,
 					provider_payloads=server.provider_payloads,
 					provider_url=SECOND_URL,

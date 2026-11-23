@@ -10,7 +10,7 @@ Satılan her uygulama (HRMS TR, CRM, Webshop ve sonrakiler) aynı çerçeveden g
 
 | # | Katman | Zorunlu çıktı | Gereksinim |
 | --- | --- | --- | --- |
-| 1 | Backend iskelet | `bench new-app` şablonu; `pyproject.toml` + `[tool.bench.frappe-dependencies] frappe = ">=16.0.0 <17.0.0"`; `hooks.py` (idempotent `after_install`, `setup_wizard_complete`, `after_migrate`, `fixtures` ön ek filtresi, `user_data_fields`); Module Def; `locale/main.pot` + `tr.po`; `bench run-tests` + ruff; CHANGELOG | G-102, G-14, G-52 |
+| 1 | Backend iskelet | `bench new-app` şablonu; `pyproject.toml` + `[tool.bench.frappe-dependencies] frappe = ">=16.0.0 <17.0.0"`; `hooks.py` (idempotent `after_install`, `setup_wizard_complete`, `after_migrate`, `fixtures` ön ek filtresi, `user_data_fields`); Module Def; çeviri dosyası `translations/tr.csv` (`.po` geçişi G-73 ile sonraya kalır); `bench run-tests` + ruff; CHANGELOG | G-102, G-14, G-52, G-73 |
 | 2 | Frontend modül | `@apps/<ad>` paketi `AppModule` arayüzüyle: TanStack Router rota ağacı, `overrides/<doctype>.tsx` registry, ikon/çeviri, dashboard widget'ları, yardım konuları, tur ve keşif kuralları (G-141), AI Prompts; yalnızca tasarım tokenları; dinamik import | G-103, G-66, G-67, G-69 |
 | 3 | Yetki sözleşmesi | Ön ekli roller (`<App> Admin/Manager/Employee`), Role Profile ve Module Profile fixture'ları, hiyerarşi alanları, varsayılan Access Rule şablonları, hassas alan permlevel şablonu; yetki matrisi testi | G-104, G-60, G-61, G-62 |
 | 4 | AI sözleşmesi | `ai_tools` hook'u: araç adı, TR/EN açıklama, şema, gereken rol, `destructive`/`billable` bayrağı, önizleme üretici, birim kredi maliyeti; tek tık akışları Prompts olarak; golden test + yetki negatif testi | G-105, G-84, G-86, SA-15 |
