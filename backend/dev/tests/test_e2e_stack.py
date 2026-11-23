@@ -227,7 +227,8 @@ class StackTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), original)
         for line in original.decode().splitlines():
             key, value = line.split("=", 1)
-            if "SECRET" in key or "PASSWORD" in key:
+            # An empty value cannot leak. Closed sign-in platforms have empty secrets (O-54).
+            if value and ("SECRET" in key or "PASSWORD" in key):
                 self.assertNotIn(value, result.stdout + result.stderr)
 
     def test_invalid_port_and_profile_do_not_create_credentials(self):

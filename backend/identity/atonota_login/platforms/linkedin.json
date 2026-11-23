@@ -1,0 +1,14 @@
+{
+  "alias": "linkedin",
+  "providerId": "linkedin-openid-connect",
+  "displayName": "LinkedIn",
+  "authorizationHost": "www.linkedin.com",
+  "secrets": {
+    "clientId": "ATONOTA_LINKEDIN_CLIENT_ID",
+    "clientSecret": "ATONOTA_LINKEDIN_CLIENT_SECRET"
+  },
+  "config": {
+    "syncMode": "IMPORT",
+    "defaultScope": "openid profile email"
+  }
+}

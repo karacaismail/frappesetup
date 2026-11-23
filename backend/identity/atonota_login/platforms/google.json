@@ -1,0 +1,14 @@
+{
+  "alias": "google",
+  "providerId": "google",
+  "displayName": "Google",
+  "authorizationHost": "accounts.google.com",
+  "secrets": {
+    "clientId": "ATONOTA_GOOGLE_CLIENT_ID",
+    "clientSecret": "ATONOTA_GOOGLE_CLIENT_SECRET"
+  },
+  "config": {
+    "syncMode": "IMPORT",
+    "defaultScope": "openid email profile"
+  }
+}
