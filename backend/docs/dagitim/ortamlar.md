@@ -437,6 +437,8 @@ ATONOTA_SITE_TENANT1_SECRET=<kiracı tarayıcı istemcisi sırrı, en az 32 kara
 
 `<` ile `>` arasındaki metin yer tutucudur. Yer tutucu, gerçek değerin yerine yazılan açıklamadır.
 
+Bir değerin tamamı `<` ile `>` arasındaysa denetim onu yer tutucu sayar. Örneğin `<noreply@atonota.net>` reddedilir. Bu değeri `noreply@atonota.net` biçiminde yazın.
+
 | Liste | Sunucudaki yeri | Ne zaman gerekir |
 | --- | --- | --- |
 | `tenant` | `/etc/atonota/<ortam>/tenant.env` | Her arka uç dağıtımında |
@@ -446,7 +448,7 @@ ATONOTA_SITE_TENANT1_SECRET=<kiracı tarayıcı istemcisi sırrı, en az 32 kara
 | `keycloak-db` | `/etc/atonota/<ortam>/keycloak-db.env` | Her arka uç dağıtımında |
 | `identity-sync` | `/etc/atonota/<ortam>/identity-sync.env` | Her arka uç dağıtımında |
 | `press` | `/etc/atonota/<ortam>/press.env` | Pakette Press imajı varsa |
-| `press-site` | Press sitesinin `site_config.json` dosyası | Press imajı gelince (E-2) |
+| `press-site` | Press sitesinin `site_config.json` dosyası | Bugün denetlenmez. Press imajı gelince denetime girer (E-2) |
 | `offsite` | `/etc/atonota/<ortam>/offsite.env` | rc ve prod'da her zaman. Öteki ortamlarda dosya varsa |
 | `edge` | `/etc/atonota/edge.env` | Her arka uç dağıtımında |
 
@@ -466,7 +468,7 @@ DevOps sorumlusu her ortam için şu adımları uygular:
 
 1. Sunucuda `/etc/atonota/<ortam>/` klasörünü açar.
 2. Her liste için listedeki adla bir dosya yazar. Örneğin `keycloak.env` yazar.
-3. Her yer tutucunun yerine gerçek değeri yazar.
+3. Her yer tutucunun yerine gerçek değeri yazar. Değerde `$` işareti varsa değeri tek tırnağa alır. Örnek: `KC_DB_PASSWORD='ab$cd'`. Docker Compose tırnaksız değerdeki `$` işaretini değişken sayar.
 4. Dosyanın iznini `0600` yapar. Dosyanın sahibi `deploy-<ortam>` kullanıcısı olur.
 5. Kiracı sitesinin ayarlarını sitenin içinde yazar. Örnek komut: `bench --site <site> set-config keycloak_client_id site-tenant1`.
 
@@ -480,7 +482,11 @@ Jenkins sırları görmez. Bu yüzden denetimi sunucudaki `remote/apply` betiği
 2. Bir dosya yoksa ya da bir anahtar eksikse betik durur. Sunucuda hiçbir şey değişmez.
 3. Betik yeni imajları indirir. Eski sürüm bu sırada çalışmaya devam eder.
 4. Betik yeni kiracı imajıyla her sitenin `site_config.json` dosyasını okur. Bunu `remote/site-probe.py` yapar.
-5. Bir site ayarı eksikse betik durur. Eski sürüm durdurulmaz ve çalışmaya devam eder.
+5. Bir site ayarı eksikse ya da `[sabit]` değerden farklıysa betik durur. Eski sürüm durdurulmaz ve çalışmaya devam eder.
+
+Site ayarlarında iki `[sabit]` değer vardır: `developer_mode` ve `mobile_allow_development_http`. İkisi de üretimde yazılmaz ya da 0 olur. Değer 1 olursa bazı yollar HTTP adresi kabul eder.
+
+Site denetimi imajın giriş betiğini çalıştırmaz. Giriş betiği ortak birimdeki `assets` bağını yeniden kurar. Eski sürüm o birimi kullanır.
 
 Betik eksik anahtarın adını ve dosyanın yolunu yazar. Değeri hiçbir zaman yazmaz. Örnek çıktı:
 
@@ -493,9 +499,12 @@ Betik şu durumları da reddeder:
 
 - Değer yer tutucu olarak kalmışsa.
 - `[sabit]` etiketli değer farklıysa.
+- Değerde tırnaksız ya da çift tırnaklı `$` işareti varsa.
 - Ortamın sır dosyasının izni `0600` değilse.
 
-Site denetimi kapsayıcıdan yalnız anahtar adlarını alır. Sitenin değerleri kapsayıcıdan çıkmaz.
+Site denetimi kapsayıcıdan yalnız anahtar adlarını alır. `[sabit]` değerleri kapsayıcının içinde karşılaştırılır. Sitenin değerleri kapsayıcıdan çıkmaz.
+
+Press sitesinin ayarları bugün denetlenmez. Press'in üretim imajı yok (E-2). İmaj gelince `press-site` listesi denetime eklenir.
 
 Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan listeyle denetlenir.
 
@@ -509,7 +518,7 @@ Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan li
 - `platform_core`, `hrms_tr` ve `press_tr` uygulamalarının site ayarı okumaları,
 - `stack.yaml`, `edge.yaml` ve sunucu betiklerindeki değişkenler.
 
-Kod bir ayarı değişken adıyla okuyabilir. Tarama bu adı çözemez. Bu okumalar testteki `INDIRECT_SITE_READS` tablosunda yazılıdır. Yeni bir okuma bu tabloya eklenmeden test geçmez.
+Kod bir ayarı değişken adıyla okuyabilir. Tarama bu adı kaynak koddan çözer. Örneğin modül sabitini, döngüdeki listeyi ve işlevin çağrılarını okur. Tarama bir adı çözemezse test düşer.
 
 Test, sır taşıyan her anahtarın değerinin yer tutucu olduğunu da denetler.
 

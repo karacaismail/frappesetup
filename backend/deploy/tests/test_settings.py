@@ -37,19 +37,6 @@ IDENTITY_SYNC_IMAGE = BACKEND / "identity" / "identity_sync" / "Dockerfile"
 STACK = DEPLOY / "compose" / "stack.yaml"
 EDGE = DEPLOY / "compose" / "edge.yaml"
 
-# Site settings read through a variable. The scan cannot resolve these by itself, so each one is
-# named here with the keys it reads. A new read through a variable fails until it is added here.
-INDIRECT_SITE_READS = {
-    ("platform_core/identity/anonymization.py", "KEY_SETTING"): {"kimlik_deletion_hmac_key"},
-    ("platform_core/identity/site_settings.py", "key"): {
-        "keycloak_public_url", "keycloak_client_id", "keycloak_client_secret", "identity_brand_name",
-        "platform_panel_url",
-    },
-    ("platform_core/shell/metadata_policy.py", "key"): {"shell_mobile_doctypes", "shell_restricted_doctypes"},
-    ("platform_core/mobile/retention.py", "setting"): {
-        "mobile_operation_retention_days", "mobile_upsert_retention_days", "mobile_removal_retention_days",
-    },
-}
 # Compose variables that are not settings of the server: remote/apply writes them (release.env)
 # or they keep their default on purpose.
 RELEASE_ENV = {"ATONOTA_HEALTH_SITE", "COMPOSE_PROFILES"}
@@ -68,36 +55,125 @@ def required(name):
             if not entry.optional}
 
 
+def _strings(node, scope):
+    """String values a name or literal can hold: literals, module constants and literal tuples."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return {node.value}
+    if isinstance(node, ast.Name) and node.id in scope:
+        return _strings(scope[node.id], scope)
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return set().union(*(_strings(item, scope) for item in node.elts)) if node.elts else set()
+    return None
+
+
+def _loop_values(target, source, name, scope):
+    """Values that loop variable `name` takes in `for target in source` (tuples unpack by position)."""
+    if isinstance(source, ast.Name) and source.id in scope:
+        source = scope[source.id]
+    if not isinstance(source, (ast.Tuple, ast.List, ast.Set)):
+        return None
+    if isinstance(target, ast.Name) and target.id == name:
+        return _strings(source, scope)
+    if isinstance(target, ast.Tuple):
+        positions = [index for index, item in enumerate(target.elts)
+                     if isinstance(item, ast.Name) and item.id == name]
+        if positions and all(isinstance(row, ast.Tuple) and len(row.elts) == len(target.elts)
+                             for row in source.elts):
+            values = set()
+            for row in source.elts:
+                found = _strings(row.elts[positions[0]], scope)
+                if found is None:
+                    return None
+                values |= found
+            return values
+    return None
+
+
+def _resolve(name_node, parents, tree, scope):
+    """Keys a conf read through a variable can read, or None when the scan cannot tell."""
+    name = name_node.id
+    if name in scope:
+        return _strings(scope[name], scope)
+    for parent in reversed(parents):
+        if isinstance(parent, (ast.For, ast.comprehension)):
+            values = _loop_values(parent.target, parent.iter, name, scope)
+            if values is not None:
+                return values
+        if isinstance(parent, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+            for generator in parent.generators:
+                values = _loop_values(generator.target, generator.iter, name, scope)
+                if values is not None:
+                    return values
+        if isinstance(parent, ast.FunctionDef) and name in [arg.arg for arg in parent.args.args]:
+            position = [arg.arg for arg in parent.args.args].index(name)
+            values = set()
+            calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                     and isinstance(node.func, ast.Name) and node.func.id == parent.name]
+            for call in calls:
+                if position >= len(call.args):
+                    return None
+                found = _strings(call.args[position], scope)
+                if found is None:
+                    return None
+                values |= found
+            return values if calls else None
+    return None
+
+
 def site_reads(app_folder):
-    """Every site_config key read by the Python code of one app (frappe.conf.get / frappe.conf.x)."""
+    """Every site_config key read by the Python code of one app.
+
+    Read forms: frappe.conf.get(...), frappe.conf.x, frappe.conf[...], frappe.local.conf[...],
+    getattr(frappe.conf, ...), frappe.get_site_config() and frappe.get_conf(). A key held in a
+    variable is resolved from module constants, literal loops and the calls of the function.
+    A read the scan cannot resolve is returned in `unresolved`, and the tests fail on it.
+    """
     keys, unresolved = set(), []
     for path in sorted(app_folder.rglob("*.py")):
         relative = path.relative_to(app_folder).as_posix()
         if "/tests/" in f"/{relative}" or path.name.startswith("test_") or "contract_tests" in relative:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        scope = {target.id: node.value for node in tree.body if isinstance(node, ast.Assign)
+                 for target in node.targets if isinstance(target, ast.Name)}
         conf_names = {"conf"}
         for node in ast.walk(tree):
-            if (isinstance(node, ast.Assign) and isinstance(node.value, ast.Attribute)
-                    and node.value.attr == "conf"):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Attribute) and node.value.attr == "conf":
                 conf_names.update(target.id for target in node.targets if isinstance(target, ast.Name))
 
         def is_conf(node):
-            return (isinstance(node, ast.Attribute) and node.attr == "conf") or (
-                isinstance(node, ast.Name) and node.id in conf_names)
+            if isinstance(node, ast.Attribute) and node.attr == "conf":
+                return True
+            if isinstance(node, ast.Name) and node.id in conf_names:
+                return True
+            return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in ("get_site_config", "get_conf"))
 
-        for node in ast.walk(tree):
+        def add(argument, parents):
+            if isinstance(argument, ast.Name):
+                found = _resolve(argument, parents, tree, scope)
+            else:
+                found = _strings(argument, scope)
+            if found:
+                keys.update(found)
+            else:
+                unresolved.append((relative, getattr(argument, "lineno", 0)))
+
+        def visit(node, parents):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get" \
                     and is_conf(node.func.value) and node.args:
-                argument = node.args[0]
-                if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
-                    keys.add(argument.value)
-                elif isinstance(argument, ast.Name):
-                    unresolved.append((relative, argument.id))
-                else:
-                    unresolved.append((relative, ast.dump(argument)))
-            elif isinstance(node, ast.Attribute) and is_conf(node.value) and node.attr != "get":
+                add(node.args[0], parents)
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "getattr" \
+                    and len(node.args) >= 2 and is_conf(node.args[0]):
+                add(node.args[1], parents)
+            elif isinstance(node, ast.Subscript) and is_conf(node.value):
+                add(node.slice, parents)
+            elif isinstance(node, ast.Attribute) and is_conf(node.value) and node.attr not in ("get", "conf"):
                 keys.add(node.attr)
+            for child in ast.iter_child_nodes(node):
+                visit(child, [*parents, node])
+
+        visit(tree, [])
     return keys, unresolved
 
 
@@ -202,14 +278,50 @@ class CodeScan(unittest.TestCase):
             found, missing = site_reads(BACKEND / "apps" / app)
             keys |= found
             unresolved += missing
-        for place in unresolved:
-            with self.subTest(read=place):
-                self.assertIn(place, INDIRECT_SITE_READS, "add this read to INDIRECT_SITE_READS")
-                keys |= INDIRECT_SITE_READS[place]
+        self.assertEqual(unresolved, [], "the scan cannot tell which key these reads use; name the key")
         self.assertTrue(keys)
         for key in sorted(keys):
             with self.subTest(key=key):
                 self.assertIn(key, listed(list_name))
+
+    def test_scan_finds_every_read_form(self):
+        # A read the scan misses would leave a setting out of the lists (review 1, finding 4).
+        with tempfile.TemporaryDirectory() as folder:
+            app = Path(folder)
+            (app / "module.py").write_text(
+                "import frappe\n"
+                "NAME = 'from_constant'\n"
+                "PAIRS = (('from_module_tuple', 1),)\n"
+                "a = frappe.conf.get('from_get')\n"
+                "b = frappe.conf.from_attribute\n"
+                "c = frappe.conf['from_subscript']\n"
+                "d = frappe.local.conf['from_local']\n"
+                "e = getattr(frappe.conf, 'from_getattr')\n"
+                "f = frappe.get_site_config().get('from_site_config')\n"
+                "g = frappe.get_conf()['from_get_conf']\n"
+                "h = frappe.conf.get(NAME)\n"
+                "def read(setting):\n"
+                "    return frappe.conf.get(setting)\n"
+                "read('from_parameter')\n"
+                "for key, _ in (('from_loop', 1), ('from_loop_two', 2)):\n"
+                "    frappe.conf.get(key)\n"
+                "for key, _ in PAIRS:\n"
+                "    frappe.conf.get(key)\n"
+                "missing = [key for key in ('from_comprehension',) if not frappe.conf.get(key)]\n")
+            keys, unresolved = site_reads(app)
+        self.assertEqual(unresolved, [])
+        self.assertEqual(keys, {
+            "from_constant", "from_module_tuple", "from_get", "from_attribute", "from_subscript", "from_local",
+            "from_getattr", "from_site_config", "from_get_conf", "from_parameter", "from_loop", "from_loop_two",
+            "from_comprehension",
+        })
+
+    def test_unresolved_read_fails(self):
+        with tempfile.TemporaryDirectory() as folder:
+            app = Path(folder)
+            (app / "module.py").write_text("import frappe\ndef f(name):\n    return frappe.conf.get(name)\n")
+            _, unresolved = site_reads(app)
+        self.assertEqual(len(unresolved), 1)
 
     def test_tenant_site_settings(self):
         self.check_site_list("tenant-site", ("platform_core", "hrms_tr"))
@@ -372,6 +484,31 @@ class FileCheck(unittest.TestCase):
         problems = self.check("beta")
         self.assertTrue(any(str(self.etc / "edge.env") in line for line in problems), problems)
 
+    def test_inline_comment_is_not_a_value(self):
+        # docker compose drops " # ..." after an unquoted value (review 1, finding 3).
+        fill_server(self.etc, "alpha")
+        path = self.etc / "alpha" / "tenant-db.env"
+        path.write_text("MARIADB_ROOT_PASSWORD= # later\n")
+        path.chmod(0o600)
+        self.assertIn(f"{path}: MARIADB_ROOT_PASSWORD (missing)", self.check())
+        path.write_text("MARIADB_ROOT_PASSWORD=<kök parolası> # todo\n")
+        self.assertIn(f"{path}: MARIADB_ROOT_PASSWORD (placeholder left)", self.check())
+        path.write_text("MARIADB_ROOT_PASSWORD='abc # def'\n")
+        self.assertEqual(self.check(), [])
+
+    def test_dollar_sign_needs_single_quotes(self):
+        # docker compose replaces $NAME in unquoted and double quoted values.
+        fill_server(self.etc, "alpha")
+        path = self.etc / "alpha" / "tenant-db.env"
+        for line in ("MARIADB_ROOT_PASSWORD=ab$cd\n", 'MARIADB_ROOT_PASSWORD="ab$cd"\n'):
+            path.write_text(line)
+            path.chmod(0o600)
+            problems = self.check()
+            self.assertEqual(problems, [f"{path}: MARIADB_ROOT_PASSWORD (has $; write the value in single quotes)"])
+            self.assertNotIn("ab$cd", "\n".join(problems))
+        path.write_text("MARIADB_ROOT_PASSWORD='ab$cd'\n")
+        self.assertEqual(self.check(), [])
+
     def test_command_line_exit_status(self):
         fill_server(self.etc, "alpha")
         script = DEPLOY / "remote" / "settings.py"
@@ -387,15 +524,16 @@ class FileCheck(unittest.TestCase):
 class SiteCheck(unittest.TestCase):
     SITE = "demo.app.alpha.atonota.net"
 
-    def complete(self):
-        return sorted(required("tenant-site"))
+    def complete(self, differs=()):
+        return {"set": sorted(required("tenant-site")), "differs": list(differs)}
 
     def test_complete_site_passes(self):
         self.assertEqual(settings.check_sites(SETTINGS, {self.SITE: self.complete()}, [self.SITE]), [])
 
     def test_missing_site_key_is_named(self):
-        keys = [key for key in self.complete() if key != "keycloak_client_secret"]
-        problems = settings.check_sites(SETTINGS, {self.SITE: keys}, [self.SITE])
+        report = self.complete()
+        report["set"].remove("keycloak_client_secret")
+        problems = settings.check_sites(SETTINGS, {self.SITE: report}, [self.SITE])
         self.assertEqual(len(problems), 1)
         self.assertIn(self.SITE, problems[0])
         self.assertIn("keycloak_client_secret", problems[0])
@@ -405,21 +543,54 @@ class SiteCheck(unittest.TestCase):
         self.assertTrue(any("does not exist" in line for line in problems), problems)
         self.assertEqual(settings.check_sites(SETTINGS, {}, [self.SITE], first_install=True), [])
 
-    def test_site_probe_prints_key_names_only(self):
+    def test_fixed_site_values_are_the_safety_switches(self):
+        # developer_mode=1 or mobile_allow_development_http=1 opens plain HTTP paths (review 1).
+        fixed = settings.site_fixed_values(SETTINGS)
+        self.assertEqual(fixed.get("developer_mode"), "0")
+        self.assertEqual(fixed.get("mobile_allow_development_http"), "0")
+
+    def test_site_value_that_differs_from_its_fixed_value_is_refused(self):
+        report = self.complete(differs=["developer_mode"])
+        problems = settings.check_sites(SETTINGS, {self.SITE: report}, [self.SITE])
+        self.assertEqual(problems, [f"site {self.SITE}, site_config.json: developer_mode (must be 0)"])
+
+    def test_bad_probe_answer_is_refused(self):
+        with self.assertRaises(settings.SettingsError):
+            settings.check_sites(SETTINGS, {self.SITE: ["keycloak_public_url"]}, [self.SITE])
+
+    def probe(self, site_config, common=None):
         with tempfile.TemporaryDirectory() as folder:
             sites = Path(folder)
             (sites / self.SITE).mkdir()
-            (sites / "common_site_config.json").write_text(json.dumps({"host_name": "https://x.test"}))
-            (sites / self.SITE / "site_config.json").write_text(json.dumps(
-                {"keycloak_client_secret": SITE_VALUE, "keycloak_realm": EMPTY, "x": "<yer tutucu>",
-                 "mcp_oauth_enabled": 0}))
-            probe = run_python("-", "site-settings-probe", self.SITE, "absent.test",
-                               input_text=(DEPLOY / "remote" / "site-probe.py").read_text(),
-                               environment={**os.environ, "ATONOTA_SITES_PATH": folder})
-        self.assertEqual(probe.returncode, 0, probe.stderr)
-        self.assertNotIn(SITE_VALUE, probe.stdout)
-        self.assertEqual(json.loads(probe.stdout),
-                         {self.SITE: ["host_name", "keycloak_client_secret", "mcp_oauth_enabled"]})
+            (sites / "common_site_config.json").write_text(json.dumps(common or {}))
+            (sites / self.SITE / "site_config.json").write_text(json.dumps(site_config))
+            result = run_python("-", "site-settings-probe", json.dumps(settings.site_fixed_values(SETTINGS)),
+                                self.SITE, "absent.test",
+                                input_text=(DEPLOY / "remote" / "site-probe.py").read_text(),
+                                environment={**os.environ, "ATONOTA_SITES_PATH": folder})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(SITE_VALUE, result.stdout)
+        return json.loads(result.stdout)
+
+    def test_site_probe_prints_key_names_only(self):
+        found = self.probe({"keycloak_client_secret": SITE_VALUE, "keycloak_realm": EMPTY, "x": "<yer tutucu>",
+                            "mcp_oauth_enabled": 0}, common={"host_name": "https://x.test"})
+        self.assertEqual(found, {self.SITE: {
+            "set": ["host_name", "keycloak_client_secret", "mcp_oauth_enabled"], "differs": []}})
+
+    def test_site_probe_compares_fixed_values_inside_the_container(self):
+        found = self.probe({"mobile_allow_development_http": 1, "keycloak_client_id": SITE_VALUE},
+                           common={"developer_mode": 1})
+        self.assertEqual(found[self.SITE]["differs"], ["developer_mode", "mobile_allow_development_http"])
+        self.assertEqual(self.probe({"developer_mode": 0})[self.SITE]["differs"], [])
+        self.assertEqual(self.probe({"developer_mode": "0"})[self.SITE]["differs"], [])
+        self.assertEqual(self.probe({"developer_mode": False})[self.SITE]["differs"], [])
+        self.assertEqual(self.probe({"developer_mode": True})[self.SITE]["differs"], ["developer_mode"])
+
+    def test_press_site_list_is_not_checked_until_the_press_image_exists(self):
+        # E-2: no Press image, so no Press site to probe. The list waits; this test says so.
+        self.assertEqual(settings.LISTS["press-site"].when, "press-image")
+        self.assertIn("press-site", settings.NOT_CHECKED)
 
 
 class Packing(unittest.TestCase):

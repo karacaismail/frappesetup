@@ -12,6 +12,7 @@ Design: backend/docs/dagitim/ortamlar.md. Python 3.9+, standard library only.
 Usage:
   settings.py check-files <env> <lists folder> --etc <folder> --press 0|1 --offsite 0|1
   settings.py check-sites <lists folder> <probe json> [--first-install 0|1] <site>...
+  settings.py site-fixed <lists folder>     prints the fixed site values as JSON for site-probe.py
 """
 
 import argparse
@@ -26,8 +27,9 @@ Target = namedtuple("Target", "list_file kind path when")
 Entry = namedtuple("Entry", "key value optional fixed")
 
 # kind "env": a file read by docker compose (env_file). kind "site": site_config.json of a site,
-# merged with common_site_config.json. when: "always", "press" (the release has a Press image) or
-# "offsite" (environment rule ATONOTA_REQUIRE_OFFSITE_BACKUP=1; a present file is checked anyway).
+# merged with common_site_config.json. when: "always", "press" (the release has a Press image),
+# "offsite" (environment rule ATONOTA_REQUIRE_OFFSITE_BACKUP=1; a present file is checked anyway) or
+# "press-image" (checked once a Press production image exists, blocker E-2; not checked today).
 LISTS = {
     "tenant": Target("tenant.production.env.example", "env", "{etc}/{env}/tenant.env", "always"),
     "tenant-db": Target("tenant-db.production.env.example", "env", "{etc}/{env}/tenant-db.env", "always"),
@@ -37,10 +39,12 @@ LISTS = {
     "identity-sync": Target(
         "identity-sync.production.env.example", "env", "{etc}/{env}/identity-sync.env", "always"),
     "press": Target("press.production.env.example", "env", "{etc}/{env}/press.env", "press"),
-    "press-site": Target("press-site.production.env.example", "site", "sites/<site>/site_config.json", "press"),
+    "press-site": Target("press-site.production.env.example", "site", "sites/<site>/site_config.json", "press-image"),
     "offsite": Target("offsite.production.env.example", "env", "{etc}/{env}/offsite.env", "offsite"),
     "edge": Target("edge.production.env.example", "env", "{etc}/edge.env", "always"),
 }
+# Lists the deployment does not check yet, with the reason in docs/dagitim/ortamlar.md.
+NOT_CHECKED = ("press-site",)
 ENVIRONMENTS = ("alpha", "beta", "rc", "prod")
 LIST_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 PLACEHOLDER = re.compile(r"<[^<>]*>")
@@ -72,8 +76,18 @@ def parse_list(path):
     return entries
 
 
+class EnvValue(str):
+    """A value of an env file. `expands` is true when docker compose would replace a $ in it."""
+
+    expands = False
+
+
 def parse_env(path):
-    """Keys and values of a docker compose env file. Quotes around a value are removed."""
+    """Keys and values of a docker compose env file, read as compose reads it.
+
+    Single quotes keep the value as written. In an unquoted value " #" starts a comment. In an
+    unquoted or double quoted value compose replaces $NAME, so such a value is marked `expands`.
+    """
     values = {}
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -85,9 +99,14 @@ def parse_env(path):
         if not separator:
             continue
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+        quote = value[:1] if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"" else ""
+        if quote:
             value = value[1:-1]
-        values[key.strip()] = value
+        else:
+            value = re.split(r"(?:^|\s)#", value, maxsplit=1)[0].strip()
+        parsed = EnvValue(value)
+        parsed.expands = quote != "'" and "$" in value
+        values[key.strip()] = parsed
     return values
 
 
@@ -99,6 +118,8 @@ def compare(entries, present):
         if entry.key not in present or value == "":
             if not entry.optional:
                 problems.append(f"{entry.key} (missing)")
+        elif getattr(value, "expands", False):
+            problems.append(f"{entry.key} (has $; write the value in single quotes)")
         elif value is not None and is_placeholder(value):
             problems.append(f"{entry.key} (placeholder left)")
         elif value is not None and entry.fixed and value != entry.value:
@@ -134,18 +155,33 @@ def check_files(env, lists, etc, press=False, offsite_required=False):
     return problems
 
 
+def site_fixed_values(lists):
+    """[sabit] keys of the tenant site list and their values. site-probe.py compares them inside
+    the container, so no site value leaves it. The values are listed in the repository."""
+    return {entry.key: entry.value for entry in parse_list(Path(lists) / LISTS["tenant-site"].list_file)
+            if entry.fixed}
+
+
 def check_sites(lists, probe, sites, first_install=False):
-    """probe maps each existing site to the names of its non-empty settings (site-probe.py)."""
+    """probe: {site: {"set": [non-empty keys], "differs": [fixed keys with another value]}}."""
     entries = parse_list(Path(lists) / LISTS["tenant-site"].list_file)
+    fixed = site_fixed_values(lists)
     problems = []
     for site in sites:
         if site not in probe:
             if not first_install:
                 problems.append(f"site {site} does not exist; create it with the first install steps")
             continue
-        present = {key: None for key in probe[site]}
+        report = probe[site]
+        if not (isinstance(report, dict) and all(
+                isinstance(report.get(part), list) and all(isinstance(key, str) for key in report[part])
+                for part in ("set", "differs"))):
+            raise SettingsError(f"the site probe gave no set and differs lists for {site}")
+        present = {key: None for key in report["set"]}
         for problem in compare(entries, present):
             problems.append(f"site {site}, site_config.json: {problem}")
+        for key in sorted(set(report["differs"]) & fixed.keys()):
+            problems.append(f"site {site}, site_config.json: {key} (must be {fixed[key]})")
     return problems
 
 
@@ -163,15 +199,20 @@ def main(argv=None):
     sites.add_argument("probe")
     sites.add_argument("--first-install", choices=("0", "1"), default="0")
     sites.add_argument("sites", nargs="+")
+    fixed = commands.add_parser("site-fixed", help="print the fixed site values for site-probe.py")
+    fixed.add_argument("lists")
     arguments = parser.parse_args(argv)
     try:
+        if arguments.command == "site-fixed":
+            print(json.dumps(site_fixed_values(arguments.lists), sort_keys=True))
+            return 0
         if arguments.command == "check-files":
             problems = check_files(arguments.env, arguments.lists, arguments.etc,
                                    press=arguments.press == "1", offsite_required=arguments.offsite == "1")
         else:
             probe = json.loads(Path(arguments.probe).read_text(encoding="utf-8"))
-            if not isinstance(probe, dict) or not all(isinstance(keys, list) for keys in probe.values()):
-                raise SettingsError("the site probe did not print a JSON object of key lists")
+            if not isinstance(probe, dict):
+                raise SettingsError("the site probe did not print a JSON object")
             problems = check_sites(arguments.lists, probe, arguments.sites,
                                    first_install=arguments.first_install == "1")
     except (SettingsError, OSError, json.JSONDecodeError) as error:

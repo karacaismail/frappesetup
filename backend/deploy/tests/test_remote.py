@@ -71,7 +71,7 @@ class RemoteScripts(unittest.TestCase):
             "ATONOTA_ETC": str(self.etc),
             # The tenant image reports every site with every required setting (site-probe.py).
             "FAKE_SITE_KEYS": json.dumps({
-                site: sorted(test_settings.required("tenant-site"))
+                site: {"set": sorted(test_settings.required("tenant-site")), "differs": []}
                 for settings in release.load_environments().values()
                 for site in settings["ATONOTA_TENANT_SITES"].split()
             }),
@@ -582,7 +582,7 @@ class RemoteScripts(unittest.TestCase):
         self.first_install()
         keys = [key for key in test_settings.required("tenant-site") if key != "keycloak_client_secret"]
         result = self.apply("alpha", self.backend(2),
-                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": keys}))
+                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": {"set": keys, "differs": []}}))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("demo.app.alpha.atonota.net, site_config.json: keycloak_client_secret (missing)",
                       result.stderr)
@@ -594,6 +594,19 @@ class RemoteScripts(unittest.TestCase):
         rolled = self.run_remote("alpha", "rollback", "backend", "--failed", self.release_id(2))
         self.assertEqual(rolled.returncode, 0, rolled.stderr)
         self.assertEqual(self.calls(), [])
+
+    def test_developer_mode_on_a_site_stops_while_the_old_release_runs(self):
+        self.first_install()
+        report = {"set": sorted(test_settings.required("tenant-site")), "differs": ["developer_mode"]}
+        result = self.apply("alpha", self.backend(2),
+                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": report}))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("developer_mode (must be 0)", result.stderr)
+        probe = self.calls()[self.index("site-settings-probe")]
+        self.assertIn('"developer_mode": "0"', probe)
+        # The image entrypoint prints to stdout and relinks the assets of the running release.
+        self.assertIn("--entrypoint /home/frappe/frappe-bench/env/bin/python tenant-web -I -", probe)
+        self.assertFalse(any("set-maintenance-mode" in line for line in self.calls()))
 
     def test_missing_site_after_the_first_install_stops_before_the_old_release_stops(self):
         self.first_install()
