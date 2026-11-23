@@ -58,7 +58,7 @@ Her ekonomik olay tek tetikle tek belgeye gider; vergi ve belge zamanlaması mal
 | İade / kısmi iade | `press_tr.api.ops.refund_invoice`, negatif BT | `is_return` Sales Invoice + e-belge iptal/iade | iade onayı; iade kimliği | SA-9 |
 | İtiraz | Payment Dispute | Şüpheli alacak kaydı | itiraz bildirimi; itiraz kimliği | Finans |
 
-Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans olur; aynı ekonomik olay iki yoldan kaydedilmez; gece mutabakatında fark sıfır.
+Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans olur; aynı ekonomik olay iki yoldan kaydedilmez; elle başlatılan mutabakatta fark sıfır. Zamanlanmış iş kurulmaz (backend proje kaydı D-6).
 
 **e-Fatura konumu.** ERPNext v16 `regional/turkey/setup.py` boş fonksiyondur, `country_wise_tax.json` yalnız eski "VAT 18%" kaydını taşır, UBL-TR üreticisi yoktur; buna karşılık `tr_chart_of_accounts.json` doğrulanmıştır. KDV %20/%10/%1 şablonları elle tanımlanır; e-belge, Sales Invoice submit sonrası entegratör köprüsünden gider (VKN + mükellef → e-Fatura, aksi e-Arşiv; ETTN/durum/XML Sales Invoice'ta). `logedosoft/ERPNext-Turkish-Delight` `TD EInvoice Integrator/Settings` kalıbı (Uyumsoft, Bien Teknoloji) referanstır; v16 uyumu doğrulanmamıştır (doğrulanacak).
 
@@ -137,3 +137,62 @@ sequenceDiagram
 - **Operatör modu → ops sitesi (`ops-bff`, `aud=site-ops`; G-59):** `platform_core.api.ops.customer_360(team)` (yeni), operatörün Keycloak kimliği ve operasyon sitesi rolleriyle.
 - **iyzico → Press:** HPP webhook (`token`, `iyziEventType`, `status` SUCCESS/INIT\_\*/PENDING\_CREDIT/FAILURE), `X-IYZ-SIGNATURE-V3`; 15 dk aralıkla 3 yineleme; SUCCESS sonrası CF retrieve zorunlu.
 - **Hocuspocus → kiracı sitesi ve ops:** `extension-webhook` oturum olayları; `onAuthenticate` → kiracı sitesi (`platform_core`): bilet, `Support Session` durumu ve kapsamı.
+
+## Canlı ortamlar ve dağıtım hattı
+
+Bu bölüm backend'in 23 Kasım 2026 Pazartesi günkü dağıtım tasarımını özetler. Kaynak `backend/docs/dagitim/ortamlar.md` dosyasıdır. Dağıtım kodu `backend/deploy/` klasöründedir. Kod yazıldı ve sahte sunucularla sınandı. Henüz hiçbir sunucu kurulmadı ve hiçbir dağıtım yapılmadı (E-10).
+
+Proje sahibi şu sırayı seçti:
+
+1. Önce MVP biter.
+2. Sonra ürün Hetzner sunucusunda canlıya çıkar.
+
+### Dört ortam
+
+| Ortam | Amacı | Nasıl güncellenir |
+| --- | --- | --- |
+| alpha | Ana daldaki son kodu denemek | Ana dal güncellenince Jenkins kendiliğinden dağıtır |
+| beta | Ürün ekibinin iç denemesi | Jenkins'te biri "Move to beta" düğmesine basar |
+| rc | Prod'un aynısında son kabul denemesi | Jenkins'te biri "Move to rc" düğmesine basar |
+| prod | Gerçek müşteri | Jenkins'te biri "Move to prod" düğmesine basar |
+
+Colima yalnız geliştirme içindir. Colima, bu Mac'teki konteyner ortamıdır.
+
+### Ad haritası
+
+| Ad | alpha | prod |
+| --- | --- | --- |
+| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.atonota.net` |
+| Press | `press.alpha.atonota.net` | `press.atonota.net` |
+| Kiracı | `<kiracı>.app.alpha.atonota.net` | `<kiracı>.app.atonota.net` |
+| Panel | `https://<kiracı>/panel` | `https://<kiracı>/panel` |
+
+beta ve rc ortamları aynı kalıbı izler. Örneğin beta'da Press `press.beta.atonota.net` adresindedir. Panel her kiracının kendi adresinde `/panel` yolundadır.
+
+### Jenkins hattı
+
+- Dağıtım hattı Jenkins ile kurulur. GitHub Actions yalnız pull request test kapısı olarak kalır.
+- Jenkins kodu bir kez derler. Sonra aynı paketi sırayla bir sonraki ortama taşır. Taşımada kod yeniden derlenmez.
+- Ana daldan gelen iş yalnız alpha ve beta anahtarlarını görür. rc ve prod anahtarları ayrı bir Jenkins klasöründedir. Bu yüzden ana daldaki değişiklik prod'a kendiliğinden gitmez.
+- Jenkins her dağıtımdan sonra sağlık denetimi koşar. Denetim geçmezse sonraki ortama taşıma yapılmaz.
+- alpha ortamında hata olursa hat yedeği kendiliğinden geri yükler. rc ve prod ortamında bu kararı DevOps sorumlusu verir.
+- Yedek her dağıtımdan önce alınır. Düzenli yedek yoktur, çünkü zamanlanmış iş kurulmaz (E-7).
+
+### Canlıya çıkışın önündeki engeller
+
+Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dosyasındadır. Başlıca engeller şunlardır:
+
+| No | Engel | Sahibi |
+| --- | --- | --- |
+| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. MVP'de ilk kiracı sitesini DevOps sorumlusu elle açar | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor. Press bu yüzden bütün ortamlarda kapalıdır | press-tr işi ve DevOps sorumlusu |
+| E-3 | `/panel` sayfası arka uçta hazır. Arayüz paketi bu adrese göre henüz ayarlanmadı | atonota-web işi |
+| E-4 | Çözüldü. Ayar listeleri yazıldı. Gerçek değerleri DevOps sorumlusu sunucuya yazar | DevOps sorumlusu |
+| E-5 | CI'da güvenlik kapısı yok | DevOps sorumlusu |
+| E-7 | Zamanlanmış iş yasağı yüzünden düzenli yedek yok | Proje sahibi |
+| E-9 | Gerçek servislerle uçtan uca test yok | integration-e2e işi |
+| E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | DevOps sorumlusu |
+| E-11 | GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı | Alan adı sorumlusu |
+| E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | Hukuk ve ürün sahibi |
+
+Prod'a çıkmadan önce üç yaşam döngüsü testi de geçmelidir. Bu testler TLS aracısı olan hazırlık ortamında koşar (backend proje kaydı O-50).

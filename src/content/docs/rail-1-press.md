@@ -99,7 +99,7 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 
 | Bileşen | Press doctype / ayar | Sahip |
 | --- | --- | --- |
-| Press host (Frappe v15, Python 3.11, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); `panel.` Press'in kendi alan adı, `allow_cors` yok (G-119) | DevOps sorumlusu |
+| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); `panel.` Press'in kendi alan adı, `allow_cors` yok (G-119) | DevOps sorumlusu |
 | n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | DevOps sorumlusu |
 | f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | DevOps sorumlusu |
 | m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | DevOps sorumlusu |
@@ -107,13 +107,32 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 | İzleme / log | Monitor Server (Prometheus/Grafana/Alertmanager), Log Server (ES/Kibana), Incident Settings, Telegram + e-posta | DevOps sorumlusu |
 | Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test | DevOps sorumlusu |
 | Cluster | 'hetzner-fsn1' cloud\_provider='Generic' (bare metal); Hetzner Cloud VM'ler 'Hetzner' | DevOps sorumlusu |
-| DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53` | DevOps sorumlusu (Route 53/IAM, sonuç doğrulama) |
+| DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53`. MVP'de Route 53 yoktur: DNS GoDaddy'de kalır, sertifika her ad için ayrı alınır. Route 53 kararı Press sunucu kurma akışı çalışınca yeniden açılır (7. bölüm) | DevOps sorumlusu (Route 53/IAM, sonuç doğrulama) |
 | NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e; kiracılar `<kiracı>.app.<marka>.com.tr`, sabit host'lar GoDaddy'de (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
 | Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr`; P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | DevOps sorumlusu; DNS alan adı sorumlusu |
 | Operatör modu ve `ops-bff` (Rail 6) | `operator.<marka>.com.tr`: aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS); DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
 | Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | DevOps sorumlusu |
-| Sürüm takibi | v0.155.x+ staging Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | DevOps sorumlusu |
+| Sürüm takibi | v0.155.x+ rc ortamındaki Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | DevOps sorumlusu |
 | Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | DevOps sorumlusu |
 | Güvenlik danışmanlığı | Danışmanlık izleme ve karar kaydı; acil yama rutin takvimi beklemez (G-142, K-26) | DevOps sorumlusu |
 
-Kabul (P0): `dig NS` Route 53 sunucularını döner, wildcard TLS Certificate Active, test sitesi Active, offsite yedek bucket'ta listelenir ve geri yüklenir, Grafana/Kibana uyarıları Telegram'a düşer.
+Kabul (P0): DNS kayıtları GoDaddy'den çözülür, TLS sertifikaları Active, test sitesi Active, offsite yedek bucket'ta listelenir ve geri yüklenir, Grafana/Kibana uyarıları e-postaya düşer. Route 53 açılırsa `dig NS` Route 53 sunucularını döner. Press üretim imajında Telegram paketi yoktur (7. bölüm).
+
+## 7. Backend durumu: Press üretim imajı (O-52, O-18)
+
+Bu bölüm backend'in 23 Kasım 2026 Pazartesi günkü durumunu anlatır. Kaynak `backend/PROJECT-RECORD.md` ve `backend/docs/dagitim/press-imaji.md` dosyalarıdır. Canlı sunucu henüz yoktur. Bu yüzden Press hiçbir ortamda canlıda çalışmıyor.
+
+- **Sürümler.** İmaj Press v0.154.1, Frappe 16.56.0 ve Python 3.14.10 taşır. Taban imaj `frappe/erpnext:v16.55.0` imajıdır.
+- **Yama dizisi (O-52).** Press v0.154.1 bu sürümlerle yamasız açılmaz. Bu yüzden üretim imajı beş yama uygular. Yamalar `backend/deploy/images/press-patches/` klasöründedir.
+- **Yama kuralı.** Derleme her yamadan önce `git apply --check` çalıştırır. Yama tutmazsa derleme durur. Yamalar yalnız Python 3.14 ve Frappe 16 uyumu içindir. Ürün davranışı `press_tr` uygulamasına yazılır.
+- **Bağımlılık kilidi.** Paketler özetli bir kilit dosyasından kurulur. `uv pip check` yalnız iki bilinen satırı bildirebilir. Başka her uyumsuzluk derlemeyi durdurur.
+- **Geliştirme yaması (O-18).** `patch-py314.sh` betiği yalnız geliştirme imajında çalışır. Bu betik üretim imajına girmez.
+- **Kapanma koşulu.** Press bir düzeltmeyi kabul edip yayımlarsa o yama silinir. Bütün yamalar kalkınca bu istisna kapanır.
+- **Çalışmayan özellikler.** Telegram paketi imajda yoktur, bu yüzden Telegram uyarıları çalışmaz. Stripe ödeme akışı ve Marketplace uygulama denetimi sınanmadı.
+
+İmaj yalnız bu Mac'teki Colima ortamında denendi. İmaj sunucuda ve amd64 mimarisinde denenmedi. Canlıya çıkışın önünde şu iki engel durur:
+
+1. Press'in sunucu kurma akışı Frappe 16'da çalışmıyor (E-1). MVP'de Press sunucu kurmaz. DevOps sorumlusu ilk kiracı sitesini elle açar.
+2. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor (E-2). Bu yüzden Press, rc ve prod ortamlarında kapalı kalır.
+
+Adlar `atonota.net` alanındadır. Örneğin prod'da Press `press.atonota.net` adresindedir. Kiracılar `<kiracı>.app.atonota.net` adresindedir. Ortamların tam ad haritası [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır.
