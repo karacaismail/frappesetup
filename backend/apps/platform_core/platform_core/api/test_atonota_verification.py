@@ -41,7 +41,9 @@ def signature(body: bytes, secret: str = SECRET, stamp: int | None = None) -> st
 	return f"t={stamp},v1={digest}"
 
 
-def notice_body(event: str, attempt: int = 1, outcome: str = "approved", case: str = "case-1", **extra) -> bytes:
+def notice_body(
+	event: str, attempt: int = 1, outcome: str = "approved", case: str = "case-1", **extra
+) -> bytes:
 	return json.dumps(
 		{"event_id": event, "case_id": CASE_PREFIX + case, "attempt": attempt, "outcome": outcome, **extra}
 	).encode()
@@ -190,7 +192,11 @@ class TestAtonotaVerificationEndpoint(IntegrationTestCase):
 		verification_api.open_attempt(case)
 		frappe.db.commit()  # nosemgrep: frappe-manual-commit
 		with mock.patch("frappe.enqueue"):
-			for event, attempt, outcome in (("e-new", 2, "rejected"), ("e-old", 1, "approved"), ("e-unk", 9, "approved")):
+			for event, attempt, outcome in (
+				("e-new", 2, "rejected"),
+				("e-old", 1, "approved"),
+				("e-unk", 9, "approved"),
+			):
 				self.assertEqual(self.send(notice_body(event, attempt, outcome)).status_code, 200)
 		self.assertEqual(
 			verification_api.process_notices(),
@@ -263,7 +269,9 @@ class TestAtonotaVerificationEndpoint(IntegrationTestCase):
 		marker = secrets.token_hex(12)
 		body = notice_body("e-crash", document_image=marker, face_scan=marker)
 		before = set(frappe.get_all("Error Log", pluck="name"))
-		with mock.patch.object(verification_api.FrappeNoticeStore, "add_notice", side_effect=RuntimeError("boom")):
+		with mock.patch.object(
+			verification_api.FrappeNoticeStore, "add_notice", side_effect=RuntimeError("boom")
+		):
 			response = self.send(body)
 		self.assertEqual(response.status_code, 500, response.data[:300])
 		self.assertNotIn(marker.encode(), response.data)
@@ -279,5 +287,6 @@ class TestAtonotaVerificationEndpoint(IntegrationTestCase):
 		self.assertIn(function, frappe.guest_methods)
 		self.assertEqual(frappe.allowed_http_methods_for_whitelisted_func.get(function), ["POST"])
 		self.assertNotIn(
-			"platform_core.api.atonota_login.verification_notice", frappe.get_hooks("website_user_allowed_methods")
+			"platform_core.api.atonota_login.verification_notice",
+			frappe.get_hooks("website_user_allowed_methods"),
 		)

@@ -72,7 +72,9 @@ class FrappeNoticeStore:
 		frappe.db.commit()  # nosemgrep: frappe-manual-commit
 
 	def _case(self, case_id: str, fields: list) -> dict | None:
-		return frappe.db.get_value(CASE, {"case_id": case_id}, ["name", *fields], as_dict=True, for_update=True)
+		return frappe.db.get_value(
+			CASE, {"case_id": case_id}, ["name", *fields], as_dict=True, for_update=True
+		)
 
 	def latest_attempt(self, case_id: str) -> int:
 		row = self._case(case_id, ["latest_attempt"])
@@ -141,7 +143,13 @@ class FrappeNoticeStore:
 
 	def requeue_unknown(self) -> int:
 		table = frappe.qb.DocType(NOTICE)
-		rows = frappe.qb.from_(table).select(table.name).where(table.state == "unknown-attempt").for_update().run()
+		rows = (
+			frappe.qb.from_(table)
+			.select(table.name)
+			.where(table.state == "unknown-attempt")
+			.for_update()
+			.run()
+		)
 		for (name,) in rows:
 			frappe.db.set_value(NOTICE, name, "state", "pending")
 		return len(rows)
@@ -173,11 +181,16 @@ def receive_notice() -> dict:
 	try:
 		status = _inbox().receive(raw_body, headers, int(time.time()))
 	except inbox.ConfigurationRequired:
-		frappe.throw(_("No verification provider is configured."), VerificationNotConfigured)
+		frappe.throw(
+			_("No verification provider is configured.", context="platform_core.identity"),
+			VerificationNotConfigured,
+		)
 	except inbox.SignatureRejected:
-		frappe.throw(_("The notice signature is not valid."), NoticeSignatureRejected)
-	except ValueError as error:
-		frappe.throw(str(error), InvalidInput)
+		frappe.throw(
+			_("The notice signature is not valid.", context="platform_core.identity"), NoticeSignatureRejected
+		)
+	except ValueError:
+		frappe.throw(_("The notice fields are not valid.", context="platform_core.identity"), InvalidInput)
 	if status == "accepted":
 		# The job starts after the notice is committed. It never runs inside this request.
 		frappe.enqueue(PROCESS_JOB, queue="short", enqueue_after_commit=True)

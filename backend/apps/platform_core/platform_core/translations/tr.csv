@@ -842,3 +842,12 @@ Name of the provider account in this site.,Bu sitedeki sağlayıcı hesabının 
 Connection name,Bağlantı adı,
 Name of this API connection.,Bu API bağlantısının adı.,
 Service address,Hizmet adresi,
+No verification provider is configured.,Doğrulama sağlayıcısı ayarlanmadı.,platform_core.identity
+The notice signature is not valid.,Bildirimin imzası geçerli değil.,platform_core.identity
+The notice fields are not valid.,Bildirimin alanları geçerli değil.,platform_core.identity
+Sign in to continue.,Devam etmek için oturum açın.,platform_core.identity
+The action field must be a non-empty text of at most 140 characters.,İşlem alanı boş olmayan ve en çok 140 karakterlik bir metin olmalıdır.,platform_core.identity
+The action {0} is not allowed now ({1}).,{0} işlemine şu an izin yok ({1}).,platform_core.identity
+A final step cannot run inside a transaction with pending writes.,Bekleyen yazma varken son adım çalışamaz.,platform_core.identity
+The action {0} is not allowed now ({1}: {2}).,{0} işlemine şu an izin yok ({1}: {2}).,platform_core.identity
+Paid plans are not available yet.,Ücretli planlar henüz açık değil.,platform_core.identity
