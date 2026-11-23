@@ -8,7 +8,7 @@ import { sectionIcon } from '../components/icons';
 import { GROUP_ORDER, RAILS, SECTIONS } from '../data/sections';
 import requirements from '../data/requirements.json';
 import phases from '../data/phases.json';
-import { AS_OF, DECISION_COUNT, RAIL_COUNT, ROADMAP_WEEKS } from '../data/site';
+import { AS_OF, DECISION_COUNT, RAIL_COUNT } from '../data/site';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
@@ -36,7 +36,7 @@ const groups = GROUP_ORDER.map((label) => ({
   docs: docs.filter((d) => SECTIONS[d.id]?.group === label),
 }));
 
-// phases.json yol haritası sırasındadır (P6 operasyon düzlemi P5'ten önce başlar).
+// phases.json yol haritası sırasındadır (bağımlılık sırası; P6 operasyon düzlemi P5'ten önce gelir).
 const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }));
 ---
 
@@ -83,7 +83,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     <div class="stat"><span class="stat-n">{RAIL_COUNT}</span><span class="stat-l">mimari ray</span></div>
     <div class="stat"><span class="stat-n">{requirements.length}</span><span class="stat-l">gereksinim · {g}&nbsp;G + {sa}&nbsp;SA</span></div>
     <div class="stat"><span class="stat-n">{musts}</span><span class="stat-l">MUST maddesi</span></div>
-    <div class="stat"><span class="stat-n">{phaseCards.length}</span><span class="stat-l">faz · {ROADMAP_WEEKS} hafta</span></div>
+    <div class="stat"><span class="stat-n">{phaseCards.length}</span><span class="stat-l">faz</span></div>
   </section>
 
   <section class="block" aria-labelledby="decisions-h">

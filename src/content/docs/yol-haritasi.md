@@ -4,7 +4,7 @@ nav: "Yol haritası"
 order: 17
 ---
 
-Yol haritası yedi fazdan oluşur (P0–P5 ve P6 operasyon düzlemi); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir: Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) 14. haftada biter ve P2 bu kapıdan başlar. Süreler göreli haftadır ve ekip kapasitesiyle doğrulanmamış tahmindir; fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
+Yol haritası yedi fazdan oluşur (P0–P5 ve P6 operasyon düzlemi); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir. Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) bitince P2 başlar. Fazlara süre, hafta ya da iş yükü tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
 
 ## Faz tablosu
 
@@ -12,13 +12,13 @@ Hedef, çıkış ve sahip `phases.json`, gereksinim kimlikleri `requirements.jso
 
 <div data-embed="phase-table"></div>
 
-## Zaman çizelgesi (göreli)
+## Faz sırası
 
-Eksen hafta cinsindendir; çubuklar bağımlılıkla zincirlenir, takvim tarihi yoktur.
+Çizim fazların sırasını gösterir. Sütunlar bağımlılık düzeyidir. Oklar önkoşuldan bağımlı faza gider. Takvim tarihi ve süre yoktur.
 
 <div data-embed="timeline"></div>
 
-P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir; P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca (26. hafta) açılır; P5 ilk ödeyen müşteriden sonra gelir.
+P2 ticari katman, P1'deki Keycloak adımı bitince başlar. P2 operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir. P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür. P6 operasyon düzlemi P2 tamamlanınca açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır.
 
 ## İlk dikey dilim: İzin talebi (Leave Application)
 
@@ -36,7 +36,7 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 
 ## Bağımlılıklar ve kritik yol
 
-- G-2 NS delegasyonu (değeri DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular) → wildcard TLS (DevOps sorumlusu doğrular) → ilk test sitesi `<kiracı>.app.<marka>.com.tr`; P0'ın ilk haftasında başlar.
+- G-2 NS delegasyonu (değeri DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular) → wildcard TLS (DevOps sorumlusu doğrular) → ilk test sitesi `<kiracı>.app.<marka>.com.tr`; P0'ın ilk işidir.
 - G-76 Keycloak HA ve G-144 sertleştirme P0'da; G-12 Press girişi, G-16 davet, G-79 kayıt ve G-81 identity-sync P1'dedir (P0 çıkışı Press girişini şart koşmaz).
 - G-5 Agent `upload_offsite_backup` yaması ilk prod kiracıdan önce; G-55 binlog kurtarma tatbikatı P0 çıkışında koşar.
 - G-119 host'a bağlı oturum, G-45 CSRF enjeksiyonu ve G-75 yerleşimi SPA'nın ilk kiracı isteğinden önce hazırdır; G-120 kalıcı kimlik eşlemesi ilk girişten önce.
@@ -51,7 +51,7 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 
 ## Teslim WBS'si
 
-İş paketleri faz tablosundaki gereksinimleri teslim birimlerine böler; süreler tahmindir.
+İş paketleri faz tablosundaki gereksinimleri teslim birimlerine böler. Sıra yalnız önkoşul sütunuyla anlatılır.
 
 | İş paketi | Faz | Çıktı | Önkoşul | Sahip | Repo / app | Kabul ve kanıt |
 | --- | --- | --- | --- | --- | --- | --- |
