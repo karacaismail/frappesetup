@@ -167,7 +167,7 @@ def rails() -> str:
         f"<svg viewBox='0 0 {W} 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' {FONT}>",
         "<title id='rails-title'>Altı mimari ray ve iki taban bandı</title>",
         "<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 "
-        "Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
+        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
         "Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 "
         "ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, "
         "kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
@@ -185,12 +185,12 @@ def rails() -> str:
              ["@platform/shell · meta-ui · frappe-sdk · design-tokens · ai-sidebar · @apps/*",
               "Superadmin operatör modu (Rail 6'nın kullanıcı yüzü)"])
     # Satır 2: AI (120..460), Keycloak (600..940), y 300..470
-    o += box(120, 300, 340, 170, "Rail 5 — AI", "Claude Agent SDK · PostgreSQL/Redis",
+    o += box(120, 300, 340, 170, "Rail 5 — AI", "Ajan servisi · model geçidi",
              ["Model yönlendirme · önizle+onayla", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
     o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "api.login.&lt;marka&gt; · realm platform · HA",
              ["Client'lar: press · site-&lt;kiracı&gt;", "agent-service · identity-sync", "Organizations · MFA · passkey"])
     # Satır 3: Press (40..320), Kiracı (360..680), Ops (720..1000), y 570..740
-    o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe v15 · press.&lt;marka&gt;",
+    o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe 16 · press.&lt;marka&gt;",
              ["Team · Site · Plan · Marketplace", "Abonelik · Fatura · Agent Job", "press_tr · press_ops_bridge"])
     o += box(360, 570, 320, 170, "Rail 2 — Kiracı siteleri", "ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;",
              ["Site + DB kiracı başına", "platform_core · tr_localization", "HRMS TR · CRM · Webshop app'leri"])
