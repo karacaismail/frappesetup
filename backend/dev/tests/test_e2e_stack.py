@@ -820,6 +820,73 @@ class StackTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unclaimed stack volumes"):
             self.owner_with_container(self.env["E2E_ENV_FILE"], volumes=self.project + "_db\n")
 
+    def test_legacy_env_without_mcp_urls_uses_local_defaults_without_rewriting_env_file(self):
+        namespace = runpy.run_path(str(STACK))
+        path = Path(self.env["E2E_ENV_FILE"])
+        namespace["credentials"](path)
+        kept = [
+            line
+            for line in path.read_text().splitlines()
+            if not line.startswith(("ATONOTA_MCP_REDIRECT_URI=", "ATONOTA_MCP_RESOURCE_URL="))
+        ]
+        path.write_text("\n".join(kept) + "\n")
+        before = path.read_bytes()
+
+        result = self.run_stack("config")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.read_bytes(), before)
+
+        with patch.dict(os.environ, self.env):
+            environment, _, compose = namespace["setup"]()
+        model = namespace["config"](compose, environment)
+        keycloak_env = model["services"]["keycloak"]["environment"]
+        self.assertEqual(
+            keycloak_env["ATONOTA_MCP_REDIRECT_URI"],
+            "https://mcp-client.example.test/callback",
+        )
+        self.assertEqual(
+            keycloak_env["ATONOTA_MCP_RESOURCE_URL"],
+            "https://tenant.example.test/api/method/platform_core.api.ai.mcp",
+        )
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_legacy_env_missing_mcp_secret_names_missing_key_before_docker(self):
+        namespace = runpy.run_path(str(STACK))
+        path = Path(self.env["E2E_ENV_FILE"])
+        namespace["credentials"](path)
+        kept = [
+            line
+            for line in path.read_text().splitlines()
+            if not line.startswith(
+                (
+                    "ATONOTA_MCP_REDIRECT_URI=",
+                    "ATONOTA_MCP_RESOURCE_URL=",
+                    "ATONOTA_MCP_INTROSPECTION_SECRET=",
+                )
+            )
+        ]
+        path.write_text("\n".join(kept) + "\n")
+        before = path.read_bytes()
+        docker = Path(self.temp.name) / "docker"
+        docker.write_text("#!/bin/sh\nexit 99\n")
+        docker.chmod(0o700)
+        for key in list(self.env):
+            if key.startswith("ATONOTA_MCP_"):
+                self.env.pop(key)
+
+        for action in ("config", "up"):
+            with self.subTest(action=action):
+                result = self.run_stack(action, PATH=f"{self.temp.name}:{os.environ['PATH']}")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("ATONOTA_MCP_INTROSPECTION_SECRET", result.stderr)
+                self.assertNotIn("ATONOTA_MCP_REDIRECT_URI", result.stderr)
+                self.assertNotIn("ATONOTA_MCP_RESOURCE_URL", result.stderr)
+                self.assertEqual(path.read_bytes(), before)
+                for line in before.decode().splitlines():
+                    key, value = line.split("=", 1)
+                    if value and ("SECRET" in key or "PASSWORD" in key):
+                        self.assertNotIn(value, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

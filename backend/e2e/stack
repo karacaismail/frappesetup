@@ -18,7 +18,32 @@ BACKEND = Path(__file__).resolve().parents[1]
 # Tests may move BACKEND. The trusted credential root stays this checkout.
 REPOSITORY = Path(__file__).resolve().parents[2]
 CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
+REQUIRED_SETTING = re.compile(r"\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}")
+INCLUDE_FILE = re.compile(r"^\s*-\s*([A-Za-z0-9_.-]+\.ya?ml)\s*$")
+SECRET_PREFIXES = ("degistir-", "example-only-")
 REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+
+
+def template_entries():
+    root = BACKEND if (BACKEND / "dev/.env.example").is_file() else REPOSITORY / "backend"
+    for template in (
+        root / "dev/.env.example",
+        root / "identity/keycloak/.env.example",
+        root / "dev/press/.env.example",
+    ):
+        for line in template.read_text().splitlines():
+            if not line or line.startswith("#"):
+                continue
+            yield line.split("=", 1)
+
+
+def default_settings():
+    """Return non-secret template defaults without touching E2E_ENV_FILE."""
+    return {
+        key: value
+        for key, value in template_entries()
+        if not value.startswith(SECRET_PREFIXES)
+    }
 
 
 def project_name(environment):
@@ -82,19 +107,10 @@ def run(command, environment, check=True, **kwargs):
 def credentials(path):
     """Read plain dotenv values, never execute them as shell code."""
     if not path.exists() and not path.is_symlink():
-        values = {}
-        for template in (
-            BACKEND / "dev/.env.example",
-            BACKEND / "identity/keycloak/.env.example",
-            BACKEND / "dev/press/.env.example",
-        ):
-            for line in template.read_text().splitlines():
-                if not line or line.startswith("#"):
-                    continue
-                key, value = line.split("=", 1)
-                if value.startswith(("degistir-", "example-only-")):
-                    value = secrets.token_urlsafe(32)
-                values[key] = value
+        values = {
+            key: secrets.token_urlsafe(32) if value.startswith(SECRET_PREFIXES) else value
+            for key, value in template_entries()
+        }
         path.parent.mkdir(parents=True, exist_ok=True)
         # The staging file holds secrets too, so Git must ignore its name before it exists.
         # The name is independent of the target so one narrow .gitignore rule covers it.
@@ -138,7 +154,7 @@ def setup():
     context = "colima-factory" if profile == "factory" else "colima"
     path = env_file(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
     assert_ignored(path)
-    environment = dict(os.environ, **credentials(path))
+    environment = {**default_settings(), **os.environ, **credentials(path)}
     environment.update(
         {
             "PANE_PORT": str(port),
@@ -157,12 +173,13 @@ def setup():
         }
     )
     environment["FS_STACK_IMAGE_TAG"] = project_name(environment)
-    # Domain separation keeps preview digests distinct from event signatures.
-    environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
-        environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),
-        b"frappesetup-e2e-preview-digest-v1",
-        hashlib.sha256,
-    ).hexdigest()
+    if environment.get("IDENTITY_SYNC_WEBHOOK_SECRET"):
+        # Domain separation keeps preview digests distinct from event signatures.
+        environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
+            environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),
+            b"frappesetup-e2e-preview-digest-v1",
+            hashlib.sha256,
+        ).hexdigest()
     engine = ["docker", "--context", context]
     compose = [
         *engine,
@@ -229,7 +246,64 @@ def assert_owner(engine, compose, environment, create=False):
             raise ValueError("This stack's saved volumes belong to another worktree or port range.")
 
 
+def compose_files(compose):
+    entry = (
+        Path(compose[compose.index("--file") + 1])
+        if "--file" in compose and compose.index("--file") + 1 < len(compose)
+        else BACKEND / "dev/compose.yaml"
+    )
+    pending = [entry]
+    seen = []
+    while pending:
+        current = pending.pop(0)
+        if current in seen or not current.is_file():
+            continue
+        seen.append(current)
+        for line in current.read_text().splitlines():
+            match = INCLUDE_FILE.match(line)
+            if match:
+                pending.append(current.parent / match.group(1))
+    return seen
+
+
+def required_compose_settings(compose):
+    required_keys = []
+    for manifest in compose_files(compose):
+        text = manifest.read_text()
+        # Exclude nested fallbacks like ${FS_STACK_IMAGE_TAG:-${KC_PORT:?}} when the outer variable is set.
+        for outer, inner in re.findall(r"\$\{([A-Z][A-Z0-9_]*):-\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}\}", text):
+            text = re.sub(
+                rf"\$\{{{outer}:-\$\{{{inner}:\?[^}}]*\}}\}}",
+                f"${{{outer}:-}}",
+                text,
+            )
+            required_keys.append((outer, inner))
+        for key in REQUIRED_SETTING.findall(text):
+            if key != "IDENTITY_SYNC_DIGEST_KEY" and key not in required_keys:
+                required_keys.append(key)
+    return required_keys
+
+
+def require_compose_settings(compose, environment):
+    """Name missing Compose settings without printing any value or starting Docker."""
+    missing = []
+    for item in required_compose_settings(compose):
+        if isinstance(item, tuple):
+            outer, inner = item
+            if not environment.get(outer) and not environment.get(inner) and inner not in missing:
+                missing.append(inner)
+        elif not environment.get(item) and item not in missing:
+            missing.append(item)
+    if missing:
+        raise ValueError(
+            "Stack setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from the .env.example files into E2E_ENV_FILE."
+        )
+
+
 def config(compose, environment):
+    require_compose_settings(compose, environment)
     result = run(
         [*compose, "config", "--format", "json"],
         environment,
@@ -658,6 +732,7 @@ def main():
         elif args.action == "up":
             # Check local settings before the ownership probe or any other Docker call.
             require_press_settings(environment)
+            require_compose_settings(compose, environment)
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)
         elif args.action == "down":
