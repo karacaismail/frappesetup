@@ -6,6 +6,7 @@ import json
 import os
 import re
 import runpy
+import secrets
 import subprocess
 import sys
 import unittest
@@ -165,7 +166,7 @@ class PreviewFixturesTest(unittest.TestCase):
             return "http://localhost/entries/" + str(len(calls))
 
         with patch.dict(os.environ, settings), patch.object(fixtures, "keycloak_request", side_effect=request):
-            _, lifecycle = fixtures.seed_keycloak(43820, "synthetic")
+            lifecycle = fixtures.seed_keycloak(43820, "synthetic")
 
         self.assertEqual(set(lifecycle), {"delete", "revoke", "employee"})
         self.assertEqual(len({account["password"] for account in lifecycle.values()}), 3)
@@ -173,7 +174,56 @@ class PreviewFixturesTest(unittest.TestCase):
             self.assertEqual(account["email"], f"e2e-{name}-preview@example.test")
             self.assertTrue(account["subject"])
         members = [data for route, data in calls if route.endswith("/members")]
-        self.assertEqual(members, ["2", lifecycle["delete"]["subject"], lifecycle["revoke"]["subject"]])
+        self.assertEqual(members, [lifecycle["delete"]["subject"], lifecycle["revoke"]["subject"]])
+
+    def test_sync_fixture_client_receives_only_user_and_organization_roles(self):
+        # Made at run time so no credential-like literal sits in the source.
+        admin_grant = secrets.token_hex(8)
+        calls = []
+
+        def request(port, route, **kwargs):
+            calls.append((route, kwargs))
+            if route == "/admin/realms/platform/client-scopes":
+                return [
+                    {"name": "basic", "id": "basic-scope"},
+                    {"name": "service_account", "id": "service-scope"},
+                    {"name": "admin-api", "id": "admin-api-scope"},
+                    {"name": "kc-admin-api", "id": "kc-admin-api-scope"},
+                ]
+            if route == "/admin/realms/platform/clients?clientId=e2e-sync-fixture":
+                return [{"id": "sync-client"}]
+            if route == "/admin/realms/platform/clients?clientId=realm-management":
+                return [{"id": "management"}]
+            if route == "/admin/realms/platform/clients/sync-client/service-account-user":
+                return {"id": "sync-service-user"}
+            if route.startswith("/admin/realms/platform/clients/management/roles/"):
+                role_name = route.rsplit("/", 1)[1]
+                return {"id": role_name + "-id", "name": role_name}
+            return "http://localhost/entries/" + str(len(calls))
+
+        with patch.object(fixtures, "keycloak_request", side_effect=request):
+            sync_client = fixtures.configure_sync_fixture_client(43820, token=admin_grant)
+
+        self.assertEqual(sync_client["client_id"], "e2e-sync-fixture")
+        self.assertTrue(sync_client["client_value"])
+        sync_scopes = {
+            route.rsplit("/", 1)[1]
+            for route, kwargs in calls
+            if route.startswith("/admin/realms/platform/clients/sync-client/default-client-scopes/")
+            and kwargs.get("method") == "PUT"
+            and kwargs.get("data") == {}
+        }
+        self.assertEqual(sync_scopes, {"basic-scope", "service-scope", "admin-api-scope", "kc-admin-api-scope"})
+        granted_roles = [
+            item["name"]
+            for route, kwargs in calls
+            if route == "/admin/realms/platform/users/sync-service-user/role-mappings/clients/management"
+            for item in kwargs["data"]
+        ]
+        self.assertEqual(
+            set(granted_roles),
+            {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"},
+        )
 
     def test_loopback_provider_is_rejected_before_fixtures_are_seeded(self):
         settings = {

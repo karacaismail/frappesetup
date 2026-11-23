@@ -3,7 +3,7 @@
 Expected behaviour (orchestrator decision after the integration preview, docs/sozlesmeler.md section 5):
 - `start_login` creates the browser cookie and the state record and answers 302 to Keycloak,
 - `redirect_to` may only be a same-origin relative path,
-- with `kimlik_yalniz_keycloak` on, `/login` shows only the brand button and no password form,
+- with `identity_keycloak_only` on, `/login` redirects to the sign-in starter,
 - with the gate off the page also offers a plain password form against `/api/method/login`,
 - the button label comes from the brand setting, English source with Turkish translation.
 """
@@ -72,23 +72,17 @@ class TestLoginPage(FrappeAPITestCase):
 			response = h.request(self.client.get, START)
 		self.assertEqual(response.status_code, 503)
 
-	def test_login_page_with_gate_on_shows_only_the_brand_button(self):
+	def test_login_page_with_gate_on_redirects_without_rendering_a_password_form(self):
 		with h.SiteSettings({"identity_keycloak_only": 1}):
-			response = h.request(
-				self.client.get,
-				"/login",
-				query_string={"redirect-to": "/panel"},
-				headers={"Accept-Language": "tr"},
-			)
-		self.assertEqual(response.status_code, 200, response.data[:300])
-		html = response.data.decode()
-		self.assertIn('data-page="platform-core-login"', html)
-		self.assertIn("Atonota ile oturum aç", html)
-		self.assertIn(f'href="{START}?redirect_to=%2Fpanel"', html)
-		self.assertNotIn('name="pwd"', html)
-		self.assertNotIn('type="password"', html)
-		self.assertNotIn("frappe-web.bundle", html)
-		self.assertIn('lang="tr"', html)
+			for path, destination in (
+				("/desk?tab=1", f"{START}?redirect_to=%2Fdesk%3Ftab%3D1"),
+				("//external.example/desk", START),
+			):
+				with self.subTest(path=path):
+					response = h.request(self.client.get, "/login", query_string={"redirect-to": path})
+					self.assertEqual(response.status_code, 302)
+					self.assertEqual(response.headers["Location"], destination)
+					self.assertNotIn(b'type="password"', response.data)
 
 	def test_login_page_with_gate_off_adds_a_plain_password_form(self):
 		response = h.request(self.client.get, "/login", headers={"Accept-Language": "en"})
@@ -125,8 +119,6 @@ class TestLoginPage(FrappeAPITestCase):
 		self.assertNotIn(START, html)
 
 	def test_assets_are_served_from_the_app(self):
-		from frappe.utils import get_test_client as _unused
-
 		for path in (
 			"/assets/platform_core/identity/login.css",
 			"/assets/platform_core/identity/fonts/outfit-latin-wght-normal.woff2",

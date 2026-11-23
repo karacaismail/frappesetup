@@ -74,7 +74,11 @@ test.describe('Press account deletion with HRMS TR', () => {
     const settings = fixture();
     const { tenant } = sites();
     expect((await resource(request, tenant, settings.tenantReader, 'User', settings.email)).enabled).toBe(1);
-    await expect(expectTenantAnonymized(request, settings)).rejects.toThrow(DELETION_RECORD);
+    // The record read itself must succeed (200) and be empty. A permission error would also mention
+    // the record name, so it is ruled out here before the combined checks are expected to fail.
+    expect(await records(request, tenant, settings.tenantReader, DELETION_RECORD,
+      [['user', 'in', [settings.email, settings.tenantAnonymous]]], ['state'])).toEqual([]);
+    await expect(expectTenantAnonymized(request, settings)).rejects.toThrow(DELETION_RECORD + ' record of the anonymous user');
     expect((await resource(request, tenant, settings.tenantReader, 'Employee', settings.employee)).first_name).not.toBe(REDACTED);
   });
 

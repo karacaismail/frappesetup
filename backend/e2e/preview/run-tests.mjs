@@ -97,6 +97,10 @@ async function browserAvailable(engine, browserType) {
   return true;
 }
 
+function withoutSyncSecret(settings) {
+  return Object.fromEntries(Object.entries(settings).filter(([name]) => name !== 'E2E_SYNC_KEYCLOAK_SECRET'));
+}
+
 async function runPlaywright(label, args, reporter = 'list', settings = env) {
   const child = spawn(join(worktree, 'node_modules', '.bin', 'playwright'), [
     'test', '-c', 'backend/e2e/playwright.config.ts', '--reporter=' + reporter,
@@ -164,7 +168,9 @@ async function runFullPreview(projects) {
   }
 
   const shared = Object.fromEntries(Object.entries(env)
-    .filter(([name]) => !/^E2E_(CHROMIUM|WEBKIT)_/.test(name) && name !== 'E2E_LIFECYCLE_READER_SECRET'));
+    .filter(([name]) => !/^E2E_(CHROMIUM|WEBKIT)_/.test(name)
+      && name !== 'E2E_LIFECYCLE_READER_SECRET'
+      && name !== 'E2E_SYNC_KEYCLOAK_SECRET'));
   const runs = projects.flatMap((project) => {
     const engine = project.slice('--project='.length);
     const settings = {
@@ -205,7 +211,7 @@ try {
     if (projects.length) {
       results.push(await runPlaywright('browser', [
         ...projects, 'browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts',
-      ], containerRuntime ? 'json' : 'list'));
+      ], containerRuntime ? 'json' : 'list', withoutSyncSecret(env)));
     }
     try {
       if (!containerRuntime || env.E2E_ACCOUNT_DELETION === '1' || env.E2E_MOBILE_SESSION_REVOKE === '1') {
@@ -226,7 +232,7 @@ try {
     }
     const lifecycleProjects = containerRuntime ? projects : ['--project=chromium'];
     if (lifecycleProjects.length) {
-      results.push(await runPlaywright('lifecycle', [...lifecycleProjects, 'lifecycle.spec.ts'], 'json'));
+      results.push(await runPlaywright('lifecycle', [...lifecycleProjects, 'lifecycle.spec.ts'], 'json', withoutSyncSecret(env)));
     }
   }
   process.exitCode = results.find((code) => code !== 0) ?? 0;

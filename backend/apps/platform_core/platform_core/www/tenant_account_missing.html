@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+{% set title = _("You cannot access the panel with this account.", lang="tr", context="platform_core.identity") %}
+<html lang="tr" dir="ltr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="robots" content="noindex">
+	<meta name="referrer" content="no-referrer">
+	<title>{{ title | e }}</title>
+	<link rel="stylesheet" href="/assets/platform_core/identity/login.css">
+	<script src="/assets/platform_core/identity/login.js" defer></script>
+</head>
+<body>
+	<main class="login" aria-labelledby="login-title">
+		<h1 class="login__title" id="login-title">{{ title | e }}</h1>
+		<p class="login__lead">{{ _("Sign in with your panel account. Sign-up is closed.", lang="tr", context="platform_core.identity") | e }}</p>
+		{% if switch_account_url %}
+			<a class="button button--primary" href="{{ switch_account_url | e }}">{{ _("Sign in with another account", lang="tr", context="platform_core.identity") | e }}</a>
+		{% endif %}
+	</main>
+</body>
+</html>
