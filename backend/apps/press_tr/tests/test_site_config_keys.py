@@ -37,7 +37,6 @@ class SiteConfigKeysTest(unittest.TestCase):
 		self.assertEqual((field, operator), ("key", "in"))
 		self.assertCountEqual(keys, PASSWORD_KEYS | INTERNAL_KEYS)
 
-
 	def test_seed_metadata_does_not_emit_a_configured_password(self):
 		fake_password = "synthetic-g39-value-for-log-test"
 		stdout = io.StringIO()
