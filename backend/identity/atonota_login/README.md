@@ -12,7 +12,8 @@ Bu klasör ürünün kendi kodunu tutar. Kod MIT lisanslıdır (`LICENSE`). Keyc
 | `atonota_login/platforms.py` | Kayıtları denetler ve Keycloak kaydına çevirir. |
 | `atonota_login/keycloak_apply.py` | Platformları çalışan Keycloak'ta açar ya da kapatır. |
 | `atonota_login/decision.py` | Bir işlemin şimdi yapılıp yapılamayacağına karar verir (G-161). |
-| `policy/actions.json` | İşlemler, kontroller ve değer bekleyen kurallar (G-166, G-167). |
+| `atonota_login/policy/actions.json` | İşlemler, kontroller ve değer bekleyen kurallar (G-166, G-167). Dosya paket verisidir. |
+| `pyproject.toml` | Paket tanımı. Kiracı imajı paketi `uv pip install --no-deps` ile kurar. |
 | `atonota_login/verification_inbox.py` | Dış kimlik doğrulama bildirimlerinin gelen kutusu (G-164). |
 | `bin/atonota-login` | Komut satırı aracı. |
 | `tests/` | Ürünün testleri. |

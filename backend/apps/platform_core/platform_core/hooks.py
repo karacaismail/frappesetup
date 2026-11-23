@@ -116,6 +116,9 @@ website_user_allowed_methods = [
 	"platform_core.api.mobile_pwa.v1_revoke_installation",
 	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
 	"platform_core.api.access.get_access_summary",
+	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
+	"platform_core.api.atonota_login.evaluate",
+	"platform_core.api.atonota_login.open_paid_plan",
 ]
 
 

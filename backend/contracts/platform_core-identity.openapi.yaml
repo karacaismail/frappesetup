@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core identity endpoints
-  version: 0.7.0
+  version: 0.8.0
   summary: Endpoints for Keycloak sign-in, callback, sign-out and user sync.
   description: |
     This contract describes the identity endpoints of the `platform_core` app.
@@ -95,6 +95,8 @@ tags:
     description: Admin endpoint that turns on Keycloak sign-in on the site.
   - name: sync
     description: User endpoints of the sync service. They need a service token.
+  - name: atonota-login
+    description: AtonotA Login action decisions (G-161, G-166). They need a signed-in session.
 
 x-site-settings:
   description: |
@@ -1268,6 +1270,138 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
+
+  /platform_core.api.atonota_login.evaluate:
+    post:
+      tags: [atonota-login]
+      operationId: atonotaLoginEvaluate
+      summary: Says whether the signed-in user may take one action now.
+      description: |
+        Keycloak answers who the person is. This endpoint answers whether the person may take one action now (G-161).
+        The rules are in the `atonota_login` package (`atonota_login/policy/actions.json`). The package has no Frappe code.
+
+        The endpoint accepts only a signed-in user. A guest request gets 403 and `PermissionError`.
+
+        The server collects the evidence itself. The caller cannot send evidence.
+        Extra body fields such as `evidence` or `user` are dropped before the endpoint runs.
+        The endpoint does not read roles from a token. It reads two Frappe records:
+
+        - `identity`: the user is enabled and has a `PLT Identity Link` record.
+        - `membership`: the user is enabled and is a `System User` of this tenant site.
+
+        Evidence collected in one request holds for that request only.
+        The final step of an action collects it again (see `open_paid_plan`).
+
+        The result has one of three states:
+
+        - `ready`: every required control passed. The result holds for the named action and policy version only.
+        - `denied`: a required control has no valid evidence. `reasons` names the controls.
+        - `configuration_required`: a rule of the action has no value yet. `owner_tasks` names the rule and its owner.
+          The server opens one Frappe `ToDo` per rule for the `System Manager` role.
+          It does not open a second open task for the same rule and action.
+
+        An unknown action gives `denied` with the reason `unknown-action`.
+        A request writes at most one task per empty rule. It writes no other record. No endpoint does paid work.
+      security:
+        - frappeSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AtonotaDecisionRequest"
+            examples:
+              siparis:
+                summary: Ask whether the user may place an order.
+                value: {action: place-order}
+      responses:
+        "200":
+          description: The decision for the action.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AtonotaDecision"}
+              examples:
+                hazir:
+                  value:
+                    message:
+                      status: ready
+                      action: place-order
+                      policy_version: 0f3c0b5e2d9a4c1b8e7f6a5d4c3b2a190817263544536271809a8b7c6d5e4f3a
+                      reasons: []
+                      owner_tasks: []
+                kural_bekliyor:
+                  value:
+                    message:
+                      status: configuration_required
+                      action: open-paid-plan
+                      policy_version: 0f3c0b5e2d9a4c1b8e7f6a5d4c3b2a190817263544536271809a8b7c6d5e4f3a
+                      reasons: [configuration-required]
+                      owner_tasks:
+                        - {rule: paid-plan-pricing, owner: product-owner, action: open-paid-plan}
+        "400":
+          description: The `action` field is missing, is not text or is longer than 140 characters. The `exc_type` value is `InvalidInput`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "403":
+          description: Guest request. The `exc_type` value is `PermissionError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.api.atonota_login.open_paid_plan:
+    post:
+      tags: [atonota-login]
+      operationId: atonotaLoginOpenPaidPlan
+      summary: Opens a paid AtonotA Login plan. The gate is closed until the price decision (G-166).
+      description: |
+        This endpoint is the example final step of an action (G-161).
+        It judges the `open-paid-plan` action, collects the evidence again and calls `Policy.confirm` right before the write.
+        The write runs only when the final check says `ready` again.
+        A policy change between the two checks refuses the action with the reason `policy-changed`.
+
+        **The gate is closed today.** The `paid-plan-pricing` rule has no value. The price decision is open (G-166, K-61).
+        So every call returns 403 and `ActionRefused`, and the rule owner gets a task.
+        A system manager or administrator cannot pass the gate. The caller cannot send evidence.
+        A refused call writes no plan record and no billing record.
+        The plan record and its price come with the price decision. This file holds no price, currency or amount.
+
+        The request has no body fields. Extra fields are dropped.
+      security:
+        - frappeSession: []
+          csrfToken: []
+      responses:
+        "200":
+          description: |
+            Not reachable today. The gate is closed. When the price decision closes, this response returns the new plan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: object}
+        "403":
+          description: |
+            Guest request (`PermissionError`), or the action is refused (`ActionRefused`).
+            The message names the decision state, for example `configuration_required`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+              examples:
+                kapali:
+                  value:
+                    exc_type: ActionRefused
+                    exception: "platform_core.identity.atonota.decision_api.ActionRefused: The action open-paid-plan is not allowed now (configuration_required)."
+        "401":
+          $ref: "#/components/responses/OturumBitti"
 
   /platform_core.identity.login_policy.reset_password:
     post:
@@ -2619,6 +2753,46 @@ components:
             - $ref: "#/components/schemas/Email"
           description: The new name of the user. If nothing changed, the old name is returned.
 
+    AtonotaDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: Id of the action in `actions.json`, for example `place-order` or `open-paid-plan`.
+    AtonotaOwnerTask:
+      type: object
+      additionalProperties: false
+      required: [rule, owner, action]
+      properties:
+        rule: {type: string, description: Id of the rule that has no value yet.}
+        owner: {type: string, description: Role name of the rule owner, for example `product-owner`.}
+        action: {type: string, description: The action that waits for the rule.}
+    AtonotaDecision:
+      type: object
+      additionalProperties: false
+      required: [status, action, policy_version, reasons, owner_tasks]
+      properties:
+        status:
+          type: string
+          enum: [ready, denied, configuration_required]
+          description: The decision state.
+        action: {type: string, description: The judged action.}
+        policy_version:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: SHA-256 of the policy file. A ready result holds for this version only.
+        reasons:
+          type: array
+          items: {type: string}
+          description: Ids of the controls that failed, or a general reason such as `unknown-action`.
+        owner_tasks:
+          type: array
+          items: {$ref: "#/components/schemas/AtonotaOwnerTask"}
+          description: Rules without a value and their owners. Empty unless the state is `configuration_required`.
     FrappeError:
       type: object
       description: |
@@ -2626,7 +2800,8 @@ components:
         The custom values in this file are these: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
-        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable` and `IdentityInternalError`.
+        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable`, `IdentityInternalError`
+        and `ActionRefused`.
         The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
         `DataError`, `RateLimitExceededError` and `ValidationError`.
         The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.

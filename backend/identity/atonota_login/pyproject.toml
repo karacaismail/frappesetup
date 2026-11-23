@@ -1,0 +1,25 @@
+[build-system]
+# The PEP 639 license string (`license = "MIT"`) requires setuptools 77 or later.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atonota_login"
+version = "0.1.0"
+description = "AtonotA Login product code: action decisions, verification inbox and sign-in platforms. Independent of Frappe."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+# The tests run on Python 3.9 locally. The tenant image runs the Frappe 16 Python (3.14).
+requires-python = ">=3.9"
+# No runtime dependencies: only the standard library. The image installs it with --no-deps.
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/karacaismail/frappesetup"
+
+[tool.setuptools]
+packages = ["atonota_login"]
+
+[tool.setuptools.package-data]
+atonota_login = ["policy/*.json"]
