@@ -183,9 +183,40 @@ Kararım şudur:
 
 1. Panelin HTML sayfası Frappe'nin `/panel` sayfasıdır. Bu sayfa oturumu denetler. Sayfaya CSRF belirtecini ve güvenlik başlıklarını koyar.
 2. Arayüzün betik ve stil dosyaları `/panel/assets/` yolundan sunulur. Bu dosyaları ön vekil sunucudaki arayüz paketinden verir.
-3. Arayüz `--base=/panel/` ile derlenir.
+3. Arayüz `--base=/panel/ --manifest` ile derlenir. Vite, derleme aracının adıdır. `--manifest` seçeneği `dist/.vite/manifest.json` dosyasını yazar. Bu dosya Vite listesidir. Liste, giriş betiğini ve onun stil dosyalarını adlarıyla verir.
 
-Bugün `/panel` sayfası arayüz dosyalarını yüklemiyor. Bu bir engeldir (E-3).
+Paketin sunucudaki yolları şunlardır:
+
+| Ne | Yol |
+| --- | --- |
+| Paket klasörü | `/srv/atonota/web/<ortam>/releases/<paket kimliği>/` |
+| Şu anki paket | `/srv/atonota/web/<ortam>/current` bağı |
+| Ön vekilin gördüğü yol | `/srv/web/<ortam>/current/assets/` |
+| Kiracı container'ının gördüğü Vite listesi | `/srv/panel/current/.vite/manifest.json` |
+
+Sayfa şöyle çalışır:
+
+1. Kiracı container'ı `ATONOTA_PANEL_MANIFEST` değişkenini taşır. Değişken Vite listesinin yolunu verir. Değer `stack.yaml` dosyasındadır.
+2. Bir site başka bir liste kullanabilir. Bunun için site ayarına `panel_manifest_path` yazılır. Site ayarı değişkenden önce gelir.
+3. `/panel` sayfası listeyi her istekte okur. Sayfa giriş betiğini, stil dosyalarını ve önceden yükleme bağlantılarını listeden yazar. Bütün dosyalar `/panel/assets/` yolundan gelir.
+4. Liste yoksa ya da bozuksa sayfa yer tutucuyu gösterir. Yer tutucu "Panelin dosyaları bu siteye kurulmamış." der. Frappe günlüğüne nedeni de yazılır.
+5. Ön vekil `/panel/assets/` dosyalarını `/srv/web/<ortam>/current/assets/` klasöründen verir. Dosya yoksa ön vekil 404 döner. İstek Frappe'ye gitmez.
+6. `/panel/<yol>` biçimindeki adresler de aynı sayfayı açar. Böylece arayüzün kendi sayfaları doğrudan açılabilir.
+7. Oturumsuz istek giriş sayfasına yönlenir. Giriş sonrası kullanıcı aynı adrese döner.
+
+Geliştirme ortamında ön vekil yoktur. Bu yüzden `/panel/assets/` istekleri de Frappe'ye gider. Frappe bu isteklere dosya yerine panel sayfasının HTML'ini verir. Bu davranış beklenir. Yerelde arayüz dosyalarını Vite'ın kendi sunucusu verir. Canlıda ön vekil bu yolu Frappe'den önce karşılar.
+
+İçerik güvenlik politikası şudur. Bu politika tarayıcıya hangi kaynakların yüklenebileceğini söyler.
+
+- Betik ve stil yalnız sitenin kendi kökeninden gelir.
+- Sayfa her yanıtta yeni bir nonce üretir. Nonce, yalnız o yanıtta geçerli rastgele bir koddur.
+- Arayüz kütüphanesi kendi `style` öğelerini bu nonce ile işaretler. Politika yalnız bu öğelere izin verir.
+- Nonce `<meta property="csp-nonce">` öğesinde durur. Satır içi betik yoktur.
+- Sayfa başka sitede çerçeve içinde açılmaz.
+
+Taşıma betiği paketi kurmadan önce Vite listesini denetler. Kural `/panel` sayfasının kuralıyla aynıdır. Giriş betiği, stil dosyaları ve bütün içe aktarmalar `assets/` klasörünün hemen altında olmalıdır. Bu dosyalar pakette de bulunmalıdır. Kurala uymayan paket kurulmaz ve şu anki paket değişmez. Böylece sayfa taşımadan sonra yer tutucuya düşmez.
+
+Arka uç tarafı hazırdır. Arayüz tarafındaki ayar ayrı bir iştir (E-3).
 
 ## Jenkins hattı
 
@@ -467,7 +498,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | --- | --- | --- | --- |
 | E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
 | E-2 | Press'in üretim imajı yok. Press bugün açılışta kurulur. Python 3.14 yaması da açık (O-18) | press-tr işi `backend/deploy/images/press.Dockerfile` dosyasını yazar. Dosya gelince `build-release` Press'i pakete ekler | press-tr işi |
-| E-3 | `/panel` sayfası arayüz dosyalarını yüklemiyor. Sayfa yer tutucu metin gösteriyor | `panel.html`, arayüz paketinin Vite listesini okur. Sonra `/panel/assets/` dosyalarını yükler. İçerik güvenlik politikası bu yola izin verir | platform-core-kabuk işi |
+| E-3 | Arka uç tarafı hazır. `/panel` sayfası Vite listesini okur ve `/panel/assets/` dosyalarını yükler. Arayüz henüz bu adrese göre ayarlanmadı | atonota-web işi altı ayar yapar. (1) Yönlendiricinin kök yolu `/panel` olur. (2) Ant Design `ConfigProvider` nonce'u `csp-nonce` öğesinin `.nonce` özelliğinden alır. (3) Küçük dosyalar `data:` adresine çevrilmez. Gerekirse `build.assetsInlineLimit: 0` verilir. (4) Kök öğenin kimliği `root` olur. (5) `public/` klasörü kullanılmaz. Ön vekil `/panel/<ad>` adresini sunmaz. (6) Yerel derleme de `--base=/panel/ --manifest` kullanır. Jenkins bu seçenekleri zaten verir. Ayrıca atonota-web işi tarayıcıda politika ihlali olup olmadığını denetler. Örneğin `setAttribute('style', ...)` ile yazılan stil engellenir | atonota-web işi |
 | E-4 | Üretim ayarlarının listesi yok. Örneğin Keycloak istemci sırları, sitenin kimlik ayarları ve eşitleme servisinin kiracı listesi | Her servis için üretim anahtar listesi yazılır. Liste `production.env.example` biçiminde olur | kimlik-realm işi ve DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |
@@ -491,6 +522,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 - Sunucuya giden her dosyanın paketten geldiği sınanır. Değişmiş, eksik ya da başka commit'ten gelen dağıtım dosyası iş bağlanmadan reddedilir.
 - Üretim kiracı imajı yerelde derlendi. İçinde `panel.bundle.css` ve `panel-focus.bundle.js` dosyaları var.
 - Jenkins dosyaları Jenkins'in kendi denetleyicisinden geçti.
+- `/panel` sayfası yerel Frappe web sürecinde denendi. Sayfa Vite listesindeki dosyaları yükledi. Liste yokken yer tutucu göründü.
 
 Şunlar sınanmadı:
 

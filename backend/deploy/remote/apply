@@ -63,6 +63,8 @@ if [[ "$kind" == web ]]; then
     if [[ ! -d "$target" ]]; then
         install -d -m 0755 "$target.tmp"
         tar -xzf "$incoming/$file" -C "$target.tmp" --no-same-owner
+        # A bundle without a usable manifest would leave /panel on its placeholder (E-3).
+        ( panel_entry "$target.tmp" ) >/dev/null || { rm -rf -- "$target.tmp"; exit 1; }
         cp "$incoming/release.json" "$incoming/$file" "$target.tmp/"
         mv -T "$target.tmp" "$target"
     fi
