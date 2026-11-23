@@ -1,0 +1,185 @@
+# One environment (alpha, beta, rc or prod) on a Hetzner server. Design: docs/dagitim/ortamlar.md.
+# remote/apply runs this file as project "atonota-<env>" with two env files:
+#   release.env  image references pinned by digest (from release.json, written by remote/apply)
+#   host.env     the non-secret environment file of deploy/environments/<env>.env
+# Secrets live only on the server in /etc/atonota/<env>/<service>.env (mode 0600). Nothing here
+# publishes a host port. The edge proxy (edge.yaml) reaches tenant-frontend, keycloak and press over
+# the network "atonota-edge-<env>" by the aliases <env>-tenant, <env>-keycloak and <env>-press.
+# Each environment has its own edge network, so alpha containers cannot reach beta services.
+
+x-tenant: &tenant
+  image: ${ATONOTA_IMAGE_TENANT:?release.env is missing}
+  restart: unless-stopped
+  env_file: ["/etc/atonota/${ATONOTA_ENV:?}/tenant.env"]
+  volumes:
+    - tenant-sites:/home/frappe/frappe-bench/sites
+    - tenant-logs:/home/frappe/frappe-bench/logs
+    - /srv/atonota/web/${ATONOTA_ENV:?}:/srv/panel:ro
+  networks: [internal]
+
+services:
+  tenant-db:
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
+    restart: unless-stopped
+    env_file: ["/etc/atonota/${ATONOTA_ENV:?}/tenant-db.env"]
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--skip-name-resolve"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes: [tenant-db:/var/lib/mysql]
+    networks: [internal]
+
+  tenant-redis-cache:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 20}
+    networks: [internal]
+
+  tenant-redis-queue:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 20}
+    volumes: [tenant-redis-queue:/data]
+    networks: [internal]
+
+  tenant-web:
+    <<: *tenant
+    command:
+      - env/bin/gunicorn
+      - --chdir=/home/frappe/frappe-bench/sites
+      - --bind=0.0.0.0:8000
+      - --threads=4
+      - --workers=${ATONOTA_GUNICORN_WORKERS:-4}
+      - --worker-class=gthread
+      - --worker-tmp-dir=/dev/shm
+      - --timeout=120
+      - --preload
+      - frappe.app:application
+    healthcheck:
+      test:
+        - CMD
+        - env/bin/python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/method/ping', headers={'Host': '${ATONOTA_HEALTH_SITE:?}'}), timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      tenant-db: {condition: service_healthy}
+      tenant-redis-cache: {condition: service_healthy}
+      tenant-redis-queue: {condition: service_healthy}
+
+  tenant-socket:
+    <<: *tenant
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    depends_on: [tenant-web]
+
+  tenant-worker:
+    <<: *tenant
+    command: ["bench", "worker", "--queue", "short,default,long"]
+    depends_on: [tenant-web]
+
+  # Frappe's own scheduler. Off until the project owner decides on scheduled work
+  # (cron rule in backend/CLAUDE.md). Turn on with COMPOSE_PROFILES=scheduler.
+  tenant-scheduler:
+    <<: *tenant
+    profiles: [scheduler]
+    command: ["bench", "schedule"]
+    depends_on: [tenant-web]
+
+  # Serves Frappe assets and forwards to gunicorn and socket.io, as in the frappe/erpnext image.
+  tenant-frontend:
+    <<: *tenant
+    command: ["nginx-entrypoint.sh"]
+    environment:
+      BACKEND: tenant-web:8000
+      SOCKETIO: tenant-socket:9000
+      FRAPPE_SITE_NAME_HEADER: $$host
+      UPSTREAM_REAL_IP_ADDRESS: 0.0.0.0/0
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      PROXY_READ_TIMEOUT: "120"
+      CLIENT_MAX_BODY_SIZE: 50m
+    depends_on: [tenant-web, tenant-socket]
+    networks:
+      internal: {}
+      edge: {aliases: ["${ATONOTA_ENV:?}-tenant"]}
+
+  keycloak-db:
+    image: postgres:17.12-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+    restart: unless-stopped
+    env_file: ["/etc/atonota/${ATONOTA_ENV:?}/keycloak-db.env"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes: [keycloak-db:/var/lib/postgresql/data]
+    networks: [internal]
+
+  keycloak:
+    image: ${ATONOTA_IMAGE_KEYCLOAK:?release.env is missing}
+    restart: unless-stopped
+    # The image has no kc.sh build step, so "start" builds at boot. "--import-realm" skips a realm
+    # that already exists, so later releases do not overwrite realm changes.
+    command: ["start", "--import-realm"]
+    env_file: ["/etc/atonota/${ATONOTA_ENV:?}/keycloak.env"]
+    environment:
+      KC_HOSTNAME: https://${ATONOTA_ID_HOST:?}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      keycloak-db: {condition: service_healthy}
+    networks:
+      internal: {}
+      edge: {aliases: ["${ATONOTA_ENV:?}-keycloak"]}
+
+  identity-sync:
+    image: ${ATONOTA_IMAGE_IDENTITY_SYNC:?release.env is missing}
+    restart: unless-stopped
+    env_file: ["/etc/atonota/${ATONOTA_ENV:?}/identity-sync.env"]
+    volumes: [identity-sync:/data]
+    depends_on:
+      keycloak: {condition: service_healthy}
+    networks: [internal]
+
+  # Press has no production image yet (blocker E-2 in docs/dagitim/ortamlar.md).
+  # remote/apply turns this profile on only when the release carries a press image.
+  press:
+    image: ${ATONOTA_IMAGE_PRESS:-unset}
+    profiles: [press]
+    restart: unless-stopped
+    env_file: ["/etc/atonota/${ATONOTA_ENV:?}/press.env"]
+    volumes: [press-sites:/home/frappe/frappe-bench/sites]
+    networks:
+      internal: {}
+      edge: {aliases: ["${ATONOTA_ENV:?}-press"]}
+
+volumes:
+  tenant-db:
+  tenant-sites:
+  tenant-logs:
+  tenant-redis-queue:
+  keycloak-db:
+  identity-sync:
+  press-sites:
+
+networks:
+  internal: {}
+  # One edge network per environment (remote/apply creates it); the edge proxy joins each one.
+  edge:
+    name: atonota-edge-${ATONOTA_ENV:?}
+    external: true

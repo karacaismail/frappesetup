@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Restore a backup taken by remote/backup into the release in <release folder>.
+# Usage: restore <env> <release folder> <backup folder>
+# Run only from rollback --restore-backup, with the Frappe processes stopped.
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$here/common.sh"
+
+env="${1:?usage: restore <env> <release folder> <backup folder>}"
+folder="${2:?usage: restore <env> <release folder> <backup folder>}"
+backup="${3:?usage: restore <env> <release folder> <backup folder>}"
+check_env_name "$env"
+load_host_env "$folder/host.env"
+(cd "$backup" && sha256sum --quiet --check SHA256SUMS) || fail "backup $backup is damaged"
+
+stack "$folder" up --detach --wait tenant-db tenant-redis-cache tenant-redis-queue keycloak-db
+for site in $ATONOTA_TENANT_SITES; do
+    inside="/home/frappe/frappe-bench/sites/deploy-restore/$site"
+    stack "$folder" run --rm --no-deps --entrypoint sh tenant-web -c "mkdir -p '$inside'"
+    tar -C "$backup/tenant/$site" -cf - . |
+        stack "$folder" run --rm --no-deps -T --entrypoint sh tenant-web -c "tar -xf - -C '$inside'"
+    # The database root password comes from tenant.env inside the container, not from this shell.
+    stack "$folder" run --rm --no-deps --entrypoint sh tenant-web -c "
+        set -e
+        cd '$inside'
+        db=\$(ls *-database.sql.gz)
+        public=\$(ls *-files.tar 2>/dev/null | grep -v private || true)
+        private=\$(ls *-private-files.tar 2>/dev/null || true)
+        cd /home/frappe/frappe-bench
+        bench --site '$site' --force restore \"$inside/\$db\" \
+            \${public:+--with-public-files \"$inside/\$public\"} \
+            \${private:+--with-private-files \"$inside/\$private\"} \
+            --db-root-password \"\$MARIADB_ROOT_PASSWORD\"
+        rm -rf '$inside'"
+done
+stack "$folder" exec -T keycloak-db dropdb --username keycloak --if-exists --force keycloak
+stack "$folder" exec -T keycloak-db createdb --username keycloak keycloak
+stack "$folder" exec -T keycloak-db pg_restore --username keycloak --dbname keycloak --no-owner <"$backup/keycloak.dump"
+stack "$folder" run --rm --no-deps -T --entrypoint sh identity-sync -c 'cat >/data/identity_sync.sqlite3' \
+    <"$backup/identity-sync.sqlite3"
+say "restored $backup into $env"
