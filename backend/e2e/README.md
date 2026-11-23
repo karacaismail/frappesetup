@@ -128,6 +128,10 @@ npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=c
 npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=api
 ```
 
+Silme testinin ayar dosyası yüklüyken iki motorlu genel komutu çalıştırmayın. `E2E_PRESS_DELETION=1` ayarı silme testlerini açar.
+Chromium'daki test deneme hesabını tüketir. WebKit'teki test aynı hesapla kalır. Her motor için ayrı `seed-deletion` gerekir.
+Komutlar "Press'ten hesap silme ve HRMS TR çalışan kaydı" bölümündedir.
+
 ## Örnek veri
 
 Yalnız yerel test ortamını kullanın. Gerçek hesap veya veri kullanmayın.
@@ -152,6 +156,42 @@ Bu iki test grubu, örnek ortam hazır olunca açılır.
 
 Sihirli bağlantı için `magic-link.spec.ts` dosyasını seçin.
 Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
+
+## Press'ten hesap silme ve HRMS TR çalışan kaydı
+
+Bu test MVP testi 2'nin 5e satırını kapatır. Test dosyası `press-deletion.spec.ts` dosyasıdır.
+Test ortak yığında çalışır. Yığın, kiracıya HRMS TR kurar ve Keycloak ayarlarını yazar.
+
+Zincir şöyle ilerler:
+
+1. Müşteri Press'te hesabını silmek ister. Press, Keycloak'ta yeni bir giriş ister.
+2. Press, isteği kimlik eşitleme servisine gönderir.
+3. Servis Press'i ve kiracıyı sırayla kapatır ve anonim yapar.
+4. Servis en son Keycloak hesabını siler. Test bu silmeyi bekler.
+5. Test kiracıyı yalnız okur. Servisin açtığı silme kaydı “Anonymized” olmalıdır. Eski kullanıcı yok, anonim kullanıcı kapalı olmalıdır. Kimlik bağı silinmiş, çalışan kaydının kişisel alanları temizlenmiş olmalıdır. Bu okumalar geçmeden test ilerlemez.
+6. Test en son tekrar çağrı sözleşmesini sınar. Kiracının anonim yapma ucunu servis belirteciyle çağırır. Kiracı 200 ile `anonymized: true`, `found: true`, anonim kullanıcı adı ve “Anonymized” durumunu döner. Yeni silme kaydı açılmaz.
+
+Aynı dosyada bir negatif test vardır. Test taze deneme hesabıyla çalışır. Bu hesapta servis kiracıya hiç dokunmamıştır.
+Negatif test 5. adımdaki okumaların bu durumda kaldığını doğrular. Servis kiracıyı atlarsa asıl test aynı yerde kalır.
+Negatif test yalnız okur. İki test aynı deneme hesabını sırayla kullanır.
+
+Komutları depo kökünden çalıştırın.
+
+```sh
+backend/e2e/stack seed-deletion
+set -a; . .pane/scratch/e2e-deletion.env; set +a
+npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium press-deletion.spec.ts
+```
+
+WebKit için komutları yeniden çalıştırın. Önce yeni `seed-deletion`, sonra `--project=webkit` ile test. Bir deneme hesabı tek motor için yeter.
+İki motoru tek komutta çalıştırmayın. İkinci motor tüketilmiş hesapla kalır.
+
+`seed-deletion` yeni bir deneme hesabı, bir şirket ve kişisel alanları dolu bir çalışan kaydı açar.
+Komut ayrıca yalnız kullanıcı okuyan bir Keycloak istemcisi hazırlar. Test bu istemciyle Keycloak hesabının silindiğini doğrular.
+Komut kimlik eşitleme servisinin kısa ömürlü belirtecini de alır. Belirteç 300 saniye yaşar. Testi bu süre içinde çalıştırın.
+Her test koşusu için komutu yeniden çalıştırın. Silinen hesap bir daha açılamaz.
+Test ayar dosyasını Git'e eklemeyin. Dosya parola, servis belirteci ve iki yönetici oturumu taşır.
+Yönetici oturumları kiracıda ve Press'te okuma içindir. Test bitince bu oturumları kapatır. Test hiç çalışmazsa oturumlar süresi dolana kadar açık kalır.
 
 ## Hesap ve oturum testleri
 
