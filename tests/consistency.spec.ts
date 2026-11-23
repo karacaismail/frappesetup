@@ -20,6 +20,7 @@ const ids = new Set(reqs.map((r) => r.id));
 type TaskItem = { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[] } };
 type TaskBoard = {
   audit: { date: string; commit: string; note: string; addedAfter: string[] };
+  update: { date: string; commit: string; note: string; reviewed: string[] };
   epics: { id: string; title: string; goal: string }[];
   statuses: { id: string; label: string; rule: string }[];
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
@@ -98,7 +99,10 @@ test.describe('content consistency', () => {
       for (const t of ev.tests) expect(existsSync(new URL(t, root)), `${id} test dosyası ${t}`).toBe(true);
     }
     const commits = new Set(done.map(([, it]) => it.evidence!.commit));
-    for (const c of commits) {
+    // Sığ klonda (CI'daki actions/checkout varsayılanı) eski commit yoktur; commit denetimi yalnız tam geçmişte koşar.
+    const shallow =
+      execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: fileURLToPath(root) }).toString().trim() === 'true';
+    for (const c of shallow ? [] : commits) {
       expect(() => execFileSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: fileURLToPath(root), stdio: 'ignore' }), `commit ${c}`).not.toThrow();
     }
     // Denetlenmemiş kalem bitti ya da sürüyor sayılmaz: denetim yalnız P0..P4 MUST kalemlerini okudu.
@@ -107,10 +111,36 @@ test.describe('content consistency', () => {
     expect([...addedAfter].filter((id) => !ids.has(id)), 'addedAfter bilinmeyen kimlik').toEqual([]);
     expect(addedAfter.size, 'addedAfter tekrarsız').toBe(board.audit.addedAfter.length);
     expect(board.statuses.find((s) => s.id === 'unverified')!.rule).toContain('denetimden sonra eklen');
+    // Güncelleme (update.reviewed) denetim dışındaki kalemleri adıyla okur; yalnız bu kalemler ek durum taşıyabilir.
+    const reviewed = new Set(board.update.reviewed);
+    expect([...reviewed].filter((id) => !ids.has(id)), 'reviewed bilinmeyen kimlik').toEqual([]);
+    expect(reviewed.size, 'reviewed tekrarsız').toBe(board.update.reviewed.length);
     const audited = (r: Req) =>
-      !addedAfter.has(r.id) && r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase);
+      reviewed.has(r.id) ||
+      (!addedAfter.has(r.id) && r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase));
     const claimed = reqs.filter((r) => !audited(r) && board.items[r.id].status !== 'unverified').map((r) => r.id);
     expect(claimed, 'denetim dışı kalemde durum iddiası').toEqual([]);
+  });
+
+  test('task board update names a commit that is an ancestor of HEAD', () => {
+    // Pano güncel kalır: gereksinimi bitiren ya da ilerleten dal, aynı dalda task-board.json kaydını ve update
+    // bloğunu da günceller. update.commit depoda olmalı ve HEAD'in atası olmalı; tarih denetim tarihinden önce olamaz.
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const u = board.update;
+    expect(u.date, 'update.date YYYY-AA-GG').toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(Number.isNaN(Date.parse(`${u.date}T00:00:00Z`)), 'update.date geçerli tarih').toBe(false);
+    expect(u.date >= board.audit.date, 'güncelleme denetimden önce olamaz').toBe(true);
+    expect(u.commit, 'update.commit').toMatch(/^[0-9a-f]{7,40}$/);
+    expect(u.note.trim(), 'update.note').not.toBe('');
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: fileURLToPath(root), stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    // Sığ klonda (CI'daki actions/checkout varsayılanı) geçmiş yoktur; denetim yerel kapıda ve birleştirmede koşar.
+    test.skip(git('rev-parse', '--is-shallow-repository') === 'true', 'Sığ klon: commit geçmişi yok.');
+    expect(() => git('cat-file', '-e', `${u.commit}^{commit}`), `update.commit ${u.commit} depoda`).not.toThrow();
+    expect(
+      () => execFileSync('git', ['merge-base', '--is-ancestor', u.commit, 'HEAD'], { cwd: fileURLToPath(root), stdio: 'ignore' }),
+      `update.commit ${u.commit} HEAD'in atası`,
+    ).not.toThrow();
   });
 
   test('requirement ids are unique, contiguous and well formed', () => {

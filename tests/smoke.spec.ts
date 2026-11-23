@@ -8,6 +8,8 @@ const require = createRequire(import.meta.url);
 const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
   require('../src/data/requirements.json');
 const board: {
+  update: { date: string; commit: string; note: string };
+  audit: { commit: string; note: string };
   epics: { id: string; title: string }[];
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
@@ -1097,6 +1099,24 @@ test.describe('task board', () => {
       await noHorizontalOverflow(page);
     });
   }
+
+  test('the board says when and at which commit the statuses were updated', async ({ page }) => {
+    // Okur durumun hangi güne ve hangi commit'e göre yazıldığını panonun kurallar bölümünde görür.
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const stamp = page.getByTestId('task-board-updated');
+    const day = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: 'UTC' })
+      .formatToParts(new Date(`${board.update.date}T00:00:00Z`))
+      .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+    await expect(stamp).toContainText(
+      `Durumlar ${day.day} ${day.month} ${day.year} ${day.weekday} günü ${board.update.commit} commit'ine göre güncellendi.`,
+    );
+    await expect(stamp).toBeVisible();
+    // Cümleler arasında boşluk kalır: derleme metni bitişik yazarsa "güncellendi.Güncelleme" tek sözcük olur.
+    await expect(stamp).toContainText(`güncellendi. ${board.update.note}`);
+    await expect(page.locator('.task-rules > p').nth(1)).toContainText(`commit'inde yapıldı. ${board.audit.note}`);
+    await noHorizontalOverflow(page);
+  });
 
   test('status, level and epic filters are toggle groups with exact counts', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
