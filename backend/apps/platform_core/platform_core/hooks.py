@@ -79,6 +79,9 @@ ai_write_closed_doctypes = [
 	"PLT Mobile Installation",
 	"PLT Mobile Account State",
 	"PLT Access Rule",
+	# G-164: verification notices and cases change only through the signed provider notice and its queue job.
+	"PLT Verification Notice",
+	"PLT Verification Case",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [

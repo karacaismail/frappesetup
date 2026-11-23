@@ -34,7 +34,8 @@
       "platform_core.identity.service_client",
       "platform_core.api.auth",
       "platform_core.api.identity",
-      "platform_core.identity.atonota.decision_api"
+      "platform_core.identity.atonota.decision_api",
+      "platform_core.identity.atonota.verification_api"
     ],
     "platform_core.shell": [
       "platform_core.shell.api",
@@ -61,7 +62,8 @@
     ],
     "atonota_login": [
       "atonota_login",
-      "atonota_login.decision"
+      "atonota_login.decision",
+      "atonota_login.verification_inbox"
     ]
   },
   "path_owners": {
