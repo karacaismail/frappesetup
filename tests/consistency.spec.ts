@@ -152,27 +152,31 @@ test.describe('content consistency', () => {
       seen.add(p.id);
     }
 
+    // Metin önce Türkçe kurallarla küçültülür: JavaScript `i` bayrağı "I" ile "ı" harfini eşlemez ("BİTİŞ HAFTASI").
+    // Kalıplar küçük harfle yazılır ve Türkçe eklerde ASCII `\b` yerine Unicode harf sınırı kullanılır: `\b` yalnız ASCII
+    // harf sınırıdır, "haftada" ve "eforu" gibi ekli biçimlerde sınır oluşmaz.
+    const lower = (t: string) => t.toLocaleLowerCase('tr');
     const PATTERNS: [RegExp, string][] = [
-      [/\d+\.\s*hafta/iu, 'N. hafta'],
-      [/\d+\s*[–-]\s*\d+\.\s*hafta/iu, 'N–M. hafta'],
-      [/≈\s*\d+\s*hafta/iu, '≈N hafta'],
-      [/\d+\s*haftalık plan/iu, 'N haftalık plan'],
-      [/göreli süre/iu, 'göreli süre'],
-      [/story ?point/iu, 'story point'],
-      [/\bsprint\b/iu, 'sprint'],
-      [/adam[- /]?(gün|ay)/iu, 'adam-gün'],
-      [/hafta sayısı/iu, 'hafta sayısı'],
-      [/\d+\s*hafta\b/iu, 'N hafta'],
-      [/hafta(sı|sında)(?![\p{L}\p{N}])/iu, 'haftası'], // \b ASCII sınırıdır; "ı" sonrası için Unicode sınır
-      [/\befor\b/iu, 'efor'],
-      [/\b\d+\s*SP\b/u, 'N SP'],
+      [/\d+\.\s*hafta/u, 'N. hafta'],
+      [/\d+\s*[–-]\s*\d+\.\s*hafta/u, 'N–M. hafta'],
+      [/≈\s*\d+\s*hafta/u, '≈N hafta'],
+      [/\d+\s*haftalık plan/u, 'N haftalık plan'],
+      [/göreli süre/u, 'göreli süre'],
+      [/story ?point/u, 'story point'],
+      [/(?<![\p{L}])sprint/u, 'sprint'],
+      [/adam[- /]?(gün|ay)/u, 'adam-gün'],
+      [/hafta sayısı/u, 'hafta sayısı'],
+      [/\d+\s*hafta(?!l[ıi]k)/u, 'N hafta'], // "4 haftalık" ürün süresidir, geçer
+      [/hafta(s[ıi]|da|ya|dan|lar)(?![\p{L}])|hafta(s[ıi]n)/u, 'haftası'],
+      [/(?<![\p{L}])efor/u, 'efor'],
+      [/(?<![\p{L}\p{N}])\d+\s*sp(?![\p{L}])/u, 'N SP'],
     ];
     // Kalıpların kendisi denenir: görev süresi yakalanır, ürün süresi geçer ("ay" için kalıp yok: "ilk 6 ay açık" ürün kuralıdır).
-    const hit = (t: string) => PATTERNS.some(([re]) => re.test(t));
-    for (const bad of ['P1 12 hafta sürer', '3 hafta', "P0'ın ilk haftasında başlar", 'bitiş haftası', '5 SP', 'efor: 10 gün', '3 adam/gün', '14–26. hafta', '≈12 hafta', '42 haftalık plan', 'story point', 'iki sprint']) {
+    const hit = (t: string) => PATTERNS.some(([re]) => re.test(lower(t)));
+    for (const bad of ['P1 12 hafta sürer', '3 hafta', "P0'ın ilk haftasında başlar", 'bitiş haftası', '5 SP', 'efor: 10 gün', '3 adam/gün', '14–26. hafta', '≈12 hafta', '42 haftalık plan', 'story point', 'iki sprint', 'P1 12 haftada biter', '3 haftaya sığar', 'ilk haftadan sonra', 'haftasından', 'eforu 10 gün', 'BİTİŞ HAFTASI', 'sprintler']) {
       expect(hit(bad), `yakalanmalı: ${bad}`).toBe(true);
     }
-    for (const ok of ['4 haftalık', 'haftalık realm export', '14 günlük deneme', 'ilk 6 ay açık', '7 günlük/4 haftalık/12 aylık', 'haftalık sapma kontrolü', '72 saat', '365 gün', 'efora', 'spring']) {
+    for (const ok of ['4 haftalık', 'haftalık realm export', '14 günlük deneme', 'ilk 6 ay açık', '7 günlük/4 haftalık/12 aylık', 'haftalık sapma kontrolü', '72 saat', '365 gün', 'spring']) {
       expect(hit(ok), `geçmeli: ${ok}`).toBe(false);
     }
     const rootDir = fileURLToPath(root);
@@ -195,7 +199,8 @@ test.describe('content consistency', () => {
     for (const file of files) {
       const lines = readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, i) => {
-        for (const [re, why] of PATTERNS) if (re.test(line)) offenders.push(`${file.slice(rootDir.length)}:${i + 1}: ${why}`);
+        const l = lower(line);
+        for (const [re, why] of PATTERNS) if (re.test(l)) offenders.push(`${file.slice(rootDir.length)}:${i + 1}: ${why}`);
       });
     }
     expect(offenders).toEqual([]);
