@@ -1,4 +1,47 @@
+Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabı ve `Karaca.20` parolasıyla açın.
+
 # Uçtan uca entegrasyon testleri
+
+## Yerel inceleme hesapları
+
+Bu hesaplar yalnız yerel yığında kullanılır.
+Yerel yığın, `backend/e2e/stack up` komutunun açtığı Keycloak, kiracı ve Press ortamıdır.
+Önce yığını açın.
+Sonra depo kökünden bu komutu çalıştırın.
+Komut hesapları kurar ya da günceller.
+
+```sh
+PANE_PORT=<port> backend/e2e/stack review-accounts
+```
+
+Bütün hesapların parolası `Karaca.20` olur.
+Parola tek bir dosyada durur: `backend/e2e/review-accounts.json`.
+Hesap listesi de bu dosyadadır.
+
+| Hesap | Nerede | Ne için |
+| --- | --- | --- |
+| `inceleme-panel@example.test` | Keycloak `platform` realm'i ve kiracı | Headless paneli inceler. Kiracıda “Employee” ve “HR User” rolleri vardır. Bir örnek çalışan kaydına bağlıdır. |
+| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Kiracıda “System Manager” rolü vardır. |
+| `inceleme-yerel-yonetici` | Keycloak `master` realm'i | Keycloak yönetim konsolunu açar. “admin” rolü vardır. |
+| `inceleme-press@example.test` | Keycloak `platform` realm'i ve Press | Press kullanıcısı olarak girer. |
+
+Realm, Keycloak'ta kullanıcıları ve kuralları bir arada tutan alandır.
+Keycloak yönetim konsolu `http://identity.localhost:<PANE_PORT>/admin/` adresindedir.
+
+Komut önce yığının adreslerini denetler.
+Adres `localhost` ya da `*.localhost` değilse komut durur.
+
+`platform` realm'inin parola kuralı en az 12 karakter ister.
+Bu kural üretim kuralıdır ve realm dosyasında değişmez.
+Komut çalışırken yalnız yerel Keycloak'ta kısa bir süre 8 karakter kabul edilir.
+Aynı parolanın yeniden yazılabilmesi için parola geçmişi kuralı da o süre kapalı kalır.
+Parolalar yazılınca komut realm'in kendi kuralını geri yükler.
+Komut hata verse bile kural geri yüklenir.
+
+Kiracıya ve Press'e parola gitmez.
+Giriş her zaman Keycloak üzerinden olur.
+Komut kiracıda ve Press'te kimlik bağını kurar.
+Kimlik bağı, Keycloak hesabını yerel kullanıcıya bağlayan kayıttır.
 
 ## Birleştirme önizlemesi
 
