@@ -55,5 +55,8 @@ class StackTenantLoginTest(unittest.TestCase):
                 self.assertEqual(tenant["attributes"]["backchannel.logout.url"], backchannel)
                 expected = original_uris + ([origin + STACK["TENANT_CALLBACK"]] if vite == "1" else [])
                 self.assertEqual(tenant["redirectUris"], expected)
-                expected_logout = logout + "##" + origin + "/panel" if vite == "1" else logout
+                recovery = "/api/method/platform_core.api.auth.start_login?switch_account=1"
+                self.assertIn(environment["ATONOTA_SITE_TENANT1_URL"] + recovery,
+                              logout.replace("${ATONOTA_SITE_TENANT1_URL}", environment["ATONOTA_SITE_TENANT1_URL"]))
+                expected_logout = "##".join((logout, origin + "/panel", origin + recovery)) if vite == "1" else logout
                 self.assertEqual(tenant["attributes"]["post.logout.redirect.uris"], expected_logout)

@@ -467,7 +467,10 @@ def stack_realm(realm, environment):
         tenant = next(client for client in realm["clients"] if client["clientId"] == "site-tenant1")
         tenant["redirectUris"].append(origin + TENANT_CALLBACK)
         logout_uris = tenant["attributes"]["post.logout.redirect.uris"]
-        tenant["attributes"]["post.logout.redirect.uris"] = logout_uris + "##" + origin + "/panel"
+        recovery = "/api/method/platform_core.api.auth.start_login?switch_account=1"
+        tenant["attributes"]["post.logout.redirect.uris"] = "##".join(
+            (logout_uris, origin + "/panel", origin + recovery)
+        )
     return realm
 
 

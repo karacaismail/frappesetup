@@ -875,7 +875,7 @@
         "backchannel.logout.url": "${ATONOTA_SITE_TENANT1_URL}/api/method/platform_core.api.keycloak_backchannel_logout",
         "backchannel.logout.session.required": "true",
         "backchannel.logout.revoke.offline.tokens": "false",
-        "post.logout.redirect.uris": "${ATONOTA_SITE_TENANT1_URL}/panel",
+        "post.logout.redirect.uris": "${ATONOTA_SITE_TENANT1_URL}/panel##${ATONOTA_SITE_TENANT1_URL}/api/method/platform_core.api.auth.start_login?switch_account=1",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",

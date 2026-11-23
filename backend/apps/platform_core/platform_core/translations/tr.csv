@@ -449,6 +449,9 @@ The identity provider did not return an identity token.,Kimlik sunucusu kimlik b
 The identity token is not valid ({0}).,Kimlik belirteci geçerli değil ({0}).,platform_core.identity
 The identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.,platform_core.identity
 There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.,platform_core.identity
+You cannot access the panel with this account.,Bu hesapla panele giremezsiniz.,platform_core.identity
+Sign in with your panel account. Sign-up is closed.,Panel hesabınızla giriş yapın. Yeni kayıt kapalı.,platform_core.identity
+Sign in with another account,Başka hesapla oturum aç,platform_core.identity
 This user is disabled.,Bu kullanıcı kapalı.,platform_core.identity
 Sign-in failed,Giriş başarısız,platform_core.identity
 You hit the rate limit because of too many requests. Please try after sometime.,Çok fazla istek gönderdiniz. Biraz sonra yeniden deneyin.,platform_core.identity

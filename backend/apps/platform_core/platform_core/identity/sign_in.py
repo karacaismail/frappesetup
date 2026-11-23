@@ -47,6 +47,10 @@ class SignInRefusedError(Exception):
 		self.message = message
 
 
+class TenantAccountMissingError(SignInRefusedError):
+	"""The verified identity has no account on this tenant."""
+
+
 class ExchangeFailedError(Exception):
 	"""The token endpoint did not return a token. The response body is never logged."""
 
@@ -288,7 +292,7 @@ def resolve_user(issuer: str, claims: dict) -> str:
 	user = frappe.db.get_value(LINK_DOCTYPE, {"issuer": issuer, "subject": subject}, "user")
 	if not user:
 		if not email or not frappe.db.exists("User", email):
-			raise SignInRefusedError(
+			raise TenantAccountMissingError(
 				403,
 				_(
 					"There is no account for this e-mail address. Sign-up is closed.",
@@ -385,6 +389,16 @@ def exchange_code(settings, code: str, code_verifier: str, redirect_uri: str) ->
 
 def callback_url() -> str:
 	return get_url(helpers.CALLBACK_PATH)
+
+
+def switch_account_url() -> str:
+	settings = site_settings.get()
+	return helpers.end_session_url(
+		settings.public_url,
+		settings.realm,
+		settings.client_id,
+		get_url("/api/method/platform_core.api.auth.start_login?switch_account=1"),
+	)
 
 
 SID_INDEX_PREFIX = "kimlik_kc_sid"

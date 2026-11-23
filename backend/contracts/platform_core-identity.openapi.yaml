@@ -343,6 +343,12 @@ paths:
           examples:
             panel:
               value: /panel
+        - name: switch_account
+          in: query
+          description: The account-switch return address sends 1 to require a fresh Keycloak sign-in.
+          schema:
+            type: integer
+            default: 0
       responses:
         "302":
           description: The flow has started. The browser goes to the Keycloak authorization address.
