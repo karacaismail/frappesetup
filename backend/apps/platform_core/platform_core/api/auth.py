@@ -51,11 +51,11 @@ def get_login_url(redirect_to: str | None = None) -> dict:
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
 @_render_browser_rate_limit
 @rate_limit(limit=20, seconds=60)
-def start_login(redirect_to: str | None = None) -> None:
+def start_login(redirect_to: str | None = None, switch_account: int = 0) -> None:
 	"""Browser entry point of the sign-in: same work as `get_login_url`, then a 302 to Keycloak.
 	The brand button on the tenant `/login` page links here."""
 	try:
-		result = sign_in.build_login_url(redirect_to)
+		result = sign_in.build_login_url(redirect_to, force_login=switch_account == 1)
 	except (InvalidRedirect, KeycloakLoginNotConfigured) as error:
 		frappe.respond_as_web_page(
 			_("Sign-in failed", context="platform_core.identity"),
@@ -86,6 +86,16 @@ def keycloak_callback(
 	except sign_in.SignInRefusedError as refusal:
 		# Releases the identity lock at once (merge review E1). Nothing of a refused sign-in is kept.
 		frappe.db.rollback()
+		if isinstance(refusal, sign_in.TenantAccountMissingError):
+			frappe.local.response_headers["Cache-Control"] = "no-store"
+			frappe.respond_as_web_page(
+				refusal.message,
+				refusal.message,
+				http_status_code=403,
+				template="tenant_account_missing",
+				context={"switch_account_url": sign_in.switch_account_url()},
+			)
+			return
 		frappe.respond_as_web_page(
 			_("Sign-in failed", context="platform_core.identity"),
 			refusal.message,

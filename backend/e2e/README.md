@@ -66,6 +66,21 @@ Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
 `e2e/stack up` Keycloak hazır olunca realm eşitleme adımını çalıştırır. Bu adım realm dosyasındaki istemci ve kapsamları korunan veritabanına uygular. Adım kullanıcı ve oturum silmez. Ayrıntı `identity/keycloak/README.md` dosyasının "Korunan veritabanında realm eşitleme" bölümündedir.
 
+Ayrı Vite arayüzü için yerel yığını şu komutla açın.
+
+```sh
+PANE_PORT=7400 FS_STACK_VITE=1 backend/e2e/stack up
+```
+
+Girişi `http://localhost:5180` üzerinden başlatın.
+Vite, giriş ve dönüş isteklerini `http://tenant1.localhost:7401` adresine iletir.
+Vite ayarında `VITE_DEV_SITE_NAME=tenant1.localhost` değerini kullanın.
+Keycloak aynı Vite adresine döner. Frappe oturum çerezini bu adreste açar.
+Frappe girişten sonra `http://localhost:5180/panel` adresine yönlendirir.
+`FS_STACK_VITE=1` yoksa giriş kiracı adresini kullanır.
+Vite kipi açıkken Frappe, tam bağlantıları Vite adresiyle kurar.
+Birleştirme önizlemesi ayrı bir yığında çalışır.
+
 `e2e/stack` eski bir `.env` dosyasını da açar. Gizli olmayan eksik anahtarları `.env.example` dosyalarındaki yerel örnek değerle doldurur. Örneğin `ATONOTA_MCP_REDIRECT_URI` ve `ATONOTA_MCP_RESOURCE_URL` böyledir. Betik `.env` dosyasını değiştirmez. Gizli bir anahtar eksikse betik Docker'a dokunmadan durur. Betik eksik anahtarın yalnız adını yazar, değer yazmaz. Örneğin `ATONOTA_MCP_INTROSPECTION_SECRET` böyledir. Eksik anahtarı `.env.example` dosyasından `.env` dosyanıza kopyalayın ve kendi değerinizi yazın.
 
 ### Colima profilleri
