@@ -78,7 +78,7 @@ export function toRequirementRow(
     board.statuses.findIndex((s) => s.id === it.status),
     board.levels.findIndex((l) => l.id === it.level),
   ];
-  if (it.evidence) row.push(`${it.evidence.commit} commit'i. Test: ${it.evidence.tests.map(fileName).join(', ')}.`);
+  if (it.evidence) row.push(`Denetim commit'i ${it.evidence.commit}. Test: ${it.evidence.tests.map(fileName).join(', ')}.`);
   return row;
 }
 
@@ -501,7 +501,7 @@ function Explorer({ items, meta: board }: Props) {
       <div className="req-bar">
         <Group gap="md" wrap="wrap">
           <Text role="status" aria-live="polite" data-testid="req-count">
-            <strong>{filtered.length}</strong> / {items.length} gereksinim
+            <strong>{filtered.length}</strong> / {items.length} görev
           </Text>
           <Group gap="xs" wrap="wrap" role="group" aria-label="Görünüm">
             {(
@@ -575,7 +575,7 @@ function Explorer({ items, meta: board }: Props) {
           {filtered.map(card)}
           {filtered.length === 0 && (
             <li className="req-card">
-              <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
+              <Text c="dimmed">Bu filtrelerle eşleşen görev yok.</Text>
             </li>
           )}
         </Box>
@@ -633,7 +633,7 @@ function Explorer({ items, meta: board }: Props) {
                 {filtered.length === 0 && (
                   <Table.Tr>
                     <Table.Td colSpan={6}>
-                      <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
+                      <Text c="dimmed">Bu filtrelerle eşleşen görev yok.</Text>
                     </Table.Td>
                   </Table.Tr>
                 )}
