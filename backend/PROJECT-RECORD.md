@@ -403,6 +403,14 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tanıtım sayfası (G-165) site işidir. Bu iş site dosyalarına dokunmadı.
   - Bu karar önce O-54 numarasını taşıyordu. O-54 ve O-55 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-56 oldu.
 
+- **O-57. AJA-72 mevcut yetki ve oturum davranışlarını sınar.** Kararı sistem mimarı AJA-163 görevinde doğruladı.
+  - A Takımı bu test işinde yeni rol yönetimi kurmaz.
+  - Kaynakta `Tenant Admin` rolü ve sınırlı rol yönetimi uçları yoktur.
+  - Frappe parola ve başarısız giriş ayarlarını kuran kod da yoktur.
+  - O-25 oturum süresi geçerlidir. G-43, G-53 ve G-62 açık kalır.
+  - A Takımı eksikleri `docs/handoff/identity-role-test-gaps.md` dosyasında izler.
+  - A Takımı PO sonraki işleri AJA-165 görevinde ayırır.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
