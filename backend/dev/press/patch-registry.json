@@ -9,106 +9,122 @@
       "id": "standard-imghdr",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_removed_standard_modules_import",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan imghdr kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan imghdr kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "standard-pipes",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_removed_standard_modules_import",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan pipes kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan pipes kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "standard-crypt",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_removed_standard_modules_import",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan crypt kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan crypt kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "standard-cgi",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_removed_standard_modules_import",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan cgi kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Tam bağımlılık kurulumunda bu ek komut olmadan cgi kullanan modüller açılmalıdır. Press sitesi ve yönetim ekranı açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "ansible-six",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_ansible_collection_loader_runs_local_task",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Ansible paketinin six dosyasını değiştirmeden kayıtlı test geçmelidir."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Ansible paketinin six dosyasını değiştirmeden kayıtlı test geçmelidir.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "telegram-six",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_telegram_and_stripe_import_without_patching",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Telegram paketinin six dosyasını değiştirmeden kayıtlı test geçmelidir."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Telegram paketinin six dosyasını değiştirmeden kayıtlı test geçmelidir.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "stripe-six",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_telegram_and_stripe_import_without_patching",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Stripe paketinin six dosyasını değiştirmeden kayıtlı test geçmelidir."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Stripe paketinin six dosyasını değiştirmeden kayıtlı test geçmelidir.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "ansible-collection-loader",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_ansible_collection_loader_runs_local_task",
-      "removal_condition": "Yeni Press sürümü uyumlu Ansible sürümü kurmalıdır. Yama olmadan koleksiyon yükleyici yerel görevi Python 3.14 üzerinde çalıştırmalıdır."
+      "removal_condition": "Yeni Press sürümü uyumlu Ansible sürümü kurmalıdır. Yama olmadan koleksiyon yükleyici yerel görevi Python 3.14 üzerinde çalıştırmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#yamanın-her-parçası-için-karar"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "deploy-candidate-typed-dict",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_deploy_candidate_imports",
-      "removal_condition": "Yeni Press sürümünde CommandOutput sözlük biçimini kullanmalıdır. Yama olmadan cache_utils modülü Python 3.14 üzerinde açılmalıdır."
+      "removal_condition": "Yeni Press sürümünde CommandOutput sözlük biçimini kullanmalıdır. Yama olmadan cache_utils modülü Python 3.14 üzerinde açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-1-typeddict-tanımını-düzeltin"
     },
     {
       "source": "dev/press/patch-py314.sh",
       "id": "product-trial-telemetry",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_product_trial_request_imports",
-      "removal_condition": "Yeni Press sürümü kendi telemetri işlevini kullanmalıdır. Yama olmadan ürün denemesi modülü Frappe 16 üzerinde açılmalıdır."
+      "removal_condition": "Yeni Press sürümü kendi telemetri işlevini kullanmalıdır. Yama olmadan ürün denemesi modülü Frappe 16 üzerinde açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-2-telemetriyi-frappe-sürümünden-ayırın"
     },
     {
       "source": "dev/press/uv-overrides.txt",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_dependencies_are_consistent",
-      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Sürüm geçersiz kılma dosyası olmadan tam kurulum ve uv pip check geçmelidir."
+      "removal_condition": "Yeni Press sürümünü geliştirme imajına sabitleyin. Sürüm geçersiz kılma dosyası olmadan tam kurulum ve uv pip check geçmelidir.",
+      "upstream": "docs/press-python314-upstream.md#öneri-4-tam-bağımlılık-çözümünü-doğrulayın"
     },
     {
       "source": "deploy/images/press-patches/0001-typeddict-dict-form.patch",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_deploy_candidate_imports",
-      "removal_condition": "Yeni Press sürümünde CommandOutput sözlük biçimini kullanmalıdır. Yama olmadan cache_utils modülü Python 3.14 üzerinde açılmalıdır."
+      "removal_condition": "Yeni Press sürümünde CommandOutput sözlük biçimini kullanmalıdır. Yama olmadan cache_utils modülü Python 3.14 üzerinde açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-1-typeddict-tanımını-düzeltin"
     },
     {
       "source": "deploy/images/press-patches/0002-press-telemetry-helper.patch",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_product_trial_request_imports",
-      "removal_condition": "Yeni Press sürümü kendi telemetri işlevini kullanmalıdır. Yama olmadan ürün denemesi modülü Frappe 16 üzerinde açılmalıdır."
+      "removal_condition": "Yeni Press sürümü kendi telemetri işlevini kullanmalıdır. Yama olmadan ürün denemesi modülü Frappe 16 üzerinde açılmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-2-telemetriyi-frappe-sürümünden-ayırın"
     },
     {
       "source": "deploy/images/press-patches/0003-request-cookies.patch",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_press_cookies_imports",
-      "removal_condition": "Yeni Press sürümü çerezi Frappe 16 istek nesnesinden okumalıdır. Yamasız imajda modül açılmalıdır. Analitik izni değişince kayıt oluşmalıdır."
+      "removal_condition": "Yeni Press sürümü çerezi Frappe 16 istek nesnesinden okumalıdır. Yamasız imajda modül açılmalıdır. Analitik izni değişince kayıt oluşmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-3-çerez-okuma-yolunu-frappe-16ya-uyarlayın"
     },
     {
       "source": "deploy/images/press-patches/0004-optional-telegram.patch",
       "owner": "press-tr",
-      "test": "deploy/tests/test_press_image.py::PressLock.test_telegram_client_is_not_installed",
-      "removal_condition": "Yeni Press sürümü Python 3.14 ile uyumlu Telegram istemcisi kullanmalıdır. Yamasız imajda Press Settings açılmalıdır. Sahte istemciyle mesaj kuyruğu testi geçmelidir."
+      "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_press_settings_imports",
+      "removal_condition": "Yeni Press sürümü Python 3.14 ile uyumlu Telegram istemcisi kullanmalıdır. Yamasız imajda Press Settings açılmalıdır. Sahte istemciyle mesaj kuyruğu testi geçmelidir.",
+      "upstream": "docs/press-python314-upstream.md#öneri-5-telegram-paketini-isteğe-bağlı-yapın"
     },
     {
       "source": "deploy/images/press-patches/0005-dependency-pins.patch",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_dependencies_are_consistent",
-      "removal_condition": "Yeni Press sürümünün bağımlılıkları Frappe 16 ile birlikte kurulmalıdır. Yamasız tam kurulumda uv pip check başarılı olmalıdır."
+      "removal_condition": "Yeni Press sürümünün bağımlılıkları Frappe 16 ile birlikte kurulmalıdır. Yamasız tam kurulumda uv pip check başarılı olmalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-4-tam-bağımlılık-çözümünü-doğrulayın"
     }
   ]
 }
