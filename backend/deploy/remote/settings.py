@@ -27,9 +27,10 @@ Target = namedtuple("Target", "list_file kind path when")
 Entry = namedtuple("Entry", "key value optional fixed")
 
 # kind "env": a file read by docker compose (env_file). kind "site": site_config.json of a site,
-# merged with common_site_config.json. when: "always", "press" (the release has a Press image),
+# merged with common_site_config.json. when: "always", "press" (Press is on: the release has a Press image
+# and ATONOTA_PRESS_ENABLED=1, see press_on in common.sh),
 # "offsite" (environment rule ATONOTA_REQUIRE_OFFSITE_BACKUP=1; a present file is checked anyway) or
-# "press-image" (checked once a Press production image exists, blocker E-2; not checked today).
+# "press-image" (checked once a Press site is open in an environment, blocker E-2; not checked today).
 LISTS = {
     "tenant": Target("tenant.production.env.example", "env", "{etc}/{env}/tenant.env", "always"),
     "tenant-db": Target("tenant-db.production.env.example", "env", "{etc}/{env}/tenant-db.env", "always"),

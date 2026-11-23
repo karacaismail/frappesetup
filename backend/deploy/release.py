@@ -20,6 +20,9 @@ REQUIRED = {
     "backend": ("tenant", "keycloak", "identity-sync", "press"),
     "web": ("panel",),
 }
+# Environments that may run Press (ATONOTA_PRESS_ENABLED=1). remote/backup, remote/restore and
+# remote/apply do not cover the Press site yet (blocker E-2), so rc and prod never run it.
+PRESS_ENVIRONMENTS = ("alpha", "beta")
 ENV_KEYS = {
     "ATONOTA_ENV",
     "ATONOTA_PREVIOUS_ENV",
@@ -28,6 +31,7 @@ ENV_KEYS = {
     "ATONOTA_BASE_HOST",
     "ATONOTA_ID_HOST",
     "ATONOTA_PRESS_HOST",
+    "ATONOTA_PRESS_ENABLED",
     "ATONOTA_TENANT_ZONE",
     "ATONOTA_TENANT_SITES",
     "ATONOTA_REQUIRE_ALL_COMPONENTS",
@@ -66,6 +70,10 @@ def load_environments(folder=DEPLOY / "environments"):
         missing = ENV_KEYS - settings.keys()
         if missing or settings["ATONOTA_ENV"] != name:
             raise ReleaseError(f"{name}.env is incomplete: {sorted(missing)}")
+        if settings["ATONOTA_PRESS_ENABLED"] not in ("0", "1"):
+            raise ReleaseError(f"{name}.env: ATONOTA_PRESS_ENABLED must be 0 or 1")
+        if settings["ATONOTA_PRESS_ENABLED"] == "1" and name not in PRESS_ENVIRONMENTS:
+            raise ReleaseError(f"{name}.env: ATONOTA_PRESS_ENABLED=1 is refused; Press is not backed up there yet (E-2)")
         environments[name] = settings
     return environments
 

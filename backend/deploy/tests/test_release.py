@@ -76,6 +76,36 @@ class EnvironmentFiles(unittest.TestCase):
             self.assertEqual(environments[name]["ATONOTA_REQUIRE_OFFSITE_BACKUP"], "1")
             self.assertEqual(environments[name]["ATONOTA_AUTO_RESTORE_ON_FAILURE"], "0")
 
+    def test_press_switch_is_off_where_press_is_not_safe(self):
+        # Blocker E-2: remote/backup, remote/restore and remote/apply do not cover the Press site
+        # yet, so rc and prod never run Press (review finding B2).
+        environments = release.load_environments()
+        for name, settings in environments.items():
+            self.assertIn(settings["ATONOTA_PRESS_ENABLED"], ("0", "1"), name)
+        for name in ("rc", "prod"):
+            self.assertEqual(environments[name]["ATONOTA_PRESS_ENABLED"], "0")
+
+    def test_press_switch_on_in_rc_or_prod_is_refused(self):
+        for name in ("rc", "prod"):
+            with tempfile.TemporaryDirectory() as folder:
+                for env in release.ORDER:
+                    text = (DEPLOY / "environments" / f"{env}.env").read_text()
+                    if env == name:
+                        text = text.replace("ATONOTA_PRESS_ENABLED=0", "ATONOTA_PRESS_ENABLED=1")
+                    (Path(folder) / f"{env}.env").write_text(text)
+                with self.subTest(env=name), self.assertRaisesRegex(release.ReleaseError, "ATONOTA_PRESS_ENABLED"):
+                    release.load_environments(folder)
+
+    def test_press_switch_must_be_zero_or_one(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for env in release.ORDER:
+                text = (DEPLOY / "environments" / f"{env}.env").read_text()
+                if env == "alpha":
+                    text = text.replace("ATONOTA_PRESS_ENABLED=0", "ATONOTA_PRESS_ENABLED=yes")
+                (Path(folder) / f"{env}.env").write_text(text)
+            with self.assertRaisesRegex(release.ReleaseError, "ATONOTA_PRESS_ENABLED"):
+                release.load_environments(folder)
+
     def test_prod_has_its_own_server(self):
         environments = release.load_environments()
         others = {environments[name]["ATONOTA_SSH_HOST"] for name in ("alpha", "beta", "rc")}

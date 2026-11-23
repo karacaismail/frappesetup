@@ -40,6 +40,12 @@ load_host_env() {
     set +a
 }
 
+# Press runs only when the environment switch is 1 and the release carries the Press image.
+# bin/lib.sh has the same rule for the health check. Usage: press_on <switch> <release.json>
+press_on() {
+    [[ "$1" == 1 ]] && python3 -I -c 'import json,sys; sys.exit("press" not in json.load(open(sys.argv[1]))["components"])' "$2"
+}
+
 # Point a link at a target in one rename, so readers never see a missing link.
 switch_link() {
     local target="$1" link="$2"

@@ -41,7 +41,7 @@ EDGE = DEPLOY / "compose" / "edge.yaml"
 # or they keep their default on purpose.
 RELEASE_ENV = {"ATONOTA_HEALTH_SITE", "COMPOSE_PROFILES"}
 # Measured later (blocker E-8); the stack keeps its default until then.
-COMPOSE_DEFAULT_ONLY = {"ATONOTA_GUNICORN_WORKERS"}
+COMPOSE_DEFAULT_ONLY = {"ATONOTA_GUNICORN_WORKERS", "ATONOTA_PRESS_GUNICORN_WORKERS"}
 # Variables of the remote scripts that are not settings: test paths and the first install switch.
 SCRIPT_CONTROLS = {"ATONOTA_ROOT", "ATONOTA_ETC", "ATONOTA_FIRST_INSTALL"}
 

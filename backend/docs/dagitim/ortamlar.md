@@ -43,7 +43,7 @@ Her ortamın kuralları `backend/deploy/environments/` klasöründedir. Bu dosya
 
 rc ve prod ortamları daha sıkıdır:
 
-- Sürüm paketinde her parça bulunmalıdır. Örneğin Press imajı eksikse rc dağıtımı reddeder.
+- Sürüm paketinde her parça bulunmalıdır. Örneğin Press imajı eksikse rc dağıtımı reddeder. Press imajı pakette olsa da rc ve prod'da Press açılmaz (E-2).
 - Yedeğin sunucu dışına kopyası başarılı olmalıdır. Kopya başarısızsa dağıtım başlamaz.
 - Hata olursa veritabanı kendiliğinden geri yüklenmez. Bu kararı DevOps sorumlusu verir.
 
@@ -95,7 +95,7 @@ Her ortamın kendi veritabanı, kendi birimleri ve kendi iç ağı vardır. Orta
 
 Her sunucuda tek bir ön vekil vardır. Ön vekil 80 ve 443 portlarını açar. Öteki hiçbir servis port açmaz.
 
-Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press. Veritabanları bu ağda değildir.
+Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press ön yüzü. Veritabanları bu ağda değildir.
 
 Ortamlar aynı ağı paylaşmaz. Bu yüzden alpha'daki bir konteyner beta'nın Keycloak'ına doğrudan ulaşamaz. `remote/apply` betiği ağı açar. Betik ön vekilin ağ listesini de `networks.yaml` dosyasına yazar.
 
@@ -120,13 +120,14 @@ Kural şudur: kod bir kez derlenir. Her ortam aynı paketi çalıştırır.
 
 ### Arka uç paketi
 
-Arka uç paketinde üç imaj vardır:
+Arka uç paketinde dört imaj vardır:
 
 - `atonota-tenant` imajı kiracı sitesini taşır. İçinde ERPNext, HRMS, `platform_core` ve `hrms_tr` vardır. İmajı `backend/deploy/images/tenant.Dockerfile` dosyası derler.
 - `atonota-keycloak` imajı Keycloak'ı taşır. İmajı `backend/identity/keycloak/Dockerfile` dosyasının `prod` hedefi derler.
 - `atonota-identity-sync` imajı kullanıcı eşitleme servisini taşır. İmajı `backend/identity/identity_sync/Dockerfile` dosyası derler.
+- `atonota-press` imajı Press'i taşır. İçinde Press v0.154.1, `press_tr` ve `oidc_verify` vardır. İmajı `backend/deploy/images/press.Dockerfile` dosyası derler. Ayrıntı [Press imajı belgesindedir](press-imaji.md).
 
-Press imajı henüz yok. Bu bir engeldir (E-2). Press imajı eklenince pakete dördüncü parça olarak girer.
+Press'in sunucu tarafı işleri henüz tam değildir. Kalan iş E-2 satırındadır.
 
 İmajlar GitHub Container Registry'ye yüklenir. Adres `ghcr.io/karacaismail/atonota-<parça>` olur. Depo açık kaynaktır. İmajlarda sır yoktur.
 
@@ -428,7 +429,7 @@ Sunucudaki sır dosyaları şunlardır:
 - `tenant.env` ve `tenant-db.env` dosyaları kiracı sitesinin ve MariaDB'nin sırlarını tutar.
 - `keycloak.env` ve `keycloak-db.env` dosyaları Keycloak'ın ve PostgreSQL'in sırlarını tutar.
 - `identity-sync.env` dosyası eşitleme servisinin sırlarını tutar.
-- `press.env` dosyası Press'in sırlarını tutar. Bu dosya Press imajı gelince gerekir.
+- `press.env` dosyası Press'in sırlarını tutar. Press servisleri bu dosyayı okur.
 - `offsite.env` dosyası sunucu dışı yedeğin `rclone` adresini tutar.
 - `/etc/atonota/edge.env` dosyası sertifika uyarısının gideceği e-posta adresini tutar.
 
@@ -478,8 +479,8 @@ Bir değerin tamamı `<` ile `>` arasındaysa denetim onu yer tutucu sayar. Örn
 | `keycloak` | `/etc/atonota/<ortam>/keycloak.env` | Her arka uç dağıtımında |
 | `keycloak-db` | `/etc/atonota/<ortam>/keycloak-db.env` | Her arka uç dağıtımında |
 | `identity-sync` | `/etc/atonota/<ortam>/identity-sync.env` | Her arka uç dağıtımında |
-| `press` | `/etc/atonota/<ortam>/press.env` | Pakette Press imajı varsa |
-| `press-site` | Press sitesinin `site_config.json` dosyası | Bugün denetlenmez. Press imajı gelince denetime girer (E-2) |
+| `press` | `/etc/atonota/<ortam>/press.env` | Pakette Press imajı varsa ve `ATONOTA_PRESS_ENABLED=1` ise |
+| `press-site` | Press sitesinin `site_config.json` dosyası | Bugün denetlenmez. Press sitesi açılınca denetime girer (E-2) |
 | `offsite` | `/etc/atonota/<ortam>/offsite.env` | rc ve prod'da her zaman. Öteki ortamlarda dosya varsa |
 | `edge` | `/etc/atonota/edge.env` | Her arka uç dağıtımında |
 
@@ -535,7 +536,7 @@ Betik şu durumları da reddeder:
 
 Site denetimi kapsayıcıdan yalnız anahtar adlarını alır. `[sabit]` değerleri kapsayıcının içinde karşılaştırılır. Sitenin değerleri kapsayıcıdan çıkmaz.
 
-Press sitesinin ayarları bugün denetlenmez. Press'in üretim imajı yok (E-2). İmaj gelince `press-site` listesi denetime eklenir.
+Press sitesinin ayarları bugün denetlenmez. Press imajı vardır, ama Press sitesi hiçbir ortamda açılmadı (E-2). Site açılınca `press-site` listesi denetime eklenir.
 
 Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan listeyle denetlenir.
 
@@ -566,7 +567,7 @@ Arka uç için şu denetimler geçmelidir:
 3. `https://<Keycloak>/admin/` adresi 404 döner.
 4. Her kiracıda `/api/method/ping` adresi `pong` döner.
 5. Her kiracıda oturumsuz `/panel` isteği `/login` sayfasına yönlenir.
-6. Press imajı paketteyse `https://<Press>/api/method/ping` adresi `pong` döner. İmaj yoksa denetim `not_run` yazar.
+6. Pakette Press imajı varsa ve `ATONOTA_PRESS_ENABLED=1` ise `https://<Press>/api/method/ping` adresi `pong` döner. Öteki durumda denetim `not_run` yazar.
 7. Sertifika geçerlidir. `curl` geçersiz sertifikada hata verir.
 
 Arayüz için şu denetim geçmelidir:
@@ -599,8 +600,8 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 
 | No | Engel | Önerilen çözüm | Sahibi |
 | --- | --- | --- | --- |
-| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
-| E-2 | Press'in üretim imajı yok. Press bugün açılışta kurulur. Python 3.14 yaması da açık (O-18) | press-tr işi `backend/deploy/images/press.Dockerfile` dosyasını yazar. Dosya gelince `build-release` Press'i pakete ekler | press-tr işi |
+| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. 23 Kasım 2026 Pazartesi günü üretim imajında ansible-core 2.21.6 yerel bir oyunu çalıştırdı. Gerçek sunucu kurma denenmedi | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi ([Press imajı belgesi](press-imaji.md)). Press yalnız `ATONOTA_PRESS_ENABLED=1` olan ortamda açılır. Anahtar bütün ortamlarda bugün 0'dır. Kalan iş şudur: `remote/backup`, `remote/restore` ve `remote/apply` Press sitesini yedeklemez, geri yüklemez ve Press sitesinde `migrate` çalıştırmaz. `remote/site-probe.py` Press sitesinin ayarlarını denetlemez. Press'in migrate adımı Press'in kendi denetimi için internetten chromedriver indirmeye çalışır. İmaj sunucuda ve amd64'te denenmedi | press-tr işi betiklere Press sitesini ekler. Ekleme bitmeden `release.py` rc ve prod'da anahtarı reddeder. DevOps sorumlusu Press sitesini alpha'da elle açar | press-tr işi ve DevOps sorumlusu |
 | E-3 | Arka uç tarafı hazır. `/panel` sayfası Vite listesini okur ve `/panel/assets/` dosyalarını yükler. Arayüz henüz bu adrese göre ayarlanmadı | atonota-web işi altı ayar yapar. (1) Yönlendiricinin kök yolu `/panel` olur. (2) Ant Design `ConfigProvider` nonce'u `csp-nonce` öğesinin `.nonce` özelliğinden alır. (3) Küçük dosyalar `data:` adresine çevrilmez. Gerekirse `build.assetsInlineLimit: 0` verilir. (4) Kök öğenin kimliği `root` olur. (5) `public/` klasörü kullanılmaz. Ön vekil `/panel/<ad>` adresini sunmaz. (6) Yerel derleme de `--base=/panel/ --manifest` kullanır. Jenkins bu seçenekleri zaten verir. Ayrıca atonota-web işi tarayıcıda politika ihlali olup olmadığını denetler. Örneğin `setAttribute('style', ...)` ile yazılan stil engellenir | atonota-web işi |
 | E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |

@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -110,9 +111,22 @@ class RemoteScripts(unittest.TestCase):
             text=True,
         )
 
-    def apply(self, env, manifest, bundle=None, drop=(), **extra):
+    def apply(self, env, manifest, bundle=None, drop=(), press_enabled=None, **extra):
         folder = self.incoming(env, manifest, bundle, drop)
+        if press_enabled is not None:
+            # The environment file comes with the release; a test may turn its Press switch.
+            env_file = folder / f"{env}.env"
+            env_file.write_text(re.sub(r"(?m)^ATONOTA_PRESS_ENABLED=.*$",
+                                       f"ATONOTA_PRESS_ENABLED={press_enabled}", env_file.read_text()))
         return self.run_script(folder / "apply", env, str(folder), **extra)
+
+    def release_env(self, env, number):
+        return (self.root / env / "releases" / f"backend-{commit(number)[:12]}-b{number}" / "release.env").read_text()
+
+    def press_backend(self, number, env="alpha"):
+        manifest = self.backend(number, env)
+        manifest["components"]["press"] = {"image": f"ghcr.io/karacaismail/atonota-press@sha256:{number:064x}"}
+        return manifest
 
     def run_remote(self, env, script, *arguments, **extra):
         # Server copies: backend scripts in <env>/bin, web scripts in web/<env>/bin.
@@ -627,12 +641,30 @@ class RemoteScripts(unittest.TestCase):
         self.assertEqual(self.calls(), [])
 
     def test_release_with_press_needs_the_press_file(self):
-        (self.etc / "rc" / "press.env").unlink()
-        test_settings.write_env(self.etc / "rc" / "offsite.env", test_settings.filled("offsite"))
-        result = self.apply("rc", self.backend(1, "rc"), ATONOTA_FIRST_INSTALL="1")
+        (self.etc / "alpha" / "press.env").unlink()
+        result = self.apply("alpha", self.press_backend(1), press_enabled=1, ATONOTA_FIRST_INSTALL="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("press.env: file is missing", result.stderr)
         self.assertEqual(self.calls(), [])
+
+    def test_press_image_without_the_switch_keeps_press_off(self):
+        # Review finding B1: a release always carries the Press image. Press starts only after the
+        # first install opened the Press site and set ATONOTA_PRESS_ENABLED=1.
+        (self.etc / "alpha" / "press.env").unlink()
+        result = self.apply("alpha", self.press_backend(1), ATONOTA_FIRST_INSTALL="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("COMPOSE_PROFILES=\n", self.release_env("alpha", 1))
+        self.assertIn("ATONOTA_IMAGE_PRESS=", self.release_env("alpha", 1))
+
+    def test_press_switch_turns_the_press_profile_on(self):
+        result = self.apply("alpha", self.press_backend(1), press_enabled=1, ATONOTA_FIRST_INSTALL="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("COMPOSE_PROFILES=press\n", self.release_env("alpha", 1))
+
+    def test_press_switch_without_a_press_image_keeps_press_off(self):
+        result = self.apply("alpha", self.backend(1), press_enabled=1, ATONOTA_FIRST_INSTALL="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("COMPOSE_PROFILES=\n", self.release_env("alpha", 1))
 
     def test_missing_site_setting_stops_while_the_old_release_runs(self):
         self.first_install()

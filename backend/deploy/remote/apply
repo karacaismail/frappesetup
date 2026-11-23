@@ -55,8 +55,10 @@ settings_help="nothing changed; fill the settings, then deploy again (docs/dagit
 # Production settings (blocker E-4): every secret file of this environment holds every listed
 # key, before anything on this server changes. The lists came with the release (settings/).
 if [[ "$kind" == backend && "$resume" == 0 ]]; then
-    press="$(python3 -I -c 'import json,sys; print(int("press" in json.load(open(sys.argv[1]))["components"]))' \
-        "$incoming/release.json")"
+    press=0
+    if press_on "$ATONOTA_PRESS_ENABLED" "$incoming/release.json"; then
+        press=1
+    fi
     python3 -I "$here/settings.py" check-files "$env" "$incoming" --etc "$ATONOTA_ETC" \
         --press "$press" --offsite "$ATONOTA_REQUIRE_OFFSITE_BACKUP" ||
         fail "settings of $env are incomplete; $settings_help"
@@ -156,7 +158,7 @@ for name, component in sorted(manifest["components"].items()):
 PY
     printf 'ATONOTA_HEALTH_SITE=%s\n' "$first_site" >>"$folder/release.env"
     profiles=()
-    if grep -q '^ATONOTA_IMAGE_PRESS=' "$folder/release.env"; then
+    if press_on "$ATONOTA_PRESS_ENABLED" "$folder/release.json"; then
         profiles+=(press)
     fi
     printf 'COMPOSE_PROFILES=%s\n' "$(IFS=,; printf '%s' "${profiles[*]}")" >>"$folder/release.env"

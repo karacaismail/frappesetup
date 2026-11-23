@@ -18,11 +18,8 @@ components=(
     "tenant|$backend|$backend/deploy/images/tenant.Dockerfile|"
     "keycloak|$backend/identity/keycloak|$backend/identity/keycloak/Dockerfile|prod"
     "identity-sync|$backend|$backend/identity/identity_sync/Dockerfile|"
+    "press|$backend|$backend/deploy/images/press.Dockerfile|"
 )
-# Press has no production image yet (blocker E-2). It joins the release when this file exists.
-if [[ -f "$backend/deploy/images/press.Dockerfile" ]]; then
-    components+=("press|$backend/..|$backend/deploy/images/press.Dockerfile|")
-fi
 
 image_arguments=()
 for entry in "${components[@]}"; do
@@ -34,7 +31,8 @@ for entry in "${components[@]}"; do
     if [[ -n "$target" ]]; then
         build_arguments+=(--target "$target")
     fi
-    docker build "${build_arguments[@]}" "$context"
+    # BuildKit reads <Dockerfile>.dockerignore; the legacy builder would send .env files too.
+    DOCKER_BUILDKIT=1 docker build "${build_arguments[@]}" "$context"
     docker push "$repository:$tag"
     digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repository:$tag" |
         grep -m1 "^$repository@sha256:")" || fail "no registry digest for $repository:$tag"

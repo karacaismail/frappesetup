@@ -3234,5 +3234,23 @@
     "reason": "Test runs the repository's own deploy scripts with this Python, fixed arguments and no shell.",
     "owner": "canli-dagitim",
     "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_press_image.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_press_image.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "debd4cad75ac37a9391a52fb01cfd9e650e577dab7f0975e00a5491bb8514b2a",
+    "reason": "Test runs the repository's own build-release script with a fake docker, fixed arguments and no shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-23"
   }
 ]

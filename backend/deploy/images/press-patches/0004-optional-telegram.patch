@@ -1,0 +1,65 @@
+Press patch 0004: make python-telegram-bot optional.
+Purpose: python-telegram-bot 13.15 cannot be imported on Python 3.12 and later. Its vendored
+urllib3 uses six.moves, and its fallback needs urllib3.contrib.appengine, which urllib3 2
+removed. Press Settings imports the Telegram helper, so the whole Press Settings DocType failed
+to load. With this patch Press imports without the package. Sending a Telegram message then
+raises ImportError, which Press logs ("Telegram Bot Error") and marks the Telegram Message as
+Error. Telegram alerts stay off in this image until Press moves to a maintained client.
+Upstream: new proposal 5 in backend/docs/press-python314-upstream.md.
+Remove when Press ships a Python 3.14 Telegram client (decision O-52 in backend/PROJECT-RECORD.md).
+
+diff --git a/press/press/doctype/telegram_message/telegram_message.py b/press/press/doctype/telegram_message/telegram_message.py
+index 3958261..b7fa996 100644
+--- a/press/press/doctype/telegram_message/telegram_message.py
++++ b/press/press/doctype/telegram_message/telegram_message.py
+@@ -7,7 +7,18 @@ import frappe
+ from frappe.model.document import Document
+ from frappe.query_builder import Interval
+ from frappe.query_builder.functions import Now
+-from telegram.error import NetworkError, RetryAfter
++
++try:
++	from telegram.error import NetworkError, RetryAfter
++except ImportError:
++	# python-telegram-bot 13.x cannot be imported on Python 3.12 and later (see telegram_utils).
++
++	class NetworkError(Exception):
++		pass
++
++	class RetryAfter(Exception):
++		pass
++
+ 
+ from press.telegram_utils import Telegram
+ 
+diff --git a/press/telegram_utils.py b/press/telegram_utils.py
+index f1ca529..2ee35fc 100644
+--- a/press/telegram_utils.py
++++ b/press/telegram_utils.py
+@@ -3,10 +3,16 @@
+ 
+ 
+ import frappe
+-import telegram
+ 
+ from press.utils import log_error
+ 
++try:
++	import telegram
++except ImportError:
++	# python-telegram-bot 13.x cannot be imported on Python 3.12 and later. Press stays usable
++	# without it; sending a message then fails and is logged like any other Telegram error.
++	telegram = None
++
+ 
+ class Telegram:
+ 	def __init__(self, topic: str | None = None, group: str | None = None):
+@@ -30,6 +36,8 @@ class Telegram:
+ 		if not message:
+ 			return None
+ 		try:
++			if telegram is None:
++				raise ImportError("python-telegram-bot is not installed")
+ 			text = message[: telegram.MAX_MESSAGE_LENGTH]
+ 			parse_mode = self._get_parse_mode(html)
+ 			return self.bot.send_message(

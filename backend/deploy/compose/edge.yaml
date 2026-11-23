@@ -3,7 +3,7 @@
 # /srv/atonota/edge/sites/ and reloads Caddy. Caddy gets one certificate per host name (HTTP-01).
 # Each environment has its own network "atonota-edge-<env>". remote/apply writes networks.yaml beside
 # this file, so Caddy joins the network of every environment on the server. Only edge-facing
-# services join those networks (tenant-frontend, keycloak, press), each with an env prefix.
+# services join those networks (tenant-frontend, keycloak, press-frontend), each with an env prefix.
 services:
   caddy:
     image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
