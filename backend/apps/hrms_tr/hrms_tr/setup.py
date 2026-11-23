@@ -22,22 +22,34 @@ def fixture_rows(filename):
 
 def require_access_engine():
 	if not engine_available() or not frappe.db.exists("DocType", RULE_DOCTYPE):
-		frappe.throw(_("Install Platform Core with Access Rule before syncing HRMS TR."))
+		frappe.throw(_("Install Platform Core with Access Rule before syncing HRMS TR.", context="hrms_tr"))
 
 
 def require_unshared_applications():
 	if frappe.db.exists("DocShare", {"share_doctype": DOCTYPE}):
-		frappe.throw(_("Resolve existing Leave Application shares before syncing HRMS TR."))
+		frappe.throw(
+			_("Resolve existing Leave Application shares before syncing HRMS TR.", context="hrms_tr")
+		)
 
 
 def check_install():
 	require_access_engine()
 	require_unshared_applications()
 	if frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE, "permlevel": 2}):
-		frappe.throw(_("Resolve existing level 2 Leave Application permissions before installing HRMS TR."))
+		frappe.throw(
+			_(
+				"Resolve existing level 2 Leave Application permissions before installing HRMS TR.",
+				context="hrms_tr",
+			)
+		)
 	for row in fixture_rows("04_property_setter.json"):
 		if frappe.db.exists(row["doctype"], row["name"]):
-			frappe.throw(_("Resolve existing leave balance field settings before installing HRMS TR."))
+			frappe.throw(
+				_(
+					"Resolve existing leave balance field settings before installing HRMS TR.",
+					context="hrms_tr",
+				)
+			)
 	preserve_employee_permissions()
 
 

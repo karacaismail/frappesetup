@@ -9,7 +9,9 @@ class PLTAIRoute(Document):
 	def validate(self):
 		if self.data_policy == "masked" and self.has_value_changed("data_policy"):
 			frappe.only_for("PLT AI Manager", message=True)
-		self.required_capabilities = encode_identifiers(self.required_capabilities, "Required Capabilities")
+		self.required_capabilities = encode_identifiers(
+			self.required_capabilities, "Required Capabilities", self.doctype
+		)
 		if not self.targets:
 			frappe.throw(_("Add at least one model and API target."))
 		seen = set()

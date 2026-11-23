@@ -8,7 +8,7 @@ from platform_core.model_gateway.doctype.validation import validate_url
 
 class PLTAIProvider(Document):
 	def validate(self):
-		validate_url(self.default_url, "Default Base URL")
+		validate_url(self.default_url, "Default Base URL", self.doctype)
 		if not self.get_doc_before_save():
 			return
 		adapter_changed = self.has_value_changed("adapter")

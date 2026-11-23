@@ -14,7 +14,7 @@ class TestRetention(TestCase):
 		for days, limit in ((None, 500), (True, 500), ("30", 500), (0, 500), (30, True), (30, 0)):
 			with (
 				self.subTest(days=days, limit=limit),
-				patch.object(retention, "_", side_effect=lambda message: message),
+				patch.object(retention, "_", side_effect=lambda message, context=None: message),
 				patch.object(retention, "frappe") as framework,
 			):
 				framework.conf = {"hrms_tr_retention_days": days}
