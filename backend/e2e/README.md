@@ -1,4 +1,4 @@
-Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabı ve `Karaca.20` parolasıyla açın.
+Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabıyla açın. Parola `backend/e2e/review-accounts.json` dosyasının `password` alanındadır.
 
 # Uçtan uca entegrasyon testleri
 
@@ -14,8 +14,9 @@ Komut hesapları kurar ya da günceller.
 PANE_PORT=<port> backend/e2e/stack review-accounts
 ```
 
-Bütün hesapların parolası `Karaca.20` olur.
+Bütün hesapların parolası aynıdır.
 Parola tek bir dosyada durur: `backend/e2e/review-accounts.json`.
+Parola o dosyanın `password` alanındadır.
 Hesap listesi de bu dosyadadır.
 
 | Hesap | Nerede | Ne için |
@@ -34,9 +35,16 @@ Adres `localhost` ya da `*.localhost` değilse komut durur.
 `platform` realm'inin parola kuralı en az 12 karakter ister.
 Bu kural üretim kuralıdır ve realm dosyasında değişmez.
 Komut çalışırken yalnız yerel Keycloak'ta kısa bir süre 8 karakter kabul edilir.
+Bu süre içinde `platform` realm'indeki her kullanıcı 8 karakterlik parola seçebilir.
 Aynı parolanın yeniden yazılabilmesi için parola geçmişi kuralı da o süre kapalı kalır.
-Parolalar yazılınca komut realm'in kendi kuralını geri yükler.
+Parolalar yazılınca komut kuralı geri yükler.
 Komut hata verse bile kural geri yüklenir.
+Geri yüklenen kural her zaman realm dosyasındaki kuraldır.
+Realm dosyası `backend/identity/keycloak/realm/platform-realm.json` dosyasıdır.
+Komut kuralı çalışan Keycloak'tan okumaz.
+Süreç yarıda ölürse yerel Keycloak gevşek kuralla kalabilir.
+Bu durumda komutu yeniden çalıştırın.
+Komut sonunda realm dosyasındaki kuralı geri yükler.
 
 Kiracıya ve Press'e parola gitmez.
 Giriş her zaman Keycloak üzerinden olur.

@@ -1,12 +1,15 @@
 """Create or update the local review accounts in the stack's Keycloak.
 
 Runs inside the stack network with `python -I`. Input on stdin: keycloak_url, admin_username,
-admin_password, password, relaxed_length and the accounts of backend/e2e/review-accounts.json.
+admin_password, password, relaxed_length, restore_policy and the accounts of
+backend/e2e/review-accounts.json.
 Output on stdout: the Keycloak subject of every platform realm account. It prints no password.
 
 The platform realm asks for 12 characters, the production rule. The shared review password is
 shorter, so the script lowers the length rule of the running local Keycloak while it sets the
-passwords, and restores the realm's own rule afterwards, also after an error. The password history
+passwords, and afterwards writes restore_policy, also after an error. restore_policy is the rule
+of platform-realm.json, never the rule read from the running Keycloak: a run killed before the
+restore leaves the relaxed rule behind, and the next run must not take that rule for the realm's. The password history
 rule is dropped for the same moment, so a repeated run may set the same password again.
 The realm file is never changed. Only a plain-HTTP local Keycloak is accepted.
 """
@@ -40,6 +43,13 @@ def relaxed_policy(policy, length):
     rules = [rule for rule in rules if not rule.startswith("passwordHistory(")]
     rules = [f"length({length})" if rule.startswith("length(") else rule for rule in rules]
     return " and ".join(rules)
+
+
+def require_production_policy(policy):
+    """The rule to restore must keep the production minimum of 12 characters."""
+    found = re.search(r"(?:^| and )length\((\d+)\)(?: and |$)", policy) if isinstance(policy, str) else None
+    if not found or int(found.group(1)) < 12:
+        raise SystemExit("The rule to restore must ask for at least 12 characters.")
 
 
 def http_caller(base_url, username, password):
@@ -124,12 +134,12 @@ def apply(payload, caller_factory=http_caller):
     length = payload["relaxed_length"]
     if type(length) is not int or not 8 <= length < 12:
         raise SystemExit("The relaxed length must be from 8 to 11.")
+    policy = payload.get("restore_policy")
+    require_production_policy(policy)
     call = caller_factory(payload["keycloak_url"], payload["admin_username"], payload["admin_password"])
     password = payload["password"]
     accounts = payload["accounts"]
     realm_path = f"/admin/realms/{PLATFORM}"
-    _, realm = expect(call, {200}, "read the platform realm", "GET", realm_path)
-    policy = realm.get("passwordPolicy") or ""
     subjects = {}
     expect(call, {204}, "relax the local password rule", "PUT", realm_path,
            {"passwordPolicy": relaxed_policy(policy, length)})

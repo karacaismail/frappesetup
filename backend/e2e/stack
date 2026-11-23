@@ -972,6 +972,9 @@ def review_accounts(compose, environment):
                     "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
                     "password": data["password"],
                     "relaxed_length": REVIEW_RELAXED_LENGTH,
+                    # The rule of the realm file, not of the running Keycloak, so a killed
+                    # earlier run cannot leave the relaxed rule in place for good.
+                    "restore_policy": json.loads(REALM_FILE.read_text())["passwordPolicy"],
                     "accounts": accounts,
                 }
             ),

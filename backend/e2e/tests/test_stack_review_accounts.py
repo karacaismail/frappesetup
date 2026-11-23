@@ -60,7 +60,7 @@ class ReviewAccountListTest(unittest.TestCase):
         data = load(ACCOUNTS)
         self.assertEqual(data["password"], json.loads(ACCOUNTS.read_text())["password"])
         broken = json.loads(ACCOUNTS.read_text())
-        broken["accounts"][0]["username"] = "someone@real-company.com"
+        broken["accounts"][0]["username"] = "someone@example.test"
         with patch.object(Path, "read_text", return_value=json.dumps(broken)):
             with self.assertRaisesRegex(ValueError, "example.test"):
                 load(ACCOUNTS)
@@ -71,12 +71,25 @@ class ReviewAccountListTest(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertNotIn(password, path.read_text())
 
-    def test_the_readme_opens_with_the_panel_sign_in_of_the_accounts_file(self):
+    def test_the_readme_opens_with_the_panel_sign_in_and_points_to_the_accounts_file(self):
         password = json.loads(ACCOUNTS.read_text())["password"]
-        first = (E2E / "README.md").read_text().splitlines()[0]
+        readme = (E2E / "README.md").read_text()
+        first = readme.splitlines()[0]
         self.assertIn("http://localhost:5180", first)
         self.assertIn("inceleme-panel@example.test", first)
-        self.assertIn(password, first)
+        self.assertIn("backend/e2e/review-accounts.json", first)
+        self.assertNotIn(password, readme)
+
+    def test_the_accounts_file_is_the_only_file_with_the_password(self):
+        password = json.loads(ACCOUNTS.read_text())["password"]
+        found = [
+            path.relative_to(E2E.parent.parent)
+            for path in E2E.parent.rglob("*")
+            if path.is_file() and path != ACCOUNTS and "node_modules" not in path.parts
+            and path.suffix in {".md", ".py", ".json", ".sh", ".yml", ".yaml", ".toml", ".txt", ""}
+            and password in path.read_text(errors="ignore")
+        ]
+        self.assertEqual(found, [])
 
 
 class LocalStackTest(unittest.TestCase):
@@ -137,6 +150,7 @@ class ReviewAccountsFlowTest(unittest.TestCase):
         self.assertEqual(keycloak["keycloak_url"], LOCAL["KC_PUBLIC_URL"])
         self.assertEqual(keycloak["password"], password)
         self.assertEqual(keycloak["relaxed_length"], 8)
+        self.assertEqual(keycloak["restore_policy"], json.loads(REALM.read_text())["passwordPolicy"])
         tenant = json.loads(run.call_args_list[1].kwargs["input"])
         self.assertEqual(tenant["issuer"], LOCAL["KC_PUBLIC_URL"] + "/realms/platform")
         self.assertEqual(
@@ -199,6 +213,7 @@ class KeycloakScriptTest(unittest.TestCase):
             "admin_password": ADMIN_VALUE,
             "password": self.data["password"],
             "relaxed_length": 8,
+            "restore_policy": json.loads(REALM.read_text())["passwordPolicy"],
             "accounts": self.data["accounts"],
         }
 
@@ -240,6 +255,23 @@ class KeycloakScriptTest(unittest.TestCase):
         self.assertIn(("POST", "/admin/realms/master/users/id-inceleme-yerel-yonetici/role-mappings/realm"),
                       keycloak.calls)
         self.assertNotIn(self.data["password"], json.dumps(result))
+
+    def test_a_rule_left_relaxed_by_a_killed_run_is_replaced_by_the_realm_file_rule(self):
+        # A killed earlier run left the relaxed rule in the running Keycloak.
+        policy = json.loads(REALM.read_text())["passwordPolicy"]
+        keycloak = FakeKeycloak(self.script["relaxed_policy"](policy, 8))
+        self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
+        self.assertEqual(keycloak.policies["platform"], policy)
+
+    def test_a_restore_rule_without_the_production_length_is_refused_before_signing_in(self):
+        apply = self.script["apply"]
+        policy = json.loads(REALM.read_text())["passwordPolicy"]
+        for restore in ("", "length(8) and notUsername", self.script["relaxed_policy"](policy, 8), None):
+            with self.subTest(restore=restore):
+                caller = Mock()
+                with self.assertRaises(SystemExit):
+                    apply({**self.payload(), "restore_policy": restore}, caller_factory=caller)
+                caller.assert_not_called()
 
     def test_the_rule_is_restored_when_a_password_update_fails(self):
         policy = json.loads(REALM.read_text())["passwordPolicy"]
