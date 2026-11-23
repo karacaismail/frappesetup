@@ -108,7 +108,7 @@ def _check_record(record: object, path: Path) -> Platform:
             raise RegistryError(f"{where}: config value of {key} must be plain text.")
         if value.strip().lower() in WEAKENING_VALUES.get(key, set()):
             raise RegistryError(f"{where}: config {key}={value} turns off a safety check.")
-        if key.endswith("Url") and value:
+        if "://" in value:
             address = urllib.parse.urlsplit(value)
             local = address.scheme == "http" and LOCAL_HOST.fullmatch(address.hostname or "")
             if address.scheme != "https" and not local:

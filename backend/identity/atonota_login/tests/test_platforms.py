@@ -130,6 +130,20 @@ class RegistryTest(unittest.TestCase):
             write_record(Path(folder), record)
             self.assertFalse(platforms.load_platforms(Path(folder))[0].active)
 
+    def test_switch_named_like_an_address_is_not_an_address(self):
+        # Live finding: Keycloak's "useJwksUrl" switch holds "true", not an address.
+        with tempfile.TemporaryDirectory() as folder:
+            record = sample_record()
+            record["config"].update(useJwksUrl="true", issuer="http://identity.localhost:5280/realms/x")
+            write_record(Path(folder), record)
+            self.assertEqual(len(platforms.load_platforms(Path(folder))), 1)
+        with tempfile.TemporaryDirectory() as folder:
+            record = sample_record()
+            record["config"]["issuer"] = "http://login.example.test/realms/x"
+            write_record(Path(folder), record)
+            with self.assertRaises(RegistryError):
+                platforms.load_platforms(Path(folder))
+
     def test_duplicate_secret_name_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
             first = sample_record("one")
