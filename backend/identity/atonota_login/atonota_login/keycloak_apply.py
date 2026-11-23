@@ -131,7 +131,12 @@ def apply_registry(call: Callable, registry: list[Platform], environment: Mappin
     known = {platform.alias for platform in registry}
     for provider in existing or []:
         if provider["alias"] not in known:
-            report.append({"alias": provider["alias"], "action": "not-in-registry", "enabled": provider.get("enabled")})
+            # Not changed. A provider without the e-mail rule is named, because it can pre-hijack
+            # an account through the shared first-login flow (review 1, important 3).
+            config = provider.get("config", {})
+            safe = all(config.get(k) == v for k, v in platforms.VERIFIED_EMAIL_CLAIM.items())
+            action = "not-in-registry" if safe else "not-in-registry-unverified-email"
+            report.append({"alias": provider["alias"], "action": action, "enabled": provider.get("enabled")})
     return report
 
 

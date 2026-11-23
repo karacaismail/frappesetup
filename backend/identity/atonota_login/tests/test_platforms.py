@@ -92,6 +92,11 @@ class RegistryTest(unittest.TestCase):
             ("bad alias", lambda r: {**r, "alias": "Bad Alias"}, None),
             ("bad host", lambda r: {**r, "authorizationHost": "https://x.test/path"}, None),
             ("unknown key", lambda r: {**r, "enabled": True}, None),
+            # Review 1, minor 4: values that turn off a safety check.
+            ("signature off", lambda r: {**r, "config": {**r["config"], "validateSignature": "false"}}, None),
+            ("no client auth", lambda r: {**r, "config": {**r["config"], "clientAuthMethod": "none"}}, None),
+            ("pkce off", lambda r: {**r, "config": {**r["config"], "pkceEnabled": "false"}}, None),
+            ("plain endpoint", lambda r: {**r, "config": {**r["config"], "tokenUrl": "http://login.example.test/token"}}, None),
         ]
         for label, change, file_name in bad:
             with self.subTest(label), tempfile.TemporaryDirectory() as folder:

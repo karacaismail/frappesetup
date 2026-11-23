@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.parse
 from pathlib import Path
 
 PRODUCT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ from atonota_login import keycloak_apply, platforms  # noqa: E402
 BACKEND = PRODUCT.parents[1]
 REALM_FILE = BACKEND / "identity" / "keycloak" / "realm" / "platform-realm.json"
 ENVIRONMENTS = BACKEND / "deploy" / "environments"
+ENVIRONMENT_CHOICES = ("alpha", "beta", "rc", "prod", "all")
 
 
 def render(arguments, registry):
@@ -56,11 +58,18 @@ def apply(arguments, registry):
     for line in keycloak_apply.apply_registry(call, registry, environment):
         state = "open" if line["enabled"] else "closed"
         print(f"{line['alias']}: {line['action']}, {state}")
+        if line["action"] == "not-in-registry-unverified-email":
+            print(f"WARNING: {line['alias']} does not require email_verified. It can claim another person's e-mail.",
+                  file=sys.stderr)
     return 0
 
 
 def redirects(arguments, registry):
     if arguments.public_url:
+        host = urllib.parse.urlsplit(arguments.public_url).hostname or ""
+        if not platforms.LOCAL_HOST.fullmatch(host):
+            print("--public-url takes only a local development address.", file=sys.stderr)
+            return 2
         table = {
             p.alias: platforms.broker_redirect_uri(arguments.public_url, p.alias, allow_local_http=True)
             for p in registry
@@ -93,7 +102,7 @@ def main(argv=None):
     apply_parser.add_argument("--remote-host", help="Exact host of an approved remote Keycloak.")
     redirect_parser = commands.add_parser("redirects", help="Print the return address of each platform.")
     target = redirect_parser.add_mutually_exclusive_group(required=True)
-    target.add_argument("--env", help="alpha, beta, rc, prod or all")
+    target.add_argument("--env", choices=ENVIRONMENT_CHOICES, help="alpha, beta, rc, prod or all")
     target.add_argument("--public-url", help="A local development Keycloak address.")
     redirect_parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args(argv)

@@ -100,9 +100,20 @@ class ApplyTest(unittest.TestCase):
 
     def test_other_providers_are_listed_not_changed(self):
         report = keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
-        self.assertIn({"alias": "corporate", "action": "not-in-registry", "enabled": True}, report)
+        self.assertIn({"alias": "corporate", "action": "not-in-registry-unverified-email", "enabled": True}, report)
         self.assertFalse([w for w in self.keycloak.writes if "corporate" in w[1]])
         self.assertTrue(self.keycloak.providers["corporate"]["enabled"])
+
+    def test_provider_outside_the_registry_is_flagged_by_its_e_mail_rule(self):
+        # Review 1, important 3: a corporate provider without the email_verified rule can pre-hijack an
+        # account. The command does not change it, but names it so the operator sees it.
+        safe = {"alias": "corporate-safe", "providerId": "oidc", "enabled": True,
+                "config": dict(platforms.VERIFIED_EMAIL_CLAIM)}
+        self.keycloak.providers["corporate-safe"] = safe
+        report = keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
+        actions = {line["alias"]: line["action"] for line in report}
+        self.assertEqual(actions["corporate"], "not-in-registry-unverified-email")
+        self.assertEqual(actions["corporate-safe"], "not-in-registry")
 
     def test_errors_hold_no_secret(self):
         def failing(method, path, payload=None):
@@ -135,3 +146,42 @@ class KeycloakAddressTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CommandTest(unittest.TestCase):
+    """Command line checks (review 1, minor 8 and 9)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.machinery
+        import importlib.util
+        path = Path(__file__).resolve().parents[1] / "bin" / "atonota-login"
+        loader = importlib.machinery.SourceFileLoader("atonota_login_command", str(path))
+        spec = importlib.util.spec_from_loader("atonota_login_command", loader)
+        cls.command = importlib.util.module_from_spec(spec)
+        loader.exec_module(cls.command)
+
+    def run_command(self, *arguments):
+        import contextlib
+        import io
+        output, errors = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            try:
+                code = self.command.main(list(arguments))
+            except SystemExit as stop:
+                code = stop.code
+        return code, output.getvalue()
+
+    def test_env_accepts_only_known_environments(self):
+        for name in ("../x", "dev", "/etc/passwd", "alpha/../prod"):
+            with self.subTest(name=name):
+                self.assertNotEqual(self.run_command("redirects", "--env", name)[0], 0)
+        for name in ("alpha", "beta", "rc", "prod", "all"):
+            with self.subTest(name=name):
+                self.assertEqual(self.run_command("redirects", "--env", name)[0], 0)
+
+    def test_public_url_accepts_only_a_local_address(self):
+        self.assertNotEqual(self.run_command("redirects", "--public-url", "https://evil.example")[0], 0)
+        code, output = self.run_command("redirects", "--public-url", "http://identity.localhost:5280")
+        self.assertEqual(code, 0)
+        self.assertIn("http://identity.localhost:5280/realms/platform/broker/", output)

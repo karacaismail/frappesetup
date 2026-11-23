@@ -61,7 +61,8 @@ def _evidence_is_valid(item: object, now: datetime) -> bool:
         return False
     expires = item.get("expiresAt")
     if expires is None:
-        return True
+        # Every proof has an end time. A proof without one would stay valid forever.
+        return False
     text = str(expires)
     # Python 3.9 does not read a trailing "Z". A time without a zone is not accepted.
     if text.endswith("Z"):
@@ -92,17 +93,22 @@ class Policy:
             action = _require_keys(action, ACTION_KEYS, "An action")
             if action["id"] in self.actions:
                 raise PolicyError(f"Action {action['id']} is listed twice.")
-            if not action["controls"]:
-                raise PolicyError(f"Action {action['id']} needs at least one control.")
+            if not isinstance(action["controls"], list) or not action["controls"]:
+                raise PolicyError(f"Action {action['id']} needs a list of controls.")
             for control in action["controls"]:
                 control = _require_keys(control, CONTROL_KEYS, f"A control of {action['id']}")
                 if not isinstance(control["applies"], bool) or not isinstance(control["required"], bool):
                     raise PolicyError(f"Control {control['id']}: applies and required must be true or false.")
                 if not isinstance(control["evidence"], str) or not control["evidence"]:
                     raise PolicyError(f"Control {control['id']} needs an evidence name.")
+                if not isinstance(control["rules"], list) or not all(isinstance(r, str) for r in control["rules"]):
+                    raise PolicyError(f"Control {control['id']}: rules must be a list of rule ids.")
                 unknown = [r for r in control["rules"] if r not in self.rules]
                 if unknown:
                     raise PolicyError(f"Control {control['id']} names unknown rules: {', '.join(unknown)}.")
+            if not any(c["applies"] and c["required"] for c in action["controls"]):
+                # Default deny: an action must check at least one thing.
+                raise PolicyError(f"Action {action['id']} needs a control that applies and is required.")
             self.actions[action["id"]] = action
         canonical = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
         self.version = hashlib.sha256(canonical).hexdigest()
@@ -112,13 +118,16 @@ class Policy:
         action = self.actions.get(action_id)
         if action is None:
             return Result(DENIED, action_id, self.version, ("unknown-action",))
-        reasons, tasks = [], []
+        if not isinstance(evidence, Mapping):
+            return Result(DENIED, action_id, self.version, ("bad-evidence",))
+        reasons, tasks, checked = [], [], 0
         for control in action["controls"]:
             if not control["applies"]:
                 continue
             empty = [r for r in control["rules"] if self.rules[r]["value"] is None]
             if not control["required"]:
                 continue
+            checked += 1
             if empty:
                 tasks.extend(
                     {"rule": r, "owner": self.rules[r]["owner"], "action": action_id} for r in empty
@@ -130,6 +139,8 @@ class Policy:
             return Result(CONFIGURATION_REQUIRED, action_id, self.version, ("configuration-required",), tuple(tasks))
         if reasons:
             return Result(DENIED, action_id, self.version, tuple(reasons))
+        if checked == 0:
+            return Result(DENIED, action_id, self.version, ("nothing-checked",))
         return Result(READY, action_id, self.version)
 
     def confirm(self, earlier: Result, action_id: str, evidence: Mapping[str, object], now: datetime) -> Result:

@@ -20,7 +20,8 @@ from atonota_login import decision
 from atonota_login.decision import PolicyError
 
 NOW = datetime(2026, 11, 23, 12, 0, tzinfo=timezone.utc)
-VALID = {"status": "valid"}
+# Review 1, minor 5: evidence without an end time is not valid. Every proof carries one.
+VALID = {"status": "valid", "expiresAt": (NOW + timedelta(hours=1)).isoformat()}
 
 
 def evidence(**items):
@@ -162,8 +163,42 @@ class PolicyFileTest(unittest.TestCase):
 
     def test_control_that_does_not_apply_is_skipped(self):
         data = self.base()
-        data["actions"][0]["controls"][0]["applies"] = False
-        self.assertEqual(self.load(data).evaluate("act", {}, NOW).status, "ready")
+        data["actions"][0]["controls"].append(
+            {"id": "extra", "applies": False, "required": True, "evidence": "extra", "rules": []})
+        self.assertEqual(self.load(data).evaluate("act", {"identity": VALID}, NOW).status, "ready")
+
+    def test_action_without_a_checked_control_is_refused(self):
+        # Review 1, important 2: an action whose controls all skip or are optional would open unchecked.
+        for applies, required in ((False, True), (True, False), (False, False)):
+            with self.subTest(applies=applies, required=required):
+                data = self.base()
+                data["actions"][0]["controls"][0].update(applies=applies, required=required)
+                with self.assertRaises(PolicyError):
+                    self.load(data)
+
+    def test_evaluate_denies_when_nothing_was_checked(self):
+        # Second line of defence: a policy built in code without the loader still fails closed.
+        policy = self.load(self.base())
+        policy.actions["act"]["controls"][0]["applies"] = False
+        self.assertEqual(policy.evaluate("act", {}, NOW).status, "denied")
+
+    def test_evidence_without_an_end_time_is_not_valid(self):
+        policy = self.load(self.base())
+        self.assertEqual(policy.evaluate("act", {"identity": {"status": "valid"}}, NOW).status, "denied")
+
+    def test_bad_evidence_and_rule_lists_fail_cleanly(self):
+        # Review 1, minor 6.
+        policy = self.load(self.base())
+        for bad in (None, [], "identity"):
+            with self.subTest(evidence=bad):
+                self.assertEqual(policy.evaluate("act", bad, NOW).status, "denied")
+        for field, value in (("rules", "a-rule"), ("controls", "identity")):
+            with self.subTest(field=field):
+                data = self.base()
+                target = data["actions"][0] if field == "controls" else data["actions"][0]["controls"][0]
+                target[field] = value
+                with self.assertRaises(PolicyError):
+                    self.load(data)
 
     def test_optional_control_with_an_empty_rule_does_not_block(self):
         data = self.base()

@@ -71,16 +71,22 @@ class HmacSignature:
 
     def verify(self, raw_body: bytes, headers: Mapping[str, str], now: int) -> None:
         header = next((v for k, v in headers.items() if k.lower() == SIGNATURE_HEADER.lower()), "")
-        parts = dict(item.split("=", 1) for item in header.split(",") if "=" in item)
+        pairs = [part.strip().split("=", 1) for part in header.split(",") if "=" in part]
+        stamps = [value for key, value in pairs if key == "t"]
+        signatures = [value for key, value in pairs if key == "v1"]
         try:
-            stamp = int(parts["t"])
-            given = parts["v1"]
-        except (KeyError, ValueError):
+            (stamp_text,) = stamps
+            stamp = int(stamp_text)
+        except ValueError:
             raise SignatureRejected("The signature header is missing or malformed.") from None
+        if not signatures:
+            raise SignatureRejected("The signature header is missing or malformed.")
         if abs(now - stamp) > self._tolerance:
             raise SignatureRejected("The signature time is outside the allowed window.")
         expected = hmac.new(self._secret, str(stamp).encode() + b"." + raw_body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected.encode("ascii"), given.encode("utf-8", "replace")):
+        # A provider may send several v1 values while it changes keys. One match is enough.
+        wanted = expected.encode("ascii")
+        if not any(hmac.compare_digest(wanted, given.encode("utf-8", "replace")) for given in signatures):
             raise SignatureRejected("The signature does not match the body.")
 
 

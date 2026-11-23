@@ -37,6 +37,12 @@ REQUIRED_KEYS = {"alias", "providerId", "displayName", "authorizationHost", "sec
 # Keycloak's "essential claim" check. An open platform must prove the e-mail is verified, or a person
 # could claim someone else's address before that person registers (account pre-hijack).
 VERIFIED_EMAIL_CLAIM = {"filteredByClaim": "true", "claimFilterName": "email_verified", "claimFilterValue": "true"}
+# Config values that turn off a safety check. The data may not set them (review 1, minor 4).
+WEAKENING_VALUES = {
+    "validateSignature": {"false"},
+    "clientAuthMethod": {"none"},
+    "pkceEnabled": {"false"},
+}
 # Fields the data may not set. They keep linking safe (G-160) and the platform closed until opened.
 FIXED_FIELDS = {
     "trustEmail": False,
@@ -100,6 +106,13 @@ def _check_record(record: object, path: Path) -> Platform:
             raise RegistryError(f"{where}: config key {key} looks secret. Name it under secrets.")
         if not isinstance(value, str) or "${" in value:
             raise RegistryError(f"{where}: config value of {key} must be plain text.")
+        if value.strip().lower() in WEAKENING_VALUES.get(key, set()):
+            raise RegistryError(f"{where}: config {key}={value} turns off a safety check.")
+        if key.endswith("Url") and value:
+            address = urllib.parse.urlsplit(value)
+            local = address.scheme == "http" and LOCAL_HOST.fullmatch(address.hostname or "")
+            if address.scheme != "https" and not local:
+                raise RegistryError(f"{where}: config {key} must use https.")
     active = record.get("active", True)
     if not isinstance(active, bool):
         raise RegistryError(f"{where}: active must be true or false.")

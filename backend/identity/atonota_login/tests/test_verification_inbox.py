@@ -159,6 +159,17 @@ class InboxTest(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 self.inbox.receive(raw, signed(self.secret, raw, self.now), self.now)
 
+    def test_any_of_several_signatures_may_match(self):
+        # Review 1, minor 7: during a key change the provider may send two v1 values.
+        self.inbox.open_attempt("case-1")
+        body, headers = self.notice("e1", 1, "approved")
+        good = headers[inbox_module.SIGNATURE_HEADER]
+        stamp, digest = good.split(",")
+        headers = {inbox_module.SIGNATURE_HEADER: f"{stamp},{digest},v1={'0' * 64}"}
+        self.assertEqual(self.inbox.receive(body, headers, self.now), "accepted")
+        headers = {inbox_module.SIGNATURE_HEADER: f"{stamp},v1={'0' * 64},{digest}"}
+        self.assertEqual(self.inbox.receive(body, headers, self.now), "duplicate")
+
     def test_bad_outcome_is_refused(self):
         body, headers = self.notice("e1", 1, "approve-everything")
         with self.assertRaises(ValueError):
