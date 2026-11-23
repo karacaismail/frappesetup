@@ -38,7 +38,7 @@ Platform şu kurala göre açılır:
 
 Açık bir platform e-postanın doğrulandığını bildirmelidir. Kayıt bunun için `email_verified` iddiasını zorunlu kılar. Örnek `google.json` dosyasındadır. Bu kural yoksa biri başkasının e-postasıyla önceden hesap açabilir. Kişi sonra kaydolunca hesap saldırganın olur. Bu saldırıya önceden ele geçirme denir.
 
-Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını kapatan kayıt reddedilir. Platform adresleri https kullanır. Yalnız yerel deneme adresi http kullanabilir.
+Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını kapatan kayıt reddedilir. Platform adresleri https kullanır. Kayıt bütün ortamlara gider. Bu yüzden yerel `http` adresi de reddedilir. Tek istisna geliştirme için yerel Keycloak'a yapılan `apply` işidir. Bu işte `--allow-local-http` seçeneği yerel `http` adresine izin verir. Canlı test bu seçeneği kullanır.
 
 Facebook ve X bu iddiayı Keycloak'a göndermez. Bu yüzden iki kayıt `"active": false` ile gelir. İki platformu açmak için önce ek bir denetim gerekir. Borç satırı proje kaydındadır (O-56).
 
