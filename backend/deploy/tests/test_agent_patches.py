@@ -11,12 +11,14 @@ Credentials in this file are fixture words, not real keys.
 """
 
 import ast
+import importlib.util
 import os
 import re
 import shutil
 import subprocess
 import tempfile
 import sys
+import textwrap
 import types
 import unittest
 from unittest import mock
@@ -27,6 +29,28 @@ PATCHES = DEPLOY / "images" / "agent-patches"
 PATCH = PATCHES / "0001-offsite-s3-endpoint.patch"
 AGENT_COMMIT = "1956afb39613aafc88d821a9b1762ae397d4f588"
 HETZNER = "https://fsn1.your-objectstorage.com"
+FIXTURE_ID = "fixture-id"
+FIXTURE_KEY = "fixture-secret"
+GIT = shutil.which("git")
+
+
+def load_module(name, source, path, **names):
+    """Run source as a module from a temporary file. ``names`` are its preset globals."""
+    with tempfile.TemporaryDirectory() as folder:
+        file = Path(folder) / Path(path).name
+        file.write_text(source, encoding="utf-8")
+        spec = importlib.util.spec_from_file_location(name, file)
+        module = importlib.util.module_from_spec(spec)
+        module.__dict__.update(names)
+        spec.loader.exec_module(module)
+    return module
+
+
+def git(*arguments):
+    """Run git with an absolute path and no shell. Output on stderr stays visible."""
+    return subprocess.run(
+        [GIT, *map(str, arguments)], stdout=subprocess.PIPE, text=True, check=True
+    ).stdout
 
 
 def patch_text():
@@ -45,9 +69,7 @@ def helper_module():
         for line in file_diff("agent/offsite_s3.py").splitlines()
         if line.startswith("+") and not line.startswith("+++")
     ]
-    module = types.ModuleType("offsite_s3")
-    exec(compile("\n".join(added) + "\n", "agent/offsite_s3.py", "exec"), module.__dict__)
-    return module
+    return load_module("offsite_s3", "\n".join(added) + "\n", "agent/offsite_s3.py")
 
 
 PATCHED_FILES = ("agent/site.py", "agent/database_server.py", "agent/snapshot_recovery.py")
@@ -58,7 +80,7 @@ def patched_paths():
 
 
 def auth(**extra):
-    return {"ACCESS_KEY": "fixture-id", "SECRET_KEY": "fixture-secret", **extra}
+    return {"ACCESS_KEY": FIXTURE_ID, "SECRET_KEY": FIXTURE_KEY, **extra}
 
 
 class AgentPatchFileTest(unittest.TestCase):
@@ -103,8 +125,8 @@ class OffsiteHelperTest(unittest.TestCase):
         kwargs = self.helper.boto3_client_kwargs(auth(REGION="fsn1", ENDPOINT_URL=HETZNER))
         self.assertEqual(kwargs["endpoint_url"], HETZNER)
         self.assertEqual(kwargs["region_name"], "fsn1")
-        self.assertEqual(kwargs["aws_access_key_id"], "fixture-id")
-        self.assertEqual(kwargs["aws_secret_access_key"], "fixture-secret")
+        self.assertEqual(kwargs["aws_access_key_id"], FIXTURE_ID)
+        self.assertEqual(kwargs["aws_secret_access_key"], FIXTURE_KEY)
 
     def test_boto3_without_endpoint_stays_as_before(self):
         self.assertNotIn("endpoint_url", self.helper.boto3_client_kwargs(auth(REGION="eu-central-1")))
@@ -157,24 +179,23 @@ class OffsiteHelperTest(unittest.TestCase):
     def test_credentials_never_reach_rclone_flags(self):
         flags = self.helper.rclone_s3_flags(auth(REGION="fsn1", ENDPOINT_URL=HETZNER))
         joined = " ".join(flags)
-        self.assertNotIn("fixture-id", joined)
-        self.assertNotIn("fixture-secret", joined)
+        self.assertNotIn(FIXTURE_ID, joined)
+        self.assertNotIn(FIXTURE_KEY, joined)
 
 
 @unittest.skipUnless(os.environ.get("AGENT_SOURCE"), "set AGENT_SOURCE to an Agent checkout")
 class AgentPatchAppliesTest(unittest.TestCase):
     def test_patch_applies_to_pinned_agent(self):
+        self.assertIsNotNone(GIT, "git is required")
         source = Path(os.environ["AGENT_SOURCE"])
-        head = subprocess.run(
-            ["git", "-C", source, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        ).stdout.strip()
+        head = git("-C", source, "rev-parse", "HEAD").strip()
         self.assertEqual(head, AGENT_COMMIT)
         with tempfile.TemporaryDirectory() as folder:
             copy = Path(folder) / "agent"
             shutil.copytree(source, copy, ignore=shutil.ignore_patterns(".git"))
-            subprocess.run(["git", "init", "-q", copy], check=True)
-            subprocess.run(["git", "-C", copy, "apply", "--check", PATCH], check=True)
-            subprocess.run(["git", "-C", copy, "apply", PATCH], check=True)
+            git("init", "-q", copy)
+            git("-C", copy, "apply", "--check", PATCH)
+            git("-C", copy, "apply", PATCH)
             for path in PATCHED_FILES:
                 text = (copy / path).read_text(encoding="utf-8")
                 with self.subTest(path=path):
@@ -194,7 +215,8 @@ class AgentPatchAppliesTest(unittest.TestCase):
             ({}, None),
         ):
             with self.subTest(snapshot_auth=sorted(extra)):
-                kwargs, uploads = run_snapshot_upload(self.snapshot_upload, auth(**extra))
+                service, kwargs, uploads = run_snapshot_upload(self.snapshot_upload, auth(**extra))
+                self.assertEqual(service, "s3")
                 self.assertEqual(kwargs.get("endpoint_url"), endpoint)
                 self.assertEqual(kwargs.get("region_name"), extra.get("REGION"))
                 self.assertEqual(uploads, [("bucket", "prefix/site.sql.gz")])
@@ -203,16 +225,19 @@ class AgentPatchAppliesTest(unittest.TestCase):
 def snapshot_upload_function(copy):
     """upload_backup_files_to_s3 from the patched snapshot_recovery.py, without Agent's imports."""
     path = copy / "agent/snapshot_recovery.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    tree = ast.parse(text)
     function = next(
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef) and node.name == "upload_backup_files_to_s3"
     )
-    function.decorator_list = []
-    namespace = {"os": os, "offsite_s3": helper_module()}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), str(path), "exec"), namespace)
-    return namespace["upload_backup_files_to_s3"]
+    # The segment starts at "def", so the decorators stay out.
+    source = textwrap.dedent(ast.get_source_segment(text, function, padded=True)) + "\n"
+    module = load_module(
+        "snapshot_recovery_upload", source, path.name, os=os, offsite_s3=helper_module()
+    )
+    return module.upload_backup_files_to_s3
 
 
 def run_snapshot_upload(upload, snapshot_auth):
@@ -234,8 +259,7 @@ def run_snapshot_upload(upload, snapshot_auth):
         with mock.patch.dict(sys.modules, {"boto3": types.SimpleNamespace(client=client)}):
             upload(None, files, offsite)
     [(service, kwargs)] = calls
-    assert service == "s3"
-    return kwargs, uploads
+    return service, kwargs, uploads
 
 
 if __name__ == "__main__":
