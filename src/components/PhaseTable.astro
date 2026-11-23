@@ -69,4 +69,8 @@ const rows = phases.map((p) => {
     font-weight: 400;
     color: var(--fs-quiet);
   }
+  /* Faz sütunu önkoşul metnini okunur tutar; tablo kendi kapsayıcısında yatay kayar, sözcük bölünmez. */
+  .phase-table th[scope='row'] {
+    min-width: 10rem;
+  }
 </style>
