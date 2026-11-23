@@ -353,7 +353,15 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
   - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
-- **O-54. Press'in `press.` adı yalnız özel ağa açıktır. Müşteriye yalnız hesap silme akışı açılır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+- **O-54. Her geçici Press yaması kayıt altına alınır.**
+  - [Yama kaydı](dev/press/patch-registry.json) geliştirme ve üretim yamalarını kapsar.
+  - Press Türkiye uygulamasının ekibi her yamanın sahibidir. Kayıtta ekibin adı `press-tr` olur.
+  - Ekip, kaldırma koşulu sağlanınca ilgili testi yamasız imajda çalıştırır.
+  - Depo testi eksik kayıtları ve boş alanları yakalar.
+  - Geçici geliştirme betiği değişirse dosya özeti de değişir. Test kayıt incelemesini ister.
+  - Bu karar G-7 kapsamındaki takibi sağlar. O-18 borcu açık kalır.
+
+- **O-55. Press'in `press.` adı yalnız özel ağa açıktır. Müşteriye yalnız hesap silme akışı açılır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
   - G-6, G-13 ve G-119 aynı kuralı yazar. Desk ve operatör adı yalnız Tailscale ya da özel ağdan açılır. Bu karar o kuralı kenar vekile işler.
   - MVP'de müşterinin Press'te yaptığı tek iş hesap silme isteğidir (O-27). Mağaza, fatura ve takım ekranları G-13'e göre ayrı `panel.` adında açılır. O ad MVP'de yoktur.
   - Kenar vekil müşteriye yalnız şu yolları açar:
