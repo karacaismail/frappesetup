@@ -24,7 +24,8 @@
     "identity_sync": [
       "oidc_verify"
     ],
-    "oidc_verify": []
+    "oidc_verify": [],
+    "atonota_login": []
   },
   "public_paths": {
     "platform_core.identity": [

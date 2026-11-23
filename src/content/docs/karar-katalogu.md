@@ -4,7 +4,7 @@ nav: "Karar kataloğu"
 order: 26
 ---
 
-Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez, bir satırda. Notlar karardır: repodaki aktif veriyle çelişenler **Çelişki** olarak işaretlendi ve repo verisi değişmedi. Repoda zaten yazılı kararlar (320-first, `issuer + sub`, ROPC yasağı, belirteç tarayıcıya inmez, hibrit giriş, gerçek cihaz ayrı rapor vb.) tekrar edilmedi. Açık ve çelişkili satırlar [Açık kararlar](/frappesetup/acik-kararlar/) sayfasındaki K-37..K-60'a bağlıdır.
+Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez, bir satırda. Notlar karardır: repodaki aktif veriyle çelişenler **Çelişki** olarak işaretlendi ve repo verisi değişmedi. Repoda zaten yazılı kararlar (320-first, `issuer + sub`, ROPC yasağı, belirteç tarayıcıya inmez, hibrit giriş, gerçek cihaz ayrı rapor vb.) tekrar edilmedi. Açık ve çelişkili satırlar [Açık kararlar](/frappesetup/acik-kararlar/) sayfasındaki K-37..K-60'a bağlıdır. AtonotA Login kararı K-61'dir.
 
 **Durum:** Kesin · Koşullu (koşul sağlanınca) · Açık (karar bekliyor) · Çelişki (repo verisiyle zıt, onay bekliyor).
 **Kaynak:** KC kimlik rehberi · AE AI ekosistemi · KS Kaizen şartnamesi · KP Kaizen paketi · AM, A1, A2 adaptif arayüz notları. Dosya adları: [İzlenebilirlik](/frappesetup/izlenebilirlik/) KD-38..KD-44.

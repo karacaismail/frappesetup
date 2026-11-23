@@ -9,7 +9,7 @@ Komutu Bench klasöründen çalıştırın.
 
 ```sh
 bench --site perf-kabuk.localhost set-config allow_performance_fixture 1
-env/bin/python -m platform_core.kabuk.measure_performance --site perf-kabuk.localhost --status-file /yol/durum.md
+env/bin/python -m platform_core.shell.measure_performance --site perf-kabuk.localhost --status-file /yol/durum.md
 ```
 
 Komut 200 çalışan ve 2.000 izin kaydı ekler.

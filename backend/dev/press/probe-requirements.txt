@@ -10,3 +10,7 @@ standard-cgi==3.13.0
 standard-crypt==3.13.0
 dnspython==1.16.0
 wrapt==1.17.3
+boto3==1.39.14
+twilio==8.10.3
+posthog==3.0.1
+razorpay==2.0.1

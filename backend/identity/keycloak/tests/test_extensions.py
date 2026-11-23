@@ -144,7 +144,10 @@ class LiveExtensionTest(unittest.TestCase):
         self.assertEqual(realm["browserFlow"], AKIS)
         apple = admin("/identity-provider/instances/apple", self.admin_token).json()
         self.assertFalse(apple["enabled"])
-        self.assertEqual(apple["config"]["teamId"], get_environment_value("ATONOTA_APPLE_TEAM_ID"))
+        self.assertTrue(apple["hideOnLogin"])
+        # O-56: development keeps the platform secrets empty, and a closed platform stores none.
+        for key in ("clientId", "teamId", "keyId"):
+            self.assertEqual(apple["config"].get(key, ""), "", key)
 
     def test_magic_link_endpoints_are_gone(self):
         # Acceptance for removing the extension: its realm resource no longer exists.

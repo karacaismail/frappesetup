@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manages the Keycloak development environment. Owned by the kimlik-realm workstream.
-# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|realm-reload|realm-delete-only|delete-realm>
+# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|platforms|realm-reload|realm-delete-only|delete-realm>
 # Keycloak uses PANE_PORT. The Mailpit UI uses PANE_PORT + 6.
 set -euo pipefail
 
@@ -281,6 +281,11 @@ case "$command" in
     # Keycloak must be reachable from this Mac (see "tunnel").
     python3 -I "$SCRIPT_DIR/bin/sync-dev-realm.py" --from-env
     ;;
+  platforms)
+    # Opens a sign-in platform whose secrets are all set in .env and closes the others (G-159).
+    # The platform list is data: ../atonota_login/platforms/. Development only unless approved.
+    python3 -I "$SCRIPT_DIR/../atonota_login/bin/atonota-login" apply --from-env "$@"
+    ;;
   realm-reload)
     # Loads the realm file without an image build: the file is copied into the running container, the
     # realm is deleted and the container restarts, so --import-realm imports the file again.
@@ -327,7 +332,7 @@ case "$command" in
     compose up -d --force-recreate --wait keycloak
     ;;
   *)
-    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|realm-reload|realm-delete-only|delete-realm>" >&2
+    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-sync|platforms|realm-reload|realm-delete-only|delete-realm>" >&2
     exit 2
     ;;
 esac
