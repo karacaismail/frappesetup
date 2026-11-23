@@ -57,6 +57,32 @@ def requirement_names(text):
     return names
 
 
+def service_networks(text):
+    """Networks of every service in stack.yaml; a service without its own list takes the anchor's.
+
+    The file uses two forms: "networks: [a, b]" and a block of "<name>: {...}" lines below it.
+    """
+    def networks(block, indent):
+        inline = re.search(rf"^{indent}networks: \[(.*?)\]$", block, re.M)
+        if inline:
+            return {name.strip() for name in inline.group(1).split(",") if name.strip()}
+        nested = re.search(rf"^{indent}networks:\n((?:{indent}  \S.*\n)+)", block, re.M)
+        if nested:
+            return set(re.findall(rf"^{indent}  ([a-z0-9-]+):", nested.group(1), re.M))
+        return None
+
+    anchors = {}
+    for match in re.finditer(r"^x-(\w+): &\1\n((?:  .*\n)+)", text, re.M):
+        anchors[match.group(1)] = networks(match.group(2), "  ")
+    services = text.split("\nservices:\n", 1)[1].split("\nvolumes:\n", 1)[0] + "\n"
+    result = {}
+    for match in re.finditer(r"^  ([a-z0-9-]+):\n((?:(?:    .*)?\n)*)", services, re.M):
+        name, block = match.groups()
+        own = networks(block, "    ")
+        merged = re.search(r"^    <<: \*(\w+)$", block, re.M)
+        result[name] = own if own is not None else anchors[merged.group(1)] if merged else set()
+    return result
+
 class PressDockerfile(unittest.TestCase):
     def test_base_is_the_pinned_tenant_base(self):
         tenant = base_image((IMAGES / "tenant.Dockerfile").read_text())
@@ -114,6 +140,17 @@ class PressDockerfile(unittest.TestCase):
         self.assertNotIn("go.dev", final)
         self.assertIn("rm -rf apps/press/node_modules apps/press/dashboard/node_modules", final)
 
+
+    def test_arm64_source_build_runs_only_for_a_local_trial(self):
+        # Review 1, finding 2: on arm64 the dockerfile sdist fetches Go code without a pinned
+        # version. That build is allowed only with PRESS_LOCAL_ARM64_TRIAL=1; build-release never
+        # sets it, so a release image never carries the unpinned Go code.
+        stage = dockerfile().split(" AS dockerfile-wheel\n", 1)[1].split("\nFROM ", 1)[0]
+        self.assertIn("ARG PRESS_LOCAL_ARM64_TRIAL=0", stage)
+        gate = stage.index('[ "$PRESS_LOCAL_ARM64_TRIAL" = 1 ] || {')
+        self.assertLess(gate, stage.index("apt-get update"))
+        self.assertLess(gate, stage.index("curl "))
+        self.assertNotIn("PRESS_LOCAL_ARM64_TRIAL", (DEPLOY / "bin" / "build-release").read_text())
 
 class PatchSeries(unittest.TestCase):
     def patches(self):
@@ -240,6 +277,16 @@ class ReleaseCarriesPress(unittest.TestCase):
         self.assertEqual(press[0][-1], str(BACKEND))
 
 
+    def test_every_release_image_is_built_for_amd64(self):
+        # Review 1, finding 2 and E-15: the release images are built for linux/amd64 on any build
+        # agent, so an arm64 agent cannot produce a different Press image from the same commit.
+        self.build_release()
+        builds = [line.split("\t") for line in self.log.read_text().splitlines() if line.startswith("docker\tbuild")]
+        self.assertEqual(len(builds), len(release.REQUIRED["backend"]))
+        for call in builds:
+            with self.subTest(dockerfile=call[call.index("--file") + 1]):
+                self.assertEqual(call[call.index("--platform") + 1], "linux/amd64")
+
 class StackServesPress(unittest.TestCase):
     def stack(self):
         return (DEPLOY / "compose" / "stack.yaml").read_text()
@@ -266,6 +313,27 @@ class StackServesPress(unittest.TestCase):
         text = self.stack()
         self.assertIn("  press-redis-queue:", text)
         self.assertIn("  press-redis-cache:", text)
+
+    def test_press_has_its_own_network(self):
+        # Review 1, finding 1: a tenant container must not reach the Press Redis queue or
+        # press-web:8000 past the front proxy. Press services join only press-internal; the
+        # database joins both networks; press-frontend joins the edge as well.
+        text = self.stack()
+        networks = service_networks(text)
+        self.assertRegex(text, r"(?m)^networks:\n(?:  .*\n)*  press-internal: \{\}")
+        press = {name for name in networks if name.startswith("press-")}
+        self.assertEqual(press, {"press-redis-cache", "press-redis-queue", "press-web", "press-worker",
+                                 "press-socket", "press-frontend"})
+        for name in press:
+            with self.subTest(service=name):
+                self.assertNotIn("internal", networks[name])
+                self.assertIn("press-internal", networks[name])
+        self.assertEqual(networks["press-frontend"], {"press-internal", "edge"})
+        self.assertEqual(networks["tenant-db"], {"internal", "press-internal"})
+        for name in set(networks) - press - {"tenant-db"}:
+            with self.subTest(service=name):
+                self.assertNotIn("press-internal", networks[name])
+                self.assertTrue(networks[name])
 
     def test_edge_sends_the_press_host_to_the_press_frontend(self):
         template = (DEPLOY / "compose" / "site.caddy.template").read_text()

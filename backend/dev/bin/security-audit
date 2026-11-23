@@ -39,6 +39,9 @@ scan_rules() (
 
 status=0
 uv run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py bandit || status=1
+# Offline OSV scan of the Press image lock (review 1, finding 3). It reads only local files; the
+# scanner and its database come from backend/dev/security/osv-setup, which needs the network.
+uv run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py press-lock || status=1
 "${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
 scan_rules || status=1
 python3 -B -m unittest discover -s backend/dev/security -p test_semgrep_exceptions.py || status=1

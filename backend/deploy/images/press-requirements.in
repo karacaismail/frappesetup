@@ -12,11 +12,11 @@ beautifulsoup4
 boto3==1.39.14
 Click
 coverage
-dnspython==1.16.0
+dnspython==2.9.2
 docker==6.1.2
 dockerfile==3.2.0
 oci==2.192.0
-paramiko==3.3.1
+paramiko==5.1.0
 pexpect==4.9.0
 posthog==3.0.1
 prometheus-client==0.19.0
@@ -40,7 +40,7 @@ playwright==1.65.2
 prometheus-api-client==0.6.0
 pydo==0.24.0
 semgrep==1.79.0
-setuptools==80.9.0
+setuptools==84.2.1
 # frappe-mcp runtime requirement (frappe-mcp itself is installed with --no-deps)
 jsonschema>=4.24.0,<5.0.0
 # press_tr

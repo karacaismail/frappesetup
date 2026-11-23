@@ -8,6 +8,7 @@ Bandit adımı sabitlenmiş Python 3.12 ortamında çalışır.
 Komut aşağıdaki işleri yapar.
 
 1. Bandit ile Git’in izlediği backend Python dosyalarını tarar.
+   Ardından Press imajının kilidini OSV-Scanner ile ağsız tarar. Kilit `backend/deploy/images/press-requirements.lock.txt` dosyasıdır.
 2. Semgrep kurallarını doğru ve hatalı örneklerle sınar.
 3. Backend kaynak kodunu Semgrep ile denetler.
 4. Gitleaks ile koda yazılmış gizli bilgileri arar.
@@ -16,6 +17,10 @@ Komut aşağıdaki işleri yapar.
 7. Her uç için iki yetki testi adı arar.
 
 Bir adım başarısız olursa komut hata koduyla çıkar.
+
+Press kilidi taraması için OSV-Scanner 2.7.1 ve açık veritabanı gerekir. İkisini `backend/dev/security/osv-setup` betiği indirir. Bu betik ağ ister. Kapının kendisi ağ istemez. Dosyalar `~/.cache/frappesetup-osv` klasörüne iner. Veritabanı yedi günden eskiyse kapı düşer. Bu yüzden betiği en az haftada bir çalıştırın. Araç bulunamazsa da kapı düşer.
+
+OSV istisnası `osv-exceptions.toml` dosyasına girer. OSV-Scanner `owner` anahtarını kabul etmez. Bu yüzden sahip, gerekçenin başına yazılır. Örnek: `reason = "Owner: press-tr. ..."`.
 Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
 Tarama, Git geçmişini kapsamaz.
 Gitleaks sonucu gösterirken gizli değerleri örter.

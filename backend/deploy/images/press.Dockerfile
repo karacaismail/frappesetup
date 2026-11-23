@@ -9,13 +9,20 @@
 # dockerfile==3.2.0 (pinned by Press) has a linux-amd64 wheel but no linux-arm64 wheel. Its sdist
 # needs Go 1.21 and a C compiler. This stage builds the arm64 wheel from the hash-checked sdist;
 # on amd64 it does nothing. The compiler and Go stay in this stage.
+# The sdist build fetches Go code with GO111MODULE=off, without a pinned version (review 1,
+# finding 2). So the arm64 build runs only for a local trial with PRESS_LOCAL_ARM64_TRIAL=1.
+# bin/build-release builds every release image for linux/amd64 and never sets this argument.
 FROM frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84 AS dockerfile-wheel
 USER root
 ARG TARGETARCH
 ARG GO_VERSION=1.21.13
+ARG PRESS_LOCAL_ARM64_TRIAL=0
 RUN set -eu; mkdir -p /wheels; \
     arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
     if [ "$arch" != arm64 ]; then exit 0; fi; \
+    [ "$PRESS_LOCAL_ARM64_TRIAL" = 1 ] || { \
+        echo "arm64 needs unpinned Go code; build for linux/amd64 (local trial: PRESS_LOCAL_ARM64_TRIAL=1)" >&2; \
+        exit 1; }; \
     apt-get update; apt-get install -y --no-install-recommends gcc libc6-dev; \
     curl -fsSLo /tmp/go.tgz "https://go.dev/dl/go${GO_VERSION}.linux-arm64.tar.gz"; \
     echo "2ca2d70dc9c84feef959eb31f2a5aac33eefd8c97fe48f1548886d737bffabd4  /tmp/go.tgz" | sha256sum -c -; \
