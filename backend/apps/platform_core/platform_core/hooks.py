@@ -83,6 +83,7 @@ ai_write_closed_doctypes = [
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
 	"platform_core.api.auth.logout",
+	"platform_core.api.auth.get_csrf_token",
 	"platform_core.api.shell.get_bootstrap",
 	"platform_core.api.collection.group_summary",
 	"platform_core.api.meta.get_doctype",
