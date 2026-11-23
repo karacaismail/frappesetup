@@ -23,7 +23,7 @@ class DeniedLegacyEndpointTest(TestCase):
 	def test_deny_legacy_leave_query_foreign_data_denied(self):
 		with (
 			patch.object(frappe, "session", {"user": "employee@example.test"}),
-			patch.object(hrms_endpoints, "_", side_effect=lambda message: message),
+			patch.object(hrms_endpoints, "_", side_effect=lambda message, context=None: message),
 			patch.object(frappe, "throw", side_effect=raise_permission_error),
 		):
 			with self.assertRaises(frappe.PermissionError):

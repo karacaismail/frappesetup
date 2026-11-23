@@ -125,6 +125,13 @@ class LocalStackTest(unittest.TestCase):
     def test_review_accounts_is_a_stack_action(self):
         self.assertIn("review-accounts", STACK.read_text())
 
+    def test_help_describes_every_action_including_both_merged_commands(self):
+        scope = stack()
+        self.assertIn("review-accounts", scope["ACTIONS"])
+        self.assertIn("seed-preview", scope["ACTIONS"])
+        described = [line.split()[0] for line in scope["ACTION_HELP"].splitlines()[1:] if line.strip()]
+        self.assertEqual(described, list(scope["ACTIONS"]))
+
 
 class ReviewAccountsFlowTest(unittest.TestCase):
     def test_accounts_reach_keycloak_tenant_and_press_through_stdin(self):

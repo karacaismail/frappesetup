@@ -78,7 +78,10 @@ class ApprovalReviewTest(unittest.TestCase):
 		doc = Mock(leave_approver=None, status="Open")
 		doc.is_new.return_value = False
 		doc.has_value_changed.side_effect = lambda field: field == "employee"
-		with patch.object(leave, "frappe") as fake, patch.object(leave, "_", side_effect=lambda text: text):
+		with (
+			patch.object(leave, "frappe") as fake,
+			patch.object(leave, "_", side_effect=lambda text, context=None: text),
+		):
 			fake.throw.side_effect = raise_with_message
 			with self.assertRaisesRegex(RuntimeError, "employee cannot change"):
 				leave.validate_approval(doc)
@@ -126,7 +129,7 @@ class FixtureLifecycleTest(unittest.TestCase):
 		with (
 			patch.object(setup, "frappe") as fake,
 			patch.object(setup, "engine_available", return_value=True),
-			patch.object(setup, "_", side_effect=lambda text: text),
+			patch.object(setup, "_", side_effect=lambda text, context=None: text),
 		):
 			fake.db.exists.return_value = True
 			fake.throw.side_effect = raise_with_message
@@ -249,7 +252,7 @@ class PortalRoutingTest(unittest.TestCase):
 
 		with (
 			patch.object(users, "frappe") as fake,
-			patch.object(users, "_", side_effect=lambda text: text),
+			patch.object(users, "_", side_effect=lambda text, context=None: text),
 		):
 			fake.session.user = "employee@example.test"
 			fake.get_cached_value.return_value = "Website User"

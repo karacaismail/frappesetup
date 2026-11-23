@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -224,9 +225,23 @@ def assert_owner(engine, compose, environment, create=False):
             run([*engine, "inspect", *ids], environment, capture_output=True, text=True).stdout
         )
         for container in containers:
-            labels = container["Config"].get("Labels", {})
-            if labels.get("com.docker.compose.project.working_dir") != str(BACKEND / "dev"):
-                raise ValueError("This Compose project belongs to another worktree.")
+            labels = container["Config"].get("Labels") or {}
+            name = container.get("Name", "").lstrip("/") or container.get("Id", "")[:12]
+            working_dir = labels.get("com.docker.compose.project.working_dir")
+            if not working_dir:
+                # Compose writes its project label into every image it builds. A container that
+                # `docker run` starts from the stack's tenant image inherits that label (T-17).
+                raise ValueError(
+                    f"Container {name} carries this stack's Compose project label, but Compose did not "
+                    "start it. It was probably started with docker run from the stack's tenant image, "
+                    "which holds the label. Stop that container, or start it with "
+                    "--label com.docker.compose.project= so that it leaves the project."
+                )
+            if working_dir != str(BACKEND / "dev"):
+                raise ValueError(
+                    f"This Compose project belongs to another worktree: container {name} was started "
+                    f"from {working_dir}."
+                )
             recorded_env = labels.get("com.docker.compose.project.environment_file")
             if not recorded_env or str(Path(recorded_env).resolve()) != env_path:
                 raise ValueError("This Compose project uses another environment file.")
@@ -834,6 +849,131 @@ def up(engine, compose, environment):
 
 
 FIXTURE_NAME = re.compile(r"E2E_[A-Z0-9_]+")
+EXTRA_LABEL = "io.frappesetup.stack-extra"
+PROVIDER_ALIAS = "e2e-provider"
+
+
+def preview_fixtures():
+    """Load the merge preview's fixture helpers. The stack reuses them and does not copy them."""
+    preview = BACKEND / "e2e/preview"
+    if str(preview) not in sys.path:
+        sys.path.insert(0, str(preview))
+    import fixtures
+
+    return fixtures
+
+
+def stop_provider(engine, environment):
+    """Remove this stack's fake model provider. Compose does not own it, so down alone misses it."""
+    label = f"label={EXTRA_LABEL}={project_name(environment)}"
+    ids = container_ids(
+        run([*engine, "ps", "-aq", "--filter", label], environment, capture_output=True, text=True).stdout
+    )
+    if ids:
+        run([*engine, "rm", "-f", *ids], environment, stdout=subprocess.DEVNULL)
+
+
+def start_provider(engine, environment):
+    """Start the fake model provider on the stack network and return its private address.
+
+    The provider runs from the tenant image. The image holds Compose's project and service labels,
+    so the run clears them and adds the stack's own extra label instead (T-17).
+    """
+    project = project_name(environment)
+    name = f"{project}-provider"
+    port = int(environment["PANE_PORT"]) + 7
+    running = run(
+        [*engine, "ps", "-q", "--filter", f"name=^{name}$"], environment, capture_output=True, text=True
+    ).stdout.strip()
+    if not running:
+        image = run(
+            [*engine, "inspect", "--format", "{{.Config.Image}}", f"{project}-tenant-web-1"],
+            environment,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        run(
+            [
+                *engine, "run", "-d", "--rm", "--name", name,
+                "--label", "com.docker.compose.project=", "--label", "com.docker.compose.service=",
+                "--label", f"{EXTRA_LABEL}={project}",
+                "--network", f"{project}_default", "--network-alias", PROVIDER_ALIAS, "--memory", "96m",
+                "--publish", f"127.0.0.1:{port}:{port}",
+                "--env", f"PANE_PORT={environment['PANE_PORT']}", "--env", "E2E_PROVIDER_BIND=0.0.0.0",
+                "--entrypoint", "node", image,
+                "--input-type=module", "-e", (BACKEND / "e2e/fake-provider.mjs").read_text(),
+            ],
+            environment,
+            capture_output=True,
+            text=True,
+        )
+    address = run(
+        [*engine, "inspect", "--format",
+         "{{(index .NetworkSettings.Networks \"%s_default\").IPAddress}}" % project, name],
+        environment,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    try:
+        parsed = ipaddress.ip_address(address)
+    except ValueError:
+        parsed = None
+    if not parsed or not parsed.is_private or parsed.is_loopback or parsed.is_link_local:
+        raise ValueError("The fake model provider has no private address on the stack network.")
+    return address
+
+
+def seed_preview(engine, compose, environment):
+    """Prepare the API and browser test data on a running stack (MVP test 3, T-16).
+
+    The merge preview's helpers seed Keycloak from this computer and the tenant inside its
+    container. The tenant keeps the Keycloak settings that stack up wrote. Press is not seeded
+    here: seed-deletion prepares the Press deletion chain. Run it once on a new stack.
+    """
+    require_tenant_settings(environment)
+    require_realm_sync_settings(environment)
+    fixtures = preview_fixtures()
+    port = int(environment["KC_PORT"])
+    os.environ.pop("E2E_BROWSER_RUNTIME", None)
+    os.environ.update(
+        FS_COLIMA_PROFILE=environment["FS_COLIMA_PROFILE"],
+        E2E_FULL_BROWSER_FIXTURES="1",
+        E2E_KEYCLOAK_CLIENT_SECRET=environment["ATONOTA_SITE_TENANT1_SECRET"],
+        E2E_KEYCLOAK_SERVICE_CLIENT_SECRET=environment["ATONOTA_SITE_TENANT1_SERVICE_SECRET"],
+        E2E_KEYCLOAK_ADMIN_USER=environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+        E2E_KEYCLOAK_ADMIN_PASSWORD=environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+    )
+    existing = fixtures.keycloak_request(
+        port,
+        "/admin/realms/platform/users?exact=true&email=" + fixtures.LOGIN_EMAIL,
+        token=fixtures.admin_access_token(port),
+    )
+    if existing:
+        raise ValueError(
+            "This stack's Keycloak already holds the preview accounts. If the first seed-preview run "
+            "finished, use the fixture file it wrote. If that run failed, the stack holds part of the "
+            "fixtures and cannot be seeded again: open a new stack with another PANE_PORT."
+        )
+    address = start_provider(engine, environment)
+    password, browser_fixtures, lifecycle, sync_client = fixtures.seed_identities(port)
+    settings = {
+        "PANE_PORT": environment["PANE_PORT"],
+        "E2E_PROVIDER_IP": address,
+        "E2E_PREVIEW_SYNC_ORIGIN": environment["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
+        "E2E_PREVIEW_LOGIN_EMAIL": fixtures.LOGIN_EMAIL,
+        "E2E_LIFECYCLE_IDENTITIES": fixtures.lifecycle_identities(lifecycle),
+    }
+    tenant = _seed_output(
+        run(
+            [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c",
+             (BACKEND / "e2e/preview/site-seed.py").read_text(), "stack-tenant"],
+            environment,
+            input=json.dumps(settings),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    return fixtures.account_fixtures(tenant, lifecycle, browser_fixtures, password, sync_client)
 DELETION_SCRIPTS = {
     name: BACKEND / "e2e/preview" / f"stack-deletion-{name}.py" for name in ("keycloak", "tenant", "press")
 }
@@ -1044,11 +1184,29 @@ def write_fixture(path, fixture):
         stream.write("".join(f"{key}={value}\n" for key, value in fixture.items()))
 
 
+ACTIONS = (
+    "config", "build", "up", "down", "check", "resources", "seed-deletion", "seed-preview", "review-accounts",
+)
+ACTION_HELP = """actions:
+  config           print the resolved service names, images, ports and networks (no secrets)
+  build            build the web image after the free disk and memory check
+  up               start the stack
+  down             stop the stack and its own test provider
+  check            probe the running services through their real protocols
+  resources        show free disk and memory in the container VM
+  seed-deletion    write the account deletion test fixture
+  seed-preview     load the API and browser test data into a running stack
+  review-accounts  create the local review accounts (local stack only; see backend/e2e/README.md)
+"""
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, epilog=ACTION_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
-        "action",
-        choices=("config", "build", "up", "down", "check", "resources", "seed-deletion", "review-accounts"),
+        "action", choices=ACTIONS, metavar="action",
+        help="one of: " + ", ".join(ACTIONS),
     )
     args = parser.parse_args()
     try:
@@ -1083,6 +1241,7 @@ def main():
             up(engine, compose, environment)
         elif args.action == "down":
             assert_owner(engine, compose, environment)
+            stop_provider(engine, environment)
             run([*compose, "down"], environment)
         elif args.action == "check":
             check(compose, environment)
@@ -1099,11 +1258,21 @@ def main():
             summary = review_accounts(compose, environment)
             print("Review accounts ready. See backend/e2e/README.md.")
             print(json.dumps(summary, indent=2))
+        elif args.action == "seed-preview":
+            assert_owner(engine, compose, environment)
+            path = env_file(os.environ.get("E2E_FIXTURE_FILE", REPOSITORY / ".pane/scratch/e2e-preview.env"))
+            assert_ignored(path)
+            write_fixture(path, seed_preview(engine, compose, environment))
+            print(f"Preview fixture written to {path}")
         else:
             resources(engine, environment)
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2
+    except RuntimeError as error:
+        # The preview fixture helpers raise RuntimeError without tokens or response bodies.
+        print(str(error), file=sys.stderr)
+        return 1
     except (OSError, subprocess.CalledProcessError):
         print(
             "Stack command failed. Run stack down to close this project's services.",

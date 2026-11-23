@@ -28,6 +28,8 @@ pnpm-debug.log*
 # playwright
 test-results/
 playwright-report/
+blob-report/
+all-blob-reports/
 
 # python
 __pycache__/

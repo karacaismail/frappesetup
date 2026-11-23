@@ -198,6 +198,34 @@ Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenl
 - **Oturumlar.** Okuyucu için `E2E_READER_COOKIE` ve `E2E_READER_CSRF` kullanın. Yetkili hesap için `E2E_OPERATOR_COOKIE` ve `E2E_OPERATOR_CSRF` kullanın. CSRF değeri, sitenin yazma isteğini doğruladığı oturum anahtarıdır.
 - **Model geçidi.** `backend/e2e/environment.sh provider` komutuyla sahte sağlayıcıyı açın. `e2e-local-only` yoluna iki kimliksiz Ollama uyumlu adres ekleyin. Yol kaydının adını `E2E_MODEL_ROUTE` değişkenine verin. İlk adres `http://e2e-provider:<PANE_PORT+7>/limited` olur. İkinci adres `http://e2e-provider:<PANE_PORT+7>/fallback` olur. İkinci API kaydının adını `E2E_FALLBACK_API` değişkenine verin. Bu yola gerçek sağlayıcı eklemeyin. Tekrar öncesi ilk adresin bekleme süresi dolmalı.
 
+### Yığında örnek veri hazırlama
+
+`backend/e2e/stack seed-preview` komutu açık yığına API ve tarayıcı test verisini yükler. Komut birleştirme önizlemesinin örnek veri işlevlerini kullanır.
+
+1. Yığını `backend/e2e/stack up` ile açın.
+2. `PANE_PORT=<port> backend/e2e/stack seed-preview` komutunu çalıştırın.
+3. Komutun yazdığı dosyayı Playwright ortamına yükleyin.
+
+Dosya varsayılan olarak `.pane/scratch/e2e-preview.env` yoluna yazılır. `E2E_FIXTURE_FILE` değişkeni yolu değiştirir. Dosyanın izni 0600'dür ve Git bu dosyayı yok sayar.
+
+Komut Keycloak'a her tarayıcı için örnek hesaplar ekler. Komut kiracıya erişim kuralı ve model yolu örneklerini ekler. Kiracının Keycloak ayarları değişmez. Press verisini `seed-deletion` hazırlar.
+
+Komut sahte model sağlayıcısını da açar. Sağlayıcının adı `<yığın projesi>-provider` olur. `stack down` bu sağlayıcıyı da kapatır.
+
+Komut bir yığında yalnız bir kez çalışır. Örnek hesaplar zaten varsa komut durur. İlk koşu bittiyse onun yazdığı dosyayı kullanın. İlk koşu yarıda kaldıysa yığında eksik örnek veri kalır. Bu durumda başka bir `PANE_PORT` ile yeni yığın açın.
+
+Yığın, telefonun kimlik eşitleme adresine düz HTTP ile bağlanır. Bu yüzden TLS aracısı isteyen üç yaşam döngüsü testi bu veriyle koşmaz. Bu testler aşağıdaki "Hesap ve oturum testleri" bölümündedir.
+
+### Kiracı imajından açılan ek konteyner
+
+`docker compose build` yığın projesinin etiketini kiracı imajına yazar. `docker run` ile bu imajdan açılan konteyner etiketi taşır. Bu durumda `stack` komutları konteynerin adını yazarak durur.
+
+Ek konteyneri kapatın. Konteyner gerekiyorsa `--label com.docker.compose.project=` ile açın. Bu boş etiket konteyneri yığın projesinden çıkarır. `seed-preview` sağlayıcıyı bu biçimde açar.
+
+### Telefon isteği yardımcısı
+
+`mobile-request.ts` içindeki `postMobile` her isteğin gövdesine `installation_id` ekler. `v1_cleanup` ucu bu alanı kabul etmez. Bu uç için son bağımsız değişkene `{ installationField: false }` verin.
+
 ## Sihirli bağlantı ve telefon paketi
 
 Bu iki test grubu, örnek ortam hazır olunca açılır.
@@ -251,6 +279,8 @@ Yönetici oturumları kiracıda ve Press'te okuma içindir. Test bitince bu otur
 | Müşteri hesabını siler. | `fail` (Chromium ve WebKit) | Kiracı yanıtında `anonymized` ve `found` alanları eksik. Sahip iş `platform-core-kimlik`. |
 | Yönetici telefonu iptal eder. | `not_run` | Mobil kimlik doğrulaması ve Keycloak oturumu iptal ucu. |
 | Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
+
+Orkestratör 23 Kasım 2026 Pazartesi günü bu üç testin yerini belirledi. Bu testler yerel MVP için zorunlu değildir. Testler `lifecycle.spec.ts` dosyasındaki hesap silme, yönetici telefon iptali ve bir saatlik çalışan oturumudur. Üç test üretime çıkmadan önce koşulur. Testler TLS aracısı olan önizleme yığınında koşar. TLS aracısı, telefon iptali için geçici HTTPS bağlantısını kuran ara servistir.
 
 Bu senaryoları yalnız ayrı bir yerel test ortamında açın.
 Birleştirme önizlemesi her senaryo için ayrı bir örnek hesap hazırlar.

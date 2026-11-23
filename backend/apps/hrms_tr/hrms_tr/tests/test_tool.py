@@ -43,7 +43,7 @@ class ApprovalToolTest(unittest.TestCase):
 		)
 		with (
 			patch.object(ai_tools.leave, "pending_leave", return_value=doc),
-			patch.object(ai_tools, "_", side_effect=lambda message: message),
+			patch.object(ai_tools, "_", side_effect=lambda message, context=None: message),
 		):
 			preview = ai_tools.preview_approval(doc.name)
 		self.assertEqual(preview["target_version"], doc.modified)
@@ -69,7 +69,7 @@ class ApprovalToolTest(unittest.TestCase):
 				ai_tools.leave, "approve", side_effect=frappe.ValidationError("Private employee conflict")
 			),
 			patch.object(ai_tools, "frappe") as framework,
-			patch.object(ai_tools, "_", side_effect=lambda value: value),
+			patch.object(ai_tools, "_", side_effect=lambda value, context=None: value),
 		):
 			framework.ValidationError = frappe.ValidationError
 			framework.PermissionError = frappe.PermissionError

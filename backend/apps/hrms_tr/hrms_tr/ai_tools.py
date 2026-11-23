@@ -34,13 +34,23 @@ def declarations() -> list[dict]:
 def preview_approval(name: str) -> dict:
 	doc = leave.pending_leave(name)
 	return {
-		"summary": _("Approve and submit leave application {0}.").format(doc.name),
+		"summary": _("Approve and submit leave application {0}.", context="hrms_tr").format(doc.name),
 		"target_doctype": doc.doctype,
 		"target_name": doc.name,
 		"target_version": str(doc.modified),
 		"changes": [
-			{"fieldname": "status", "label": _("Status"), "old": doc.status, "new": "Approved"},
-			{"fieldname": "docstatus", "label": _("Document Status"), "old": int(doc.docstatus), "new": 1},
+			{
+				"fieldname": "status",
+				"label": _("Status", context="hrms_tr"),
+				"old": doc.status,
+				"new": "Approved",
+			},
+			{
+				"fieldname": "docstatus",
+				"label": _("Document Status", context="hrms_tr"),
+				"old": int(doc.docstatus),
+				"new": 1,
+			},
 		],
 		"details": {"name": doc.name},
 	}
@@ -52,4 +62,6 @@ def execute_approval(name: str) -> dict[str, str]:
 	except (frappe.ValidationError, frappe.PermissionError):
 		# The platform stores this exception in the proposal. HRMS errors may contain personal data.
 		frappe.clear_messages()
-		raise frappe.ValidationError(_("The leave application could not be approved.")) from None
+		raise frappe.ValidationError(
+			_("The leave application could not be approved.", context="hrms_tr")
+		) from None

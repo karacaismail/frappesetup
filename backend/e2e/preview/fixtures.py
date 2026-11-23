@@ -244,58 +244,32 @@ def seed_site(project, service, bench, environment):
     return json.loads(completed.stdout.splitlines()[-1])
 
 
-def main():
-    project = os.environ["PREVIEW_PROJECT"]
-    if not re.fullmatch(r"fs-e2e-preview-[a-z0-9-]+", project):
-        raise SystemExit("Refusing to seed a project outside the merge preview.")
-    port = int(os.environ["PANE_PORT"])
-    if not 1000 <= port <= 65526:
-        raise SystemExit("PANE_PORT is out of range.")
-    address = ipaddress.ip_address(os.environ["E2E_PROVIDER_IP"])
-    if (
-        not address.is_private
-        or address.is_unspecified
-        or address.is_multicast
-        or address.is_link_local
-        or address.is_loopback
-    ):
-        raise SystemExit("The fake provider must use a private address on the preview network.")
+def seed_identities(port):
+    """Seed Keycloak once. The merge preview and the shared stack both use this step.
 
-    docker_executable()
+    Returns the login password, the browser fixtures (None without full browser fixtures),
+    the lifecycle accounts and the sync fixture client.
+    """
     check_tenant_clients(port)
     print("Tenant browser and service client checks passed.", flush=True)
     password = "Aa9!" + secrets.token_urlsafe(24)
     browser_fixtures = {} if os.environ.get("E2E_FULL_BROWSER_FIXTURES") == "1" else None
     lifecycle = seed_keycloak(port, password, browser_fixtures=browser_fixtures)
     sync_client = configure_sync_fixture_client(port)
-    common = {
-        "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
-        "PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL,
-        "E2E_FULL_BROWSER_FIXTURES": "1" if browser_fixtures is not None else "0",
-        "E2E_LIFECYCLE_IDENTITIES": json.dumps({
-            key: {field: item[field] for field in ("email", "subject")}
-            for key, item in lifecycle.items()
-        }),
-    }
-    keycloak_settings = Path(os.environ["PREVIEW_DIR"]) / "keycloak.env"
-    press_service_secret = next(
-        (line.partition("=")[2] for line in keycloak_settings.read_text().splitlines()
-         if line.startswith("ATONOTA_PRESS_SERVICE_SECRET=")), "",
-    )
-    if not press_service_secret:
-        raise RuntimeError("The preview Keycloak settings are missing the Press service secret.")
-    press_fixture = seed_site(project, "web", PRESS_BENCH, {
-        **common, "E2E_PRESS_CLIENT_SECRET": os.environ["E2E_PRESS_CLIENT_SECRET"],
-        "E2E_PRESS_SERVICE_SECRET": press_service_secret,
+    return password, browser_fixtures, lifecycle, sync_client
+
+
+def lifecycle_identities(lifecycle):
+    """Pass only the e-mail and subject of each lifecycle account to a site, never a password."""
+    return json.dumps({
+        key: {field: item[field] for field in ("email", "subject")}
+        for key, item in lifecycle.items()
     })
-    fixture = seed_site(project, "tenant-web", BENCH, {
-        **common,
-        "E2E_PROVIDER_IP": str(address),
-        "PYTHONPATH": os.environ["E2E_TENANT_MODULE_DIR"],
-        "E2E_KEYCLOAK_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
-        "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
-    })
-    fixture.update(press_fixture)
+
+
+def account_fixtures(fixture, lifecycle, browser_fixtures, password, sync_client):
+    """Add the Keycloak accounts to the site fixture under the names the specs read."""
+    fixture = dict(fixture)
     if browser_fixtures is None:
         for scenario in ("delete", "revoke", "employee"):
             for field in ("email", "password", "subject"):
@@ -319,6 +293,54 @@ def main():
         E2E_SYNC_KEYCLOAK_CLIENT=sync_client["client_id"],
         E2E_SYNC_KEYCLOAK_SECRET=sync_client["client_value"],
     )
+    return fixture
+
+
+def main():
+    project = os.environ["PREVIEW_PROJECT"]
+    if not re.fullmatch(r"fs-e2e-preview-[a-z0-9-]+", project):
+        raise SystemExit("Refusing to seed a project outside the merge preview.")
+    port = int(os.environ["PANE_PORT"])
+    if not 1000 <= port <= 65526:
+        raise SystemExit("PANE_PORT is out of range.")
+    address = ipaddress.ip_address(os.environ["E2E_PROVIDER_IP"])
+    if (
+        not address.is_private
+        or address.is_unspecified
+        or address.is_multicast
+        or address.is_link_local
+        or address.is_loopback
+    ):
+        raise SystemExit("The fake provider must use a private address on the preview network.")
+
+    docker_executable()
+    password, browser_fixtures, lifecycle, sync_client = seed_identities(port)
+    common = {
+        "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
+        "PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL,
+        "E2E_FULL_BROWSER_FIXTURES": "1" if browser_fixtures is not None else "0",
+        "E2E_LIFECYCLE_IDENTITIES": lifecycle_identities(lifecycle),
+    }
+    keycloak_settings = Path(os.environ["PREVIEW_DIR"]) / "keycloak.env"
+    press_service_secret = next(
+        (line.partition("=")[2] for line in keycloak_settings.read_text().splitlines()
+         if line.startswith("ATONOTA_PRESS_SERVICE_SECRET=")), "",
+    )
+    if not press_service_secret:
+        raise RuntimeError("The preview Keycloak settings are missing the Press service secret.")
+    press_fixture = seed_site(project, "web", PRESS_BENCH, {
+        **common, "E2E_PRESS_CLIENT_SECRET": os.environ["E2E_PRESS_CLIENT_SECRET"],
+        "E2E_PRESS_SERVICE_SECRET": press_service_secret,
+    })
+    fixture = seed_site(project, "tenant-web", BENCH, {
+        **common,
+        "E2E_PROVIDER_IP": str(address),
+        "PYTHONPATH": os.environ["E2E_TENANT_MODULE_DIR"],
+        "E2E_KEYCLOAK_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
+        "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
+    })
+    fixture.update(press_fixture)
+    fixture = account_fixtures(fixture, lifecycle, browser_fixtures, password, sync_client)
     path = Path(os.environ["PREVIEW_DIR"]) / "fixtures.json"
     with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as stream:
         json.dump(fixture, stream)
