@@ -307,6 +307,31 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
   - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
 
+- **O-45. P2 ödeme katmanı MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü MVP durum denetimiyle alındı. Prod, gerçek müşterinin kullandığı canlı ortamdır.
+  - MVP ilk kullanılabilir sürümdür (D-1).
+  - İlk kullanıcılar ürünü alpha ve beta ortamında dener. Bu ortamlarda ödeme alınmaz.
+  - iyzico ve e-fatura işi prod satışından önce biter.
+- **O-46. P4 kendi kendine deneme ve “Etkinleştir” akışı MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - MVP'de kiracıyı operatör Press ile açar.
+  - Kendi kendine deneme akışı P2 ile birlikte gelir.
+- **O-47. 5. ve 7. teknik borç kodda kapandı.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - Biri tema derleme adımının iki kopyasıdır. Öteki geçiş anahtarı testlerinin zaman aşımıdır.
+  - İki borç “Teknik borç” tablosundan çıktı.
+  - Kanıtlar “Kapanan teknik borç” bölümündedir.
+- **O-48. Kayıt dışındaki 7 `BORC(mvp)` işareti kayda alınır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - MVP durum denetimi bu işaretleri 3. bölümünde saydı.
+  - Kayda girmeyen işaret de MVP geçişini engeller.
+  - İki işaret kodda kapanmıştı. Bu ikisi “Kapanan teknik borç” bölümüne yazıldı.
+  - Beş işaret “Teknik borç” tablosuna girdi.
+- **O-49. Telefon paketi MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - O-26 kararı geçerlidir.
+  - Telefonun sunucu tarafı MVP düzeyindedir.
+  - Telefon paketi borcu tabloda kalır. Bu borç MVP'yi engellemez.
+- **O-50. Üç yaşam döngüsü testi prod'dan önce zorunludur.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - Testler MVP son test 3 raporundaki üç yaşam döngüsü testidir.
+  - alpha ortamı için bu testler zorunlu değildir.
+  - Testler TLS aracısı olan hazırlık ortamında koşar. TLS aracısı, şifreli bağlantıyı karşılayan ara sunucudur.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
@@ -354,9 +379,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
 | `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
-| `BORC(mvp)`: Tema derleme adımının iki kopyası var | Bir kopya değişince öteki eski kalabilir | kimlik-tema | Derleme adımı tek yerde durur ve test bunu denetler |
 | `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
-| `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
 | `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
@@ -364,7 +387,12 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Tam bağımlılık çözümü ve kilidi de eksik. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Üç kaynak engeli giderilir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
-| `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
+| Telefon paketi yok (O-26). Bu borç MVP'yi engellemez (O-49) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
+| `BORC(mvp)`: Giriş sayfası ve panel tasarım tokenlarını ayrı tutar | Bir dosyadaki renk ya da yazı değeri değişince öteki eski kalabilir. Outfit dosyaları iki klasörde durur. İşaret `apps/platform_core/platform_core/public/identity/login.css` dosyasındadır | platform-core-kimlik ve platform-core-kabuk | Giriş sayfası ve panel tek token dosyasını ve tek yazı tipi klasörünü kullanır |
+| `BORC(mvp)`: Sihirli bağlantı eklentisi Keycloak 26.1.4 için yazıldı | Eklenti Keycloak'ın iç arayüzlerini kullanır. Keycloak yükseltmesi eklentiyi bozabilir. İşaret `identity/keycloak/Dockerfile` dosyasındadır | kimlik-realm | Eklentinin çalışan Keycloak sürümü için yayımı çıkar. Yayım yoksa her Keycloak yükseltmesinde `identity/keycloak/tests/test_magic_link.py` yeniden koşar |
+| `BORC(mvp)`: `list_identities` satırı e-posta ve takım taşımaz | Mutabakat, var olan kaydın e-posta farkını göremez. Fazla takım üyeliğini de göremez. İşaret `identity/identity_sync/README.md` dosyasındadır | Orkestratör | İki farkın nasıl bulunacağı sözleşmeye yazılır. Ya da iki fark kapsam dışı sayılır |
+| `BORC(mvp)`: identity-sync'in bazı veritabanı okumaları son ana bağlı değildir | Son an, isteğin en geç bitmesi gereken zamandır. Başka bir süreç yazarken okuma en çok 5 saniye bekleyebilir. Örnekler `is_processed`, `dead_letter_state` ve `progress` okumalarıdır. İşaret `docs/gap-backlog.md` dosyasının identity-sync bölümündedir | identity-sync işi | İki bağlantılı bir test, okuma beklerken de olay yanıtının 5 saniyelik sınırı aşmadığını gösterir |
+| `BORC(mvp)`: identity-sync gerçek TLS sunucusuyla süre denemesinden geçmedi | TLS kurulumu bağlantının kalan süresiyle bekler. Bu davranış gerçek sunucuyla sınanmadı. İşaret `docs/gap-backlog.md` dosyasının identity-sync bölümündedir | identity-sync işi | Yavaş el sıkışan bir test sunucusuyla istek son anda biter |
 
 ### Kapanan teknik borç
 
@@ -378,3 +406,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
   `test_confirmed_creation_posts_restricted_client_to_admin_api` testi, onay sonrası isteği doğrular.
 - **Kimlik eşitleme servisinin container dosyası.** `6aaa981` kaydı `Dockerfile` dosyasını ekledi.
   İmaj `oidc_verify` kitaplığıyla açıldı. `/healthz` isteği HTTP 200 döndü.
+
+- **Tema derleme adımının iki kopyası.** `6ce91697` commit'i derleme adımını `account-provider/build.sh` dosyasına taşıdı. `dev-script.spec.ts` dosyasındaki “the account provider is built in one place only” testi ikinci kopyayı arar. Test bir kopya bulursa başarısız olur. Kayıt 23 Kasım 2026 Pazartesi günü kapandı (O-47).
+- **Geçiş anahtarı testlerinin yük altında zaman aşımı.** `08cb7ea3` commit'i bu testleri yük altında kararlı yaptı. Giriş yardımcısı artık sayfanın yüklenmesini bekler. Hiçbir süre sınırı gevşetilmedi. Değişen dosyalar `flow.spec.ts`, `focus-diff.ts` ve `helpers.ts` dosyalarıdır. Kayıt 23 Kasım 2026 Pazartesi günü kapandı (O-47).
+- **Anahtar listesi hatasının sınıfı.** Bu işaret `apps/platform_core/platform_core/identity/jwks.py` dosyasındaydı. `oidc_verify` kitaplığı artık `JwksUnavailable` sınıfını dışa açar. `mcp_tokens.py` dosyası bu sınıfı kitaplıktan alır. `test_jwks_transport.py` testleri de sınıfı kitaplıktan alır. Koddaki işaret 23 Kasım 2026 Pazartesi günü kaldırıldı (O-48).
+- **Çıkış belirtecinin alan denetimi.** Bu işaret `apps/platform_core/platform_core/identity/sign_out.py` dosyasındaydı. Kitaplıktaki `verify_logout_token` işlevi `exp`, `jti`, `events` ve `sid` alanlarını denetler. Kanıt `libs/oidc_verify/tests/test_security_findings.py` dosyasındadır. Örnekler `test_missing_jti_is_malformed` ve `test_events_must_be_object` testleridir. `platform_core` ikinci denetimi güvenlik payı olarak tutar. Koddaki işaret 23 Kasım 2026 Pazartesi günü kaldırıldı (O-48).

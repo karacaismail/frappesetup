@@ -10,7 +10,7 @@ Satılan her uygulama (HRMS TR, CRM, Webshop ve sonrakiler) aynı çerçeveden g
 
 | # | Katman | Zorunlu çıktı | Gereksinim |
 | --- | --- | --- | --- |
-| 1 | Backend iskelet | `bench new-app` şablonu; `pyproject.toml` + `[tool.bench.frappe-dependencies] frappe = ">=16.0.0 <17.0.0"`; `hooks.py` (idempotent `after_install`, `setup_wizard_complete`, `after_migrate`, `fixtures` ön ek filtresi, `user_data_fields`); Module Def; `locale/main.pot` + `tr.po`; `bench run-tests` + ruff; CHANGELOG | G-102, G-14, G-52 |
+| 1 | Backend iskelet | `bench new-app` şablonu; `pyproject.toml` + `[tool.bench.frappe-dependencies] frappe = ">=16.0.0 <17.0.0"`; `hooks.py` (idempotent `after_install`, `setup_wizard_complete`, `after_migrate`, `fixtures` ön ek filtresi, `user_data_fields`); Module Def; çeviri dosyası `translations/tr.csv` (`.po` geçişi G-73 ile sonraya kalır); `bench run-tests` + ruff; CHANGELOG | G-102, G-14, G-52, G-73 |
 | 2 | Frontend modül | `@apps/<ad>` paketi `AppModule` arayüzüyle: TanStack Router rota ağacı, `overrides/<doctype>.tsx` registry, ikon/çeviri, dashboard widget'ları, yardım konuları, tur ve keşif kuralları (G-141), AI Prompts; yalnızca tasarım tokenları; dinamik import | G-103, G-66, G-67, G-69 |
 | 3 | Yetki sözleşmesi | Ön ekli roller (`<App> Admin/Manager/Employee`), Role Profile ve Module Profile fixture'ları, hiyerarşi alanları, varsayılan Access Rule şablonları, hassas alan permlevel şablonu; yetki matrisi testi | G-104, G-60, G-61, G-62 |
 | 4 | AI sözleşmesi | `ai_tools` hook'u: araç adı, TR/EN açıklama, şema, gereken rol, `destructive`/`billable` bayrağı, önizleme üretici, birim kredi maliyeti; tek tık akışları Prompts olarak; golden test + yetki negatif testi | G-105, G-84, G-86, SA-15 |
@@ -62,7 +62,7 @@ Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmu
 - Aktivasyon E2E'si 320 px ve masaüstünde geçer; Marketplace App Subscription Active, `site_config` içinde `sk_<app>`, sidebar'da uygulama başlığı ve Workspace çocukları görünür (G-29, G-94, SA-16).
 - Yetki matrisi ve AI negatif testleri (yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, confirm'siz yıkıcı aksiyon) reddedilir ve AI Action Log'a `denied` düşer (G-85, G-64).
 - `user_data_fields` ile Personal Data Download/Deletion talebi uygulamanın tüm kişisel veri doctype'larını kapsar (G-52).
-- Türkçe `tr.po` tam; panel metinleri i18n kataloğunda (G-73).
+- Backend metinleri `_()` ile bağlamla sarılır. Türkçe çeviri `translations/tr.csv` dosyasında tamdır. Panel metinleri dil kataloğundadır (G-73).
 - İlk Paid Invoice operasyon sitesinde `APP-<ad>` satırıyla Sales Invoice olarak görünür (SA-19).
 
 HRMS TR bu çerçevenin ilk uygulamasıdır (P4); CRM ve Webshop aynı manifestle P5'te yayına alınır, çerçevede değişiklik gerekirse önce manifest güncellenir, sonra üç uygulama birlikte yeniden doğrulanır.

@@ -9,9 +9,9 @@ from platform_core.model_gateway.doctype.validation import encode_identifiers, v
 
 class PLTAIAPI(Document):
 	def validate(self):
-		self.allowed_models = encode_identifiers(self.allowed_models, "Allowed Models")
-		validate_url(self.base_url, "Base URL")
-		validate_url(self.oauth_token_url, "OAuth Token URL", https_only=True)
+		self.allowed_models = encode_identifiers(self.allowed_models, "Allowed Models", self.doctype)
+		validate_url(self.base_url, "Base URL", self.doctype)
+		validate_url(self.oauth_token_url, "OAuth Token URL", self.doctype, https_only=True)
 		if self.api_key and not isinstance(self.api_key, str):
 			frappe.throw(_("Enter the API credential as text."))
 		uses_mask = self.api_key and self.is_dummy_password(self.api_key)

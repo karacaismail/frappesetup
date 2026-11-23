@@ -12,7 +12,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
+  // CI'da parçalı koşu (PW_BLOB=1): her parça blob raporu yazar, toplayıcı iş tek HTML rapora birleştirir.
+  reporter: process.env.CI
+    ? [['github'], process.env.PW_BLOB ? ['blob'] : ['html', { open: 'never' }]]
+    : [['list']],
   timeout: 45_000,
   expect: {
     timeout: 10_000,

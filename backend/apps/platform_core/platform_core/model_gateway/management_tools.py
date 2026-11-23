@@ -84,8 +84,8 @@ def _validated(model, arguments):
 
 
 def _check_api_values(values):
-	validate_url(values.get("base_url"), "Base URL")
-	validate_url(values.get("oauth_token_url"), "OAuth Token URL", https_only=True)
+	validate_url(values.get("base_url"), "Base URL", API_DOCTYPE)
+	validate_url(values.get("oauth_token_url"), "OAuth Token URL", API_DOCTYPE, https_only=True)
 
 
 def _new_doc(doctype, values):

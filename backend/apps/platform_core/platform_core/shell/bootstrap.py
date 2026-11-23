@@ -6,6 +6,8 @@ import frappe
 from frappe.desk.desktop import get_workspaces
 from frappe.desk.doctype.sidebar.sidebar import SidebarContext, get_navigable_modules, resolve_sidebar
 from frappe.desk.utils import is_item_allowed
+from frappe.locale import get_date_format, get_first_day_of_the_week, get_time_format
+from frappe.translate import get_all_languages
 from frappe.utils import cint, get_system_timezone
 
 from platform_core.shell.cache import permission_version
@@ -159,7 +161,12 @@ def _build_bootstrap(user: str, version: str, language: str, roles: list[str]) -
 			"currency": frappe.get_system_settings("currency") or None,
 			"number_format": frappe.get_system_settings("number_format") or "#,###.##",
 			"rounding_method": frappe.get_system_settings("rounding_method") or "Banker's Rounding (legacy)",
+			# Frappe 16 reads these from the Language record first, then System Settings (frappe/locale.py).
+			"date_format": get_date_format(language),
+			"time_format": get_time_format(language),
+			"first_day_of_the_week": get_first_day_of_the_week(language),
 		},
+		"languages": enabled_languages(),
 		"workspaces": [
 			{
 				"name": page["name"],
@@ -179,6 +186,15 @@ def _build_bootstrap(user: str, version: str, language: str, roles: list[str]) -
 	return payload
 
 
+def enabled_languages() -> list[dict]:
+	"""Enabled Language records as code and display name, in a stable order."""
+	rows = get_all_languages(with_language_name=True) or []
+	return sorted(
+		({"code": row["language_code"], "name": row["language_name"]} for row in rows),
+		key=lambda row: row["code"],
+	)
+
+
 def workspace_target_allowed(page: dict, context) -> bool:
 	if page.get("type") == "URL":
 		return safe_url(page.get("external_link"))
@@ -191,10 +207,11 @@ def workspace_target_allowed(page: dict, context) -> bool:
 
 
 def compact_bootstrap(payload: dict) -> dict:
-	"""Keep identity and formatting without returning a broken navigation tree."""
+	"""Keep identity, formatting and languages without returning a broken navigation tree."""
 	summary = {
 		"user": {**payload["user"], "roles": []},
 		"formatting": payload["formatting"],
+		"languages": payload["languages"],
 		"installed_apps": [],
 		"workspaces": [],
 		"sidebars": [],

@@ -31,17 +31,21 @@ def name_portal_leave(doc, method=None):
 
 def check_approver_role():
 	if not set((*APPROVER_ROLES, *OPERATIONS_ROLES)).intersection(frappe.get_roles()):
-		frappe.throw(_("You do not have permission to approve leave."), frappe.PermissionError)
+		frappe.throw(
+			_("You do not have permission to approve leave.", context="hrms_tr"), frappe.PermissionError
+		)
 
 
 def check_not_own_leave(doc):
 	if frappe.db.get_value("Employee", doc.employee, "user_id") == frappe.session.user:
-		frappe.throw(_("You cannot approve your own leave."), frappe.PermissionError)
+		frappe.throw(_("You cannot approve your own leave.", context="hrms_tr"), frappe.PermissionError)
 
 
 def check_hr_role():
 	if frappe.session.user != "Administrator" and HR_ROLE not in frappe.get_roles():
-		frappe.throw(_("Only HRMS TR Admin can amend leave applications."), frappe.PermissionError)
+		frappe.throw(
+			_("Only HRMS TR Admin can amend leave applications.", context="hrms_tr"), frappe.PermissionError
+		)
 
 
 def validate_cancellation(doc, method=None):
@@ -51,7 +55,9 @@ def validate_cancellation(doc, method=None):
 	if set(OPERATIONS_ROLES).intersection(roles):
 		return
 	if HR_ROLE not in roles or not doc.flags.hrms_tr_version_checked:
-		frappe.throw(_("You do not have permission to cancel leave."), frappe.PermissionError)
+		frappe.throw(
+			_("You do not have permission to cancel leave.", context="hrms_tr"), frappe.PermissionError
+		)
 
 
 def validate_manager_fields(doc, method=None):
@@ -70,22 +76,26 @@ def validate_manager_fields(doc, method=None):
 	protected_fields = set(doc.meta.get_valid_columns()) - status_and_audit_fields
 	if any(doc.has_value_changed(fieldname) for fieldname in protected_fields):
 		frappe.throw(
-			_("Managers can only change the status of a team leave application."), frappe.PermissionError
+			_("Managers can only change the status of a team leave application.", context="hrms_tr"),
+			frappe.PermissionError,
 		)
 
 
 def validate_approval(doc, method=None):
 	"""Apply the approval policy to native Frappe writes."""
 	if not doc.is_new() and doc.has_value_changed("employee"):
-		frappe.throw(_("The employee cannot change on a saved leave application."))
+		frappe.throw(_("The employee cannot change on a saved leave application.", context="hrms_tr"))
 	if doc.is_new() and doc.amended_from:
 		check_hr_role()
 		if frappe.db.get_value(DOCTYPE, doc.amended_from, "employee") != doc.employee:
-			frappe.throw(_("The employee cannot change on an amended leave application."))
+			frappe.throw(_("The employee cannot change on an amended leave application.", context="hrms_tr"))
 	if doc.leave_approver and not frappe.has_permission(
 		DOCTYPE, "submit", doc, user=doc.leave_approver, ignore_share_permissions=True
 	):
-		frappe.throw(_("The selected approver cannot submit this leave application."), frappe.PermissionError)
+		frappe.throw(
+			_("The selected approver cannot submit this leave application.", context="hrms_tr"),
+			frappe.PermissionError,
+		)
 	if doc.status != "Approved" or frappe.session.user == "Administrator":
 		return
 	check_approver_role()
@@ -100,11 +110,11 @@ def pending_leave(name: str, *, expected_version: str | None = None, lock: bool 
 	check_not_own_leave(doc)
 	if expected_version is not None and str(doc.modified) != expected_version:
 		frappe.throw(
-			_("The leave application changed. Open it again before approving."),
+			_("The leave application changed. Open it again before approving.", context="hrms_tr"),
 			frappe.TimestampMismatchError,
 		)
 	if doc.docstatus != DocStatus.draft() or doc.status != "Open":
-		frappe.throw(_("Only open draft leave applications can be approved."))
+		frappe.throw(_("Only open draft leave applications can be approved.", context="hrms_tr"))
 	return doc
 
 
@@ -117,17 +127,22 @@ def approve(name: str, *, expected_version: str | None = None) -> dict[str, str]
 
 def cancel(name: str, *, expected_version: str) -> dict[str, str]:
 	if HR_ROLE not in frappe.get_roles():
-		frappe.throw(_("You do not have permission to cancel leave."), frappe.PermissionError)
+		frappe.throw(
+			_("You do not have permission to cancel leave.", context="hrms_tr"), frappe.PermissionError
+		)
 	doc = frappe.get_doc(DOCTYPE, name, for_update=True)
 	doc.check_permission("read")
 	doc.check_permission("cancel")
 	if str(doc.modified) != expected_version:
 		frappe.throw(
-			_("The leave application changed. Open it again before cancelling."),
+			_("The leave application changed. Open it again before cancelling.", context="hrms_tr"),
 			frappe.TimestampMismatchError,
 		)
 	if not doc.docstatus.is_submitted():
-		frappe.throw(_("Only submitted leave applications can be cancelled."), frappe.ValidationError)
+		frappe.throw(
+			_("Only submitted leave applications can be cancelled.", context="hrms_tr"),
+			frappe.ValidationError,
+		)
 	doc.flags.hrms_tr_version_checked = True
 	doc.cancel()
 	return {"name": doc.name}
@@ -138,7 +153,7 @@ def get_approver(employee: str) -> str | None:
 	if frappe.session.user != "Administrator" and not set((*HRMS_TR_ROLES, *OPERATIONS_ROLES)).intersection(
 		roles
 	):
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
+		frappe.throw(_("Not permitted", context="hrms_tr"), frappe.PermissionError)
 	if not frappe.db.exists("Employee", employee):
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
+		frappe.throw(_("Not permitted", context="hrms_tr"), frappe.PermissionError)
 	return frappe.get_attr(HRMS_APPROVER_METHOD)(employee)

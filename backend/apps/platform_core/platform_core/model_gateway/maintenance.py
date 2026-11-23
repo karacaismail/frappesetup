@@ -7,6 +7,7 @@ from secrets import token_hex
 from uuid import uuid4
 
 import frappe
+from frappe import _
 from frappe.utils import now_datetime
 
 from platform_core.model_gateway import gateway, ledger, policy
@@ -156,7 +157,7 @@ def purge_usage_logs(*, dry_run: bool = False, names: list[str] | None = None) -
 	"""Preview expired logs or permanently delete the approved names."""
 	_require_retention_manager()
 	if type(dry_run) is not bool:
-		raise frappe.ValidationError("Expected a boolean dry_run value.")
+		raise frappe.ValidationError(_("Expected a boolean dry_run value."))
 	now = now_datetime()
 	filters = _retention_filters(now - timedelta(days=RETENTION_DAYS))
 	if dry_run:
@@ -171,7 +172,7 @@ def purge_usage_logs(*, dry_run: bool = False, names: list[str] | None = None) -
 		or any(not isinstance(name, str) or not name for name in names)
 		or len(set(names)) != len(names)
 	):
-		raise frappe.ValidationError("Provide the unique record names from the purge preview.")
+		raise frappe.ValidationError(_("Provide the unique record names from the purge preview."))
 	if not names:
 		return {"eligible": frappe.db.count(USAGE_LOG, filters), "deleted": 0, "names": []}
 
@@ -181,7 +182,7 @@ def purge_usage_logs(*, dry_run: bool = False, names: list[str] | None = None) -
 	try:
 		rows = _purge_batch({**filters, "name": ["in", names]}, for_update=True)
 		if {row.name for row in rows} != set(names):
-			raise frappe.ValidationError("Purge eligibility changed. Preview the records again.")
+			raise frappe.ValidationError(_("Purge eligibility changed. Preview the records again."))
 		deleted = _delete_usage_batch([(row.name, row.modified) for row in rows], now)
 		eligible = deleted + frappe.db.count(USAGE_LOG, filters)
 	except frappe.QueryDeadlockError:

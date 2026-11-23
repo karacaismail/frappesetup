@@ -12,9 +12,8 @@ _LOCK = threading.Lock()
 def is_keys_unavailable(error: BaseException) -> bool:
 	"""True for oidc_verify's JwksUnavailable (keys could not be fetched and none are cached).
 
-	The package does not export that class yet, and the module boundary check forbids importing
-	`oidc_verify.hatalar` directly. kimlik-realm was asked to export it; until then it is matched by name.
-	BORC(mvp): owner kimlik-realm. Closes when `oidc_verify` exports `JwksUnavailable`.
+	`oidc_verify` now exports the class (mcp_tokens.py imports it). The match by name is kept so the
+	callers do not change; it accepts the same exception.
 	"""
 	return type(error).__name__ == "JwksUnavailable"
 
