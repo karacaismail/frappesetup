@@ -27,8 +27,7 @@ class TestSiteSetup(unittest.TestCase):
         self.site.name = "tenant.example.test"
 
     def test_dispatches_after_site_is_active(self):
-        self.frappe.db.get_value.return_value = ("Active", 0, "test-server")
-        self.frappe.db.exists.return_value = None
+        self.frappe.db.get_value.side_effect = [("Active", 0, "test-server"), None]
         args = {"language": "tr", "country": "Türkiye", "currency": "TRY"}
         self.assertIs(
             self.site.complete_setup_wizard(args),
@@ -45,7 +44,6 @@ class TestSiteSetup(unittest.TestCase):
         self.agent.Agent.assert_not_called()
 
     def test_existing_job_prevents_duplicate_dispatch(self):
-        self.frappe.db.get_value.return_value = ("Active", 0, "test-server")
-        self.frappe.db.exists.return_value = "existing-job"
+        self.frappe.db.get_value.side_effect = [("Active", 0, "test-server"), "existing-job"]
         self.assertIsNone(self.site.complete_setup_wizard({}))
         self.agent.Agent.assert_not_called()

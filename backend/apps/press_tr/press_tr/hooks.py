@@ -282,6 +282,7 @@ doc_events = {
 	# G-49: Press's own key format check never runs, so press_tr checks it on every Site save.
 	"Site": {"validate": "press_tr.backup_keys.validate_site_keys"},
 }
+override_doctype_class = {"Site": "press_tr.site_setup.SetupSite"}
 extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
 
 ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session"]

@@ -5,7 +5,9 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 BENCH = Path("/home/frappe/frappe-bench")
 
@@ -30,6 +32,35 @@ def configure() -> None:
     apps_path = BENCH / "sites/apps.txt"
     apps = apps_path.read_text().splitlines()
     apps_path.write_text("\n".join(dict.fromkeys([a for a in apps if a] + ["platform_core"])) + "\n")
+
+
+def complete_local_setup(frappe) -> None:
+    if int(frappe.db.get_single_value("System Settings", "setup_complete") or 0) == 1:
+        return
+
+    from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
+
+    timezone = "Europe/Istanbul"
+    year = datetime.now(ZoneInfo(timezone)).year
+    setup_complete(
+        {
+            "language": "tr",
+            "country": "Türkiye",
+            "timezone": timezone,
+            "currency": "TRY",
+            "company_name": "Yerel Deneme",
+            "company_abbr": "YD",
+            "chart_of_accounts": "Turkey - Chart of Accounts",
+            "fy_start_date": f"{year}-01-01",
+            "fy_end_date": f"{year}-12-31",
+            "full_name": "Yerel Yönetici",
+            "email": "setup-owner@example.test",
+            "enable_telemetry": 0,
+        }
+    )
+    if int(frappe.db.get_single_value("System Settings", "setup_complete") or 0) != 1:
+        raise RuntimeError("Setup wizard did not set System Settings.setup_complete=1")
+    frappe.db.commit()
 
 
 def prepare(site: str, apps: list[str]) -> None:
@@ -72,6 +103,14 @@ def prepare(site: str, apps: list[str]) -> None:
     os.chdir(BENCH)
     for app in apps:
         subprocess.run(["bench", "--site", site, "install-app", app], check=True)
+    if site == "tenant1.localhost" and "erpnext" in apps:
+        frappe.init(site=site, sites_path=str(BENCH / "sites"))
+        try:
+            frappe.connect()
+            frappe.set_user("Administrator")
+            complete_local_setup(frappe)
+        finally:
+            frappe.destroy()
     print(f"Prepared {site}; allow_tests={site.startswith('test-')}")
 
 
