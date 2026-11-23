@@ -118,7 +118,7 @@ class KeycloakAddressTest(unittest.TestCase):
             keycloak_apply.checked_keycloak_url("https://api.login.atonota.net", "api.login.atonota.net"),
             "https://api.login.atonota.net")
         for url, host in (("https://api.login.atonota.net", None), ("http://api.login.atonota.net", "api.login.atonota.net"),
-                          ("https://evil.test", "api.login.atonota.net"), ("https://u@api.login.atonota.net", "api.login.atonota.net")):
+                          ("https://evil.test", "api.login.atonota.net"), ("https://u@login.example.test", "login.example.test")):
             with self.subTest(url=url), self.assertRaises(ApplyError):
                 keycloak_apply.checked_keycloak_url(url, host)
 

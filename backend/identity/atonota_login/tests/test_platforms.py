@@ -250,7 +250,7 @@ class RedirectTest(unittest.TestCase):
                 platforms.environment_redirects(values)
 
     def test_redirect_refuses_unsafe_addresses(self):
-        for url in ("http://api.login.atonota.net", "https://user@api.login.atonota.net", "https://h.test/path", "ftp://x"):
+        for url in ("http://api.login.atonota.net", "https://user@login.example.test", "https://h.test/path", "ftp://x"):
             with self.subTest(url=url), self.assertRaises(RegistryError):
                 platforms.broker_redirect_uri(url, "google")
 
