@@ -36,6 +36,13 @@ PATHS = {
 	"gemini": "/v1beta/models/{model}:generateContent",
 	"ollama": "/api/chat",
 }
+# The connection check reads the model list. These requests use no tokens.
+MODEL_LIST_PATHS = {
+	"openai": ("/v1/models", "data"),
+	"anthropic": ("/v1/models", "data"),
+	"gemini": ("/v1beta/models", "models"),
+	"ollama": ("/api/tags", "models"),
+}
 
 
 @dataclass(frozen=True)
@@ -50,6 +57,8 @@ class Endpoint:
 	kind: str = "external"
 	addresses: tuple[str, ...] = field(default=(), repr=False)
 	oauth_addresses: tuple[str, ...] = field(default=(), repr=False)
+	organization: str = field(default="", repr=False)
+	project: str = field(default="", repr=False)
 
 
 class GatewayError(Exception):
@@ -276,8 +285,23 @@ def _read_body(response, deadline, max_bytes):
 		raise GatewayError("invalid_response") from None
 
 
-def _post_json(
-	session, url, *, timeout, connect_timeout, deadline, max_bytes, before_post, kind, addresses, **kwargs
+def _post_json(session, url, **kwargs):
+	return _send_json(session, "POST", url, **kwargs)
+
+
+def _send_json(
+	session,
+	method,
+	url,
+	*,
+	timeout,
+	connect_timeout,
+	deadline,
+	max_bytes,
+	before_post,
+	kind,
+	addresses,
+	**kwargs,
 ):
 	if before_post is not None and not before_post():
 		raise GatewayError("reservation_lost")
@@ -290,9 +314,8 @@ def _post_json(
 	response_deadline = _RESPONSE_DEADLINE.set(deadline)
 	destination = _DESTINATION.set((kind, addresses))
 	try:
-		with session.post(
-			url, timeout=(connect, read), allow_redirects=False, stream=True, **kwargs
-		) as response:
+		send = session.post if method == "POST" else session.get
+		with send(url, timeout=(connect, read), allow_redirects=False, stream=True, **kwargs) as response:
 			if response.status_code != 200:
 				return response.status_code, None
 			return response.status_code, _read_body(response, min(deadline, monotonic() + read), max_bytes)
@@ -372,6 +395,11 @@ def _headers(endpoint, timeout, connect_timeout, deadline, *, before_post):
 		headers["Authorization"] = f"Bearer {token}"
 	elif endpoint.auth != "none":
 		raise GatewayError("configuration")
+	if endpoint.adapter == "openai":
+		if endpoint.organization:
+			headers["OpenAI-Organization"] = endpoint.organization
+		if endpoint.project:
+			headers["OpenAI-Project"] = endpoint.project
 	return headers
 
 
@@ -610,3 +638,52 @@ def complete(
 		pass
 	LOGGER.warning("Model gateway attempt failed: %s", error.code)
 	raise GatewayError(error.code, may_be_billed=error.may_be_billed)
+
+
+def list_models(endpoint, *, timeout=10, connect_timeout=5):
+	"""Read the provider's model list once and return how many models it shows.
+
+	The connection check uses this request because it uses no tokens.
+	Exceptions and logs carry only fixed codes. Model names are not returned.
+	"""
+	error = GatewayError("configuration", may_be_billed=False)
+	deadline = monotonic() + connect_timeout + timeout
+	try:
+		if endpoint.kind not in {"local", "external"}:
+			raise error
+		if endpoint.kind == "external" and urlsplit(endpoint.base_url).scheme == "http":
+			raise GatewayError("endpoint_unavailable")
+		base = _url(endpoint.base_url, secure=endpoint.kind != "local")
+		if endpoint.auth in {"api_key", "bearer"} and not endpoint.secret:
+			raise error
+		path, key = MODEL_LIST_PATHS[endpoint.adapter]
+		error = GatewayError("invalid_response")
+		with _provider_session() as session:
+			headers = _headers(endpoint, timeout, connect_timeout, deadline, before_post=None)
+			status, body = _send_json(
+				session,
+				"GET",
+				base.rstrip("/") + path,
+				headers=headers,
+				timeout=timeout,
+				connect_timeout=connect_timeout,
+				deadline=deadline,
+				max_bytes=2 * 1024 * 1024,
+				before_post=None,
+				kind=endpoint.kind,
+				addresses=endpoint.addresses,
+			)
+		if status != 200:
+			raise GatewayError(_status_code(status))
+		models = body.get(key) if isinstance(body, dict) else None
+		if not isinstance(models, list):
+			raise error
+		return len(models)
+	except GatewayError as failure:
+		error = failure
+	except Exception:
+		# Keep the phase code. Never expose the raw transport exception.
+		error = GatewayError(error.code)
+	LOGGER.warning("Model list check failed: %s", error.code)
+	# A model list request uses no tokens, so no failure is billable.
+	raise GatewayError(error.code, may_be_billed=False)

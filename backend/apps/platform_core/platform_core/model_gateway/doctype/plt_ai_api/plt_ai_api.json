@@ -18,6 +18,8 @@
   "priority",
   "weight",
   "health_status",
+  "connection_status",
+  "connection_checked_at",
   "enabled"
  ],
  "fields": [
@@ -122,6 +124,23 @@
    "options": "healthy\nunhealthy\nauth_failed",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "default": "not_checked",
+   "description": "Result of the latest live connection check. The system sets it; a changed credential or address resets it to not_checked.",
+   "fieldname": "connection_status",
+   "fieldtype": "Select",
+   "label": "Connection Status",
+   "options": "not_checked\nconnected\ninvalid_credentials\npermission_denied\nquota_exceeded\nnetwork_error\nprovider_error\nendpoint_not_approved\nconfiguration_error",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Time of the latest live connection check.",
+   "fieldname": "connection_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Connection Checked At",
+   "read_only": 1
   },
   {
    "default": "1",

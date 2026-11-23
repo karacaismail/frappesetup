@@ -89,6 +89,11 @@ export const SECTIONS: Record<string, SectionMeta> = {
   'ai-agents': { group: 'AI', icon: 'robot', summary: 'Frappe içi AI asistan ve ajan uygulamaları: mimari, güvenlik, olgunluk.' },
   'ai-press-yetkinlik': { group: 'AI', icon: 'server', summary: 'Press kılavuzundaki işlemler hangi araçla yapılabilir? Kanıtlı yetkinlik matrisi.' },
   'ai-gelistirme': { group: 'AI', icon: 'tools', summary: 'Kendi skill, MCP ve ajanlarınızı geliştirme planı; öncelik, tasarım, kabul ölçütü.' },
+  'ai-saglayici': {
+    group: 'AI',
+    icon: 'plug',
+    summary: 'Sağlayıcı ekleme akışı, alan şeması, canlı bağlantı denemesi ve büyük dosya stratejisi.',
+  },
   'ai-propr': {
     group: 'AI',
     icon: 'checklist',

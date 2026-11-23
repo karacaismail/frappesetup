@@ -3108,5 +3108,23 @@
     "reason": "Test runs a copy of the fixed bin/test script with a fake Compose and a validated app name.",
     "owner": "dev-ortam",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/connections.py",
+    "code": "\"api.oauth_token_url\": \"url\",",
+    "statementSha256": "1278a72a715540ec4823d4706a80fc8d427ac890239eb8827cfcde1c555cbb5d",
+    "reason": "The key names a record field and the value names its field kind; neither is a credential.",
+    "owner": "platform-core-gecit",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/connections.py",
+    "code": "MAX_LENGTH = {\"secret\": 4096, \"text\": 140, \"url\": 2048}",
+    "statementSha256": "ea968afeeba9ebfb9803ad3d8e58043e2d8fda2d465b0a6e80992ac6b0524389",
+    "reason": "The keys name field kinds and the values are length limits; none is a credential.",
+    "owner": "platform-core-gecit",
+    "ignoreUntil": "2027-02-22"
   }
 ]
