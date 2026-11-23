@@ -16,9 +16,12 @@ from hrms_tr.leave import LeaveName, LeaveVersion
 @rate_limit(limit=60, seconds=60, methods=["POST"], ip_based=False, user_based=True)
 def approve_leave(name: LeaveName | None = None, version: LeaveVersion | None = None) -> dict[str, str]:
 	if name is None:
-		frappe.throw(_("Select a leave application."), frappe.ValidationError)
+		frappe.throw(_("Select a leave application.", context="hrms_tr"), frappe.ValidationError)
 	if version is None:
-		frappe.throw(_("Read the leave application version before approving."), frappe.ValidationError)
+		frappe.throw(
+			_("Read the leave application version before approving.", context="hrms_tr"),
+			frappe.ValidationError,
+		)
 	return leave.approve(name, expected_version=version)
 
 
@@ -27,9 +30,12 @@ def approve_leave(name: LeaveName | None = None, version: LeaveVersion | None = 
 @rate_limit(limit=60, seconds=60, methods=["POST"], ip_based=False, user_based=True)
 def cancel_leave(name: LeaveName | None = None, version: LeaveVersion | None = None) -> dict[str, str]:
 	if name is None:
-		frappe.throw(_("Select a leave application."), frappe.ValidationError)
+		frappe.throw(_("Select a leave application.", context="hrms_tr"), frappe.ValidationError)
 	if version is None:
-		frappe.throw(_("Read the leave application version before cancelling."), frappe.ValidationError)
+		frappe.throw(
+			_("Read the leave application version before cancelling.", context="hrms_tr"),
+			frappe.ValidationError,
+		)
 	return leave.cancel(name, expected_version=version)
 
 
@@ -39,5 +45,5 @@ def get_leave_approver(
 	employee: Annotated[str, StringConstraints(min_length=1, max_length=140)] | None = None,
 ) -> dict[str, str | None]:
 	if employee is None:
-		frappe.throw(_("Select an employee."), frappe.ValidationError)
+		frappe.throw(_("Select an employee.", context="hrms_tr"), frappe.ValidationError)
 	return {"approver": leave.get_approver(employee)}

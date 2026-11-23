@@ -16,7 +16,9 @@ def keep_portal_user(doc, method=None):
 	# HRMS TR's own role grants approval without granting Desk access.
 	doc.roles[:] = [row for row in doc.roles if row.role != NATIVE_LEAVE_APPROVER]
 	if doc.has_desk_access():
-		frappe.throw(_("HRMS TR users cannot be assigned Desk roles."), frappe.PermissionError)
+		frappe.throw(
+			_("HRMS TR users cannot be assigned Desk roles.", context="hrms_tr"), frappe.PermissionError
+		)
 	doc.user_type = "Website User"
 
 
@@ -29,4 +31,4 @@ def require_tenant_portal():
 		return
 	user = frappe.session.user
 	if user == "Guest" or frappe.get_cached_value("User", user, "user_type") == "Website User":
-		frappe.throw(_("Use the tenant portal to access HRMS TR."), frappe.PermissionError)
+		frappe.throw(_("Use the tenant portal to access HRMS TR.", context="hrms_tr"), frappe.PermissionError)

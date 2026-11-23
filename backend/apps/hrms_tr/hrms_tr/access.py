@@ -48,4 +48,4 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 def deny_sharing(doc, method=None):
 	# Frappe shares are added to the results after the normal row permission check.
 	if doc.share_doctype == DOCTYPE:
-		frappe.throw(_("Leave applications cannot be shared."), frappe.PermissionError)
+		frappe.throw(_("Leave applications cannot be shared.", context="hrms_tr"), frappe.PermissionError)

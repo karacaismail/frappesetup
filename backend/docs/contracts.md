@@ -196,6 +196,7 @@ Adres biçimi `/api/method/<yol>` olur.
 | `platform_core.api.auth.get_login_url` | POST | Misafir, istek sınırlı | Keycloak giriş adresini üretir. `state` sunucuda üretilir. `redirect_to` yalnız aynı kökende göreli yol olabilir. |
 | `platform_core.api.auth.keycloak_callback` | GET | Misafir, `state`, kod ve tarayıcı çerezi | Kodu belirteçle değiştirir. Kullanıcıyı `(iss, sub)` ile bulur. Oturum açar ve `sid` değerini oturuma yazar. |
 | `platform_core.api.auth.logout` | POST | Oturum | Frappe oturumunu kapatır. Keycloak çıkış adresini döner. |
+| `platform_core.api.auth.get_csrf_token` | GET | Oturum, istek sınırlı | Oturumun CSRF belirtecini döner. Oturumda belirteç yoksa üretir. Yanıt önbelleğe alınmaz. |
 | `platform_core.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Frappe oturumlarını kapatır. |
 | `platform_core.api.identity.provision` | POST | Servis belirteci, `azp=identity-sync` | Kullanıcıyı açar ya da günceller. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `platform_core.api.identity.set_enabled` | POST | Servis belirteci, `azp=identity-sync` | Kullanıcıyı açar ya da kapatır. |
@@ -213,6 +214,11 @@ Adres biçimi `/api/method/<yol>` olur.
 - `kimlik_yalniz_keycloak` ayarı açıkken Frappe'nin yerel giriş işlevleri kapanır. Kapatma adrese değil, çağrılan işleve uygulanır. `override_whitelisted_methods` kancası kullanılır. Kapsam şudur: parola girişi, parola sıfırlama ve güncelleme, e-posta bağlantısıyla giriş ve hazır sosyal giriş uçları. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi 403 alır.
 - Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
+- Ayrı arayüz (`atonota-web`) belirteci sayfadan okumaz. Arayüz girişten sonra `get_csrf_token` ucunu çağırır. Arayüz dönen değeri her yazma isteğinde `X-Frappe-CSRF-Token` başlığıyla gönderir. Uç yalnız açık oturumla çalışır. Misafir 403 alır. Uç yalnız `GET` kabul eder. Oturumda belirteç yoksa uç `frappe.sessions.get_csrf_token()` ile üretir. Frappe belirteci yanıtın `message` alanına koyar. Yanıt `{"message": {"csrf_token": "<belirteç>"}}` biçimindedir. Süresi dolmuş oturumun çerezi 401 ve `SessionExpired` alır. Hiç çerez yoksa yanıt 403 olur. Bir oturumun ilk belirtecini yalnız bir istek üretir. Bu istek oturuma bağlı kısa bir Redis kilidi tutar. Bekleyen istek belirteci oturum kaydından okur. Böylece aynı oturumdaki iki sekme aynı belirteci alır. Yanıt `Cache-Control: private, no-store` taşır. Yanıtta `ETag` yoktur. Uç çapraz kökene izin vermez. `allow_cors` ayarı değişmez (G-45). `get_bootstrap` yanıtı belirteç taşımaz. O yanıt önbelleklenir.
+
+### Ayrı arayüzün üretimde sunulması
+
+Ayrı arayüz üretimde aynı kökende düz dosya olarak sunulur. Dosyalar kiracı sitesinin adresinden iner. Sayfanın içinde CSRF belirteci yoktur. Arayüz belirteci `get_csrf_token` ucundan alır. Arayüz yerelde ve üretimde aynı ucu kullanır. Güvenlik başlıklarını sunucu katmanı verir. Bu başlıklar `Content-Security-Policy` ve `Referrer-Policy` başlıklarıdır. `frame-ancestors` ayrı bir başlık değildir. Bu kural sayfayı hangi sitelerin çerçeve içine alabileceğini belirler. Kural `Content-Security-Policy` başlığının içinde yazılır. Örneğin `Content-Security-Policy: frame-ancestors 'none'` yazılır. Bu kurulum kıdemli DevOps mühendisinin işidir. Bu depo bunun için sunucu ayarı içermez.
 
 ### Kabuk yanıt boyutu
 
@@ -224,6 +230,24 @@ Adres biçimi `/api/method/<yol>` olur.
 - Kısa tanımda DocType kimliği ve sürüm bilgileri kalır.
 - Sunucu alanları ve alt tablo tanımlarını çıkarır. Telefon bu tanımı çevrimdışı saklayamaz.
 - Sunucu `ETag` değerini dönecek veriden üretir.
+
+### Dil ve biçim
+
+- Açılış verisi kullanıcının dilini `user.language` alanında döner.
+- Oturum açmış kullanıcıda sunucu dili Frappe 16 sırasıyla bulur. Önce `_lang` değerine bakar. Sonra kullanıcının diline bakar. Sonra site ayarındaki dile bakar. En son `en` dilini seçer.
+- Oturum açmış kullanıcıda `Accept-Language` başlığı kullanılmaz.
+- `formatting` alanı tarih biçimini (`date_format`) taşır.
+- `formatting` alanı saat biçimini (`time_format`) taşır.
+- `formatting` alanı haftanın ilk gününü (`first_day_of_the_week`) taşır.
+- Bu üç değer önce dilin “Language” kaydından gelir. Kayıtta değer yoksa site ayarı kullanılır.
+- `languages` alanı sitede açık olan dilleri listeler. Her öğe dil kodunu (`code`) ve dilin adını (`name`) taşır.
+- Kısa açılış yanıtında da `languages` listesi kalır.
+- Açılış verisi en çok 60 saniye önbellekte kalır. Yönetici dil kaydını değiştirebilir. Bu durumda eski dil listesi ve eski biçim 60 saniye dönebilir.
+- Hesap yok sayfası dili isteğin dilinden alır. Sayfa `lang` özniteliğini bu dile göre yazar.
+- Kullanıcının Frappe dili boş olabilir. Bu durumda giriş ucu belirteçteki `locale` değerini kullanıcıya yazar.
+- `locale` değeri açık diller listesinde yoksa giriş ucu dili yazmaz. Kullanıcının seçtiği dil de değişmez.
+
+Yedek dil, kullanıcının dili bilinmeyince seçilen dildir. Yedek dil MVP'de iki tarafta farklıdır. Arayüzün yedek dili `tr` değeridir. Backend'in son yedeği `en` değeridir. Bu fark bilinçli bir MVP kararıdır. Açılış verisinde `user.language` her zaman doludur. Arayüz bu değeri kullanırsa iki taraf aynı dili gösterir. Varsayılan dil işi iki yedeği birlikte değiştirir.
 
 ### Website User için yöntem izin listesi
 

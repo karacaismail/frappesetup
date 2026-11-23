@@ -652,5 +652,79 @@
       }
     },
     "additionalProperties": true
+  },
+  "Formatting": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "time_zone",
+      "currency",
+      "number_format",
+      "rounding_method",
+      "date_format",
+      "time_format",
+      "first_day_of_the_week"
+    ],
+    "properties": {
+      "time_zone": {
+        "type": "string",
+        "description": "IANA time zone configured for the site."
+      },
+      "currency": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Default display currency, or null when the site has not selected one."
+      },
+      "number_format": {
+        "type": "string",
+        "description": "Site number formatting pattern."
+      },
+      "rounding_method": {
+        "type": "string",
+        "description": "Site rounding rule."
+      },
+      "date_format": {
+        "type": "string",
+        "description": "Frappe date pattern for the response language, such as dd.mm.yyyy. The Language record overrides System Settings."
+      },
+      "time_format": {
+        "type": "string",
+        "description": "Frappe time pattern for the response language, such as HH:mm:ss. The Language record overrides System Settings."
+      },
+      "first_day_of_the_week": {
+        "type": "string",
+        "enum": [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday"
+        ],
+        "description": "First day of the week for the response language. The Language record overrides System Settings."
+      }
+    }
+  },
+  "Language": {
+    "type": "object",
+    "description": "An enabled Frappe Language record.",
+    "additionalProperties": false,
+    "required": [
+      "code",
+      "name"
+    ],
+    "properties": {
+      "code": {
+        "type": "string",
+        "description": "Language code, the name of the Language record, such as tr or en."
+      },
+      "name": {
+        "type": "string",
+        "description": "Language name as stored in the Language record."
+      }
+    }
   }
 }

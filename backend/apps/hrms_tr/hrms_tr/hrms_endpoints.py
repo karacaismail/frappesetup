@@ -10,7 +10,10 @@ from frappe import _
 # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 @frappe.whitelist(methods=["GET", "POST"])
 def deny_legacy_leave_query() -> Never:
-	frappe.throw(_("Read leave information through an authorized leave application."), frappe.PermissionError)
+	frappe.throw(
+		_("Read leave information through an authorized leave application.", context="hrms_tr"),
+		frappe.PermissionError,
+	)
 
 
 BLOCKED_LEAVE_REPORTS = frozenset(

@@ -132,6 +132,8 @@ MVC, model, görünüm ve denetleyici görevlerini ayıran bir yaklaşımdır. D
 
 **M-8 (ZORUNLU).** Kod adlarını İngilizce ve ASCII yazın. Görünen metni İngilizce yazın ve `frappe._` ile sarın. Projenin ad, girinti ve biçim kurallarına uyun. Tanımlı biçimlendiriciyi yalnız değişen dosyada çalıştırın. Biçim denetiminde R-10'u uygulayın.
 
+**M-9 (ZORUNLU).** Kullanıcıya görünen her metni `_()` ile sarın. Metnin bağlamını verin. Örneğin `_("Rule not found", context="platform_core.access")` yazın. `frappe.throw` ve `ValidationError` metni de bu kurala girer. `_()` içinde f-string ya da birleştirme kullanmayın. Değeri `{0}` yer tutucusuyla ekleyin. DocType etiketini DocType adı bağlamıyla çevirin. Çeviriyi uygulamanın `translations/<dil>.csv` dosyasına yazın.
+
 **ÖNERİLİR.** Modülün dosya düzenini ve mevcut yama klasörünü izleyin. Yazım kuralı yoksa yakın kodu veya PEP 8'i izleyin. İşlevi küçük tutun. Açık adlar kullanın. Girdi ve dönüş türünü yazın. İşlev başındaki açıklamaya docstring denir. Gerekirse amacı, yan etkiyi ve nedeni yazın. Günlük kuralı yoksa `frappe.logger` işlevine bakın.
 
 ### Alan planı, modül sınırı ve düşük bağımlılık

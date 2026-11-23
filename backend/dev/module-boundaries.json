@@ -1,7 +1,8 @@
 {
   "modules": {
     "platform_core.identity": [
-      "oidc_verify"
+      "oidc_verify",
+      "platform_core.shell"
     ],
     "platform_core.shell": [],
     "platform_core.ai": [
@@ -36,7 +37,8 @@
       "platform_core.shell.api",
       "platform_core.api.shell",
       "platform_core.api.meta",
-      "platform_core.api.collection"
+      "platform_core.api.collection",
+      "platform_core.shell.http"
     ],
     "platform_core.model_gateway": [
       "platform_core.model_gateway.api",
