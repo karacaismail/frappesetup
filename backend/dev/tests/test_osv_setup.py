@@ -58,6 +58,16 @@ class OsvSetupPins(unittest.TestCase):
         self.assertNotRegex(SETUP.read_text(), r"sum=[0-9a-f]{64}")
 
 
+class OsvSetupTemporaryFiles(unittest.TestCase):
+    def test_each_run_writes_its_own_temporary_files(self):
+        # Review r3-1, small finding K1: two Jenkins runs on one agent wrote the same "all.zip.new".
+        text = SETUP.read_text()
+        self.assertNotRegex(text, r'\.new"')
+        self.assertIn('all.zip.new.$$', text)
+        self.assertIn('$scanner.new.$$', text)
+        self.assertRegex(text, r"(?m)^trap .*rm -f")
+
+
 @unittest.skipUnless(CACHED.is_file() and pinned_sum()
                      and hashlib.sha256(CACHED.read_bytes()).hexdigest() == pinned_sum(),
                      "the pinned OSV-Scanner from osv-setup is not cached on this machine")

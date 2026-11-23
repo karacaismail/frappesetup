@@ -376,10 +376,11 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Yerel ağ aralıkları özel sayılmaz. Gerekçe şudur. Docker, IPv6 ile gelen genel isteği `172.16.0.0/12` içinden bir adresle gösterebilir.
   - Tailscale dışından gelen istekte iki ek ret vardır. Birincisi `cmd` sorgu alanıdır. Frappe 16 `cmd` alanını yoldan önce işler. Bu alan açık bir yoldan her yönteme ulaşırdı. İkincisi ham yoldaki `..`, `//`, `%2e`, `%2f` ve `%5c` dizileridir.
   - Gövdedeki `cmd` alanını kenar vekil göremez. Bu yüzden `press_tr` de `cmd` alanını denetler. Alan yolun kendi yöntemini adlandırmazsa istek reddedilir.
+  - Bu denetim Tailscale içinde de çalışır. Eski biçimde `/` adresine `cmd` gönderen bir masa ekranı bozulabilir. Bu yüzden DevOps sorumlusu alpha'da masayı Tailscale'den dener. Sonuç E-2 satırına yazılır.
   - identity-sync, Press API'lerine kenar vekilden geçmez. `identity-press` ağından `http://<Press adı>:8080` adresine gider. Bu ağda yalnız identity-sync ve `press-frontend` vardır. Ağın internete çıkışı yoktur.
   - Müşteriye yeni bir yol gerekirse yol bu listeye tek tek eklenir. Gerekçe bu karara yazılır. Joker yol eklenmez. `/assets/*` yalnız durağan dosyaları sunar.
   - DevOps sorumlusu sunucunun genel ağ arayüzünde `100.64.0.0/10` kaynaklı paketleri düşürür. Bu kural G-6 güvenlik duvarının parçasıdır.
-  - Kural `deploy/compose/site.caddy.template` dosyasındadır. `deploy/tests/test_press_image.py` kuralı denetler.
+  - Kural `deploy/compose/site.caddy.template` dosyasındadır. `deploy/tests/test_press_image.py` kuralı denetler. Test bütün şablonu da tarar. Press kabına giden satır yalnız Press bloğunda olabilir.
 
 ## Karar sitesine işlenecek farklar
 

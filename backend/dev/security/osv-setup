@@ -38,11 +38,16 @@ sha256() {
 
 mkdir -p "$home/bin"
 scanner="$home/bin/osv-scanner"
+# Two runs on one Jenkins agent may start together (review r3-1, K1). Each run writes its own
+# temporary files ("$$" is this shell's process id) and moves them into place when complete.
+tmp_scanner="$scanner.new.$$"
+tmp_files=("$tmp_scanner")
+trap 'rm -f "${tmp_files[@]}"' EXIT
 if [[ ! -x "$scanner" || "$(sha256 "$scanner")" != "$sum" ]]; then
-    curl -fsSLo "$scanner.new" "https://github.com/google/osv-scanner/releases/download/v$OSV_VERSION/osv-scanner_$asset"
-    [[ "$(sha256 "$scanner.new")" == "$sum" ]] || { rm -f "$scanner.new"; printf 'osv-setup: checksum differs\n' >&2; exit 1; }
-    chmod 0755 "$scanner.new"
-    mv "$scanner.new" "$scanner"
+    curl -fsSLo "$tmp_scanner" "https://github.com/google/osv-scanner/releases/download/v$OSV_VERSION/osv-scanner_$asset"
+    [[ "$(sha256 "$tmp_scanner")" == "$sum" ]] || { printf 'osv-setup: checksum differs\n' >&2; exit 1; }
+    chmod 0755 "$tmp_scanner"
+    mv "$tmp_scanner" "$scanner"
 fi
 
 for ecosystem in PyPI npm; do
@@ -53,8 +58,10 @@ for ecosystem in PyPI npm; do
         printf 'osv-setup: %s database is less than six days old; kept\n' "$ecosystem"
         continue
     fi
-    curl -fsSLo "$folder/all.zip.new" "https://osv-vulnerabilities.storage.googleapis.com/$ecosystem/all.zip"
-    mv "$folder/all.zip.new" "$folder/all.zip"
+    tmp_db="$folder/all.zip.new.$$"
+    tmp_files+=("$tmp_db")
+    curl -fsSLo "$tmp_db" "https://osv-vulnerabilities.storage.googleapis.com/$ecosystem/all.zip"
+    mv "$tmp_db" "$folder/all.zip"
 done
 "$scanner" --version | head -1
 printf 'osv-setup: scanner %s, database %s\n' "$scanner" "$db"

@@ -390,6 +390,37 @@ class StackServesPress(unittest.TestCase):
         template = (DEPLOY / "compose" / "site.caddy.template").read_text()
         return re.search(r"(?ms)^__PRESS_HOST__ \{\n(.*?)^\}", template).group(1)
 
+    @staticmethod
+    def press_routes_outside_press_block(template):
+        """Lines that reach the Press container, other than the two in the Press block.
+
+        Any upstream whose name ends in "-press" or names press-frontend counts, in any site block.
+        """
+        block = re.search(r"(?ms)^__PRESS_HOST__ \{\n(.*?)^\}", template)
+        inside = block.group(1) if block else ""
+        pattern = re.compile(r"(?m)^.*(?:__ENV__-press\b|\bpress-frontend\b|-press:\d+).*$")
+        outside = template.replace(inside, "", 1) if inside else template
+        lines = [line.strip() for line in pattern.findall(outside) if not line.strip().startswith("#")]
+        if len(pattern.findall(inside)) != 2:
+            lines.append(f"Press block has {len(pattern.findall(inside))} proxies, expected 2")
+        return lines
+
+    def test_only_the_press_block_reaches_the_press_container(self):
+        # Review r3-1, finding Ö1: the test read only the Press block. A tenant line or a second
+        # site block that proxies to Press would open Desk to everyone.
+        template = (DEPLOY / "compose" / "site.caddy.template").read_text()
+        self.assertEqual(self.press_routes_outside_press_block(template), [])
+        mutations = {
+            "tenant block": template.replace(
+                "\treverse_proxy __ENV__-tenant:8080", "\treverse_proxy /desk* __ENV__-press:8080\n\treverse_proxy __ENV__-tenant:8080", 1),
+            "new site block": template + "\nadmin.__PRESS_HOST__ {\n\treverse_proxy __ENV__-press:8080\n}\n",
+            "container name": template + "\nother.__BASE_HOST__ {\n\treverse_proxy press-frontend:8080\n}\n",
+        }
+        for name, text in mutations.items():
+            with self.subTest(mutation=name):
+                self.assertNotEqual(text, template)
+                self.assertNotEqual(self.press_routes_outside_press_block(text), [])
+
     def test_press_desk_and_apis_stay_on_the_private_network(self):
         # Orchestrator security item (O-55, G-6, G-13, G-119): the press. host serves Desk and the
         # Press APIs only to Tailscale. Customers get only the paths of the account deletion flow.
