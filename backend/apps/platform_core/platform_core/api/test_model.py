@@ -34,6 +34,8 @@ class TestModelHTTP(unittest.TestCase):
 		for api in (self.fixture["first_api"], self.fixture["second_api"]):
 			frappe.cache.delete(self._cooldown_key(api))
 			frappe.db.delete("PLT AI Usage Log", {"api": api})
+		# Connection form endpoints count requests per user. Each test starts with fresh counters.
+		frappe.cache.delete_keys("rl:platform_core.model_gateway.connections.")
 		frappe.db.commit()
 		self.fixture["provider_status"]["/first/api/chat"] = 429
 
@@ -176,6 +178,9 @@ class TestModelHTTP(unittest.TestCase):
 			"resolve_usage": {"log": "missing-fixture-log", "cost": "0", "currency": "USD"},
 			"purge_usage": {"dry_run": True},
 			"clear_api_credential": {"api": self.fixture["clearable_api"]},
+			"provider_catalog": {},
+			"save_connection": self._connection_payload(),
+			"check_connection": {"api": self.fixture["second_api"]},
 		}
 		for endpoint, payload in checks.items():
 			with self.subTest(endpoint=endpoint):
@@ -456,6 +461,135 @@ class TestModelHTTP(unittest.TestCase):
 			return self._maintenance(actor, "clear_api_credential", {"api": api_name})
 
 		self._assert_d6_access("clear_api_credential", request)
+
+	def _connection_payload(self, provider="ollama", fields=None):
+		return {
+			"provider": provider,
+			"account_name": f"HTTP connection account {uuid4().hex[:8]}",
+			"api_name": f"HTTP connection {uuid4().hex[:8]}",
+			"fields": {"base_url": self.fixture["provider_url"]} if fields is None else fields,
+		}
+
+	def _remove_connection(self, saved):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		for doctype, name in (("PLT AI API", saved["api"]), ("PLT AI Account", saved["account"])):
+			if frappe.db.exists(doctype, name):
+				frappe.delete_doc(doctype, name, force=True)
+		frappe.db.commit()
+
+	def _save_connection(self, actor, payload=None):
+		response = self._maintenance(actor, "save_connection", payload or self._connection_payload())
+		if response.status_code == 200:
+			self.addCleanup(self._remove_connection, response.json()["message"])
+		return response
+
+	def test_provider_catalog_guest_denied(self):
+		self.assertEqual(self._maintenance("guest", "provider_catalog", {}).status_code, 403)
+
+	def test_provider_catalog_foreign_data_denied(self):
+		response = self._maintenance("regular", "provider_catalog", {})
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("api_key", response.text)
+
+	def test_save_connection_guest_denied(self):
+		self.assertEqual(self._save_connection("guest").status_code, 403)
+
+	def test_save_connection_foreign_data_denied(self):
+		existing = {**self._connection_payload(), "account": self.fixture["second_account"]}
+		existing.pop("account_name")
+		for actor in ("regular", "desk_no_gateway_role"):
+			with self.subTest(actor=actor):
+				self.assertEqual(self._save_connection(actor, existing).status_code, 403)
+
+	def test_check_connection_guest_denied(self):
+		response = self._maintenance("guest", "check_connection", {"api": self.fixture["second_api"]})
+		self.assertEqual(response.status_code, 403)
+
+	def test_check_connection_foreign_data_denied(self):
+		requests_before = len(self.fixture["list_requests"])
+		response = self._maintenance("regular", "check_connection", {"api": self.fixture["credential_api"]})
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn(self.fixture["credential"], response.text)
+		self.assertEqual(len(self.fixture["list_requests"]), requests_before)
+
+	def test_d6_provider_catalog(self):
+		self._assert_d6_access(
+			"provider_catalog", lambda actor: self._maintenance(actor, "provider_catalog", {})
+		)
+
+	def test_d6_save_connection(self):
+		self._assert_d6_access("save_connection", self._save_connection)
+
+	def test_d6_check_connection(self):
+		saved = self._save_connection("manager").json()["message"]
+		self._assert_d6_access(
+			"check_connection",
+			lambda actor: self._maintenance(actor, "check_connection", {"api": saved["api"]}),
+		)
+
+	def test_manager_adds_and_checks_a_connection_without_seeing_the_key(self):
+		credential = f"test-only-{uuid4().hex}"
+		payload = self._connection_payload(
+			"openai_compatible", {"base_url": self.fixture["provider_url"], "api_key": credential}
+		)
+		catalog = self._maintenance("manager", "provider_catalog", {})
+		self.assertEqual(catalog.status_code, 200)
+		self.assertIn("openai_compatible", {item["id"] for item in catalog.json()["message"]["providers"]})
+		saved = self._save_connection("manager", payload)
+		self.assertEqual(saved.status_code, 200, saved.text)
+		self.assertNotIn(credential, saved.text)
+		api = saved.json()["message"]["api"]
+		requests_before = len(self.fixture["list_requests"])
+		checked = self._maintenance("manager", "check_connection", {"api": api})
+		self.assertEqual(checked.status_code, 200, checked.text)
+		self.assertEqual(checked.json()["message"]["status"], "connected")
+		self.assertEqual(checked.json()["message"]["models_visible"], 2)
+		self.assertNotIn(credential, checked.text)
+		[(path, authorization)] = self.fixture["list_requests"][requests_before:]
+		self.assertEqual((path, authorization), ("/second/v1/models", f"Bearer {credential}"))
+		record = self.request("manager", "GET", self.resource("PLT AI API", api))
+		self.assertEqual(record.json()["data"]["connection_status"], "connected")
+		self.assertNotIn(credential, record.text)
+
+	def test_connection_endpoints_answer_gateway_busy_over_the_rate_limit(self):
+		saved = self._save_connection("manager").json()["message"]
+		user = self.fixture["users"]["manager"]
+		requests_before = len(self.fixture["list_requests"])
+		for endpoint, payload in (
+			("check_connection", {"api": saved["api"]}),
+			("save_connection", self._connection_payload()),
+		):
+			with self.subTest(endpoint=endpoint):
+				counter = f"rl:platform_core.model_gateway.connections.{endpoint}:{user}"
+				frappe.cache.setex(frappe.cache.make_key(counter) + b":60", 60, 10)
+				response = self._maintenance("manager", endpoint, payload)
+				self.assertEqual(response.status_code, 429)
+				self.assertEqual(response.json()["message"], {"error": "gateway_busy"})
+				self.assertNotIn("_server_messages", response.json())
+		self.assertEqual(len(self.fixture["list_requests"]), requests_before)
+
+	def test_check_connection_reports_an_invalid_key(self):
+		saved = self._save_connection(
+			"manager",
+			self._connection_payload(
+				"openai_compatible",
+				{"base_url": self.fixture["provider_url"], "api_key": f"test-only-{uuid4().hex}"},
+			),
+		).json()["message"]
+		self.fixture["provider_status"]["/second/v1/models"] = 401
+		self.addCleanup(self.fixture["provider_status"].pop, "/second/v1/models", None)
+		checked = self._maintenance("manager", "check_connection", {"api": saved["api"]})
+		self.assertEqual(checked.status_code, 200)
+		self.assertEqual(checked.json()["message"]["status"], "invalid_credentials")
+
+	def test_save_connection_names_the_invalid_fields(self):
+		response = self._save_connection(
+			"manager",
+			self._connection_payload("openai_compatible", {"base_url": self.fixture["provider_url"]}),
+		)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json()["message"], {"error": "invalid_fields", "fields": ["api_key"]})
 
 	def test_resolve_usage_guest_denied(self):
 		response = self._maintenance(

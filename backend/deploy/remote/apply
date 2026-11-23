@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# Apply one release on this server. Jenkins (bin/deploy) runs it over SSH.
+# Usage: apply <env> <incoming folder>
+#        apply <env> --resume    (run from backend-pending/bin; see "Resume" below)
+#
+# Backend order (each step must pass before the next one starts):
+#   1. name the release in backend-pending, copy its files, pull every image by digest while the
+#      old release still runs
+#   2. put the sites in maintenance mode, then stop every process that writes: the Frappe web
+#      front, workers, socket and scheduler, identity-sync and Keycloak
+#   3. back up the sites, Keycloak and identity-sync (remote/backup); nothing writes any more
+#   4. migrate: Keycloak migrates its own database at start; then "bench migrate" per site
+#   5. start the new release, wait for healthy containers, end maintenance mode
+#   6. move the links: backend-previous <- old current, backend-current <- new, drop backend-pending
+# A failure stops the script. The "phase" file of the release tells rollback how far it got.
+#
+# The same release again: while it is pending in phase preparing or pulling, the old release
+# still runs untouched and the release starts again. From phase stopping on, the old release is
+# stopped and a backup may exist: the script refuses and a person decides (rollback,
+# rollback-restore, or --resume). The phase never goes back (common.sh).
+#
+# Resume (--resume): a person finished or fixed the migration by hand. The pending release goes on
+# from step 4 (phase migrating: "bench migrate" runs again, it skips what is done) or from step 5
+# (phase migrated or starting). Nothing stops, no backup is taken, backup-before and the links stay.
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$here/common.sh"
+
+usage="usage: apply <env> <incoming folder> | apply <env> --resume"
+env="${1:?$usage}"
+incoming="${2:?$usage}"
+(($# == 2)) || fail "$usage"
+check_env_name "$env"
+resume=0
+if [[ "$incoming" == --resume ]]; then
+    resume=1
+    pending_link="$ATONOTA_ROOT/$env/backend-pending"
+    [[ -L "$pending_link" ]] || fail "no backend release is pending in $env; nothing to resume"
+    id="$(basename "$(readlink "$pending_link")")"
+    load_host_env "$ATONOTA_ROOT/$env/releases/$id/host.env"
+    kind=backend
+else
+    load_host_env "$incoming/$env.env"
+    kind="$(json_field "$incoming/release.json" kind)"
+    id="$(json_field "$incoming/release.json" release_id)"
+fi
+[[ "$ATONOTA_ENV" == "$env" ]] || fail "environment file is for $ATONOTA_ENV"
+[[ "$id" =~ ^(backend|web)-[0-9a-f]{12}-b[1-9][0-9]*$ ]] || fail "bad release id: $id"
+
+install -d -m 0750 "$ATONOTA_ROOT/$env/releases" "$ATONOTA_ROOT/$env/backups" \
+    "$ATONOTA_ROOT/$env/health" "$ATONOTA_ROOT/$env/bin" "$ATONOTA_ROOT/web/$env/releases"
+
+if [[ "$kind" == web ]]; then
+    file="$(json_field "$incoming/release.json" components panel file)"
+    sha="$(json_field "$incoming/release.json" components panel sha256)"
+    [[ "$(sha256sum "$incoming/$file" | cut -d' ' -f1)" == "$sha" ]] || fail "bundle checksum differs"
+    target="$ATONOTA_ROOT/web/$env/releases/$id"
+    if [[ "$(readlink "$ATONOTA_ROOT/web/$env/current" 2>/dev/null)" == "releases/$id" ]]; then
+        say "web release $id is already current in $env"
+        exit 0
+    fi
+    if [[ ! -d "$target" ]]; then
+        install -d -m 0755 "$target.tmp"
+        tar -xzf "$incoming/$file" -C "$target.tmp" --no-same-owner
+        cp "$incoming/release.json" "$incoming/$file" "$target.tmp/"
+        mv -T "$target.tmp" "$target"
+    fi
+    if [[ -L "$ATONOTA_ROOT/web/$env/current" ]]; then
+        switch_link "$(readlink "$ATONOTA_ROOT/web/$env/current")" "$ATONOTA_ROOT/web/$env/previous"
+    fi
+    rm -f "$ATONOTA_ROOT/$env/health/web.json"
+    switch_link "releases/$id" "$ATONOTA_ROOT/web/$env/current"
+    # Web scripts live apart from the backend ones: an older web release must not replace the
+    # backend rollback (each release brings the scripts of its own commit).
+    install -d -m 0750 "$ATONOTA_ROOT/web/$env/bin"
+    cp "$here"/{common.sh,status,rollback} "$ATONOTA_ROOT/web/$env/bin/"
+    say "web release $id is current in $env"
+    exit 0
+fi
+
+base="$ATONOTA_ROOT/$env"
+folder="$base/releases/$id"
+current="$base/backend-current"
+pending="$base/backend-pending"
+decide="a person decides: rollback, rollback-restore or resume (docs/dagitim/ortamlar.md)"
+if [[ -L "$pending" && "$(readlink "$pending")" != "releases/$id" ]]; then
+    fail "release $(basename "$(readlink "$pending")") is still pending in $env; roll it back first"
+fi
+reached=""
+if [[ -L "$pending" ]]; then
+    reached="$(cat "$folder/phase" 2>/dev/null || printf 'preparing')"
+fi
+if [[ "$resume" == 1 ]]; then
+    case "$reached" in
+    migrating | migrated | starting) say "resume $id in $env from phase $reached" ;;
+    stopping | backing-up)
+        fail "release $id stopped in phase $reached, before its migration; use rollback" ;;
+    *) fail "release $id is in phase $reached; resume continues only from migrating, migrated or starting" ;;
+    esac
+elif [[ ! -L "$current" && "${ATONOTA_FIRST_INSTALL:-0}" == 1 ]]; then
+    # First install: no release runs and no user data exists yet, so the release starts again,
+    # also after a person removed backend-pending (first install steps).
+    [[ ! -f "$folder/phase" ]] || say "first install of $id starts again from phase $(cat "$folder/phase")"
+    rm -f "$folder/phase"
+else
+    case "$reached" in
+    "" | preparing | pulling) ;;
+    *) fail "release $id stopped in phase $reached in $env and is still pending; $decide" ;;
+    esac
+fi
+first_site="${ATONOTA_TENANT_SITES%% *}"
+if [[ "$resume" == 0 ]]; then
+    if [[ -L "$current" && "$(readlink "$current")" == "releases/$id" && ! -L "$pending" ]]; then
+        say "backend release $id is already current in $env"
+        exit 0
+    fi
+    if [[ ! -L "$current" && "${ATONOTA_FIRST_INSTALL:-0}" != 1 ]]; then
+        fail "$env has no running release. Follow the first install steps, then set ATONOTA_FIRST_INSTALL=1"
+    fi
+
+    # From here on backend-pending names this release, so rollback knows what to undo. Until the
+    # phase reaches "stopping", the running release is untouched and rollback leaves it alone.
+    install -d -m 0750 "$folder"
+    switch_link "releases/$id" "$pending"
+    phase "$folder" preparing
+    cp "$incoming"/{release.json,stack.yaml,edge.yaml,Caddyfile,site.caddy.template} "$folder/"
+    cp "$incoming/$env.env" "$folder/host.env"
+    install -d -m 0750 "$folder/bin"
+    cp "$here"/{common.sh,apply,backup,restore,status,rollback} "$folder/bin/"
+
+    # release.env: one image variable per component. Compose reads it beside host.env.
+    python3 -I - "$folder/release.json" >"$folder/release.env" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+for name, component in sorted(manifest["components"].items()):
+    print(f"ATONOTA_IMAGE_{name.upper().replace('-', '_')}={component['image']}")
+PY
+    printf 'ATONOTA_HEALTH_SITE=%s\n' "$first_site" >>"$folder/release.env"
+    profiles=()
+    if grep -q '^ATONOTA_IMAGE_PRESS=' "$folder/release.env"; then
+        profiles+=(press)
+    fi
+    printf 'COMPOSE_PROFILES=%s\n' "$(IFS=,; printf '%s' "${profiles[*]}")" >>"$folder/release.env"
+
+    # Each environment has its own edge network, so one environment cannot reach another's services.
+    network="atonota-edge-$env"
+    docker network create "$network" >/dev/null 2>&1 || docker network inspect "$network" >/dev/null
+    say "pull images of $id"
+    phase "$folder" pulling
+    stack "$folder" pull --quiet
+
+    # Check what the backup needs before anything stops (remote/backup checks it again).
+    if [[ -L "$current" && "$ATONOTA_REQUIRE_OFFSITE_BACKUP" == 1 && ! -r "$ATONOTA_ETC/$env/offsite.env" ]]; then
+        fail "$env needs an offsite backup, but $ATONOTA_ETC/$env/offsite.env is missing"
+    fi
+
+    if [[ -L "$current" ]]; then
+        # Stop every writer first, then back up: a write after the backup would be lost on restore.
+        phase "$folder" stopping
+        say "maintenance mode on"
+        stack "$current" exec -T tenant-web bench --site all set-maintenance-mode on
+        stack "$current" stop tenant-frontend tenant-socket tenant-worker identity-sync keycloak
+        stack "$current" stop tenant-scheduler 2>/dev/null || true
+        say "back up $env before $id"
+        phase "$folder" backing-up
+        backup_dir="$("$folder/bin/backup" "$env" "$current")"
+        printf '%s\n' "$backup_dir" >"$folder/backup-before"
+        stack "$current" stop tenant-web
+    fi
+fi
+
+if [[ "$resume" == 0 || "$reached" == migrating ]]; then
+    phase "$folder" migrating
+    say "start databases and Keycloak of $id"
+    stack "$folder" up --detach --wait --wait-timeout 600 tenant-db tenant-redis-cache tenant-redis-queue keycloak-db keycloak
+    for site in $ATONOTA_TENANT_SITES; do
+        stack "$folder" run --rm --no-deps tenant-web bench --site "$site" list-apps >/dev/null ||
+            fail "site $site does not exist; create it with the first install steps"
+        say "migrate $site"
+        stack "$folder" run --rm --no-deps tenant-web bench --site "$site" migrate
+    done
+    phase "$folder" migrated
+fi
+
+say "start every service of $id"
+phase "$folder" starting
+stack "$folder" up --detach --wait --wait-timeout 600 --remove-orphans
+stack "$folder" exec -T tenant-web bench --site all set-maintenance-mode off
+
+# Edge proxy: one Caddy file per environment, then a reload without downtime.
+edge_root="$ATONOTA_ROOT/edge"
+install -d -m 0755 "$edge_root/sites"
+cp "$folder"/{edge.yaml,Caddyfile} "$edge_root/"
+sed -e "s/__ENV__/$env/g" -e "s/__BASE_HOST__/$ATONOTA_BASE_HOST/g" \
+    -e "s/__ID_HOST__/$ATONOTA_ID_HOST/g" -e "s/__PRESS_HOST__/$ATONOTA_PRESS_HOST/g" \
+    -e "s/__FIRST_SITE__/$first_site/g" -e "s/__TENANT_SITES__/${ATONOTA_TENANT_SITES// /, }/g" \
+    "$folder/site.caddy.template" >"$edge_root/sites/$env.caddy.next"
+mv -T "$edge_root/sites/$env.caddy.next" "$edge_root/sites/$env.caddy"
+# The edge joins the network of every environment that has a site file on this server.
+{
+    printf '# Generated by remote/apply from sites/*.caddy; do not edit.\nservices:\n  caddy:\n    networks:\n'
+    for site_file in "$edge_root"/sites/*.caddy; do
+        printf '      - edge-%s\n' "$(basename "$site_file" .caddy)"
+    done
+    printf 'networks:\n'
+    for site_file in "$edge_root"/sites/*.caddy; do
+        name="$(basename "$site_file" .caddy)"
+        printf '  edge-%s:\n    name: atonota-edge-%s\n    external: true\n' "$name" "$name"
+    done
+} >"$edge_root/networks.yaml.next"
+mv -T "$edge_root/networks.yaml.next" "$edge_root/networks.yaml"
+edge=(docker compose --project-name atonota-edge --env-file "$ATONOTA_ETC/edge.env"
+    --file "$edge_root/edge.yaml" --file "$edge_root/networks.yaml")
+"${edge[@]}" up --detach --wait
+"${edge[@]}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+
+if [[ -L "$current" ]]; then
+    switch_link "$(readlink "$current")" "$base/backend-previous"
+fi
+rm -f "$base/health/backend.json"
+switch_link "releases/$id" "$current"
+rm -f "$pending"
+cp "$folder/bin"/{common.sh,status,rollback,backup,restore} "$base/bin/"
+phase "$folder" "done"
+say "backend release $id is current in $env"

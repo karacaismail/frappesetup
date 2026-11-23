@@ -3108,5 +3108,95 @@
     "reason": "Test runs a copy of the fixed bin/test script with a fake Compose and a validated app name.",
     "owner": "dev-ortam",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_release.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_release.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "a1fe0ddebc35424ae26db4a30bdbbc4875ef4243706e7dca5dbd0cc49bf84003",
+    "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "probe = subprocess.run([\"mv\", \"--version\"], capture_output=True, text=True)",
+    "statementSha256": "4350595a47a9ae707b680447c3396419e81d7c1aec66a8c11d1449fa608b1a77",
+    "reason": "Test runs GNU mv --version with fixed arguments and no shell to decide whether the Linux only tests can run.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "8235bab1df48705a979ff35b7814a546725aa24b2da7e8655b749d2c84fe6bd9",
+    "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "probe = subprocess.run([\"mv\", \"--version\"], capture_output=True, text=True)",
+    "statementSha256": "4350595a47a9ae707b680447c3396419e81d7c1aec66a8c11d1449fa608b1a77",
+    "reason": "Test probes GNU mv by name to decide whether the Linux only tests can run.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_jenkins_side.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_jenkins_side.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "b8f1b7ccd56d5dfd4fc1840d07a159aa4b003f63f0e8e11fa78ca85623ef3c36",
+    "reason": "Test runs the repository's own deploy scripts and release.py with a fake ssh and fixed arguments, no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/connections.py",
+    "code": "\"api.oauth_token_url\": \"url\",",
+    "statementSha256": "1278a72a715540ec4823d4706a80fc8d427ac890239eb8827cfcde1c555cbb5d",
+    "reason": "The key names a record field and the value names its field kind; neither is a credential.",
+    "owner": "platform-core-gecit",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/connections.py",
+    "code": "MAX_LENGTH = {\"secret\": 4096, \"text\": 140, \"url\": 2048}",
+    "statementSha256": "ea968afeeba9ebfb9803ad3d8e58043e2d8fda2d465b0a6e80992ac6b0524389",
+    "reason": "The keys name field kinds and the values are length limits; none is a credential.",
+    "owner": "platform-core-gecit",
+    "ignoreUntil": "2027-02-22"
   }
 ]

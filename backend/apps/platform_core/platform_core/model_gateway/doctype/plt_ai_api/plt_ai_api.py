@@ -23,6 +23,7 @@ class PLTAIAPI(Document):
 				self.api_key = saved_marker
 			elif uses_mask:
 				frappe.throw(_("Enter a credential without using the password mask."))
+		self._reset_connection_check()
 		if not cint(self.enabled):
 			return
 		if self.auth_type != "none" and not self.api_key:
@@ -31,6 +32,17 @@ class PLTAIAPI(Document):
 			not self.oauth_client_id or not self.oauth_token_url
 		):
 			frappe.throw(_("Enter the OAuth client ID and token URL."))
+
+	def _reset_connection_check(self):
+		# A live check result describes one credential at one address.
+		if not self.get_doc_before_save():
+			return
+		if any(
+			self.has_value_changed(field)
+			for field in ("api_key", "base_url", "auth_type", "oauth_token_url", "oauth_client_id", "account")
+		):
+			self.connection_status = "not_checked"
+			self.connection_checked_at = None
 
 	def as_dict(self, *args, **kwargs):
 		data = super().as_dict(*args, **kwargs)

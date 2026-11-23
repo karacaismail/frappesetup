@@ -814,3 +814,29 @@ MCP call allowance unavailable.,MCP çağrı sınırı denetlenemiyor.,platform_
 No permission to read this document type.,Bu kayıt türünü okuma izniniz yok.,
 No permission to search this document type.,Bu kayıt türünde arama izniniz yok.,
 The collection summary parameters are invalid.,Koleksiyon özeti için girilen bilgiler geçersiz.,shell.collection
+Connection Status,Bağlantı durumu,PLT AI API
+Result of the latest live connection check. The system sets it; a changed credential or address resets it to not_checked.,Son canlı bağlantı denemesinin sonucu. Değeri sistem yazar. Anahtar ya da adres değişince değer not_checked olur.,PLT AI API
+Connection Checked At,Bağlantı denemesi zamanı,PLT AI API
+Time of the latest live connection check.,Son canlı bağlantı denemesinin zamanı.,PLT AI API
+Catalog Provider,Katalogdaki sağlayıcı,PLT AI Provider
+Provider definition id from the shipped catalog. The connection form sets it; empty for providers added by hand.,Sağlayıcının katalogdaki kimliği. Değeri bağlantı formu yazar. Elle eklenen sağlayıcıda boş kalır.,PLT AI Provider
+AI LLM,Yapay zekâ dil modeli,
+Large language model providers.,Büyük dil modeli sağlayıcıları.,
+OpenAI API with an organization API key.,Kurum API anahtarıyla OpenAI API'si.,
+Anthropic API with a workspace API key.,Çalışma alanı API anahtarıyla Anthropic API'si.,
+Gemini API with a Google AI Studio API key.,Google AI Studio API anahtarıyla Gemini API'si.,
+OpenAI-compatible service,OpenAI uyumlu hizmet,
+A service that accepts the OpenAI request format at its own address.,OpenAI istek biçimini kendi adresinde kabul eden hizmet.,
+A model server in the platform's own network. Needs no credential.,Platformun kendi ağındaki model sunucusu. Anahtar istemez.,
+API key,API anahtarı,
+Secret API key from the provider console.,Sağlayıcının yönetim ekranından alınan gizli API anahtarı.,
+Secret bearer token of the service.,Hizmetin gizli erişim belirteci.,
+Optional organization identifier. The gateway sends it with every request of this account.,Kurum kimliği isteğe bağlıdır. Geçit bu kimliği hesabın her isteğiyle gönderir.,
+Optional project identifier. The gateway sends it with every request of this account.,Proje kimliği isteğe bağlıdır. Geçit bu kimliği hesabın her isteğiyle gönderir.,
+Service address without a path to the operation.,İşlem yolu olmadan hizmetin adresi.,
+Address of the model server in the platform's own network.,Platformun kendi ağındaki model sunucusunun adresi.,
+Account name,Hesap adı,
+Name of the provider account in this site.,Bu sitedeki sağlayıcı hesabının adı.,
+Connection name,Bağlantı adı,
+Name of this API connection.,Bu API bağlantısının adı.,
+Service address,Hizmet adresi,
