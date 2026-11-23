@@ -43,10 +43,35 @@ Bazı sürümler Press'in istediğinden farklıdır. Her farkın nedeni `0005-de
 1. Telegram paketi kurulmaz. Paket Python 3.12 ve sonrasında açılmaz. Telegram uyarıları bu imajda çalışmaz.
 2. Semgrep 1.79.0 kurulur. Press 1.159.0 ister. O sürüm Frappe 16'nın OpenTelemetry sürümüyle çakışır. Semgrep yalnız Marketplace uygulama denetiminde kullanılır. Bu denetim sınanmadı.
 3. Stripe 3.1.0 kurulur. Press 2.56 ister. 2.56 sürümü Python 3.12 ve sonrasında açılmaz. Ödeme akışı sınanmadı.
+4. Üç paket açık taraması yüzünden yükseldi. `dnspython` 2.9.2, `paramiko` 5.1.0 ve `setuptools` 84.2.1 kurulur. Ayrıntı "Açık taraması" bölümündedir.
 
 Playwright paketi kuruludur, ama tarayıcıları kurulu değildir. Press olay kaydında ekran görüntüsü almak için tarayıcı ister. Bu özellik bu imajda çalışmaz.
 
-`dockerfile` paketinin arm64 için hazır kurulum dosyası yoktur. Bu yüzden derleme arm64'te paketi kaynaktan derler. Kaynak dosyası özetle doğrulanır. Ancak paketin derleme betiği Go bağımlılıklarını da indirir. Bu bağımlılıkların sürümü sabit değildir. amd64 derlemesi hazır dosyayı kullanır ve bu adımı atlar. Sunucular için derleme amd64'te yapılır (E-15).
+`dockerfile` paketinin arm64 için hazır kurulum dosyası yoktur. Bu yüzden derleme arm64'te paketi kaynaktan derler. Kaynak dosyası özetle doğrulanır. Ancak paketin derleme betiği Go bağımlılıklarını da indirir. Bu bağımlılıkların sürümü sabit değildir. amd64 derlemesi hazır dosyayı kullanır ve bu adımı atlar.
+
+Bu yüzden iki kural vardır:
+
+1. `build-release` bütün sürüm imajlarını `--platform linux/amd64` ile derler. arm64 derleme ajanı da amd64 imajı üretir. Bunun için ajanda QEMU öykünmesi gerekir.
+2. Dockerfile arm64 derlemesini reddeder. Yerel deneme için `--build-arg PRESS_LOCAL_ARM64_TRIAL=1` verin. `build-release` bu değeri hiç vermez. Böylece sabitlenmemiş Go kodu sürüm imajına giremez.
+
+Karar gerekçesi şudur: sunucular için tek mimari yeterlidir. Yalnız arm64'ü reddetmek yetmezdi. O zaman arm64 ajanı hiç sürüm üretemezdi. Go bağımlılıklarını kaynağa almak ise daha büyük bir iştir. Bu iş yalnız arm64 sunucu seçilirse gerekir (E-15).
+
+### Açık taraması
+
+Güvenlik kapısı kilidi OSV-Scanner 2.7.1 ile tarar. OSV-Scanner, paket sürümlerini açık veritabanıyla karşılaştıran bir araçtır. Komut `backend/dev/security/scans.py press-lock` olur. `backend/dev/bin/security-audit` bu komutu çalıştırır. Açık bulunursa kapı düşer. Araç ya da veritabanı yoksa kapı yine düşer.
+
+Tarama ağsız çalışır. Yalnız yerel dosyaları okur. Aracı ve veritabanını `backend/dev/security/osv-setup` betiği indirir. Bu betik ağ ister. Veritabanı en çok yedi gün eski olabilir. Bu yüzden betiği en az haftada bir çalıştırın.
+
+23 Kasım 2026 Pazartesi günü ilk tarama eski kilitte 4 pakette 8 açık buldu. Yapılanlar şunlardır:
+
+| Paket | Açık | Karar |
+| --- | --- | --- |
+| `dnspython` 1.16.0 | CVE-2023-29483 ve iki yeni hizmet engelleme açığı | 2.9.2 sürümüne yükseldi. Press `Resolver.query` işlevini kullanır. Bu işlev 2.9.2'de de vardır. |
+| `paramiko` 3.3.1 | Terrapin (CVE-2023-48795) ve SHA-1 RSA imzası (CVE-2026-44405) | 5.1.0 sürümüne yükseldi. Press kodu `paramiko` kullanmaz. Ansible eklentileri ve `docker` paketi kullanır. Yeni sürüm `invoke` paketini de getirdi. |
+| `setuptools` 80.9.0 | CVE-2026-59890 ve GHSA-xmj3-9gf7-h52w | 84.2.1 sürümüne yükseldi. Bu sürümde `pkg_resources` yoktur. İmajda bu modülü açan her satır `try` bloğu içindedir. |
+| `wcmatch` 8.5.2 | GHSA-53pm-wgxf-c6qf | İstisna kaydına yazıldı. Semgrep 1.79.0, `wcmatch~=8.3` ister. Semgrep yalnız kapalı Marketplace denetiminde çalışır. Kayıt `backend/dev/security/osv-exceptions.toml` dosyasındadır. Bitiş tarihi 23 Şubat 2027 Salı günüdür. |
+
+Yükseltmeler `0005` yamasıyla Press'in `pyproject.toml` dosyasına da yazıldı. Böylece `uv pip check` yine yalnız izinli iki satırı bildirir.
 
 ### Bağımlılık denetimi
 
@@ -81,13 +106,17 @@ Bu servislerin hepsi `press` profilindedir. `remote/apply` betiği profili iki k
 1. Sürüm paketinde Press imajı vardır. `build-release` imajı her pakete koyar.
 2. Ortam dosyasında `ATONOTA_PRESS_ENABLED=1` yazılıdır.
 
-Anahtar bütün ortamlarda bugün 0'dır. Press sitesi açılmadan profil açılırsa `press-web` sağlıklı olmaz. O zaman dağıtım düşer. rc ve prod'da anahtar 1 olamaz. `release.py` bunu reddeder. Nedeni şudur: dağıtım betikleri Press sitesini henüz yedeklemez (E-2).
+Anahtar bütün ortamlarda bugün 0'dır. Press sitesi açılmadan profil açılırsa `press-web` sağlıklı olmaz. O zaman dağıtım düşer. rc ve prod'da anahtar 1 olamaz. `release.py` bunu Jenkins tarafında reddeder. Sunucudaki `remote/apply` de reddeder. Biri `apply` betiğini sunucuda elle çalıştırsa da kural geçerlidir. Nedeni şudur: dağıtım betikleri Press sitesini henüz yedeklemez (E-2).
 
 Sağlık denetimi aynı kuralı kullanır. Anahtar 0 ise Press denetimi `not_run` yazar.
 
 Press'in veritabanı kiracıların MariaDB sunucusundadır. Press'in veritabanı ve kullanıcısı ayrıdır. Bunları `bench new-site` komutu açar.
 
 Press'in Redis'i ayrıdır. Nedeni şudur: iki bench de aynı klasördedir. Kuyruk ortak olursa kiracı işçisi Press'in işini alabilir.
+
+Press servisleri ayrı bir ağdadır. Ağın adı `press-internal` olur. Kiracı kapları bu ağda değildir. Bu yüzden kiracı kabı Press'in Redis kuyruğuna iş yazamaz. Kiracı kabı `press-web:8000` adresine de ulaşamaz. Yalnız `tenant-db` iki ağdadır. `press-frontend` ayrıca ortamın kenar ağındadır.
+
+Press, Keycloak'a ve identity-sync servisine genel HTTPS adresiyle ulaşır. Bu iki servis `press-internal` ağında değildir. Bu yüzden `keycloak_internal_url` ayarı üretimde boş kalır.
 
 Ön vekil `press.<taban>` adını `press-frontend` servisine iletir. Örneğin alpha'da ad `press.alpha.atonota.net` olur.
 
@@ -150,6 +179,25 @@ Denemede dört şey daha görüldü:
 3. Press'in Telegram kuyruğu Frappe 16'da çalışmaz. `TelegramMessage.get_one` sıralamada `FIELD(priority, ...)` ifadesini kullanır. Frappe 16 bu ifadeyi reddeder. Bu engel Telegram paketinden ayrıdır. Bu imajda Telegram zaten kapalıdır.
 4. Press sitesinde `/login` adresi 403 döner. Bu beklenen davranıştır. `press_tr` yerel girişi kapatır. Kural `press_tr/press_identity/request_policy.py` dosyasındaki `block_native_login` işlevidir. Giriş Keycloak ile yapılır.
 
+### İnceleme sonrası deneme
+
+Bağımsız inceleme beş önemli bulgu verdi. Bulgular 23 Kasım 2026 Pazartesi günü kapatıldı. Paketler yükseldiği için imaj yeniden derlendi ve denendi. Deneme `colima-factory` profilinde arm64 ile yapıldı. Derleme `PRESS_LOCAL_ARM64_TRIAL=1` ile yapıldı. Yerel imaj kimliği `sha256:3b3d97db25f0c8c2e9a0c0730f497262b65fa4536b34921dcae6b80c21040149` oldu. İmaj kimliği her derlemede değişebilir. Kimlik üst veriye de bağlıdır. İmaj hiçbir kayıt deposuna yüklenmedi.
+
+| Denetim | Sonuç |
+| --- | --- |
+| İmaj derlemesi ve `uv pip check`: yalnız izinli iki satır | `pass` |
+| İmajdaki sürümler: `dnspython` 2.9.2, `paramiko` 5.1.0, `setuptools` 84.2.1 | `pass` |
+| `press` ve `press_tr` içindeki test dışı 1052 modülün içe aktarılması | `pass`. `press.hooks` yalnız siteye bağlıyken açılır. Siteyle ayrıca açıldı. |
+| `bench new-site --install-app press`, `install-app press_tr`, `migrate` | `pass` |
+| Uygulama sunucusunda `/api/method/ping`: 200 ve `pong` | `pass` |
+| Press'in `check_dns_a` ve `check_dns_cname` işlevleri, sahte DNS sunucusuyla | `pass`. A ve CNAME eşleşti. Olmayan ad hata metni döndü. |
+| `paramiko` 5.1.0 anahtar okuma ve `docker` SSH taşıyıcısının açılması | `pass` |
+| Bayraksız arm64 derlemesi | `pass`. Derleme ilk adımda durdu. |
+| Gerçek SSH bağlantısı ve Press'in dar birim test kümesi | `not_run` |
+| amd64 derlemesi ve sunucuda çalışma | `not_run` |
+
+Geçici kapların adı `e2r2-` ile başladı. Kaplar, ağ ve imaj deneme sonunda silindi.
+
 ## Kalan iş
 
 Kalan iş dağıtım belgesindeki E-2 satırındadır. Özeti şudur:
@@ -162,3 +210,4 @@ Kalan iş dağıtım belgesindeki E-2 satırındadır. Özeti şudur:
 6. Press'in chromedriver denetimi kapatılmadı.
 7. İmaj amd64'te ve sunucuda denenmedi (E-15).
 8. Press'in sunucu kurma akışı ayrı bir engeldir (E-1).
+9. Telegram yaması Press'in uyarılarını kapatır. Press açılmadan önce başka bir uyarı kanalı belirlenmelidir (E-2).

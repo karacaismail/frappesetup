@@ -300,13 +300,6 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
   - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur. İş `unknown` kalır ve Keycloak hesabı silinmez (O-43).
 
-- **O-43. Press Semgrep onayları dosya listesine bağlıdır.**
-  - Liste, 19 onayın geçtiği dosyaları ve yetki yardımcılarını kapsar.
-  - Liste, ortak OIDC doğrulama kitaplığını da kapsar.
-  - Kapsam dışı belge ve test değişiklikleri Press onaylarını düşürmez.
-  - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
-  - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
-
 - **O-45. P2 ödeme katmanı MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü MVP durum denetimiyle alındı. Prod, gerçek müşterinin kullandığı canlı ortamdır.
   - MVP ilk kullanılabilir sürümdür (D-1).
   - İlk kullanıcılar ürünü alpha ve beta ortamında dener. Bu ortamlarda ödeme alınmaz.
@@ -351,6 +344,14 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Bağımlılıklar `deploy/images/press-requirements.lock.txt` kilidinden özetle kurulur. `uv pip check` yalnız `press-pip-check.allowed` dosyasındaki iki satırı bildirebilir. Başka her uyumsuzluk derlemeyi durdurur.
   - Press bir yamanın düzeltmesini kabul edip yayımlarsa o yama silinir. Bütün yamalar kalkınca bu istisna ve O-18 borcu kapanır.
   - Ayrıntı ve deneme kanıtı [Press imajı belgesindedir](docs/dagitim/press-imaji.md).
+
+- **O-53. Press Semgrep onayları dosya listesine bağlıdır.**
+  - Liste, 19 onayın geçtiği dosyaları ve yetki yardımcılarını kapsar.
+  - Liste, ortak OIDC doğrulama kitaplığını da kapsar.
+  - Kapsam dışı belge ve test değişiklikleri Press onaylarını düşürmez.
+  - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
+  - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
+  - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
 ## Karar sitesine işlenecek farklar
 
@@ -405,7 +406,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
-| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18). Üretim imajı da beş yamayla derlenir (O-52) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Üretim imajında bu üç engel ve Telegram engeli `deploy/images/press-patches/` yamalarıyla aşıldı. Bağımlılıklar kilitle kuruldu. `uv pip check` yalnız frappe-mcp'nin iki bilinen satırını bildiriyor. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Kabul edilen her düzeltmenin yaması silinir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
+| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18). Üretim imajı da beş yamayla derlenir (O-52) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Üretim imajında bu üç engel ve Telegram engeli `deploy/images/press-patches/` yamalarıyla aşıldı. Bağımlılıklar kilitle kuruldu. `uv pip check` yalnız frappe-mcp'nin iki bilinen satırını bildiriyor. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Gönderilmeyen öneri kabul edilmez. Sonraki adım önerileri Press deposuna göndermektir. Bu adımın sahibi proje sahibidir. Gönderim dış bir depoya yazar ve proje sahibinin hesabını ister. Öneri metnini press-tr işi yamalarla güncel tutar. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Kabul edilen her düzeltmenin yaması silinir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | Telefon paketi yok (O-26). Bu borç MVP'yi engellemez (O-49) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |

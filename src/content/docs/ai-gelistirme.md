@@ -14,7 +14,7 @@ Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları
 | Press teşhisi | Press içi MCP (`enable_mcp`) | `press-build-triage`, `press-diagnoser` | Araçlar hazır, teşhis sırası yok |
 | Press kurulum ve dağıtım | — | `press-ai` MCP, `press-operations`, `press-operator` | Hiçbir hazır depo onaylı biçimde karşılamıyor |
 | Site içi veri araçları | `frappe/mcp` çatısı ya da kullanıcı kimlikli sunucu | `platform_core` araçları (Rail 5) | Kullanıcı kimliği ve denetim izi gerekir |
-| Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf staging'de denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
+| Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf beta ortamında denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
 
 AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı süreçte birleştirilmeden önce lisans uyumu kullanıcıyla netleştirilir; yeni depolara lisans onaysız seçilmez.
 

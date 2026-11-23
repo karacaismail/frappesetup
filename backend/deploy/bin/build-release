@@ -12,6 +12,10 @@ build="${BUILD_NUMBER:?BUILD_NUMBER is not set}"
 registry="${ATONOTA_REGISTRY:-ghcr.io/karacaismail}"
 backend="$(cd -- "$DEPLOY_DIR/.." && pwd)"
 tag="${commit:0:12}-b$build"
+# Every release image is built for linux/amd64, on any build agent (E-15, review 1 finding 2).
+# On arm64 the Press image would carry Go code without a pinned version (press.Dockerfile). An
+# arm64 agent needs QEMU emulation (binfmt) and takes the same amd64 build path.
+platform=linux/amd64
 
 # name|context|dockerfile|target
 components=(
@@ -25,7 +29,7 @@ image_arguments=()
 for entry in "${components[@]}"; do
     IFS='|' read -r name context dockerfile target <<<"$entry"
     repository="$registry/atonota-$name"
-    build_arguments=(--pull --file "$dockerfile" --tag "$repository:$tag"
+    build_arguments=(--pull --platform "$platform" --file "$dockerfile" --tag "$repository:$tag"
         --label "org.opencontainers.image.revision=$commit"
         --label "org.opencontainers.image.source=https://github.com/karacaismail/frappesetup")
     if [[ -n "$target" ]]; then

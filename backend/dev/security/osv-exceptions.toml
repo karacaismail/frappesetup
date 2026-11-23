@@ -1,2 +1,10 @@
-# Each [[IgnoredVulns]] entry must have an id, owner and reason.
+# Each [[IgnoredVulns]] entry must have an id and a reason that opens with "Owner: <role>.".
+# OSV-Scanner refuses unknown keys, so there is no owner key (scans.py osv_exception_valid).
 # Set ignoreUntil and OSV's effectiveUntil to the same date.
+
+[[IgnoredVulns]]
+# backend/deploy/images/press-requirements.lock.txt: wcmatch 8.5.2 (review 1, finding 3).
+id = "GHSA-53pm-wgxf-c6qf"
+reason = "Owner: press-tr. semgrep 1.79.0 pins wcmatch~=8.3; Press uses semgrep only for the Marketplace app audit, which stays off. Remove when Press moves to a semgrep that resolves with Frappe 16 (patch 0005, O-52)."
+ignoreUntil = 2027-02-23
+effectiveUntil = 2027-02-23
