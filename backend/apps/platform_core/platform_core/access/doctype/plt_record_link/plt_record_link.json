@@ -1,5 +1,6 @@
 {
  "autoname": "hash",
+ "description": "A private link to a record. The recipient needs their own read permission.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -11,6 +12,7 @@
  ],
  "fields": [
   {
+   "description": "SHA-256 hash of the private link token.",
    "fieldname": "token_hash",
    "fieldtype": "Data",
    "label": "Token hash",
@@ -19,24 +21,28 @@
    "unique": 1
   },
   {
+   "description": "Document type of the linked record.",
    "fieldname": "target_type",
    "fieldtype": "Data",
    "label": "Target type",
    "reqd": 1
   },
   {
+   "description": "Name of the linked record.",
    "fieldname": "target_name",
    "fieldtype": "Data",
    "label": "Target name",
    "reqd": 1
   },
   {
+   "description": "Date and time when the link expires.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
    "label": "Expires at",
    "reqd": 1
   },
   {
+   "description": "Date and time when the link was revoked. Empty while it has not been revoked.",
    "fieldname": "revoked_at",
    "fieldtype": "Datetime",
    "label": "Revoked at"

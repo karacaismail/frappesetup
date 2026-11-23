@@ -11,6 +11,31 @@
     }
   ],
   "paths": {
+    "/api/method/platform_core.api.shell.record_preview_image": {
+      "get": {
+        "operationId": "recordPreviewImage",
+        "summary": "Get the generic record preview image",
+        "description": "Serves the same static PNG to every caller. The image contains no record data. This endpoint accepts guest requests.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Generic preview image.",
+            "headers": {
+              "Cache-Control": {"schema": {"type": "string", "const": "public, max-age=3600"}},
+              "X-Content-Type-Options": {"schema": {"type": "string", "const": "nosniff"}}
+            },
+            "content": {
+              "image/png": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          },
+          "429": {
+            "description": "The caller exceeded the preview request limit."
+          }
+        }
+      }
+    },
     "/api/method/platform_core.api.meta.validate_mobile_policy": {
       "get": {
         "operationId": "validateMobilePolicy",

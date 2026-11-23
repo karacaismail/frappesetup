@@ -1,4 +1,5 @@
 {
+ "description": "A private request to read a record. The request grants no access.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -8,17 +9,20 @@
  ],
  "fields": [
   {
+   "description": "Private link used to request access. Empty for a direct request.",
    "fieldname": "record_link",
    "fieldtype": "Link",
    "label": "Record link",
    "options": "PLT Record Link"
   },
   {
+   "description": "Document type of the requested record.",
    "fieldname": "target_type",
    "fieldtype": "Data",
    "label": "Target type"
   },
   {
+   "description": "Name of the requested record.",
    "fieldname": "target_name",
    "fieldtype": "Data",
    "label": "Target name"

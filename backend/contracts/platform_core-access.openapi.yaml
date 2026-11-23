@@ -746,6 +746,191 @@ x-ai-tools:
         The layer compares the version again just before it executes.
         Narrowing a rule removes access. This is why the tool carries the `destructive` flag.
 
+  /platform_core.api.access.create_record_link:
+    post:
+      operationId: createRecordLink
+      summary: Create a private record link.
+      description: The caller needs read and share permission on the record. The link expires after seven days and grants no access.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doctype, name]
+              properties:
+                doctype: {type: string, description: "Target document type."}
+                name: {type: string, description: "Target record name."}
+      responses:
+        "200":
+          description: The private link was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [id, path]
+                    properties:
+                      id: {type: string, description: "Link identifier used for revocation."}
+                      path: {type: string, description: "Relative link with the private token in the URL fragment."}
+        "404":
+          description: The record is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, const: "unavailable"}
+
+  /platform_core.api.access.open_record_link:
+    post:
+      operationId: openRecordLink
+      summary: Open a private record link.
+      description: The recipient needs read permission on the target record. Send the token only in the request body.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string, description: "Private token from the link fragment."}
+      responses:
+        "200":
+          description: The caller can read the record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [doctype, name]
+                    properties:
+                      doctype: {type: string, description: "Target document type."}
+                      name: {type: string, description: "Target record name."}
+        "404":
+          description: The record is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, const: "unavailable"}
+        "410":
+          description: The link expired or was revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, const: "gone"}
+
+  /platform_core.api.access.revoke_record_link:
+    post:
+      operationId: revokeRecordLink
+      summary: Revoke a private record link.
+      description: The creator or a caller with current read and share permission can revoke the link.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [link_id]
+              properties:
+                link_id: {type: string, description: "Link identifier returned by link creation."}
+      responses:
+        "200":
+          description: The link is revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, const: "revoked"}
+        "404":
+          description: The link is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, const: "unavailable"}
+
+  /platform_core.api.access.request_record_access:
+    post:
+      operationId: requestRecordAccess
+      summary: Request access to a record.
+      description: Use a token or a document type and record name. The same acknowledgement returns without revealing record details or granting access.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              anyOf:
+                - required: [token]
+                - required: [doctype, name]
+              properties:
+                token: {type: string, description: "Private token from the link fragment."}
+                doctype: {type: string, description: "Target document type."}
+                name: {type: string, description: "Target record name."}
+      responses:
+        "202":
+          description: The request was acknowledged.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, const: "received"}
+        "429":
+          description: The caller exceeded ten requests per minute.
+
 components:
   responses:
     SessionExpired:
