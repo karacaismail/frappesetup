@@ -165,7 +165,7 @@ class PreviewFixturesTest(unittest.TestCase):
             return "http://localhost/entries/" + str(len(calls))
 
         with patch.dict(os.environ, settings), patch.object(fixtures, "keycloak_request", side_effect=request):
-            _, lifecycle = fixtures.seed_keycloak(43820, "synthetic")
+            lifecycle = fixtures.seed_keycloak(43820, "synthetic")
 
         self.assertEqual(set(lifecycle), {"delete", "revoke", "employee"})
         self.assertEqual(len({account["password"] for account in lifecycle.values()}), 3)
@@ -199,7 +199,7 @@ class PreviewFixturesTest(unittest.TestCase):
             return "http://localhost/entries/" + str(len(calls))
 
         with patch.object(fixtures, "keycloak_request", side_effect=request):
-            sync_client = fixtures.configure_sync_fixture_client(43820, auth_header="admin-grant")
+            sync_client = fixtures.configure_sync_fixture_client(43820, token="admin-grant")
 
         self.assertEqual(sync_client["client_id"], "e2e-sync-fixture")
         self.assertTrue(sync_client["client_value"])

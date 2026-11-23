@@ -874,7 +874,7 @@ class StackTests(unittest.TestCase):
             if key.startswith("ATONOTA_MCP_"):
                 self.env.pop(key)
 
-        for action in ("config", "up"):
+        for action in ("config", "build", "up", "down", "check", "resources"):
             with self.subTest(action=action):
                 result = self.run_stack(action, PATH=f"{self.temp.name}:{os.environ['PATH']}")
                 self.assertEqual(result.returncode, 2, result.stderr)

@@ -144,9 +144,9 @@ def admin_access_token(port):
     )["access_token"]
 
 
-def configure_sync_fixture_client(port, auth_header=None):
+def configure_sync_fixture_client(port, token=None):
     realm = "/admin/realms/platform"
-    bearer = auth_header or admin_access_token(port)
+    bearer = token or admin_access_token(port)
 
     def call(path, **kwargs):
         return keycloak_request(port, realm + path, token=bearer, **kwargs)
@@ -228,7 +228,7 @@ def seed_keycloak(port, password, *, browser_fixtures=None):
             port, realm + "/organizations/" + quote(organization, safe="") + "/members",
             token=token, data=member,
         )
-    return None, lifecycle
+    return lifecycle
 
 
 def seed_site(project, service, bench, environment):
@@ -266,7 +266,7 @@ def main():
     print("Tenant browser and service client checks passed.", flush=True)
     password = "Aa9!" + secrets.token_urlsafe(24)
     browser_fixtures = {} if os.environ.get("E2E_FULL_BROWSER_FIXTURES") == "1" else None
-    _, lifecycle = seed_keycloak(port, password, browser_fixtures=browser_fixtures)
+    lifecycle = seed_keycloak(port, password, browser_fixtures=browser_fixtures)
     sync_client = configure_sync_fixture_client(port)
     common = {
         "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],

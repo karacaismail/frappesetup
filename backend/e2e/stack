@@ -21,6 +21,7 @@ CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
 REQUIRED_SETTING = re.compile(r"\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}")
 INCLUDE_FILE = re.compile(r"^\s*-\s*([A-Za-z0-9_.-]+\.ya?ml)\s*$")
 SECRET_PREFIXES = ("degistir-", "example-only-")
+SECRET_KEY = re.compile(r"(?:^|_)(?:SECRET|PASSWORD|TOKEN|P8_KEY)(?:_|$)")
 REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
 
 
@@ -32,17 +33,21 @@ def template_entries():
         root / "dev/press/.env.example",
     ):
         for line in template.read_text().splitlines():
-            if not line or line.startswith("#"):
+            key, separator, value = line.partition("=")
+            if not separator or not key or key.startswith("#"):
                 continue
-            yield line.split("=", 1)
+            yield key, value
 
 
 def default_settings():
-    """Return non-secret template defaults without touching E2E_ENV_FILE."""
+    """Return non-secret template defaults without touching E2E_ENV_FILE.
+
+    A key that names a credential is never filled, even when the template holds a fake value.
+    """
     return {
         key: value
         for key, value in template_entries()
-        if not value.startswith(SECRET_PREFIXES)
+        if not value.startswith(SECRET_PREFIXES) and not SECRET_KEY.search(key)
     }
 
 
@@ -191,6 +196,8 @@ def setup():
         "--file",
         str(BACKEND / "dev/compose.yaml"),
     ]
+    # Name missing local settings before any Docker call, whatever the action.
+    require_compose_settings(compose, environment)
     return environment, engine, compose
 
 
@@ -732,7 +739,6 @@ def main():
         elif args.action == "up":
             # Check local settings before the ownership probe or any other Docker call.
             require_press_settings(environment)
-            require_compose_settings(compose, environment)
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)
         elif args.action == "down":

@@ -83,9 +83,15 @@ test('provisionUnlinkedSyncUser creates a unique user per run and drains healthz
         return;
       }
       if (req.method === 'GET' && req.url?.startsWith('/admin/realms/platform/organizations?')) {
-        events.push('list_orgs');
+        const query = new URL(req.url, 'http://127.0.0.1').searchParams;
+        events.push('list_orgs:' + query.toString());
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify([{ id: 'org-tenant1', alias: 'tenant1' }]));
+        // Keycloak's search matches name and domain, never alias: a search for the alias finds nothing.
+        if (query.has('search')) { res.end('[]'); return; }
+        const page = Number(query.get('first')) === 0
+          ? [{ id: 'org-other', alias: 'other', name: 'Other' }, { id: 'org-tenant1', alias: 'tenant1', name: 'Preview Integration Tenant' }]
+          : [];
+        res.end(JSON.stringify(page));
         return;
       }
       if (req.method === 'POST' && req.url === '/admin/realms/platform/organizations/org-tenant1/members') {
@@ -125,6 +131,7 @@ test('provisionUnlinkedSyncUser creates a unique user per run and drains healthz
   assert.equal(first.subject, 'sub-1');
   assert.equal(second.subject, 'sub-2');
 
+  assert.ok(events.some((item) => item.startsWith('list_orgs:') && item.includes('first=0') && !item.includes('search=')), JSON.stringify(events));
   const createIndex = events.findIndex((item) => item.startsWith('create_user:'));
   const healthIndex = events.indexOf('sync_healthz');
   const memberIndex = events.indexOf('add_member:sub-1');

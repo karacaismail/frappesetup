@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 
 const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost', 'identity.localhost']);
+const ORGANIZATION_PAGE = 100;
 
 type SyncUserOptions = {
   identityOrigin: string;
@@ -115,15 +116,20 @@ export async function provisionUnlinkedSyncUser({
     throw new Error(`Identity sync health check returned HTTP ${health.status}.`);
   }
 
-  const orgQuery = new URLSearchParams({ search: organizationAlias }).toString();
-  const orgReply = await sendLocal(identityOrigin, `/admin/realms/platform/organizations?${orgQuery}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (orgReply.status !== 200) {
-    throw new Error(`Sync fixture organization lookup returned HTTP ${orgReply.status}.`);
+  // Keycloak's organization search matches names and domains, not aliases. Page through the list instead.
+  let organization: { id?: string; alias?: string } | undefined;
+  for (let first = 0; !organization; first += ORGANIZATION_PAGE) {
+    const pageQuery = new URLSearchParams({ first: String(first), max: String(ORGANIZATION_PAGE) }).toString();
+    const orgReply = await sendLocal(identityOrigin, `/admin/realms/platform/organizations?${pageQuery}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (orgReply.status !== 200) {
+      throw new Error(`Sync fixture organization lookup returned HTTP ${orgReply.status}.`);
+    }
+    const organizations = JSON.parse(orgReply.body) as { id?: string; alias?: string }[];
+    organization = organizations.find((entry) => entry.alias === organizationAlias);
+    if (organizations.length < ORGANIZATION_PAGE) break;
   }
-  const organizations = JSON.parse(orgReply.body) as { id?: string; alias?: string }[];
-  const organization = organizations.find((entry) => entry.alias === organizationAlias);
   if (!organization?.id) {
     throw new Error(`Sync fixture could not find Keycloak organization ${organizationAlias}.`);
   }
