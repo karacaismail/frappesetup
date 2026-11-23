@@ -1,0 +1,20 @@
+# Global edge settings. Each environment adds sites/<env>.caddy (written by remote/apply from
+# site.caddy.template). The admin API listens only inside the container for "caddy reload".
+{
+	admin localhost:2019
+	email {$ATONOTA_ACME_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+import /etc/caddy/sites/*.caddy

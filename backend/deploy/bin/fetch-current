@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Copy the release that is current in one environment, with its health record, to a folder.
+# Usage: fetch-current <env> <backend|web> <out folder>
+# A promotion deploys exactly this copy; nothing is rebuilt.
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+env="${1:?usage: fetch-current <env> <kind> <out folder>}"
+kind="${2:?usage: fetch-current <env> <kind> <out folder>}"
+out="${3:?usage: fetch-current <env> <kind> <out folder>}"
+load_env "$env"
+case "$kind" in backend) current="/srv/atonota/$env/backend-current" ;;
+web) current="/srv/atonota/web/$env/current" ;;
+*) fail "unknown kind: $kind" ;; esac
+
+mkdir -p "$out"
+copy_from_remote "$current/release.json" "$out/release.json"
+copy_from_remote "/srv/atonota/$env/health/$kind.json" "$out/source-record.json" ||
+    fail "$env has no health record for its current $kind release"
+if [[ "$kind" == web ]]; then
+    bundle="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["components"]["panel"]["file"])' "$out/release.json")"
+    copy_from_remote "$current/$bundle" "$out/$bundle"
+    expected="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["components"]["panel"]["sha256"])' "$out/release.json")"
+    [[ "$(sha256sum "$out/$bundle" | cut -d' ' -f1)" == "$expected" ]] || fail "bundle checksum differs"
+fi
+printf '%s current %s release: %s\n' "$env" "$kind" "$(release_py field "$out/release.json" release_id)"

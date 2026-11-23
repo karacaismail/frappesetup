@@ -24,6 +24,9 @@ jobs:
           python3 --version
           python3 -I -m unittest discover -s packages/press-ai/tests
           python3 -I packages/press-ai/server.py check-contract
+      # Jenkins dağıtım hattının sürüm ve sunucu betiği testleri (backend/deploy). Yalnız stdlib ve GNU araçları.
+      - name: deploy gate (release manifest + remote scripts)
+        run: python3 -I -m unittest discover -s backend/deploy/tests -v
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24

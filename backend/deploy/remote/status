@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Print the current release id of one kind, after checking that its containers are healthy.
+# Usage: status <env> <backend|web|web-asset>
+# "web-asset" prints the file name of the main script that index.html loads.
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$here/common.sh"
+
+env="${1:?usage: status <env> <kind>}"
+kind="${2:?usage: status <env> <kind>}"
+check_env_name "$env"
+case "$kind" in
+backend)
+    current="$ATONOTA_ROOT/$env/backend-current"
+    [[ -L "$current" ]] || fail "$env has no backend release"
+    load_host_env "$current/host.env"
+    stack "$current" ps --format '{{.Service}} {{.State}} {{.Health}}' | while read -r service state health; do
+        [[ "$state" == running && ( -z "$health" || "$health" == healthy ) ]] ||
+            fail "$service is $state $health"
+    done
+    json_field "$current/release.json" release_id
+    ;;
+web)
+    json_field "$ATONOTA_ROOT/web/$env/current/release.json" release_id
+    ;;
+web-asset)
+    grep -o 'src="/panel/assets/[^"]*\.js"' "$ATONOTA_ROOT/web/$env/current/index.html" |
+        head -n 1 | sed -e 's#^src="/panel/assets/##' -e 's#"$##' | grep . ||
+        fail "index.html loads no script from /panel/assets/"
+    ;;
+*) fail "unknown kind: $kind" ;;
+esac

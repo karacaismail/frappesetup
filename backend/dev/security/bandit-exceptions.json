@@ -3108,5 +3108,68 @@
     "reason": "Test runs a copy of the fixed bin/test script with a fake Compose and a validated app name.",
     "owner": "dev-ortam",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_release.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_release.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "a1fe0ddebc35424ae26db4a30bdbbc4875ef4243706e7dca5dbd0cc49bf84003",
+    "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "probe = subprocess.run([\"mv\", \"--version\"], capture_output=True, text=True)",
+    "statementSha256": "4350595a47a9ae707b680447c3396419e81d7c1aec66a8c11d1449fa608b1a77",
+    "reason": "Test runs GNU mv --version with fixed arguments and no shell to decide whether the Linux only tests can run.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "b50985a0ced19839ffbff12b5286fb22ed54fcd5ead5c90062c9fe4442a9507e",
+    "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "df314478acad96f883690c790ea650665176bd22f173b8139f6607257b40371a",
+    "reason": "Test runs the repository's own deploy scripts with fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_remote.py",
+    "code": "probe = subprocess.run([\"mv\", \"--version\"], capture_output=True, text=True)",
+    "statementSha256": "4350595a47a9ae707b680447c3396419e81d7c1aec66a8c11d1449fa608b1a77",
+    "reason": "Test probes GNU mv by name to decide whether the Linux only tests can run.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
   }
 ]

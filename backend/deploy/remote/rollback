@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Return one environment to its previous release.
+# Usage: rollback <env> <backend|web> [--restore-backup]
+#
+# web:      move the "current" link back to "previous". No restart; the next request uses it.
+# backend:  start the previous release's images with the previous release's compose files.
+#           Migrations are written so the previous release still runs on the new schema
+#           (expand and contract rule, docs/dagitim/ortamlar.md). When that does not hold, or the
+#           failed release stopped in the middle of a migration, use --restore-backup: it restores
+#           the backup taken right before the failed release, then starts the previous release.
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$here/common.sh"
+
+env="${1:?usage: rollback <env> <kind> [--restore-backup]}"
+kind="${2:?usage: rollback <env> <kind> [--restore-backup]}"
+mode="${3:-}"
+check_env_name "$env"
+base="$ATONOTA_ROOT/$env"
+
+if [[ "$kind" == web ]]; then
+    web="$ATONOTA_ROOT/web/$env"
+    [[ -L "$web/previous" ]] || fail "$env has no previous web release"
+    failed="$(readlink "$web/current")"
+    switch_link "$(readlink "$web/previous")" "$web/current"
+    switch_link "$failed" "$web/previous"
+    rm -f "$base/health/web.json"
+    say "web of $env is back on $(readlink "$web/current")"
+    exit 0
+fi
+[[ "$kind" == backend ]] || fail "unknown kind: $kind"
+
+# A release still in progress is named by backend-pending; it never became current.
+# Without it, the current release is the one to undo.
+if [[ -L "$base/backend-pending" ]]; then
+    failed="$base/$(readlink "$base/backend-pending")"
+    target="$base/backend-current"
+else
+    failed="$base/$(readlink "$base/backend-current")"
+    target="$base/backend-previous"
+fi
+[[ -L "$target" ]] || fail "$env has no release to return to"
+target="$base/$(readlink "$target")"
+[[ "$target" != "$failed" ]] || fail "previous and failed release are the same"
+load_host_env "$target/host.env"
+
+stack "$failed" down --remove-orphans || true
+if [[ "$mode" == --restore-backup ]]; then
+    backup="$(cat "$failed/backup-before" 2>/dev/null)" || fail "the failed release has no backup"
+    "$target/bin/restore" "$env" "$target" "$backup"
+fi
+stack "$target" up --detach --wait --wait-timeout 600 --remove-orphans
+stack "$target" exec -T tenant-web bench --site all set-maintenance-mode off
+switch_link "releases/$(basename "$target")" "$base/backend-current"
+switch_link "releases/$(basename "$failed")" "$base/backend-previous"
+rm -f "$base/backend-pending"
+rm -f "$base/health/backend.json"
+phase rolled-back
+say "backend of $env is back on $(basename "$target")"

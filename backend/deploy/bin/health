@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Probe one environment from outside over HTTPS, then store the health record on the server.
+# Usage: health <env> <release folder>
+# A later promotion reads this record (fetch-current). Without it, nothing moves on.
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+env="${1:?usage: health <env> <release folder>}"
+folder="${2:?usage: health <env> <release folder>}"
+load_env "$env"
+manifest="$folder/release.json"
+kind="$(release_py field "$manifest" kind)"
+id="$(release_py field "$manifest" release_id)"
+
+# The server must report the same release as current, with every container healthy.
+running="$(remote "/srv/atonota/$env/bin/status" "$env" "$kind")"
+[[ "$running" == "$id" ]] || fail "$env runs $running, expected $id"
+
+probe() {
+    local url="$1" expect="$2"
+    local body
+    body="$(curl --fail --silent --show-error --max-time 15 --proto '=https' "$url")" ||
+        fail "$url did not answer"
+    grep -q -- "$expect" <<<"$body" || fail "$url answered without $expect"
+    printf 'pass %s\n' "$url"
+}
+
+redirect() {
+    local url="$1" expect="$2"
+    local location
+    location="$(curl --silent --show-error --max-time 15 --proto '=https' -o /dev/null \
+        -w '%{http_code} %{redirect_url}' "$url")" || fail "$url did not answer"
+    [[ "$location" == 302\ *"$expect"* ]] || fail "$url answered '$location', expected 302 to $expect"
+    printf 'pass %s\n' "$url"
+}
+
+if [[ "$kind" == backend ]]; then
+    probe "https://$ATONOTA_ID_HOST/realms/platform/.well-known/openid-configuration" \
+        "\"issuer\":\"https://$ATONOTA_ID_HOST/realms/platform\""
+    status="$(curl --silent --max-time 15 -o /dev/null -w '%{http_code}' "https://$ATONOTA_ID_HOST/admin/")"
+    [[ "$status" == 404 ]] || fail "Keycloak admin console is open on the public host ($status)"
+    printf 'pass admin console closed\n'
+    for site in $ATONOTA_TENANT_SITES; do
+        probe "https://$site/api/method/ping" '"message":"pong"'
+        redirect "https://$site/panel" "/login"
+    done
+    if release_py images "$manifest" | grep -q '^press='; then
+        probe "https://$ATONOTA_PRESS_HOST/api/method/ping" '"message":"pong"'
+    else
+        printf 'not_run press (no press image in this release)\n'
+    fi
+else
+    # Every file the bundle's index.html names must be served from /panel/assets/.
+    asset="$(remote "/srv/atonota/$env/bin/status" "$env" web-asset)"
+    for site in $ATONOTA_TENANT_SITES; do
+        curl --fail --silent --show-error --max-time 15 --proto '=https' -o /dev/null \
+            "https://$site/panel/assets/$asset" || fail "panel asset $asset is not served on $site"
+        printf 'pass https://%s/panel/assets/%s\n' "$site" "$asset"
+    done
+fi
+
+record="$(mktemp)"
+trap 'rm -f -- "$record"' EXIT
+release_py record "$manifest" --env "$env" --out "$record"
+copy_to_remote "/srv/atonota/$env/health/$kind.json" "$record"
+printf 'health record of %s stored in %s\n' "$id" "$env"

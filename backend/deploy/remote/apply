@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Apply one release on this server. Jenkins (bin/deploy) runs it over SSH.
+# Usage: apply <env> <incoming folder>
+#
+# Backend order (each step must pass before the next one starts):
+#   1. pull every image by digest while the old release still runs
+#   2. back up the sites, Keycloak and identity-sync (remote/backup)
+#   3. put the sites in maintenance mode and stop the Frappe processes
+#   4. migrate: Keycloak migrates its own database at start; then "bench migrate" per site
+#   5. start the new release, wait for healthy containers, end maintenance mode
+#   6. move the links: backend-previous <- old current, backend-current <- new, drop backend-pending
+# A failure stops the script. "phase" tells rollback how far the release got.
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$here/common.sh"
+
+env="${1:?usage: apply <env> <incoming folder>}"
+incoming="${2:?usage: apply <env> <incoming folder>}"
+check_env_name "$env"
+load_host_env "$incoming/$env.env"
+[[ "$ATONOTA_ENV" == "$env" ]] || fail "environment file is for $ATONOTA_ENV"
+kind="$(json_field "$incoming/release.json" kind)"
+id="$(json_field "$incoming/release.json" release_id)"
+[[ "$id" =~ ^(backend|web)-[0-9a-f]{12}-b[0-9]+$ ]] || fail "bad release id: $id"
+
+install -d -m 0750 "$ATONOTA_ROOT/$env/releases" "$ATONOTA_ROOT/$env/backups" \
+    "$ATONOTA_ROOT/$env/health" "$ATONOTA_ROOT/$env/bin" "$ATONOTA_ROOT/web/$env/releases"
+
+if [[ "$kind" == web ]]; then
+    file="$(json_field "$incoming/release.json" components panel file)"
+    sha="$(json_field "$incoming/release.json" components panel sha256)"
+    [[ "$(sha256sum "$incoming/$file" | cut -d' ' -f1)" == "$sha" ]] || fail "bundle checksum differs"
+    target="$ATONOTA_ROOT/web/$env/releases/$id"
+    if [[ ! -d "$target" ]]; then
+        install -d -m 0755 "$target.tmp"
+        tar -xzf "$incoming/$file" -C "$target.tmp" --no-same-owner
+        cp "$incoming/release.json" "$incoming/$file" "$target.tmp/"
+        mv -T "$target.tmp" "$target"
+    fi
+    if [[ -L "$ATONOTA_ROOT/web/$env/current" ]]; then
+        switch_link "$(readlink "$ATONOTA_ROOT/web/$env/current")" "$ATONOTA_ROOT/web/$env/previous"
+    fi
+    rm -f "$ATONOTA_ROOT/$env/health/web.json"
+    switch_link "releases/$id" "$ATONOTA_ROOT/web/$env/current"
+    cp "$here"/{common.sh,status,rollback} "$ATONOTA_ROOT/$env/bin/"
+    say "web release $id is current in $env"
+    exit 0
+fi
+
+folder="$ATONOTA_ROOT/$env/releases/$id"
+install -d -m 0750 "$folder"
+cp "$incoming"/{release.json,stack.yaml,edge.yaml,Caddyfile,site.caddy.template} "$folder/"
+cp "$incoming/$env.env" "$folder/host.env"
+install -d -m 0750 "$folder/bin"
+cp "$here"/{common.sh,apply,backup,restore,status,rollback} "$folder/bin/"
+
+# release.env: one image variable per component. Compose reads it beside host.env.
+python3 -I - "$folder/release.json" >"$folder/release.env" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+for name, component in sorted(manifest["components"].items()):
+    print(f"ATONOTA_IMAGE_{name.upper().replace('-', '_')}={component['image']}")
+PY
+first_site="${ATONOTA_TENANT_SITES%% *}"
+printf 'ATONOTA_HEALTH_SITE=%s\n' "$first_site" >>"$folder/release.env"
+profiles=()
+if grep -q '^ATONOTA_IMAGE_PRESS=' "$folder/release.env"; then
+    profiles+=(press)
+fi
+printf 'COMPOSE_PROFILES=%s\n' "$(IFS=,; printf '%s' "${profiles[*]}")" >>"$folder/release.env"
+
+current="$ATONOTA_ROOT/$env/backend-current"
+if [[ ! -L "$current" && "${ATONOTA_FIRST_INSTALL:-0}" != 1 ]]; then
+    fail "$env has no running release. Follow the first install steps, then set ATONOTA_FIRST_INSTALL=1"
+fi
+
+# "backend-pending" names the release in progress until it becomes current. rollback reads it.
+switch_link "releases/$id" "$ATONOTA_ROOT/$env/backend-pending"
+docker network inspect atonota-edge >/dev/null 2>&1 || docker network create atonota-edge >/dev/null
+say "pull images of $id"
+phase pulling
+stack "$folder" pull --quiet
+
+if [[ -L "$current" ]]; then
+    say "back up $env before $id"
+    phase backing-up
+    backup_dir="$("$folder/bin/backup" "$env" "$current")"
+    printf '%s\n' "$backup_dir" >"$folder/backup-before"
+    say "maintenance mode on"
+    stack "$current" exec -T tenant-web bench --site all set-maintenance-mode on
+    stack "$current" stop tenant-frontend tenant-worker tenant-socket tenant-web
+    stack "$current" stop tenant-scheduler 2>/dev/null || true
+    stack "$current" stop identity-sync keycloak
+fi
+
+phase migrating
+say "start databases and Keycloak of $id"
+stack "$folder" up --detach --wait --wait-timeout 600 tenant-db tenant-redis-cache tenant-redis-queue keycloak-db keycloak
+for site in $ATONOTA_TENANT_SITES; do
+    stack "$folder" run --rm --no-deps tenant-web bench --site "$site" list-apps >/dev/null ||
+        fail "site $site does not exist; create it with the first install steps"
+    say "migrate $site"
+    stack "$folder" run --rm --no-deps tenant-web bench --site "$site" migrate
+done
+phase migrated
+
+say "start every service of $id"
+stack "$folder" up --detach --wait --wait-timeout 600 --remove-orphans
+stack "$folder" exec -T tenant-web bench --site all set-maintenance-mode off
+
+# Edge proxy: one Caddy file per environment, then a reload without downtime.
+install -d -m 0755 "$ATONOTA_ROOT/edge/sites"
+cp "$folder"/{edge.yaml,Caddyfile} "$ATONOTA_ROOT/edge/"
+sed -e "s/__ENV__/$env/g" -e "s/__BASE_HOST__/$ATONOTA_BASE_HOST/g" \
+    -e "s/__ID_HOST__/$ATONOTA_ID_HOST/g" -e "s/__PRESS_HOST__/$ATONOTA_PRESS_HOST/g" \
+    -e "s/__FIRST_SITE__/$first_site/g" -e "s/__TENANT_SITES__/${ATONOTA_TENANT_SITES// /, }/g" \
+    "$folder/site.caddy.template" >"$ATONOTA_ROOT/edge/sites/$env.caddy.next"
+mv -T "$ATONOTA_ROOT/edge/sites/$env.caddy.next" "$ATONOTA_ROOT/edge/sites/$env.caddy"
+edge=(docker compose --project-name atonota-edge --env-file "$ATONOTA_ETC/edge.env" --file "$ATONOTA_ROOT/edge/edge.yaml")
+"${edge[@]}" up --detach --wait
+"${edge[@]}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+
+if [[ -L "$current" ]]; then
+    switch_link "$(readlink "$current")" "$ATONOTA_ROOT/$env/backend-previous"
+fi
+rm -f "$ATONOTA_ROOT/$env/health/backend.json"
+switch_link "releases/$id" "$current"
+rm -f "$ATONOTA_ROOT/$env/backend-pending"
+cp "$folder/bin"/{common.sh,status,rollback,backup,restore} "$ATONOTA_ROOT/$env/bin/"
+phase "done"
+say "backend release $id is current in $env"

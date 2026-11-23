@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Send one release to one environment and apply it there.
+# Usage: deploy <env> <release folder>
+# The release folder holds release.json (and the web bundle for a web release).
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+env="${1:?usage: deploy <env> <release folder>}"
+folder="${2:?usage: deploy <env> <release folder>}"
+load_env "$env"
+manifest="$folder/release.json"
+release_py check "$manifest" --env "$env" || fail "release is not valid for $env"
+kind="$(release_py field "$manifest" kind)"
+id="$(release_py field "$manifest" release_id)"
+
+files=("$manifest" "$DEPLOY_DIR/environments/$env.env")
+if [[ "$kind" == web ]]; then
+    bundle="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["components"]["panel"]["file"])' "$manifest")"
+    files+=("$folder/$bundle")
+else
+    files+=("$DEPLOY_DIR/compose/stack.yaml" "$DEPLOY_DIR/compose/edge.yaml"
+        "$DEPLOY_DIR/compose/Caddyfile" "$DEPLOY_DIR/compose/site.caddy.template")
+fi
+files+=("$DEPLOY_DIR"/remote/*)
+
+incoming="/srv/atonota/incoming/$env-$id"
+remote install -d -m 0750 "$incoming"
+copy_to_remote "$incoming/" "${files[@]}"
+remote "$incoming/apply" "$env" "$incoming"

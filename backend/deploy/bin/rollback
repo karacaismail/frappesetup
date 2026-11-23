@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Return one environment to its previous release.
+# Usage: rollback <env> <backend|web> [--restore-backup]
+# Without --restore-backup only images (or web files) go back; the database stays.
+# --restore-backup also restores the backup taken before the failed release (backend only).
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+env="${1:?usage: rollback <env> <kind> [--restore-backup]}"
+kind="${2:?usage: rollback <env> <kind> [--restore-backup]}"
+mode="${3:-}"
+load_env "$env"
+case "$mode" in "" | --restore-backup) ;; *) fail "unknown option: $mode" ;; esac
+[[ "$kind" == backend || -z "$mode" ]] || fail "--restore-backup applies to backend releases only"
+remote "/srv/atonota/$env/bin/rollback" "$env" "$kind" ${mode:+"$mode"}
