@@ -300,13 +300,6 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
   - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur. İş `unknown` kalır ve Keycloak hesabı silinmez (O-43).
 
-- **O-43. Press Semgrep onayları dosya listesine bağlıdır.**
-  - Liste, 19 onayın geçtiği dosyaları ve yetki yardımcılarını kapsar.
-  - Liste, ortak OIDC doğrulama kitaplığını da kapsar.
-  - Kapsam dışı belge ve test değişiklikleri Press onaylarını düşürmez.
-  - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
-  - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
-
 - **O-45. P2 ödeme katmanı MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü MVP durum denetimiyle alındı. Prod, gerçek müşterinin kullandığı canlı ortamdır.
   - MVP ilk kullanılabilir sürümdür (D-1).
   - İlk kullanıcılar ürünü alpha ve beta ortamında dener. Bu ortamlarda ödeme alınmaz.
@@ -351,6 +344,14 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Bağımlılıklar `deploy/images/press-requirements.lock.txt` kilidinden özetle kurulur. `uv pip check` yalnız `press-pip-check.allowed` dosyasındaki iki satırı bildirebilir. Başka her uyumsuzluk derlemeyi durdurur.
   - Press bir yamanın düzeltmesini kabul edip yayımlarsa o yama silinir. Bütün yamalar kalkınca bu istisna ve O-18 borcu kapanır.
   - Ayrıntı ve deneme kanıtı [Press imajı belgesindedir](docs/dagitim/press-imaji.md).
+
+- **O-53. Press Semgrep onayları dosya listesine bağlıdır.**
+  - Liste, 19 onayın geçtiği dosyaları ve yetki yardımcılarını kapsar.
+  - Liste, ortak OIDC doğrulama kitaplığını da kapsar.
+  - Kapsam dışı belge ve test değişiklikleri Press onaylarını düşürmez.
+  - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
+  - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
+  - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
 ## Karar sitesine işlenecek farklar
 
