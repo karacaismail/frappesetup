@@ -10,13 +10,13 @@ Yamalar şu Agent sürümüne göre yazıldı: `1956afb39613aafc88d821a9b1762ae3
 | --- | --- | --- |
 | `0001-offsite-s3-endpoint.patch` | Agent'ın yedeği Hetzner Object Storage adresine yüklemesini sağlar | G-5 |
 
-Press, Agent'a depolama adresini `ENDPOINT_URL` adıyla gönderir. Yamasız Agent bu adresi okumaz. Yedek bu yüzden AWS'e gider. Yama `agent/offsite_s3.py` dosyasını ekler. Site yedeği, binlog ve denetim kaydı yüklemeleri adresi bu dosyadan alır. Adres yoksa Agent eskisi gibi çalışır.
+Press, Agent'a depolama adresini `ENDPOINT_URL` adıyla gönderir. Yamasız Agent bu adresi okumaz. Yedek bu yüzden AWS'e gider. Yama `agent/offsite_s3.py` dosyasını ekler. Agent'ın dış depoya yaptığı bütün yüklemeler adresi bu dosyadan alır. Bu yüklemeler dört türdür: site yedeği, binlog, denetim kaydı ve anlık görüntüden kurtarma. Anlık görüntüden kurtarma yüklemesi `agent/snapshot_recovery.py` dosyasındadır. Adres yoksa Agent eskisi gibi çalışır.
 
 ## Nasıl denenir
 
 Test `backend/deploy/tests/test_agent_patches.py` dosyasındadır. Test, yamanın eklediği yardımcı kodu Agent kaynağı olmadan dener.
 
-Yamanın Agent kaynağına uyduğunu denemek için `AGENT_SOURCE` değişkenini verin. Değişken, yukarıdaki sürümdeki bir Agent kopyasını göstermelidir:
+Yamanın Agent kaynağına uyduğunu denemek için `AGENT_SOURCE` değişkenini verin. Değişken, yukarıdaki sürümdeki bir Agent kopyasını göstermelidir. Bu kipte test, kurtarma yüklemesini sahte bir depolama istemcisiyle de çalıştırır:
 
 ```bash
 AGENT_SOURCE=<Agent kopyası> python3 -I -m unittest discover -s backend/deploy/tests -p test_agent_patches.py

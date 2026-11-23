@@ -8,7 +8,13 @@ Press sends ENDPOINT_URL in the offsite auth (press/agent.py,
 _get_offsite_backup_config, Press v0.154.1). Unpatched Agent ignores it: the
 boto3 uploads go to AWS, and the streaming rclone path fixes the endpoint to
 s3.<region>.amazonaws.com. This patch adds agent/offsite_s3.py. Every offsite
-S3 client (site backups, binlogs, audit logs) now takes its settings from it.
+S3 client in Agent now takes its settings from it:
+
+- agent/site.py: site backups (boto3) and streaming backups (rclone)
+- agent/database_server.py: binlog and audit log uploads (boto3)
+- agent/snapshot_recovery.py: snapshot recovery uploads
+  (upload_backup_files_to_s3, boto3)
+
 With ENDPOINT_URL set, boto3 gets endpoint_url and rclone gets
 --s3-provider Other and --s3-endpoint. Without it, behaviour is unchanged.
 Credentials still reach rclone only through the environment.
@@ -203,3 +209,39 @@ index 4fc0aff..1e40de1 100644
                  # Credentials go via env (--s3-env-auth) instead of CLI flags so
                  # they don't leak into the process table. GOMEMLIMIT/GOGC cap
                  # rclone's Go heap so it stays a small earlyoom target. Built
+diff --git a/agent/snapshot_recovery.py b/agent/snapshot_recovery.py
+index eb5db5c..e09b66b 100644
+--- a/agent/snapshot_recovery.py
++++ b/agent/snapshot_recovery.py
+@@ -6,6 +6,7 @@ import os
+ import subprocess
+ from pathlib import Path
+ 
++from agent import offsite_s3
+ from agent.job import job, step
+ from agent.server import Server
+ from agent.utils import db_dump_cli
+@@ -180,21 +181,8 @@ class SnapshotRecovery(Server):
+             offsite["auth"],
+             offsite["path"],
+         )
+-        region = auth.get("REGION")
+-
+-        if region:
+-            s3 = boto3.client(
+-                "s3",
+-                aws_access_key_id=auth["ACCESS_KEY"],
+-                aws_secret_access_key=auth["SECRET_KEY"],
+-                region_name=region,
+-            )
+-        else:
+-            s3 = boto3.client(
+-                "s3",
+-                aws_access_key_id=auth["ACCESS_KEY"],
+-                aws_secret_access_key=auth["SECRET_KEY"],
+-            )
++
++        s3 = boto3.client("s3", **offsite_s3.boto3_client_kwargs(auth))
+ 
+         for backup_file in backup_files.values():
+             file_name = backup_file["file"].split(os.sep)[-1]
