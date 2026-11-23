@@ -10,7 +10,7 @@ CI sistemi değişiklikleri birleştirmeden önce denetimleri çalıştırır.
 | Yerel yanıtın güvenlik başlığı ve pasif ZAP taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/dast-scan --ci "http://kiraci1.localhost:$((PANE_PORT + 1))"` |
 | Son taramaların raporu | Depo kökü | `backend/dev/bin/release-report` |
 
-Hüseyin Cengiz, `backend/dev/tests` testlerini CI sistemine ekler.
+DevOps sorumlusu `backend/dev/tests` testlerini CI sistemine ekler.
 Test komutu depo kökünde çalışır.
 
 ```sh

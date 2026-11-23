@@ -116,7 +116,7 @@
       "source": "deploy/images/press-patches/0004-optional-telegram.patch",
       "owner": "press-tr",
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_press_settings_imports",
-      "removal_condition": "Yeni Press sürümü Python 3.14 ile uyumlu Telegram istemcisi kullanmalıdır. Yamasız imajda Press Settings açılmalıdır. Sahte istemciyle mesaj kuyruğu testi geçmelidir.",
+      "removal_condition": "Yeni Press sürümü Python 3.14 ile uyumlu Telegram istemcisi kullanmalıdır. Deneme imajı eski Telegram paketini içerir. Bu paket varken alınan geçiş, paketsiz üretim imajını doğrulamaz. Üretimdeki paket seçimiyle yamasız Press Settings testi geçmelidir. Sahte istemciyle mesaj kuyruğu testi de geçmelidir.",
       "upstream": "docs/press-python314-upstream.md#öneri-5-telegram-paketini-isteğe-bağlı-yapın"
     },
     {
