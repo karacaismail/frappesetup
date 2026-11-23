@@ -356,10 +356,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-54. Her geçici Press yaması kayıt altına alınır.**
   - [Yama kaydı](dev/press/patch-registry.json) geliştirme ve üretim yamalarını kapsar.
   - Press Türkiye uygulamasının ekibi her yamanın sahibidir. Kayıtta ekibin adı `press-tr` olur.
-  - Ekip, kaldırma koşulu sağlanınca ilgili testi yamasız imajda çalıştırır.
-  - Depo testi eksik kayıtları ve boş alanları yakalar.
+  - Ekip her Press yükseltmesinde ilgili testi yamasız imajda çalıştırır. Test geçerse ekip yamayı kaldırır.
+  - `upstream` alanı Press'in asıl geliştirici deposundaki hata kaydını veya değişiklik önerisini gösterir.
+  - Ekip öneriyi Press'e göndermediyse alan [yerel öneri belgesinin](docs/press-python314-upstream.md) ilgili bölümünü gösterir.
+  - Depo testi eksik kayıtları ve boş alanları yakalar. Test dosyasını, sınıfını ve yöntemini de doğrular.
   - Geçici geliştirme betiği değişirse dosya özeti de değişir. Test kayıt incelemesini ister.
-  - Bu karar G-7 kapsamındaki takibi sağlar. O-18 borcu açık kalır.
+  - Ekip yerel önerileri Press'e gönderip bağlantıları ekleyince G-7 takibi tamamlanır. O-18 borcu açık kalır.
 
 - **O-55. Press'in `press.` adı yalnız özel ağa açıktır. Müşteriye yalnız hesap silme akışı açılır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
   - G-6, G-13 ve G-119 aynı kuralı yazar. Desk ve operatör adı yalnız Tailscale ya da özel ağdan açılır. Bu karar o kuralı kenar vekile işler.
