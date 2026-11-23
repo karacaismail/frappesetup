@@ -1012,7 +1012,7 @@
  {
   "id": "G-102",
   "title": "Backend uygulama iskeleti ve yayın kontrol listesi",
-  "detail": "`bench new-app` tabanlı şablon: pyproject + frappe-dependencies, hooks (after_install idempotent, `setup_wizard_complete`, after_migrate, fixtures filtre ön eki), Module Def, locale/main.pot + tr.po (CI'da `generate-pot-file/update-po-files/compile-po-to-mo`), testler (`bench run-tests`), ruff, Marketplace App metadata, after_install_script, CHANGELOG; yayın: version-16 dalı, semver etiket, App Release → staging Release Group → E2E aktivasyon testi → prod zamanlanmış deploy; `bench --site X install-app` idempotent çalışır.",
+  "detail": "`bench new-app` tabanlı şablon: pyproject + frappe-dependencies, hooks (after_install idempotent, `setup_wizard_complete`, after_migrate, fixtures filtre ön eki), Module Def, çeviri dosyası `translations/tr.csv` (`.po` geçişi G-73'e bağlıdır ve sonraya kalır), testler (`bench run-tests`), ruff, Marketplace App metadata, after_install_script, CHANGELOG; yayın: version-16 dalı, semver etiket, App Release → staging Release Group → E2E aktivasyon testi → prod zamanlanmış deploy; `bench --site X install-app` idempotent çalışır.",
   "rail": "App çerçevesi",
   "priority": "MUST",
   "phase": "P4",
