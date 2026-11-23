@@ -29,6 +29,11 @@ PRESS_ENVIRONMENT = {
 PRESS_ENVIRONMENT.update(
     KC_BOOTSTRAP_ADMIN_USERNAME=secrets.token_hex(8),
     KC_BOOTSTRAP_ADMIN_PASSWORD=secrets.token_urlsafe(16),
+    # The tenant settings the stack writes (MVP test 2, row 5e). `up` checks them after the Press settings.
+    ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:7151",
+    ATONOTA_SITE_TENANT1_SECRET=secrets.token_urlsafe(16),
+    ATONOTA_SITE_TENANT1_SERVICE_SECRET=secrets.token_urlsafe(16),
+    IDENTITY_BRAND_NAME="Atonota",
 )
 
 

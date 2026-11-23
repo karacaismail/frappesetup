@@ -61,7 +61,10 @@ Kiracı ortamınızı kapatmak için `backend/dev/bin/stop` komutunu çalıştı
    Başlatma için en az 10 GiB disk ve 3 GiB bellek gerekir.
    Betik Keycloak ve eşitleme servisini güncel kaynaktan derler.
    Diğer mevcut imajları yeniden kullanır. Eksik imajları derler.
-   Kiracıya ERPNext ve `platform_core` kurulur. Press sitesine `press_tr` kurulur.
+   Kiracıya ERPNext, `platform_core`, HRMS ve `hrms_tr` kurulur. Press sitesine `press_tr` kurulur.
+   Kiracı imajı HRMS'yi sabit bir sürümden alır. Bu katman platform kodundan bağımsız önbelleğe girer.
+   Betik kiracının Keycloak ayarlarını site ayarına yazar. Ayar anahtarları `platform_core` kimlik belgesindedir.
+   Silme kaydı anahtarı sitede bir kez üretilir ve korunur. Betik var olan anahtarı değiştirmez.
    `up`, `press_tr` kaynak kodunu kopyalar.
    Press kurulum işareti varsa `up`, `bench migrate` komutuyla Press veritabanını günceller.
    Betik servislerin yanıtlarını ve bellek kullanımını gösterir.
@@ -145,6 +148,20 @@ Test aynı olay kimliği için `processed` kaydını bekler.
 Bozuk imza ve eski zaman damgası için HTTP 401 yanıtını denetler.
 Örnek hesap geliştirme veritabanında kalır. Test gerçek müşteri hesabını değiştirmez.
 Son koşunun kaydı [canlı olay kanıtı](../e2e/keycloak-delivery-result.md) dosyasındadır.
+
+## Press'ten hesap silme zincirini sınayın
+
+Bu sınama MVP testi 2'nin 5e satırını kapatır. Zincir Press'te başlar ve kiracıdaki çalışan kaydında biter.
+Betik önce bir deneme hesabı hazırlar. Hazırlık Keycloak'a, kiracıya ve Press'e yazar.
+
+```sh
+backend/e2e/stack seed-deletion
+```
+
+Betik test ayarlarını `.pane/scratch/e2e-deletion.env` dosyasına yazar. Dosya yalnız sahibince okunur.
+Başka bir yol için `E2E_FIXTURE_FILE` değişkenini kullanın. Yol depo içinde ve Git'in yok saydığı bir yer olmalıdır.
+Her çağrı yeni bir deneme hesabı açar. Eski deneme hesapları kiracıda anonim kalır.
+Sonra testi çalıştırın. Ayrıntı `backend/e2e/README.md` dosyasının "Press'ten hesap silme" bölümündedir.
 
 İş bitince bu projenin servislerini kapatın.
 

@@ -136,6 +136,32 @@ Bu iki test grubu, örnek ortam hazır olunca açılır.
 Sihirli bağlantı için `magic-link.spec.ts` dosyasını seçin.
 Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
 
+## Press'ten hesap silme ve HRMS TR çalışan kaydı
+
+Bu test MVP testi 2'nin 5e satırını kapatır. Test dosyası `press-deletion.spec.ts` dosyasıdır.
+Test ortak yığında çalışır. Yığın, kiracıya HRMS TR kurar ve Keycloak ayarlarını yazar.
+
+Zincir şöyle ilerler:
+
+1. Müşteri Press'te hesabını silmek ister. Press, Keycloak'ta yeni bir giriş ister.
+2. Press, isteği kimlik eşitleme servisine gönderir.
+3. Servis Press'i ve kiracıyı sırayla kapatır ve anonim yapar. Kiracı 200 ile `anonymized: true` ve `found: true` döner (O-44).
+4. Servis en son Keycloak hesabını siler. Test bu silmeyi bekler. Böylece kiracı yanıtı kanıtlanır (O-43).
+5. Test kiracıdaki “User” ve “Employee” kayıtlarını okur. Kişisel alanlar temizlenmiş olmalıdır.
+
+Komutları depo kökünden çalıştırın.
+
+```sh
+backend/e2e/stack seed-deletion
+set -a; . .pane/scratch/e2e-deletion.env; set +a
+npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium press-deletion.spec.ts
+```
+
+`seed-deletion` yeni bir deneme hesabı, bir şirket ve kişisel alanları dolu bir çalışan kaydı açar.
+Komut ayrıca yalnız kullanıcı okuyan bir Keycloak istemcisi hazırlar. Test bu istemciyle Keycloak hesabının silindiğini doğrular.
+Her test koşusu için komutu yeniden çalıştırın. Silinen hesap bir daha açılamaz.
+Test ayar dosyasını Git'e eklemeyin. Dosya parola taşır.
+
 ## Hesap ve oturum testleri
 
 | Senaryo | Sonuç | Neden veya önkoşul |

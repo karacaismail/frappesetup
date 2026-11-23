@@ -1,5 +1,12 @@
 FROM frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+# HRMS is pinned to one commit and comes first, so this layer is cached independently of the platform code.
+# The tenant that Press is bound to runs HRMS TR (MVP test 2, row 5e); dev/hrms/Dockerfile builds on this image.
+RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git apps/hrms \
+    && test "$(git -C apps/hrms rev-parse HEAD)" = a01032350ba1b799345b862cb122fa408bf6780e \
+    && uv pip install --python env/bin/python -e apps/hrms \
+    && printf '\nhrms\n' >> sites/apps.txt
 COPY --chown=frappe:frappe apps/platform_core /home/frappe/frappe-bench/apps/platform_core
+COPY --chown=frappe:frappe apps/hrms_tr /home/frappe/frappe-bench/apps/hrms_tr
 COPY --chown=frappe:frappe dev /workspace/dev
 COPY --chown=frappe:frappe libs/oidc_verify /workspace/libs/oidc_verify
 # Colima cannot bind-mount this checkout. The shell tests read their contract from this copy.
@@ -10,4 +17,5 @@ COPY --chown=frappe:frappe contracts/platform_core-model-gateway.openapi.yaml /h
 RUN uv pip install --python env/bin/python --no-deps -e apps/platform_core \
     && uv pip install --python env/bin/python --no-deps /workspace/libs/oidc_verify \
     && uv pip install --python env/bin/python ruff==0.14.10 -r /workspace/dev/requirements-contract-tests.txt \
-    && printf '\nplatform_core\n' >> sites/apps.txt
+    && uv pip install --python env/bin/python --no-deps -e apps/hrms_tr \
+    && printf '\nplatform_core\nhrms_tr\n' >> sites/apps.txt
