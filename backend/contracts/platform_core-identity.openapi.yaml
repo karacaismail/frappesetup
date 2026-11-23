@@ -51,6 +51,7 @@ info:
     The Turkish text comes from `translations/tr.csv`. Its row carries the module context in the third column.
     The button goes to the `start_login` endpoint.
     While `identity_keycloak_only` is on, the page redirects guests to `start_login` without rendering a form.
+    The redirect happens even if a Keycloak site setting is missing. Then `start_login` answers 503. No password form opens. This is accepted.
     While the setting is off, the page offers the brand button and a password form. The form uses the Frappe `/api/method/login` endpoint.
     The page takes the `redirect-to` query field. If the value is safe, the page passes it to `start_login` as `redirect_to`.
 
@@ -179,6 +180,7 @@ x-yerel-giris-kapisi:
     The `/api/method`, `/api/v1/method`, `/api/v2/method` and `cmd` forms are all covered.
     `start_login`, `keycloak_callback` and the other endpoints in this file are not affected.
     While the gate is on, the `/login` page redirects guests to `start_login` without rendering a password form.
+    If a Keycloak site setting is missing while the gate is on, `start_login` answers 503. The password form stays closed. This is accepted.
     The admin recovery path opens only through the site setting. An admin with server access writes the setting.
   parola_girisi:
     description: Password sign-in returns 401 and `AuthenticationError`.
@@ -347,7 +349,10 @@ paths:
               value: /panel
         - name: switch_account
           in: query
-          description: The account-switch return address sends 1 to require a fresh Keycloak sign-in.
+          description: |
+            The account-switch return address sends 1 to require a fresh Keycloak sign-in.
+            The return address is fixed. It carries no `redirect_to`. After the switch the browser goes to the `platform_panel_url` address.
+            The path the user first asked for is not kept. This keeps the Keycloak return-address list short. This is accepted.
           schema:
             type: integer
             default: 0
@@ -503,6 +508,9 @@ paths:
             - the user is disabled.
 
             The page does not give the reason in detail. The page tells the user to contact their admin.
+            If the user does not exist on this site, the page is the `tenant_account_missing` template. It offers a “Sign in with another account” link.
+            The link opens the Keycloak logout page. Keycloak returns to `start_login` with `switch_account=1`. The first `redirect_to` path is dropped.
+            The template has no standalone address. A direct request of `/tenant_account_missing` gets the 404 page.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}

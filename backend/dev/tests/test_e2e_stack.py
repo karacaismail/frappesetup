@@ -29,6 +29,11 @@ PRESS_ENVIRONMENT = {
 PRESS_ENVIRONMENT.update(
     KC_BOOTSTRAP_ADMIN_USERNAME=secrets.token_hex(8),
     KC_BOOTSTRAP_ADMIN_PASSWORD=secrets.token_urlsafe(16),
+    # The tenant settings the stack writes (MVP test 2, row 5e). `up` checks them after the Press settings.
+    ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:7151",
+    ATONOTA_SITE_TENANT1_SECRET=secrets.token_urlsafe(16),
+    ATONOTA_SITE_TENANT1_SERVICE_SECRET=secrets.token_urlsafe(16),
+    IDENTITY_BRAND_NAME="Atonota",
 )
 STACK_ENVIRONMENT = dict(
     PRESS_ENVIRONMENT,
@@ -326,7 +331,7 @@ class StackTests(unittest.TestCase):
 
     def test_up_names_missing_press_settings_before_any_command(self):
         namespace = runpy.run_path(str(STACK))
-        for missing in PRESS_ENVIRONMENT:
+        for missing in STACK_ENVIRONMENT:
             with self.subTest(missing=missing):
                 environment = {key: value for key, value in STACK_ENVIRONMENT.items() if key != missing}
                 with (
@@ -346,7 +351,13 @@ class StackTests(unittest.TestCase):
 
     def test_up_command_names_missing_press_settings_before_any_docker_call(self):
         namespace = runpy.run_path(str(STACK))
-        for missing in (("ATONOTA_PRESS_SECRET",), ("ATONOTA_PRESS_URL", "ATONOTA_PRESS_SERVICE_SECRET")):
+        for missing in (
+            ("ATONOTA_PRESS_SECRET",),
+            ("ATONOTA_PRESS_URL", "ATONOTA_PRESS_SERVICE_SECRET"),
+            ("KC_BOOTSTRAP_ADMIN_PASSWORD",),
+            ("ATONOTA_SITE_TENANT1_SECRET",),
+            ("ATONOTA_SITE_TENANT1_URL", "ATONOTA_SITE_TENANT1_SECRET"),
+        ):
             with self.subTest(missing=missing):
                 environment = {key: value for key, value in STACK_ENVIRONMENT.items() if key not in missing}
                 errors = io.StringIO()
@@ -365,7 +376,7 @@ class StackTests(unittest.TestCase):
                 ):
                     self.assertEqual(namespace["main"](), 2)
                 message = errors.getvalue()
-                for key in PRESS_ENVIRONMENT:
+                for key in STACK_ENVIRONMENT:
                     if key in missing:
                         self.assertIn(key, message)
                     else:

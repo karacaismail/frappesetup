@@ -17,10 +17,13 @@ class StackTenantLoginTest(unittest.TestCase):
         run = Mock()
         run.return_value.stdout = "platform-id"
         configure = Mock(side_effect=RuntimeError("stop after configuring tenant login"))
-        environment = {"ATONOTA_SITE_TENANT1_SECRET": token_hex(16)}
+        environment = {
+            "ATONOTA_SITE_TENANT1_URL": "http://tenant1.localhost:7401",
+            "ATONOTA_SITE_TENANT1_SECRET": token_hex(16),
+        }
         dependencies = {
             name: Mock()
-            for name in ("require_press_settings", "require_realm_sync_settings",
+            for name in ("require_press_settings", "require_tenant_settings", "require_realm_sync_settings",
                          "check_resources", "config", "ensure_images", "sync_realm")
         }
         with patch.dict(up.__globals__, dependencies | {"run": run, "configure_tenant_login": configure}):
