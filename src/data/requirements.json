@@ -2102,7 +2102,7 @@
  {
   "id": "G-167",
   "title": "Değer bekleyen kurallar boşken işlem açılmaz",
-  "detail": "Bazı kuralların değeri henüz belirlenmedi. Örnekler: doğrulama sağlayıcısı, ülke ve belge kuralı, giriş ve kanıt süreleri, yeniden deneme sınırları, veri saklama bölgesi ve misafire açık işlem listesi. Değer boşsa ilgili zorunlu işlem açılmaz. Sonuç \"yapılandırma gerekiyor\" olur. Örnek değerler ürün kararı sayılmaz. Her kuralın karar sahibi kayıtta yazılıdır. Kabul: boş kuralla zorunlu işlem denenince sistem işlemi açmaz ve kural sahibine iş oluşturur.",
+  "detail": "Bazı kuralların değeri henüz belirlenmedi. Örnekler: doğrulama sağlayıcısı, ülke ve belge kuralı, giriş ve kanıt süreleri, yeniden deneme sınırları, doğrulama sağlayıcısının veri bölgesi ve misafire açık işlem listesi. Değer boşsa ilgili zorunlu işlem açılmaz. Sonuç \"yapılandırma gerekiyor\" olur. Örnek değerler ürün kararı sayılmaz. Her kuralın karar sahibi kayıtta yazılıdır. Kabul: boş kuralla zorunlu işlem denenince sistem işlemi açmaz ve kural sahibine iş oluşturur.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P7",

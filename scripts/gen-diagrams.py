@@ -166,7 +166,7 @@ def rails() -> str:
     # Satır 2: AI (120..460), Keycloak (600..940), y 300..470
     o += box(120, 300, 340, 170, "Rail 5 — AI", "Claude Agent SDK · PostgreSQL/Redis",
              ["Model yönlendirme · önizle+onayla", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
-    o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "id.&lt;marka&gt; · realm platform · HA",
+    o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "api.login.&lt;marka&gt; · realm platform · HA",
              ["Client'lar: press · site-&lt;kiracı&gt;", "agent-service · identity-sync", "Organizations · MFA · passkey"])
     # Satır 3: Press (40..320), Kiracı (360..680), Ops (720..1000), y 570..740
     o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe v15 · press.&lt;marka&gt;",
