@@ -11,6 +11,7 @@ from platform_core.ai.tests.base import AiTestCase
 
 OPEN = {
 	"platform_core.api.ai.mcp",
+	"platform_core.api.ai.mcp_resource_metadata",
 	"platform_core.api.ai.issue_agent_token",
 	"platform_core.api.ai.list_proposals",
 	"platform_core.api.ai.get_proposal",

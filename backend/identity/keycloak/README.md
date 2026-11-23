@@ -38,6 +38,7 @@ Komutların hepsi `PANE_PORT` değişkenini ister.
 | `bin/kc-dev.sh tunnel` | Portları ssh tüneliyle bu Mac'e taşır. |
 | `bin/kc-dev.sh close-tunnel` | Tüneli kapatır. |
 | `bin/kc-dev.sh prod-check` | Üretim imajını Compose ayarı olmadan açar. Keycloak hazırsa testleri çalıştırır. Sonra geçici container'ları siler. |
+| `bin/kc-dev.sh realm-sync` | Realm dosyasındaki istemci ve kapsamları var olan veritabanına uygular. Veri silmez. |
 | `bin/kc-dev.sh realm-reload --yes` | Realm dosyasını imaj derlemeden yükler. Realm verisini siler. |
 | `bin/kc-dev.sh realm-delete-only --yes` | Yalnız realm'i siler. |
 | `bin/kc-dev.sh delete-realm --yes` | Realm'i siler ve imajdaki realm dosyasını yeniden içe alır. |
@@ -168,6 +169,35 @@ Realm dosyası sır taşımaz. Sır alanları `${ATONOTA_...}` yer tutucusudur. 
 
 - `model/storage-services/src/main/java/org/keycloak/exportimport/AbstractFileBasedImportProvider.java` 33 ve 42. satırlar: yer tutucu `System.getenv` ile çözülür.
 - `services/src/main/java/org/keycloak/exportimport/ExportImportManager.java` 79 ve 81. satırlar: açılıştaki içe alım yer tutucu değişimini açar.
+
+## Korunan veritabanında realm eşitleme
+
+Keycloak `--import-realm` ile açılır. Realm veritabanında varsa Keycloak dosyayı yeniden içe almaz. Bu yüzden eski bir veritabanı eski istemci ayarlarını korur. Örneğin `mobile-app` istemcisi `mobile` ve `aud-site-tenant1` kapsamlarını almaz. Bu sorun MVP testi 2'de T-11 adıyla bulundu.
+
+`bin/sync-dev-realm.py` betiği bu açığı kapatır. Betik Keycloak yönetim API'sini kullanır. Betik realm dosyasındaki şu ayarları veritabanına uygular:
+
+- istemciler, istemci ayarları ve istemci sırları,
+- istemcilerin varsayılan ve isteğe bağlı kapsamları,
+- kapsamlar ve kapsamların eşleyicileri,
+- realm'in varsayılan kapsamları,
+- kapsamların rol eşlemeleri.
+
+Betik yalnız ekler ve düzeltir. Betik istemci, kapsam, kullanıcı ve oturum silmez. Bir kapsam bağı yanlış türdeyse betik bağı doğru türe taşır. Dosyada olmayan bağlar ve eşleyiciler yerinde kalır. Örneğin `create-tenant-client.py` ile eklenen kiracı kapsamı kalır. Betiği tekrar çalıştırmak güvenlidir. Ayarlar eşitse betik hiçbir şey yazmaz.
+
+Betik çıktıya yalnız değişen öğenin adını yazar. Sır değeri yazmaz. Sırlar komut satırına girmez.
+
+Ortak yığın betiği `backend/e2e/stack up` bu adımı kendisi çalıştırır. Adım Keycloak hazır olunca çalışır. Betik yığının ağında, `identity-sync` imajıyla çalışır. Yalnız Keycloak yığınında adımı elle çalıştırın:
+
+```bash
+bin/kc-dev.sh tunnel
+bin/kc-dev.sh realm-sync
+```
+
+### Üretimde realm değişikliği
+
+Bu betik yalnız yerel geliştirme ve test yığınında çalışır. Betik yalnız `localhost`, `127.0.0.1` ve `.localhost` ile biten adresleri kabul eder. Başka adreste betik istek atmadan durur.
+
+Üretimde realm değişikliği ayrı ve onaylı bir iştir. Değişiklik bir değişiklik kaydıyla planlanır. Kimlik ve altyapı sorumlusu değişikliği onaylar. Değişiklik önce bir hazırlık ortamında denenir. Bu betik üretim için kullanılmaz.
 
 ## Yeni kiracı için istemci açma
 

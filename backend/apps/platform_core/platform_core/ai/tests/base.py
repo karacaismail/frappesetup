@@ -159,6 +159,13 @@ class AiTestCase(IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
 		frappe.set_user("Administrator")
+		# Redis counters survive database rollbacks. Start each test with its own request allowance.
+		for endpoint in (
+			"platform_core.api.ai.mcp",
+			"platform_core.api.ai.mcp_resource_metadata",
+			"platform_core.ai.oauth._verify_bearer",
+		):
+			frappe.cache.delete_keys(f"rl:{endpoint}:")
 		# Log rows written by earlier tests or runs must not satisfy an assertion of this test.
 		# Rows are told apart by name, not by time: the clock of the container host can step back.
 		self.known_logs = set(frappe.get_all("PLT AI Action Log", pluck="name"))

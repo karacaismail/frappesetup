@@ -28,6 +28,9 @@ TARGET_SCOPES = {
     "aud-mobile-app": "mobile-app",
     "aud-identity-sync": "identity-sync",
 }
+# Contract docs/contracts.md (target scope table): the mobile app asks for the tenant audience.
+# test_realm_sync.MobileTokenLiveTest checks the granted token.
+BROWSER_AUDIENCE_SCOPES = {"mobile-app": {"aud-site-tenant1"}}
 ADMIN_SCOPES = {"admin-api", "kc-admin-api"}
 MANAGEMENT_ROLES = {
     "view-users",
@@ -137,7 +140,7 @@ class TokenAccessMatrixTest(unittest.TestCase):
     def test_browser_clients_reject_foreign_audience_scopes(self):
         for client_id, (callback, _) in self.browser_clients().items():
             for scope, target in TARGET_SCOPES.items():
-                if target == client_id:
+                if target == client_id or scope in BROWSER_AUDIENCE_SCOPES.get(client_id, set()):
                     continue
                 with self.subTest(client=client_id, target=target):
                     url, _ = self.authorize(client_id, callback, f"openid {scope}")
