@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -27,6 +28,10 @@ SECURITY = Path("backend/dev/security")
 FIXTURES = SECURITY / "fixtures"
 CONTRACT_FIXTURE = SECURITY / "contract-fixtures" / "contract.yaml"
 OSV_CONFIG = SECURITY / "osv-exceptions.toml"
+# The Press production image installs this lock (backend/deploy/images/press.Dockerfile).
+PRESS_LOCK = Path("backend/deploy/images/press-requirements.lock.txt")
+# backend/dev/security/osv-setup puts the pinned scanner and the open vulnerability database here.
+OSV_HOME = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "frappesetup-osv"
 VERSIONS = dict(line.split("=", 1) for line in (ROOT / SECURITY / "tool-versions.env").read_text().splitlines())
 BANDIT = VERSIONS["BANDIT_VERSION"]
 OSV = VERSIONS["OSV_VERSION"]
@@ -271,8 +276,27 @@ def bandit_source_signature(source, tree, line):
 
 def dependency_locks(files):
     return [path for path in files if not path.startswith(f"{FIXTURES}/")
-            and Path(path).name in {"requirements.txt", "package-lock.json", "uv.lock",
-                                    "poetry.lock", "Pipfile.lock", "pnpm-lock.yaml", "yarn.lock"}]
+            and (Path(path).name in {"requirements.txt", "package-lock.json", "uv.lock",
+                                     "poetry.lock", "Pipfile.lock", "pnpm-lock.yaml", "yarn.lock"}
+                 or path == str(PRESS_LOCK))]
+
+
+def osv_lockfile(lock):
+    """OSV-Scanner picks the parser by file name. The Press lock is a requirements file."""
+    return f"requirements.txt:{lock}" if Path(lock).name.endswith(".lock.txt") else str(lock)
+
+
+def osv_scanner():
+    """The scanner on PATH, else the copy that osv-setup downloaded, else None."""
+    found = shutil.which("osv-scanner")
+    if found:
+        return found
+    local = OSV_HOME / "bin" / "osv-scanner"
+    return str(local) if local.is_file() and os.access(local, os.X_OK) else None
+
+
+def osv_database():
+    os.environ.setdefault("OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY", str(OSV_HOME / "db"))
 
 
 def python_manifests():
@@ -323,6 +347,16 @@ def verify_python_lock(locks, *, reproduce=False):
         raise ValueError("Python lock differs from the generated lock.")
 
 
+def osv_exception_valid(item, today):
+    """OSV-Scanner refuses unknown keys, so the reason opens with "Owner: <role>." (no owner key)."""
+    if set(item) - {"id", "reason", "ignoreUntil", "effectiveUntil"} or not item.get("id"):
+        return False
+    owner = re.match(r"Owner: ([a-z0-9][a-z0-9-]*)\. (\S.*)", str(item.get("reason", "")), re.S)
+    if not owner or str(item.get("ignoreUntil")) != str(item.get("effectiveUntil")):
+        return False
+    return valid_exception({**item, "owner": owner[1], "reason": owner[2]}, today)
+
+
 def validate_osv_inputs(locks):
     import tomllib
 
@@ -331,9 +365,8 @@ def validate_osv_inputs(locks):
     if set(config) - {"IgnoredVulns"}:
         raise ValueError("OSV may only ignore individual vulnerability IDs.")
     for item in config.get("IgnoredVulns", []):
-        if (not item.get("id") or not valid_exception(item, today)
-                or str(item["ignoreUntil"]) != str(item.get("effectiveUntil"))):
-            raise ValueError("OSV exceptions require id, owner, reason and matching expiry dates.")
+        if not osv_exception_valid(item, today):
+            raise ValueError("OSV exceptions require id, an owner and a reason, and matching expiry dates.")
     cache = Path(os.environ["OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY"]) / "osv-scalibr"
     ecosystems = {"PyPI"}
     if any(Path(path).name in {"package-lock.json", "pnpm-lock.yaml", "yarn.lock"} for path in locks):
@@ -346,17 +379,75 @@ def validate_osv_inputs(locks):
             raise ValueError(f"OSV {ecosystem} database must be downloaded within the last seven days.")
 
 
+def osv_fixture_check(scanner):
+    fixture_command = [scanner, "scan", "source", "--offline", "--format", "json",
+                       "--lockfile", str(FIXTURES / "requirements.txt")]
+    code, fixture = run_json(fixture_command)
+    ids = {vulnerability["id"] for source in fixture.get("results", [])
+           for package in source["packages"] for vulnerability in package["vulnerabilities"]}
+    if code != 1 or "GHSA-hmr4-m2h5-33qx" not in ids:
+        raise ValueError("OSV missed its fixture.")
+
+
+def osv_report_findings(report):
+    findings = set()
+    for source in report["results"]:
+        file = Path(source["source"]["path"])
+        if file.is_absolute():
+            file = file.relative_to(ROOT) if file.is_relative_to(ROOT) else Path(file.name)
+        for entry in source["packages"]:
+            package = entry["package"]
+            for vulnerability in entry["vulnerabilities"]:
+                findings.add(f"{file} · {package['name']} {package['version']} · {vulnerability['id']}")
+    return findings
+
+
+def scan_press_lock():
+    """Offline OSV scan of the Press image lock. The security gate runs it (review 1, finding 3).
+
+    The scan reads only local files. osv-setup needs the network: it downloads the pinned scanner
+    and the database, and the database must be at most seven days old (validate_osv_inputs).
+    """
+    scanner = osv_scanner()
+    command = [scanner or "osv-scanner", "scan", "source", "--offline", "--format", "json",
+               "--config", str(OSV_CONFIG), "--lockfile", osv_lockfile(PRESS_LOCK)]
+    result = Result("OSV-Scanner (Press lock)", OSV, shlex.join(command), "fail")
+    if scanner is None:
+        print("OSV-Scanner is missing. Run backend/dev/security/osv-setup (needs the network).")
+        return result
+    try:
+        osv_database()
+        output = subprocess.check_output([scanner, "--version"], text=True, cwd=ROOT)
+        if not re.search(rf"(?m)^osv-scanner version: v?{re.escape(OSV)}\s*$", output, re.IGNORECASE):
+            raise ValueError(f"OSV-Scanner {OSV} is required.")
+        validate_osv_inputs([str(PRESS_LOCK)])
+        osv_fixture_check(scanner)
+        code, report = run_json(command)
+        if code not in (0, 1):
+            raise ValueError(f"OSV exited with code {code}.")
+        findings = osv_report_findings(report)
+        if code == 1 and not findings:
+            raise ValueError("OSV returned no findings for a failed scan.")
+        for note in sorted(findings):
+            print(f"OSV: {note}")
+        return replace(result, status="fail" if findings else "pass", findings=tuple(sorted(findings)))
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        print(f"OSV check failed: {error} Refresh with backend/dev/security/osv-setup (needs the network).")
+        return result
+
+
 def scan_dependencies(requirements=None, *, reproduce=False):
-    command = ["osv-scanner", "scan", "source", "--offline", "--format", "json",
+    scanner = osv_scanner()
+    command = [scanner or "osv-scanner", "scan", "source", "--offline", "--format", "json",
                "--config", str(OSV_CONFIG)]
     locks = dependency_locks(git("ls-files", "-z").split("\0"))
     result = Result("OSV-Scanner", OSV, shlex.join(command) + " LOCKFILES", "fail")
     try:
-        try:
-            output = subprocess.check_output(["osv-scanner", "--version"], text=True, cwd=ROOT)
-        except FileNotFoundError:
+        if scanner is None:
             print("OSV-Scanner is not available on PATH.")
             return replace(result, status="not_run")
+        osv_database()
+        output = subprocess.check_output([scanner, "--version"], text=True, cwd=ROOT)
         if not locks:
             raise ValueError("No tracked dependency lock files.")
         verify_python_lock(locks, reproduce=reproduce)
@@ -365,26 +456,12 @@ def scan_dependencies(requirements=None, *, reproduce=False):
         if not re.search(rf"(?m)^osv-scanner version: v?{re.escape(OSV)}\s*$", output, re.IGNORECASE):
             raise ValueError(f"OSV-Scanner {OSV} is required.")
         validate_osv_inputs(locks)
-        fixture_command = ["osv-scanner", "scan", "source", "--offline", "--format", "json",
-                           "--lockfile", str(FIXTURES / "requirements.txt")]
-        code, fixture = run_json(fixture_command)
-        ids = {vulnerability["id"] for source in fixture.get("results", [])
-               for package in source["packages"] for vulnerability in package["vulnerabilities"]}
-        if code != 1 or "GHSA-hmr4-m2h5-33qx" not in ids:
-            raise ValueError("OSV missed its fixture.")
-        actual = [*command, *(arg for lock in locks for arg in ("--lockfile", lock))]
+        osv_fixture_check(scanner)
+        actual = [*command, *(arg for lock in locks for arg in ("--lockfile", osv_lockfile(lock)))]
         code, report = run_json(actual)
         if code not in (0, 1):
             raise ValueError(f"OSV exited with code {code}.")
-        findings = set()
-        for source in report["results"]:
-            file = Path(source["source"]["path"])
-            if file.is_absolute():
-                file = file.relative_to(ROOT) if file.is_relative_to(ROOT) else Path(file.name)
-            for entry in source["packages"]:
-                package = entry["package"]
-                for vulnerability in entry["vulnerabilities"]:
-                    findings.add(f"{file} · {package['name']} {package['version']} · {vulnerability['id']}")
+        findings = osv_report_findings(report)
         if code == 1 and not findings:
             raise ValueError("OSV returned no findings for a failed scan.")
         unchecked = []
@@ -758,6 +835,7 @@ def main():
     for scan in (full, local):
         scan.add_argument("--ci", action="store_true", default=os.environ.get("CI", "").lower() in ("1", "true"))
     subcommands.add_parser("bandit")
+    subcommands.add_parser("press-lock")
     subcommands.add_parser("report")
     subcommands.add_parser("compile-lock")
     card = subcommands.add_parser("scorecard")
@@ -778,6 +856,8 @@ def main():
             parser.error(str(error))
     if args.mode == "bandit":
         return int(scan_bandit().status != "pass")
+    if args.mode == "press-lock":
+        return int(scan_press_lock().status != "pass")
     if args.mode == "compile-lock":
         compile_lock()
         return 0
