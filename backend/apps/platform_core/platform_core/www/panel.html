@@ -2,18 +2,37 @@
 <html class="platform-shell-panel" lang="{{ panel_language | default('en', true) | e }}">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<meta name="csrf-token" content="{{ panel_csrf_token | default('', true) | e }}">
-	{{ include_style('panel.bundle.css') }}
 	<title>{{ _("Admin panel", context="shell.panel") | e }}</title>
+	{%- if panel_assets is defined and panel_assets %}
+	<meta name="color-scheme" content="light dark">
+	{#- Vite and the UI library read the nonce from this element for the style elements they create. #}
+	<meta property="csp-nonce" nonce="{{ panel_csp_nonce | e }}">
+	{%- for href in panel_assets.styles %}
+	<link rel="stylesheet" href="{{ href | e }}">
+	{%- endfor %}
+	{%- for href in panel_assets.preloads %}
+	<link rel="modulepreload" href="{{ href | e }}">
+	{%- endfor %}
+	<script type="module" src="{{ panel_assets.script | e }}"></script>
+	{%- else %}
+	{{ include_style('panel.bundle.css') }}
+	{%- endif %}
 </head>
 <body>
+	{%- if panel_assets is defined and panel_assets %}
+	<div id="root"></div>
+	<noscript>{{ _("Turn on JavaScript to use the panel.", context="shell.panel") | e }}</noscript>
+	{%- else %}
 	<a class="skip-link" href="#panel">{{ _("Skip to main content", context="shell.panel") | e }}</a>
 	<main id="panel" tabindex="-1">
 		<h1>{{ _("Admin panel", context="shell.panel") | e }}</h1>
 		<p>{{ _("The panel is not available yet.", context="shell.panel") | e }}</p>
+		<p>{{ _("The panel files are not installed on this site.", context="shell.panel") | e }}</p>
 		<a href="/">{{ _("Go to site home", context="shell.panel") | e }}</a>
 	</main>
 	{{ include_script('panel-focus.bundle.js') }}
+	{%- endif %}
 </body>
 </html>

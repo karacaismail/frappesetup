@@ -115,11 +115,15 @@ class RemoteScripts(unittest.TestCase):
             components["press"] = {"image": f"ghcr.io/karacaismail/atonota-press@sha256:{number:064x}"}
         return release.new_manifest("backend", commit(number), number, components)
 
-    def web(self, number):
+    def web(self, number, vite_manifest=True, entry=None):
         buffer = io.BytesIO()
+        entry = entry or f"assets/index-{number}.js"
+        files = [("index.html", b"<!doctype html>"), (f"assets/index-{number}.js", b"1")]
+        if vite_manifest:
+            # The /panel page reads this file (E-3). Vite writes it with build.manifest.
+            files.append((".vite/manifest.json", json.dumps({"index.html": {"file": entry, "isEntry": True}}).encode()))
         with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
-            html = f'<script type="module" src="/panel/assets/index-{number}.js"></script>'.encode()
-            for name, data in (("index.html", html), (f"assets/index-{number}.js", b"1")):
+            for name, data in files:
                 info = tarfile.TarInfo(name)
                 info.size = len(data)
                 archive.addfile(info, io.BytesIO(data))
@@ -510,6 +514,19 @@ class RemoteScripts(unittest.TestCase):
         self.assertEqual(rolled.returncode, 0, rolled.stderr)
         self.assertEqual(os.readlink(web / "current"), f"releases/{first['release_id']}")
         self.assertEqual(self.calls(), [])
+
+    def test_web_release_needs_a_manifest_that_names_a_bundled_entry(self):
+        for name, (manifest, bundle) in {
+            "no manifest": self.web(1, vite_manifest=False),
+            "entry not in the bundle": self.web(1, entry="assets/missing.js"),
+            "entry outside assets": self.web(1, entry="../index-1.js"),
+        }.items():
+            with self.subTest(name):
+                result = self.apply("alpha", manifest, bundle)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("manifest", result.stderr)
+                self.assertFalse((self.root / "web" / "alpha" / "current").exists())
+                self.assertFalse((self.root / "web" / "alpha" / "releases" / manifest["release_id"]).exists())
 
     def test_web_release_keeps_the_backend_scripts_of_the_server(self):
         # Scripts come from each release's own commit (Ö8). An older web release must not put its

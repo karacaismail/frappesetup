@@ -63,6 +63,20 @@ for k in sys.argv[2:]: d=d[k]
 print(d)' "$@"
 }
 
+# panel_entry <web bundle folder>: print the entry script that .vite/manifest.json names, relative
+# to assets/. The /panel page of Frappe loads it from /panel/assets/ (E-3). Fails when the manifest
+# is missing, names a file outside assets/ or names a file the bundle does not have.
+panel_entry() {
+    local entry
+    entry="$(python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1]))["index.html"]
+assert m.get("isEntry") is True
+print(m["file"])' "$1/.vite/manifest.json" 2>/dev/null)" ||
+        fail "the bundle has no Vite manifest with an index.html entry"
+    [[ "$entry" =~ ^assets/[A-Za-z0-9][A-Za-z0-9._-]*\.m?js$ && -f "$1/$entry" ]] ||
+        fail "the Vite manifest names a missing entry script: $entry"
+    printf '%s\n' "${entry#assets/}"
+}
+
 # phase <release folder> <name>: how far a backend release got. rollback reads the folder copy.
 # Names in order: preparing, pulling, stopping, backing-up, migrating, migrated, starting, done.
 # rollback ends a release with "abandoned" or "rolled-back"; after those and "done" it may start

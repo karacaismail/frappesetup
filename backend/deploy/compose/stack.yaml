@@ -15,6 +15,10 @@ x-tenant: &tenant
     - tenant-sites:/home/frappe/frappe-bench/sites
     - tenant-logs:/home/frappe/frappe-bench/logs
     - /srv/atonota/web/${ATONOTA_ENV:?}:/srv/panel:ro
+  environment:
+    # The /panel page reads the current web bundle's Vite manifest (E-3). "current" is a relative
+    # link inside the mount, so a web release switches the panel without restarting Frappe.
+    ATONOTA_PANEL_MANIFEST: /srv/panel/current/.vite/manifest.json
   networks: [internal]
 
 services:

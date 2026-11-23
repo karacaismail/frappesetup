@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Print the current release id of one kind, after checking that its containers are healthy.
 # Usage: status <env> <backend|web|web-asset>
-# "web-asset" prints the file name of the main script that index.html loads.
+# "web-asset" prints the file name of the main script that the Vite manifest names. The /panel
+# page of Frappe loads this script from /panel/assets/ (E-3).
 set -euo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
@@ -32,9 +33,7 @@ web)
     json_field "$ATONOTA_ROOT/web/$env/current/release.json" release_id
     ;;
 web-asset)
-    grep -o 'src="/panel/assets/[^"]*\.js"' "$ATONOTA_ROOT/web/$env/current/index.html" |
-        head -n 1 | sed -e 's#^src="/panel/assets/##' -e 's#"$##' | grep . ||
-        fail "index.html loads no script from /panel/assets/"
+    panel_entry "$ATONOTA_ROOT/web/$env/current"
     ;;
 *) fail "unknown kind: $kind" ;;
 esac
