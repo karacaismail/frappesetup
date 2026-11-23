@@ -9,9 +9,11 @@ set -euo pipefail
 checkout="${1:?usage: build-web <checkout> <out folder>}"
 out="${2:?usage: build-web <checkout> <out folder>}"
 build="${BUILD_NUMBER:?BUILD_NUMBER is not set}"
-commit="$(git -C "$checkout" rev-parse HEAD)"
 [[ -f "$checkout/dist/index.html" ]] || fail "dist/index.html is missing; run npm run build first"
 [[ -d "$checkout/dist/assets" ]] || fail "dist/assets is missing"
+# The /panel page of Frappe loads the files this manifest names (build with --manifest).
+[[ -f "$checkout/dist/.vite/manifest.json" ]] || fail "dist/.vite/manifest.json is missing; build with --manifest"
+commit="$(git -C "$checkout" rev-parse HEAD)"
 
 mkdir -p "$out"
 file="atonota-web-${commit:0:12}.tar.gz"

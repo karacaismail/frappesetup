@@ -13,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -1044,6 +1045,122 @@ def seed_deletion(compose, environment):
     }
 
 
+REVIEW_ACCOUNTS = BACKEND / "e2e/review-accounts.json"
+REVIEW_SCRIPTS = {
+    name: BACKEND / "e2e/preview" / f"stack-review-{name}.py" for name in ("keycloak", "tenant", "press")
+}
+# The production rule stays 12 characters. Only the running local Keycloak uses this while
+# review-accounts sets the passwords.
+REVIEW_RELAXED_LENGTH = 8
+REVIEW_LOCAL_SETTINGS = ("KC_PUBLIC_URL", "ATONOTA_SITE_TENANT1_URL", "ATONOTA_PRESS_URL")
+LOCAL_HOST = re.compile(r"(?:localhost|127\.0\.0\.1|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.localhost)")
+REVIEW_EMAIL = re.compile(r"inceleme-[a-z-]+@example\.test")
+
+
+def load_review_accounts(path=REVIEW_ACCOUNTS):
+    """Read the local review accounts. Only synthetic example.test names and a local admin name pass."""
+    data = json.loads(path.read_text())
+    password = data.get("password")
+    accounts = data.get("accounts")
+    if not isinstance(password, str) or not password or not isinstance(accounts, list) or not accounts:
+        raise ValueError("review-accounts.json needs a password and a list of accounts.")
+    for account in accounts:
+        realm, username = account.get("realm"), account.get("username")
+        if realm == "platform" and isinstance(username, str) and REVIEW_EMAIL.fullmatch(username):
+            continue
+        if realm == "master" and isinstance(username, str) and re.fullmatch(r"inceleme-[a-z-]+", username):
+            continue
+        raise ValueError("A review account must be a synthetic inceleme-*@example.test platform user"
+                         " or a local inceleme-* master user.")
+    return data
+
+
+def require_local_stack(environment):
+    """Stop unless every address of the stack is a plain-HTTP localhost address."""
+    for key in REVIEW_LOCAL_SETTINGS:
+        parts = urllib.parse.urlsplit(environment.get(key, ""))
+        if (
+            parts.scheme != "http"
+            or not LOCAL_HOST.fullmatch(parts.hostname or "")
+            or parts.path not in ("", "/")
+            or parts.query
+            or parts.username
+        ):
+            raise ValueError(f"review-accounts runs only on a local stack. {key} is not a localhost address.")
+
+
+def review_accounts(compose, environment):
+    """Create or update the local review accounts (backend/e2e/review-accounts.json).
+
+    Keycloak gets the users and the shared review password, the tenant gets the roles and the
+    identity links, and Press gets the identity link. The password travels on stdin only.
+    """
+    require_local_stack(environment)
+    require_realm_sync_settings(environment)
+    data = load_review_accounts()
+    accounts = data["accounts"]
+    issuer = environment["KC_PUBLIC_URL"] + "/realms/platform"
+    keycloak = _seed_output(
+        run(
+            [*compose, "run", "--rm", "--no-deps", "-T", "identity-sync", "python", "-I", "-c",
+             REVIEW_SCRIPTS["keycloak"].read_text()],
+            environment,
+            input=json.dumps(
+                {
+                    "keycloak_url": environment["KC_PUBLIC_URL"],
+                    "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+                    "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+                    "password": data["password"],
+                    "relaxed_length": REVIEW_RELAXED_LENGTH,
+                    # The rule of the realm file, not of the running Keycloak, so a killed
+                    # earlier run cannot leave the relaxed rule in place for good.
+                    "restore_policy": json.loads(REALM_FILE.read_text())["passwordPolicy"],
+                    "accounts": accounts,
+                }
+            ),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    subjects = keycloak.get("subjects")
+    if not isinstance(subjects, dict):
+        raise ValueError("The Keycloak review script returned no subjects.")
+
+    def linked(account):
+        return {"email": account["username"], "subject": subjects[account["username"]]}
+
+    tenant_accounts = [
+        {**linked(account), "first_name": account["first_name"], "last_name": account["last_name"],
+         "tenant_roles": account["tenant_roles"], "employee": bool(account.get("employee"))}
+        for account in accounts if account.get("tenant_roles")
+    ]
+    press_accounts = [linked(account) for account in accounts if account.get("press")]
+    tenant = _seed_output(
+        run(
+            [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c", REVIEW_SCRIPTS["tenant"].read_text()],
+            environment,
+            input=json.dumps({"issuer": issuer, "accounts": tenant_accounts}),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    press = _seed_output(
+        run(
+            [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench", "web",
+             "env/bin/python", "-c", REVIEW_SCRIPTS["press"].read_text()],
+            environment,
+            input=json.dumps({"issuer": issuer, "accounts": press_accounts}),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    return {
+        "keycloak": sorted(account["username"] for account in accounts),
+        "tenant": tenant.get("users", []),
+        "press": press.get("users", []),
+    }
+
+
 def _seed_output(completed):
     """The seed scripts print one JSON object as their last line. Earlier lines are Frappe output."""
     lines = [line for line in completed.stdout.splitlines() if line.strip()]
@@ -1067,12 +1184,29 @@ def write_fixture(path, fixture):
         stream.write("".join(f"{key}={value}\n" for key, value in fixture.items()))
 
 
+ACTIONS = (
+    "config", "build", "up", "down", "check", "resources", "seed-deletion", "seed-preview", "review-accounts",
+)
+ACTION_HELP = """actions:
+  config           print the resolved service names, images, ports and networks (no secrets)
+  build            build the web image after the free disk and memory check
+  up               start the stack
+  down             stop the stack and its own test provider
+  check            probe the running services through their real protocols
+  resources        show free disk and memory in the container VM
+  seed-deletion    write the account deletion test fixture
+  seed-preview     load the API and browser test data into a running stack
+  review-accounts  create the local review accounts (local stack only; see backend/e2e/README.md)
+"""
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, epilog=ACTION_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
-        "action", choices=(
-            "config", "build", "up", "down", "check", "resources", "seed-deletion", "seed-preview",
-        ),
+        "action", choices=ACTIONS, metavar="action",
+        help="one of: " + ", ".join(ACTIONS),
     )
     args = parser.parse_args()
     try:
@@ -1117,6 +1251,13 @@ def main():
             assert_ignored(path)
             write_fixture(path, seed_deletion(compose, environment))
             print(f"Deletion fixture written to {path}")
+        elif args.action == "review-accounts":
+            # Refuse a non-local stack before the ownership probe or any other Docker call.
+            require_local_stack(environment)
+            assert_owner(engine, compose, environment)
+            summary = review_accounts(compose, environment)
+            print("Review accounts ready. See backend/e2e/README.md.")
+            print(json.dumps(summary, indent=2))
         elif args.action == "seed-preview":
             assert_owner(engine, compose, environment)
             path = env_file(os.environ.get("E2E_FIXTURE_FILE", REPOSITORY / ".pane/scratch/e2e-preview.env"))

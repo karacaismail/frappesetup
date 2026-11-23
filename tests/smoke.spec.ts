@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 import { test, expect, type Page } from '@playwright/test';
@@ -27,6 +27,10 @@ const DOC_SLUGS = readdirSync(new URL('../src/content/docs/', import.meta.url))
   .sort();
 const ALL_PAGES = ['', ...DOC_SLUGS.map((slug) => `${slug}/`)];
 const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/'];
+// AI grubundaki sayfa sayısı bölüm üst verisinden türer: yeni AI sayfası eklendiğinde test kendiliğinden uyar.
+const AI_NAV_COUNT = (
+  readFileSync(new URL('../src/data/sections.ts', import.meta.url), 'utf8').match(/group: 'AI'/g) ?? []
+).length;
 
 async function noHorizontalOverflow(page: Page) {
   const r = await page.evaluate(() => ({
@@ -554,16 +558,17 @@ test.describe('AI nav group', () => {
     await waitForHydration(page);
     const wrapper = page.getByTestId('nav-wrapper-ai');
     const links = page.locator('#site-nav a[href*="/ai-"]');
+    expect(AI_NAV_COUNT, 'sections.ts içinde AI grubu sayfası yok').toBeGreaterThan(0);
     await expect(wrapper).toBeVisible();
     await expect(links.first()).toBeHidden();
     await wrapper.focus();
     await page.keyboard.press('Enter');
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(AI_NAV_COUNT);
     await expect(links.first()).toBeVisible();
 
     await page.goto('ai-mcp/');
     await waitForHydration(page);
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(AI_NAV_COUNT);
     await expect(page.locator('#site-nav a[aria-current="page"]')).toHaveText(/MCP sunucuları/);
   });
 });
