@@ -59,7 +59,7 @@ Frappe her işlemde üç soru sorar:
 
 Bilinmeyen zorunlu koşul işlemi açmaz. Bu kuralın gereksinimi G-161'dir.
 
-İşlem kararının çekirdeği yazıldı. Çekirdek her işlemde en az bir zorunlu kontrol ister. Kontrolü olmayan işlem reddedilir. Bitiş zamanı olmayan kanıt geçerli sayılmaz. Çekirdek artık Frappe'ye bağlıdır. Frappe'de iki uç vardır. Birinci uç, bir işlemin şimdi yapılıp yapılamayacağını söyler. İkinci uç ücretli plan açar. Kanıtı sunucu kendi kayıtlarından toplar. Tarayıcıdan gelen kanıt ve roller okunmaz. Uçlar yerel testlerden geçti. Uçlar canlı sunucuda denenmedi.
+İşlem kararının çekirdeği yazıldı. Çekirdek her işlemde en az bir zorunlu kontrol ister. Kontrolü olmayan işlem reddedilir. Bitiş zamanı olmayan kanıt geçerli sayılmaz. Çekirdek artık Frappe'ye bağlıdır. İşlem kararı için Frappe'de iki uç vardır. Birinci uç, bir işlemin şimdi yapılıp yapılamayacağını söyler. İkinci uç ücretli plan açar. Kanıtı sunucu kendi kayıtlarından toplar. Tarayıcıdan gelen kanıt ve roller okunmaz. Uçlar yerel testlerden geçti. Uçlar canlı sunucuda denenmedi.
 
 ## Giriş yolu ve adresler
 
@@ -198,7 +198,7 @@ Sunucu tarafında iş şöyle bölünür:
 - İş kuralı yalnız Keycloak belirtecindeki eski role bırakılmaz. Sunucu her korunan istekte yeniden denetler.
 - Her kaydın değişmeyen bir kimliği ve kuruluş kapsamı vardır.
 - Ham belge ve yüz verisi karar kaydına kopyalanmaz.
-- Dış sağlayıcının bildirimi imza denetiminden geçer. Sonra kalıcı gelen kutusuna yazılır. Aynı bildirim iki kez işlenmez (G-164). Gelen kutusunun kodu ürün klasöründe yazıldı. Kod henüz Frappe'ye bağlı değildir.
+- Dış sağlayıcının bildirimi imza denetiminden geçer. Sonra kalıcı gelen kutusuna yazılır. Aynı bildirim iki kez işlenmez (G-164). Gelen kutusu artık Frappe'ye bağlıdır. Bildirimi Frappe'deki `verification_notice` ucu alır. Doğrulama sağlayıcısı seçilmedi. Bu yüzden uç şimdilik her bildirimi geri çevirir. Doğrulamayı başlatan kod da henüz yoktur.
 
 Analiz Frappe'de on kayıt türü önerir. Kayıt türleri şunlardır:
 
@@ -215,7 +215,7 @@ Analiz Frappe'de on kayıt türü önerir. Kayıt türleri şunlardır:
 
 Bu kayıtlar henüz yoktur. Adları kurulumda kesinleşir.
 
-Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcısı seçilmedi. Değer boşken ilgili zorunlu işlem açılmaz. Sonuç "yapılandırma gerekiyor" olur (G-167). Bu kurallar ürün klasöründe bir veri dosyasındadır. Her kuralın sahibi dosyada yazılıdır. Kural sahibine iş açan kod henüz yoktur.
+Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcısı seçilmedi. Değer boşken ilgili zorunlu işlem açılmaz. Sonuç "yapılandırma gerekiyor" olur (G-167). Bu kurallar ürün klasöründe bir veri dosyasındadır. Her kuralın sahibi dosyada yazılıdır. Kural boşsa Frappe bir görev açar. Görev "System Manager" rolüne açılır. Kural sahibinin adı görevin metnindedir.
 
 ## Tanıtım sayfası
 
@@ -303,10 +303,10 @@ Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundak
 | G-161 | Sürüyor | İşlem kararı Frappe ucuna bağlandı. Uç yerel testlerden geçti. Uç canlı sunucuda denenmedi. |
 | G-162 | Sürüyor | Bağlantı tek kullanımlıktır. Aynı yanıt ve ekranda onay denenmedi. |
 | G-163 | Sürüyor | İkinci adım vardır. Kurtarma, cihaz ve çıkış kapsamı yoktur. |
-| G-164 | Sürüyor | Gelen kutusu Frappe'ye bağlanmadı. Sağlayıcı seçilmedi. |
+| G-164 | Sürüyor | Bildirim ucu Frappe'de vardır. Uç yerel testlerden geçti. Sağlayıcı seçilmediği için uç her bildirimi geri çevirir. Doğrulamayı başlatan kod yoktur. Uç canlı sunucuda denenmedi. |
 | G-165 | Başlamadı | Tanıtım sayfası yapılmadı. |
 | G-166 | Sürüyor | Fiyat kararı açıktır. Frappe'deki kapı `open_paid_plan` ucudur. Fiyat kuralı boş olduğu için kapı kapalıdır. |
-| G-167 | Sürüyor | Kural boşsa Frappe, kural sahibine bir görev açar. Bu kod `decision_api.py` dosyasındadır. Kod canlı sunucuda denenmedi. Kural sahipleri değerleri henüz girmedi. |
+| G-167 | Sürüyor | Kural boşsa Frappe bir görev açar. Görev "System Manager" rolüne açılır. Kural sahibinin adı görevin metnindedir. Bu kod `decision_api.py` dosyasındadır. Kod canlı sunucuda denenmedi. Kural sahipleri değerleri henüz girmedi. |
 
 ## Kaynak
 
@@ -314,7 +314,7 @@ Bu sayfa dört kaynağa dayanır:
 
 - Proje sahibinin AtonotA Login kararları, 23 Kasım 2026 Pazartesi günü.
 - Backend proje kaydındaki O-51 ve O-56 kararları ve ürün klasörünün belgesi.
-- Backend dalındaki `e7130aaa` birleşmesi. Bu birleşme işlem kararını Frappe'ye bağladı. Birleşme henüz yayımlanmadı.
+- Backend dalındaki `e7130aaa` ve `6730160f` birleşmeleri. Birinci birleşme işlem kararını Frappe'ye bağladı. İkinci birleşme bildirim ucunu ekledi. Birleşmeler henüz yayımlanmadı.
 - "Kurumsal kimlik ve erişim" analizi, 23 Kasım 2026 Pazartesi günü. Proje sahibi bu analizi yeterli buldu.
 
 Analiz başka ürünlerin belgelerinden alıntılar ve görseller içerir. Bu içerik depoya kopyalanmadı. Sayfa analizi kendi sözleriyle özetler.
