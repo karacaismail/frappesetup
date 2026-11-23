@@ -124,7 +124,7 @@ Model listesi isteği token harcamaz. Bu yüzden deneme ücret doğurmaz. Deneme
 
 Aynı bağlantı için iki deneme aynı anda çalışmaz. İkinci deneme 429 kodu alır.
 
-Her kullanıcı deneme ucunu 60 saniyede en çok 10 kez çağırabilir. Kaydetme ucunda da aynı sınır vardır. Sayaç her kullanıcı ve her uç için ayrıdır. Kullanıcı sınırı aşarsa sunucu 429 kodu ve `gateway_busy` hatasını döner. Bu durumda sağlayıcıya istek gitmez. Kaydetme ucu da kayıt açmaz. Bu sınır sağlayıcının anahtarı kısıtlamasını önler. Çalınmış bir yönetici oturumu da sınırsız istek gönderemez.
+Her kullanıcı deneme ucunu 60 saniyede en çok 10 kez çağırabilir. Kaydetme ucunda da aynı sınır vardır. Sayaç her kullanıcı ve her uç için ayrıdır. Kullanıcı sınırı aşarsa sunucu 429 kodu ve `gateway_busy` hatasını döner. Bu durumda sağlayıcıya istek gitmez. Kaydetme ucu da kayıt açmaz. Böylece sağlayıcı anahtarı çok istek yüzünden kısıtlamaz. Çalınmış bir yönetici oturumu da sınırsız istek gönderemez.
 
 ### Süre sınırı
 

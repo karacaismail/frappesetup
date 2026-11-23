@@ -564,7 +564,7 @@ class TestModelHTTP(unittest.TestCase):
 				counter = f"rl:platform_core.model_gateway.connections.{endpoint}:{user}"
 				frappe.cache.setex(frappe.cache.make_key(counter) + b":60", 60, 10)
 				response = self._maintenance("manager", endpoint, payload)
-				self.assertEqual(response.status_code, 429, response.text)
+				self.assertEqual(response.status_code, 429)
 				self.assertEqual(response.json()["message"], {"error": "gateway_busy"})
 				self.assertNotIn("_server_messages", response.json())
 		self.assertEqual(len(self.fixture["list_requests"]), requests_before)

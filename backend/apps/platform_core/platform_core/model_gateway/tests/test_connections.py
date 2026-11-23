@@ -82,9 +82,9 @@ class FakeProvider:
 	def requests(self):
 		return self.server.requests
 
-	def endpoint(self, adapter, auth="none", secret="", **extra):
+	def endpoint(self, adapter, auth="none", key="", **extra):
 		return Endpoint(
-			"fixture", adapter, self.url, auth, secret, kind="local", addresses=("127.0.0.1",), **extra
+			"fixture", adapter, self.url, auth, key, kind="local", addresses=("127.0.0.1",), **extra
 		)
 
 
