@@ -117,6 +117,20 @@ class TestPanelPage(IntegrationTestCase):
 			frappe.local.flags.redirect_location, "/login?redirect-to=/panel/records/Sample%20Record"
 		)
 
+	def test_guest_browser_navigation_returns_to_record_after_login(self):
+		self.path.stop()
+		with (
+			patch.object(frappe.local, "path", "panel/hrms/leave-application/missing-record", create=True),
+			patch.object(frappe, "get_request_header", return_value="?1"),
+			self.assertRaises(frappe.Redirect),
+		):
+			self.render(signed_in=False)
+		self.path.start()
+		self.assertEqual(
+			frappe.local.flags.redirect_location,
+			"/login?redirect-to=%2Fpanel%2Fhrms%2Fleave-application%2Fmissing-record",
+		)
+
 	def test_client_routes_render_the_panel_page(self):
 		rules = frappe.get_hooks("website_route_rules", app_name="platform_core")
 		self.assertIn({"from_route": "/panel/<path:app_path>", "to_route": "panel"}, rules)

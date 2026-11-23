@@ -842,3 +842,5 @@ Name of the provider account in this site.,Bu sitedeki sağlayıcı hesabının 
 Connection name,Bağlantı adı,
 Name of this API connection.,Bu API bağlantısının adı.,
 Service address,Hizmet adresi,
+Record,Kayıt,shell.record_preview
+Sign in to open this record.,Kaydı açmak için giriş yapın.,shell.record_preview

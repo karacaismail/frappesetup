@@ -270,3 +270,20 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 					self.assertEqual(self.request(path, self.privileged_sid)[0], 200)
 				finally:
 					frappe.cache.delete(key)
+
+
+class TestRecordPreviewImageHTTP(ShellHTTPFixture):
+	route = "/api/method/platform_core.api.shell.record_preview_image"
+
+	def test_record_preview_image_guest_denied(self):
+		"""Guests may only fetch the static card using GET."""
+		status, _headers, _body = self.request(self.route, method="POST")
+		self.assertEqual(status, 403)
+
+	def test_record_preview_image_foreign_data_denied(self):
+		status, _headers, plain = self.request(self.route)
+		self.assertEqual(status, 200)
+		query = urlencode({"doctype": DOCTYPE, "name": "another-user-record"})
+		status, _headers, selected = self.request(f"{self.route}?{query}")
+		self.assertEqual(status, 200)
+		self.assertEqual(plain, selected)

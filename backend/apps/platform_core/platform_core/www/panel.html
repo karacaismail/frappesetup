@@ -1,3 +1,24 @@
+{% if record_preview is defined and record_preview %}
+<!DOCTYPE html>
+<html lang="{{ panel_language | e }}">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{{ record_preview.title | e }}</title>
+	<link rel="canonical" href="{{ record_preview.url | e }}">
+	<meta property="og:url" content="{{ record_preview.url | e }}">
+	<meta property="og:title" content="{{ record_preview.title | e }}">
+	<meta property="og:description" content="{{ record_preview.description | e }}">
+	<meta property="og:image" content="{{ record_preview.image | e }}">
+</head>
+<body>
+	<main>
+		<h1>{{ record_preview.title | e }}</h1>
+		<a href="{{ record_preview.login | e }}">{{ record_preview.description | e }}</a>
+	</main>
+</body>
+</html>
+{% else %}
 <!DOCTYPE html>
 <html class="platform-shell-panel" lang="{{ panel_language | default('en', true) | e }}">
 <head>
@@ -36,3 +57,4 @@
 	{%- endif %}
 </body>
 </html>
+{% endif %}

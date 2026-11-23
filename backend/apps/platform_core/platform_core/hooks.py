@@ -79,12 +79,19 @@ ai_write_closed_doctypes = [
 	"PLT Mobile Installation",
 	"PLT Mobile Account State",
 	"PLT Access Rule",
+	"PLT Record Link",
+	"PLT Record Access Request",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
 	"platform_core.api.auth.logout",
 	"platform_core.api.auth.get_csrf_token",
 	"platform_core.api.shell.get_bootstrap",
+	"platform_core.api.shell.record_preview_image",
+	"platform_core.api.access.create_record_link",
+	"platform_core.api.access.open_record_link",
+	"platform_core.api.access.revoke_record_link",
+	"platform_core.api.access.request_record_access",
 	"platform_core.api.collection.group_summary",
 	"platform_core.api.meta.get_doctype",
 	"frappe.auth.get_logged_user",

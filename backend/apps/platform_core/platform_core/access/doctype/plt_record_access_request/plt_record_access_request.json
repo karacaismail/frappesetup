@@ -1,0 +1,32 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "record_link",
+  "target_type",
+  "target_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "record_link",
+   "fieldtype": "Link",
+   "label": "Record link",
+   "options": "PLT Record Link"
+  },
+  {
+   "fieldname": "target_type",
+   "fieldtype": "Data",
+   "label": "Target type"
+  },
+  {
+   "fieldname": "target_name",
+   "fieldtype": "Data",
+   "label": "Target name"
+  }
+ ],
+ "module": "Access",
+ "name": "PLT Record Access Request",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}
