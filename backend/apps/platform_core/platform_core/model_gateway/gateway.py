@@ -62,6 +62,8 @@ class Target:
 			kind=kind,
 			addresses=addresses,
 			oauth_addresses=oauth_addresses,
+			organization=getattr(self.account, "organization_id", None) or "",
+			project=getattr(self.account, "project_id", None) or "",
 		)
 
 
