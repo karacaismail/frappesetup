@@ -42,6 +42,47 @@ class TestKeycloakOnly(FrappeAPITestCase):
 		response = self.password_login()
 		self.assertEqual(response.status_code, 200, response.data[:200])
 
+	def test_rejected_password_login_creates_no_session(self):
+		h.clear_sessions_of(self.admin_user)
+		h.refresh()
+		self.addCleanup(h.clear_sessions_of, self.admin_user)
+		self.assertEqual(h.session_count(self.admin_user), 0)
+		with h.SiteSettings({"identity_keycloak_only": 1}):
+			for path, extra in (("/api/method/login", {}), ("/", {"cmd": "login"})):
+				with self.subTest(path=path):
+					client = h.new_client()
+					response = h.request(
+						client.post,
+						path,
+						data={"usr": self.admin_user, "pwd": self.admin_password, **extra},
+					)
+					self.assertEqual(response.status_code, 401, response.data[:200])
+					self.assertEqual(response.json.get("exc_type"), "AuthenticationError")
+					self.assertEqual(h.logged_user(client), "Guest")
+					self.assertEqual(h.session_count(self.admin_user), 0)
+
+	def test_desk_denial_preserves_end_user_session_and_roles(self):
+		client = h.new_client()
+		response = h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
+		self.assertEqual(response.status_code, 302, response.data[:200])
+		self.assertEqual(h.logged_user(client), h.AYSE)
+		sid = client.get_cookie("sid").value
+		h.refresh()
+		user = frappe.get_doc("User", h.AYSE)
+		self.assertEqual(user.user_type, "Website User")
+		roles = sorted(row.role for row in user.roles)
+		self.assertEqual(h.session_count(h.AYSE), 1)
+		for path in ("/desk", "/app"):
+			with self.subTest(path=path):
+				denied = h.request(client.get, path, follow_redirects=True)
+				self.assertEqual(denied.status_code, 403, denied.data[:200])
+				self.assertEqual(client.get_cookie("sid").value, sid)
+				self.assertEqual(h.logged_user(client), h.AYSE)
+				self.assertEqual(h.session_count(h.AYSE), 1)
+				user.reload()
+				self.assertEqual(user.user_type, "Website User")
+				self.assertEqual(sorted(row.role for row in user.roles), roles)
+
 	def test_gate_on_rejects_password_and_email_link_but_keycloak_works(self):
 		with h.SiteSettings({"identity_keycloak_only": 1}):
 			password = self.password_login()
