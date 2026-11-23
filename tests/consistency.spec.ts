@@ -228,6 +228,58 @@ test.describe('content consistency', () => {
     expect(diagram).toContain('Yol haritası faz sırası');
   });
 
+  test('phase diagram arrows read exactly as the after lists in phases.json', () => {
+    // Okur, birbirine değen çizgileri tek bir bağlantı gibi okur. Bu yüzden değen oklar bir grup oluşturur.
+    // Bir grupta her çıkış fazı her hedef faza bağlı görünür. Grubun okunan bağımlılıkları veriyle birebir aynı olmalı.
+    // Aynı fazdan çıkan oklar (P0 → P1, P2) ve aynı faza giren oklar bu yüzden çizgi paylaşabilir.
+    // Uçları değmeyen dik kesişme bağlantı sayılmaz. Çizimde kesişme noktası zemin renginde bir boşlukla ayrılır.
+    const svg = read('src/components/Timeline.astro');
+    type Pt = [number, number];
+    const boxes = [...svg.matchAll(/<rect x='(\d+)' y='(\d+)' width='(\d+)' height='(\d+)'[^>]*\/>\s*<text[^>]*>(P\d)</g)].map((m) => ({
+      id: m[5],
+      x: +m[1],
+      y: +m[2],
+      w: +m[3],
+      h: +m[4],
+    }));
+    expect(boxes.map((b) => b.id).sort()).toEqual(phases.map((p) => p.id).sort());
+    const edges = [...svg.matchAll(/<path data-edge='([^']+)' d='([^']+)'/g)].map((m) => {
+      const pts: Pt[] = [...m[2].matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)].map((c) => [+c[1], +c[2]]);
+      expect(m[2].replace(/[ML]\s*-?[\d.]+\s+-?[\d.]+/g, '').trim(), `${m[1]} yalnız M/L komutu kullanır`).toBe('');
+      return { label: m[1], pts };
+    });
+    const onBoundary = ([x, y]: Pt, b: (typeof boxes)[number]) =>
+      x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h && (x === b.x || x === b.x + b.w || y === b.y || y === b.y + b.h);
+    const boxAt = (p: Pt) => boxes.filter((b) => onBoundary(p, b)).map((b) => b.id);
+    const ends = edges.map((e) => {
+      const from = boxAt(e.pts[0]);
+      const to = boxAt(e.pts[e.pts.length - 1]);
+      expect(from, `${e.label} tek bir fazdan çıkar`).toHaveLength(1);
+      expect(to, `${e.label} tek bir faza girer`).toHaveLength(1);
+      const expected = e.label.replace(/-gate$/, '');
+      expect(`${from[0]}-${to[0]}`, `${e.label} çizilen uçlar`).toBe(expected);
+      return { ...e, from: from[0], to: to[0] };
+    });
+    const deps = ends.filter((e) => !e.label.endsWith('-gate')).map((e) => e.label).sort();
+    expect(deps, 'oklar phases.json after listesiyle birebir').toEqual(phases.flatMap((p) => p.after.map((a) => `${a}-${p.id}`)).sort());
+    const onSeg = ([x, y]: Pt, [a, b]: [Pt, Pt]) =>
+      (a[0] === b[0] && x === a[0] && y >= Math.min(a[1], b[1]) && y <= Math.max(a[1], b[1])) ||
+      (a[1] === b[1] && y === a[1] && x >= Math.min(a[0], b[0]) && x <= Math.max(a[0], b[0]));
+    const segs = (pts: Pt[]) => pts.slice(1).map((p, i) => [pts[i], p] as [Pt, Pt]);
+    for (const e of ends) for (const [a, b] of segs(e.pts)) expect(a[0] === b[0] || a[1] === b[1], `${e.label} dik parçalı`).toBe(true);
+    const touch = (a: Pt[], b: Pt[]) => a.some((p) => segs(b).some((s) => onSeg(p, s))) || b.some((p) => segs(a).some((s) => onSeg(p, s)));
+    const parent = ends.map((_, i) => i);
+    const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+    for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) if (touch(ends[i].pts, ends[j].pts)) parent[find(i)] = find(j);
+    const groups = new Map<number, typeof ends>();
+    for (const [i, e] of ends.entries()) groups.set(find(i), [...(groups.get(find(i)) ?? []), e]);
+    for (const g of groups.values()) {
+      const drawn = g.map((e) => `${e.from}-${e.to}`).sort();
+      const seen = [...new Set(g.map((e) => e.from))].flatMap((f) => [...new Set(g.map((e) => e.to))].map((t) => `${f}-${t}`)).sort();
+      expect(seen, `değen oklar (${g.map((e) => e.label).join(', ')}) yalnız çizilen bağımlılıkları göstermeli`).toEqual(drawn);
+    }
+  });
+
   test('phases and tasks carry no duration, week, story point or effort estimate', () => {
     // Ürün kuralı olan süreler (log saklama günleri, 14 günlük deneme, haftalık yedek, K-26 yama hedefleri) görev
     // süresi değildir ve kalıpların dışındadır; yasak olan faz/görev süresi ve efor ölçümüdür.
