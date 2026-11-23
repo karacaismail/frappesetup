@@ -87,7 +87,7 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - `press_tr` içinde Keycloak ile giriş.
 - **D-4. Kimlik markası Atonota'dır.** Proje sahibi alan adı olarak atonota.net yazdı. Ürünün adı O-51 ile “AtonotA Login” oldu.
   - Keycloak bu alan adında, platformdan ayrı durur.
-  - Düğme metni “Atonota ile oturum aç” olur.
+  - Düğme metni “Atonota ile oturum aç” olur. Bu metin O-51 ile değişti. Yeni düğme metni “AtonotA Login ile oturum aç” olur.
   - Marka adı ve alan adı ayardan gelir. Kodda sabit yazılmaz.
 - **D-5. Son kullanıcı yalnız ayrı arayüzü görür.** Son kullanıcının türü “Website User” olur (Karar 10, G-16).
 - **D-6. Zamanlanmış iş kurulmaz.** Proje sahibi `cron` kurulumunu istemedi (V-9).

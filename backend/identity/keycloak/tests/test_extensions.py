@@ -57,6 +57,12 @@ class ExtensionFileTest(unittest.TestCase):
         self.assertIn("conditional-user-configured", [y.get("authenticator") for y in yurutmeler])
         self.assertIn("auth-otp-form", [y.get("authenticator") for y in yurutmeler])
 
+    def test_current_platforms_stay_in_the_realm(self):
+        # Review 1, minor finding 4: the rule above covers every provider, so a deleted provider would
+        # go unnoticed. Today's realm has these two. A new platform comes as data and is not listed here.
+        aliases = {idp["alias"] for idp in self.realm["identityProviders"]}
+        self.assertLessEqual({"google", "apple"}, aliases)
+
     def test_apple_provider_disabled_without_keys(self):
         apple = [s for s in self.realm["identityProviders"] if s["alias"] == "apple"]
         self.assertEqual(len(apple), 1)
