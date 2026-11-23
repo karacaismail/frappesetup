@@ -112,7 +112,7 @@ Komutlar `atonota-<ortam>` Compose projesinde çalışır. Anahtar 0 iken profil
 
 ## Deneme sonucu
 
-Deneme 23 Kasım 2026 Pazartesi günü bu Mac'te yapıldı. Colima'nın `colima-factory` profili kullanıldı. İşlemci arm64'tür. Yerel imaj kimliği `sha256:b84de35339dfd0de55602746d76aee6b4cabe3709b65cbb6f17fed737f82478a` oldu. İmaj hiçbir kayıt deposuna yüklenmedi.
+Deneme 23 Kasım 2026 Pazartesi günü bu Mac'te yapıldı. Colima'nın `colima-factory` profili kullanıldı. İşlemci arm64'tür. Son deneme `abc68402` commit'inden derlenen imajla yapıldı. Yerel imaj kimliği `sha256:22d7d0ed5898e6548eab8c27078b53d14f3dedadc8ea45ff5ffcea483e2e2ab6` oldu. İmaj hiçbir kayıt deposuna yüklenmedi.
 
 Deneme geçici kaplarla yapıldı. Kapların adı `e2press-` ile başladı. Hiçbir port bilgisayara açılmadı. Parolalar çalışma anında üretildi ve depoya yazılmadı. Deneme bitince kaplar, ağ, birimler ve imaj silindi.
 
@@ -120,12 +120,13 @@ Deneme geçici kaplarla yapıldı. Kapların adı `e2press-` ile başladı. Hiç
 | --- | --- |
 | İmaj derlemesi, beş yamanın `git apply --check` denetimi | `pass` |
 | Temiz kapta `uv pip check`: yalnız izinli iki satır | `pass` |
-| `press`, `press_tr` ve yamalı modüllerin içe aktarılması | `pass` |
+| `press` ve `press_tr` içindeki test dışı 1052 modülün içe aktarılması | `pass` |
 | `bench new-site` ve `--install-app press` | `pass` |
 | `bench --site <site> install-app press_tr` | `pass` |
 | `bench --site <site> migrate` | `pass` |
 | Uygulama sunucusunda `/api/method/ping`: 200 ve `pong` | `pass` |
-| Ön yüz kabında `/api/method/ping`, `/dashboard` ve Press dosyaları: 200 | `pass` |
+| Ön yüz kabında `/api/method/ping`, `/dashboard`, Press, Frappe ve ERPNext dosyaları: 200 | `pass` |
+| Telegram yaması: paket yokken mesaj "Error" olur ve hata kaydı yazılır | `pass` |
 | Çerez yaması: izin değişince kayıt açılır, değişmeyince açılmaz | `pass` |
 | Press'in dar birim test kümesi: 34 test, 1 test kendiliğinden atlandı | `pass` |
 | frappe-mcp'nin kendi testleri imajın paket sürümleriyle: 67 test | `pass` |
@@ -142,10 +143,12 @@ Dar test kümesi şu üç modüldür:
 
 Testler Frappe'nin `run-tests` komutuyla koşmadı. Komut bağlı belge türlerinin test dosyalarını da açar. Bu dosyalardan biri Telegram paketini ister. Bu yüzden testler `unittest` ile doğrudan koştu. Test araçları imajda yoktur. `moto`, `hypothesis`, `faker` ve `pytest` yalnız geçici kaba kuruldu.
 
-Denemede iki şey daha görüldü:
+Denemede dört şey daha görüldü:
 
 1. Press'in `migrate` adımı kendi denetimini de çalıştırır. Denetim internetten chromedriver indirmeye çalışır. İmajda `unzip` olmadığı için denetim bir uyarıyla durdu. `migrate` yine başarılı bitti.
 2. Press'in `hooks.py` dosyası açılırken veritabanını okur. Bu yüzden `bench build` sitesiz derlemede kanca adımında düşer. Dockerfile bu yüzden derlemenin iki adımını doğrudan çalıştırır. Hiçbir uygulamada derleme sonrası kanca yoktur. Kanca eklenirse derleme durur.
+3. Press'in Telegram kuyruğu Frappe 16'da çalışmaz. `TelegramMessage.get_one` sıralamada `FIELD(priority, ...)` ifadesini kullanır. Frappe 16 bu ifadeyi reddeder. Bu engel Telegram paketinden ayrıdır. Bu imajda Telegram zaten kapalıdır.
+4. Press sitesinde `/login` adresi 403 döner. Press girişi Keycloak ile yapılır.
 
 ## Kalan iş
 
