@@ -2,8 +2,7 @@
  {
   "id": "P0",
   "title": "P0 Altyapı",
-  "start": 0,
-  "end": 6,
+  "after": [],
   "goal": "Hetzner bare-metal üzerinde Press v0.154.x kontrol düzlemi (Frappe v15 / Python 3.11), proxy-app-db-registry-monitor-log sunucuları, Keycloak HA ve sertleştirme, Hetzner Object Storage offsite yedek, ağ sertleştirme, güvenlik danışmanlığı karar kaydı ve ERPNext v16 TR Release Group için ilk Deploy Candidate derlemesi.",
   "exit": "Press staging ve prod ayakta; Route 53 wildcard TLS (yalnız app. alt bölgesi) alınmış; asgari staging Release Group'unda (Frappe + ERPNext; G-3 dağıtım zinciri) imaj derlenip bir test sitesi Active olmuş (uygulama kaynakları, prod grubu ve zamanlanmış dağıtım G-14 ile P1'de); offsite yedek Hetzner bucket'ında listelenmiş ve geri yüklenmiş; Keycloak HA ayakta ve yönetim konsolu ile Admin REST API public host'ta kapalı; güvenlik danışmanlığı karar kaydı ve kaynak defteri açılmış; tüm sunucular Press doctype'larıyla envanterde ve izleme uyarıları Telegram/e-postaya düşüyor.",
   "owner": "DevOps sorumlusu (sunucular, Route 53/IAM, yedek, Keycloak HA ve sertleştirme, güvenlik danışmanlığı kaydı); alan adı sorumlusu (GoDaddy NS delegasyonu, G-2); Platform ekibi (kaynak defteri, G-128)"
@@ -11,8 +10,9 @@
  {
   "id": "P1",
   "title": "P1 Platform çekirdeği",
-  "start": 6,
-  "end": 18,
+  "after": [
+   "P0"
+  ],
   "goal": "press_tr ve platform_core temeli, host'a bağlı oturum ve kalıcı kimlik sözleşmesi, kiracı sitelerde Keycloak SSO/SLO, Türkiye temel çizgisi, Access Rule yetki motoru ve veri yüzeyi kapsama matrisi, meta-driven CRUD + shell + metadata sidebar, insan odaklı URL sözleşmesi, yardım katmanı, mobil öncelikli tasarım token sistemi ve staging'de AI ile destek prototipleri.",
   "exit": "Bir ERPNext v16 test kiracısında Keycloak ile giriş/çıkış çalışıyor ve kullanıcı (issuer, sub) ile eşleniyor; host'a bağlı oturum, CORS ve CSRF negatif testleri geçiyor; sidebar Workspace Sidebar + installed apps + yetkilerden türüyor; çekirdek doctype'larda liste/form/CRUD meta'dan üretiliyor; kayıt kuralı, hiyerarşi ve alan yetkisi her veri yüzeyinde aynı sonucu veriyor; Playwright 320/360/375/390 + Chromium/Firefox/WebKit matrisi yeşil; P1 AI ve destek prototipleri staging'de kendi kabul satırlarıyla geçmiş; TR System Settings değerleri setup wizard sonrası korunuyor.",
   "owner": "Platform ekibi + Frontend ekibi; DevOps sorumlusu (CI/CD, DR runbook, SMTP relay G-47, operatör sırları SA-1, nginx API allowlist G-143)"
@@ -20,8 +20,10 @@
  {
   "id": "P2",
   "title": "P2 Ticari katman",
-  "start": 14,
-  "end": 26,
+  "after": [
+   "P0"
+  ],
+  "entryGate": "P1'deki Keycloak adımı bitince başlar (G-12, G-16, G-79, G-81)",
   "goal": "TRY fiyatlandırma, iyzico tahsilat, ödeme–abonelik–kurulum durum makinesi, KDV ve e-Arşiv/e-Fatura, operasyon sitesinin finans çekirdeği (create-fc-invoice alıcısı, e-belge köprüsü, asgari EFT mutabakatı, finans olay–belge matrisi), sözleşme/KVKK onayları, dunning, özel alan adı ve kimlik akışı, panel faturalama ekranları, ölçüm adapterları ve kampanya atıf sözleşmesi.",
   "exit": "Sandbox ve prod'da 3DS ile plan satın alma, saklı karttan aylık tahsilat, iade ve Havale/EFT akışları Press Invoice durum makinesiyle uçtan uca geçmiş; operasyon sitesinde (P2 finans çekirdeği) e-Arşiv/e-Fatura üretilip PDF panelde görünmüş; finans olay–belge matrisi mali müşavirle kapanmış ve çift/eksik kayıt testleri geçmiş; askıya alma/arşiv zaman çizelgesi test edilip sözleşmeye yazılmış; rıza yokken ölçüm satıcısına istek gitmediği ağ kanıtıyla doğrulanmış; KVKK aktarım bildirimi ve VERBİS kaydı hukuk tarafından onaylanmış.",
   "owner": "Platform ekibi + Frontend ekibi; Finans/Muhasebe + mali müşavir (G-20, G-22, SA-5, SA-13, SA-18, SA-21, SA-41, K-13); ürün sahibi + hukuk (G-23, G-116, G-117, K-27, K-28); DevOps sorumlusu (operasyon sitesi dağıtımı SA-17, log saklama G-117, sızma testi ortamı G-115, faturalama zamanlayıcı izleme SA-12); alan adı sorumlusu (ops. DNS kaydı)"
@@ -29,8 +31,9 @@
  {
   "id": "P3",
   "title": "P3 AI",
-  "start": 18,
-  "end": 30,
+  "after": [
+   "P1"
+  ],
   "goal": "Claude Agent SDK tabanlı agent servisi, Press MCP + press_tr MCP + kiracı MCP, site tarafından basılan aracı belirteciyle kullanıcı kimliğinde delegasyon, her yazmada sunucuda bağlanan önizle+onayla, AI Action Log, atomik AI kredi rezervasyonu ve @ant-design/x sağ panel.",
   "exit": "Panelden en az üç 'tek tık' akışı prod'da çalışıyor; insert/update dahil her yazma ve yıkıcı/ücretli aksiyon onay olmadan yalnızca önizleme döndürüyor; her araç çağrısı kullanıcının Frappe/Press yetkisiyle yürütülüp AI Action Log'a düşüyor; dış model çağrısından önce yerel maskeleme ve veri seçimi uygulanıyor; eşzamanlı çağrılarda kredi aşımı yok; prompt injection ve yetki aşımı negatif testleri geçiyor; Anthropic aktarımı KVKK envanterine işlenmiş.",
   "owner": "Platform ekibi + AI ekibi; DevOps sorumlusu (konteyner, PostgreSQL/Redis, TLS, IP allowlist; G-83)"
@@ -38,8 +41,9 @@
  {
   "id": "P4",
   "title": "P4 İlk app (HRMS TR)",
-  "start": 18,
-  "end": 30,
+  "after": [
+   "P1"
+  ],
   "goal": "App çerçevesinin (backend iskelet, frontend modül, yetki/AI/abonelik sözleşmeleri, uygulama durum modeli, yardım ve tur içeriği) HRMS TR ile ilk kez uygulanması; Marketplace App, App Plan, Product Trial, aktivasyon UX, paylaşım bağlantıları ve güvenli bağlantı önizlemesi.",
   "exit": "Yeni müşteri Keycloak ile kayıt → 14 günlük deneme sitesi → 'Etkinleştir' → Agent Job → sidebar'da HRMS TR başlığı akışı E2E testte ve ilk ödeyen müşteride çalışıyor; HRMS TR bordro kabul senaryoları geçiyor; subscription info ile özellik kapıları ve uygulama durumları doğrulanmış; paylaşılan kayıt bağlantısının oturumsuz önizlemesi kayıt verisi içermiyor; ilk ziyaret turu girdi kaybı olmadan çalışıyor.",
   "owner": "Platform ekibi + App ekibi + Frontend ekibi; ürün sahibi (plan/fiyat, K-29, K-35); mali müşavir (bordro parametreleri)"
@@ -47,8 +51,9 @@
  {
   "id": "P6",
   "title": "P6 Operasyon düzlemi",
-  "start": 26,
-  "end": 38,
+  "after": [
+   "P2"
+  ],
   "goal": "P2 finans çekirdeğinin üzerine: Frappe CRM ve Helpdesk (operasyon sitesi), press_ops_bridge'in destek ve abonelik olayları, iyzico hak ediş mutabakatı, superadmin operatör modu ekranları, iki katmanlı operatör yetkisi + maker-checker + Operator Audit, kapsamları ayrılmış izinli destek oturumu (görüntüle, takip, kontrol, temsil; Hocuspocus), Helpdesk entegrasyonu ve destek widget'ı, KVKK rıza sürümleme/saklama matrisi ve operatör BI.",
   "exit": "Gece mutabakat raporunda iyzico/EFT farkı 0; Müşteri 360'tan kredi tahsisi ve plan değişimi Operator Audit'te; destek oturumunun dört kapsamı ayrı rıza ve süreyle çalışıyor, Revoke açık WebSocket'i ve temsil oturumunu 2 sn içinde kesiyor, maskeli alan ağ kaydında yok, Support Access'siz temsil reddediliyor; HD Ticket tenant widget'ından açılıp SLA'ya düşüyor.",
   "owner": "Platform ekibi + Frontend ekibi; DevOps sorumlusu (Hocuspocus, Metabase; SA-29, G-136); Finans/Muhasebe (SA-33); hukuk + ürün sahibi (SA-36, K-19, K-33)"
@@ -56,8 +61,9 @@
  {
   "id": "P5",
   "title": "P5 CRM · Webshop",
-  "start": 30,
-  "end": 42,
+  "after": [
+   "P4"
+  ],
   "goal": "CRM ve Webshop uygulamalarının aynı kontrol listesiyle yayına alınması, ilişki tabanlı paylaşım kataloğu, tek Release Group içinde çoklu uygulama, ileri Press yetenekleri (partner, sürüm yükseltme, site devri), hassas müşteri izolasyon kademeleri ve e-belge kapsamının kiracı satış faturalarına genişlemesi.",
   "exit": "Her iki uygulama Marketplace App olarak etkinleştirilebiliyor ve yalnızca kurulan uygulamalar sidebar'da görünüyor; ilişki türü yetenek matrisi testleri geçiyor; ERPNext v17 hazırlık planı Version Upgrade ile belgelenmiş; kiracı e-belge (tr_edocs) kararı segment bazında verilmiş.",
   "owner": "Platform ekibi + App ekibi; DevOps sorumlusu (migration/upgrade runbook G-33, izolasyon kademeleri G-147)"

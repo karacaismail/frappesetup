@@ -11,7 +11,7 @@ Bu sayfa değerlendirme raporundaki her maddenin sonucunu ve bu sürümdeki doğ
 | Madde | Konu | Sonuç | Nerede |
 | --- | --- | --- | --- |
 | T-03 | Araştırmanın kararlara izlenebilir bağlanması | Kapatıldı: kaynak defteri (aşağıda) ve kalıcı kayıt kuralı G-128 | Bu sayfa |
-| Y-01 | P2'nin P6 çıktısına bağımlılığı | Kapatıldı: operasyon sitesi finans çekirdeği P2'ye alındı (SA-17, SA-18, SA-19, SA-21, SA-22, SA-23, SA-34, SA-35); P6 P2 tamamlanınca (26. hafta) başlar; faz sırası tutarlılık testinde | [Yol haritası](/frappesetup/yol-haritasi/) |
+| Y-01 | P2'nin P6 çıktısına bağımlılığı | Kapatıldı: operasyon sitesi finans çekirdeği P2'ye alındı (SA-17, SA-18, SA-19, SA-21, SA-22, SA-23, SA-34, SA-35); P6 P2 tamamlanınca başlar; faz sırası tutarlılık testinde | [Yol haritası](/frappesetup/yol-haritasi/) |
 | Y-02 | P1 dilimi ve P0 kabulünün sonraki faz kalemlerine bağımlılığı | Kapatıldı: AI ve destek adımları ayrı kabullü prototip (G-129, SA-40); P0 çıkışı yalnız P0 kalemlerine dayanır | [Yol haritası](/frappesetup/yol-haritasi/) |
 | Y-03 | SSO ile site oturumunun karışması, origin | Kapatıldı: host'a bağlı oturum ve origin tablosu, CORS yok (G-119); tarayıcı belirteç modeli önerisi | [Rail 4](/frappesetup/rail-4-keycloak/); karar bekliyor K-25 |
 | Y-04 | DNS delegasyonu ile kiracı adresi | Kapatıldı: kiracılar `<kiracı>.app.<marka>.com.tr` | [Raylar](/frappesetup/raylar/), K-2 |

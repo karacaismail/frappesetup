@@ -25,7 +25,7 @@ function compress(ids: string[]): string {
 
 const rows = phases.map((p) => {
   const ids = requirements.filter((r) => r.phase === p.id).map((r) => r.id);
-  return { ...p, weeks: p.end - p.start, ids: compress(ids), count: ids.length };
+  return { ...p, prerequisite: p.after.length ? p.after.join(', ') : 'yok', ids: compress(ids), count: ids.length };
 });
 ---
 
@@ -45,7 +45,9 @@ const rows = phases.map((p) => {
         rows.map((p) => (
           <tr>
             <th scope="row">
-              <strong>{p.title}</strong> <span class="nowrap">({p.start}–{p.end}. hafta,</span> <span class="nowrap">≈{p.weeks} hafta)</span>
+              <strong>{p.title}</strong>
+              <span class="phase-meta">Önkoşul: {p.prerequisite}</span>
+              {p.entryGate && <span class="phase-meta">{p.entryGate}</span>}
             </th>
             <td>{p.goal}</td>
             <td>{p.exit}</td>
@@ -61,8 +63,10 @@ const rows = phases.map((p) => {
 </div>
 
 <style>
-  /* Hafta aralığı tek parça kalır: "(18–30." gibi bir dizgi tire sonrasında satır kırmaz. */
-  .nowrap {
-    white-space: nowrap;
+  /* Faz adının altında yalnız önkoşul yazar; süre, hafta ve efor tahmini yazılmaz (tests/consistency.spec.ts). */
+  .phase-meta {
+    display: block;
+    font-weight: 400;
+    color: var(--fs-quiet);
   }
 </style>

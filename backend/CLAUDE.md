@@ -68,6 +68,11 @@ Her liste kancası dosyada yalnız bir kez atanır. Örneğin `auth_hooks` ya da
 - Beklenen sonucu sözleşmeden ya da karar sitesinden alın (D-1). Değişen koddan kopyalamayın.
 - Yetkiyi gerçek giriş yolunda sınayın (D-6). Ret durumunu da sınayın.
 
+### Süre ve efor yasağı
+
+- Fazlara ve görevlere süre, hafta, story point ya da efor tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Deponun kökündeki `tests/consistency.spec.ts` bunu denetler.
+- Ürün kuralı olan süreler bu yasağın dışındadır. Örneğin log saklama günleri, 14 günlük deneme sitesi, oturum süresi ve K-26 yama hedefleri böyledir.
+
 ### Veri ve sırlar
 
 - Gerçek kişi verisi kullanmayın. Yalnız uydurma örnek veri kullanın.

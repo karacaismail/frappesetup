@@ -1,4 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 
 // İçerik tutarlılığı (rapor E-15): gereksinim JSON'u, fazlar, açık kararlar ve markdown sayfaları aynı karar setine
@@ -7,7 +9,8 @@ const root = new URL('../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 type Req = { id: string; title: string; detail: string; rail: string; priority: string; phase: string; source: string; owner?: string };
 const reqs: Req[] = JSON.parse(read('src/data/requirements.json'));
-const phases: { id: string; start: number; end: number }[] = JSON.parse(read('src/data/phases.json'));
+type Phase = { id: string; after: string[]; entryGate?: string };
+const phases: Phase[] = JSON.parse(read('src/data/phases.json'));
 const docsDir = new URL('src/content/docs/', root);
 const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
@@ -36,7 +39,6 @@ test.describe('content consistency', () => {
       expect(['native', 'configure', 'develop', 'integrate'], `${r.id} kaynak`).toContain(r.source);
       expect(RAILS, `${r.id} ray`).toContain(r.rail);
     }
-    for (const p of phases) expect(p.end, p.id).toBeGreaterThan(p.start);
   });
 
   test('every G/SA reference in pages and requirement details exists', () => {
@@ -113,16 +115,82 @@ test.describe('content consistency', () => {
     expect(broken).toEqual([]);
   });
 
-  test('phase order has no backward dependency and the timeline matches phases.json', () => {
+  test('phase order is told only by dependencies and the diagram follows phases.json', () => {
     const ph = Object.fromEntries(phases.map((p) => [p.id, p]));
-    // Belgelenen bağımlılıklar: bağımlı faz önkoşulun bitişinden sonra başlar. P2'nin tek ara kapısı P1 içindeki
-    // Keycloak adımıdır (14. hafta, yol haritası metni).
-    const after: [string, string][] = [['P1', 'P0'], ['P2', 'P0'], ['P3', 'P1'], ['P4', 'P1'], ['P6', 'P2'], ['P5', 'P4']];
-    for (const [dep, pre] of after) expect(ph[dep].start, `${dep} ${pre} bitmeden başlıyor`).toBeGreaterThanOrEqual(ph[pre].end);
-    expect(ph.P2.start).toBeGreaterThan(ph.P1.start);
-    const timeline = read('src/components/Timeline.astro');
-    for (const p of phases) expect(timeline, `zaman çizelgesi ${p.id}`).toContain(`${p.start}–${p.end}. hafta`);
-    expect(timeline).toContain(`${Math.max(...phases.map((p) => p.end))} haftalık plan`);
+    // Belgelenen bağımlılıklar (yol haritası metni): tek ara kapı P1 içindeki Keycloak adımıdır ve yalnız P2'yi açar.
+    expect(Object.fromEntries(phases.map((p) => [p.id, p.after]))).toEqual({
+      P0: [],
+      P1: ['P0'],
+      P2: ['P0'],
+      P3: ['P1'],
+      P4: ['P1'],
+      P6: ['P2'],
+      P5: ['P4'],
+    });
+    expect(ph.P2.entryGate).toMatch(/Keycloak/);
+    expect(ph.P2.entryGate).toMatch(/G-12.*G-16.*G-79.*G-81/);
+    for (const p of phases) if (p.id !== 'P2') expect(p.entryGate, `${p.id} entryGate`).toBeUndefined();
+    const diagram = read('src/components/Timeline.astro');
+    for (const p of phases) expect(diagram, `faz sırası ${p.id}`).toContain(`>${p.id}<`);
+    for (const p of phases) for (const pre of p.after) expect(diagram).toContain(`data-edge='${pre}-${p.id}'`);
+    expect(diagram).toContain('Keycloak adımı');
+    expect(diagram).toContain('Yol haritası faz sırası');
+  });
+
+  test('phases and tasks carry no duration, week, story point or effort estimate', () => {
+    // Ürün kuralı olan süreler (log saklama günleri, 14 günlük deneme, haftalık yedek, K-26 yama hedefleri) görev
+    // süresi değildir ve kalıpların dışındadır; yasak olan faz/görev süresi ve efor ölçümüdür.
+    const raw: Record<string, unknown>[] = JSON.parse(read('src/data/phases.json'));
+    const FORBIDDEN_FIELDS = ['start', 'end', 'weeks', 'duration', 'estimate', 'points'];
+    for (const p of raw) {
+      for (const f of FORBIDDEN_FIELDS) expect(p, `${p.id} alanı ${f}`).not.toHaveProperty(f);
+      expect(Array.isArray(p.after), `${p.id} after`).toBe(true);
+    }
+    const seen = new Set<string>();
+    for (const p of phases) {
+      for (const pre of p.after) expect(seen.has(pre), `${p.id} önkoşulu ${pre} dizide daha önce gelmeli`).toBe(true);
+      seen.add(p.id);
+    }
+
+    const PATTERNS: [RegExp, string][] = [
+      [/\d+\.\s*hafta/iu, 'N. hafta'],
+      [/\d+\s*[–-]\s*\d+\.\s*hafta/iu, 'N–M. hafta'],
+      [/≈\s*\d+\s*hafta/iu, '≈N hafta'],
+      [/\d+\s*haftalık plan/iu, 'N haftalık plan'],
+      [/göreli süre/iu, 'göreli süre'],
+      [/story ?point/iu, 'story point'],
+      [/\bsprint\b/iu, 'sprint'],
+      [/adam[- ]gün/iu, 'adam-gün'],
+      [/hafta sayısı/iu, 'hafta sayısı'],
+    ];
+    const rootDir = fileURLToPath(root);
+    const walk = (dir: string, exts: string[]): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) return walk(full, exts);
+        return exts.some((e) => name.endsWith(e)) ? [full] : [];
+      });
+    const files = [
+      ...walk(join(rootDir, 'src/content/docs'), ['.md']),
+      ...walk(join(rootDir, 'src/data'), ['.json', '.ts']),
+      ...walk(join(rootDir, 'src/components'), ['.astro', '.tsx']),
+      ...walk(join(rootDir, 'src/pages'), ['.astro']),
+      join(rootDir, 'scripts/gen-diagrams.py'),
+      join(rootDir, 'README.md'),
+    ];
+    expect(files.length).toBeGreaterThan(20);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const lines = readFileSync(file, 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        for (const [re, why] of PATTERNS) if (re.test(line)) offenders.push(`${file.slice(rootDir.length)}:${i + 1}: ${why}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+    // Ürün süreleri kalıplara takılmaz (bilinçli örnekler).
+    for (const ok of ['haftalık sapma kontrolü', '7 günlük/4 haftalık/12 aylık', '14 günlük deneme', 'haftalık realm export']) {
+      expect(PATTERNS.some(([re]) => re.test(ok)), ok).toBe(false);
+    }
   });
 
   test('README counts match the requirement data', () => {

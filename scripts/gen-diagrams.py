@@ -24,68 +24,80 @@ def figure(cls: str, label: str, svg: str, caption: str, source: str) -> str:
 
 
 def timeline() -> str:
+    """Faz sırası çizimi: sütunlar bağımlılık düzeyi, oklar önkoşuldan bağımlı faza. Zaman ekseni ve süre yoktur."""
     phases = json.loads((ROOT / "src/data/phases.json").read_text(encoding="utf-8"))
     by_id = {p["id"]: p for p in phases}
-    rows = [(p["id"].lower(), p["title"], p["start"], p["end"]) for p in phases]
-    total = max(p["end"] for p in phases)
-    m1 = by_id["P1"]["end"]
-    m2 = max(by_id["P2"]["end"], by_id["P4"]["end"])
-    m3 = by_id["P6"]["end"]
-    m4 = by_id["P5"]["end"]
-    L, R = 290, 996
-    X = lambda w: L + w / total * (R - L)  # noqa: E731
-    # (id, ad, hafta, konum, hizalama, x)
-    gates = [
-        ("m1", "M1 İlk dikey dilim", m1, "above", "middle", None),
-        ("m2", "M2 İlk ödeyen müşteri", m2, "below", "end", X(m2) + 10),
-        ("m3", "M3 Operasyon canlı", m3, "above", "middle", None),
-        ("m4", "M4 CRM/Webshop", m4, "below", "end", X(m4) + 20),
+    level: dict[str, int] = {}
+    for p in phases:  # phases.json önkoşulları önce listeler; düzey = en uzun önkoşul zinciri
+        level[p["id"]] = max((level[a] + 1 for a in p["after"]), default=0)
+    columns: list[list[str]] = [[] for _ in range(max(level.values()) + 1)]
+    for p in phases:
+        columns[level[p["id"]]].append(p["id"])
+    # Düzen: düzey başına bir sütun; satırlar P1/P3, P0/P4/P5, P2/P6 hizalanır (oklar düz kalsın).
+    ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190}
+    BOX_W, BOX_H, COL_X0, COL_STEP = 200, 64, 40, 256
+    col_x = {pid: COL_X0 + COL_STEP * lvl for pid, lvl in level.items()}
+    name_of = lambda pid: by_id[pid]["title"].split(" ", 1)[1]  # noqa: E731
+    gates = [  # (kimlik, ad, çıkışına bağlı olduğu fazlar)
+        ("M1", "İlk dikey dilim", ["P1"]),
+        ("M2", "İlk ödeyen müşteri", ["P2", "P4"]),
+        ("M3", "Operasyon canlı", ["P6"]),
+        ("M4", "CRM/Webshop", ["P5"]),
     ]
-    spans = ", ".join(f"{p['title']} {p['start']}–{p['end']}" for p in phases)
-    gy = 520
+    join = lambda ids: " ve ".join(ids)  # noqa: E731
+    levels_txt = "; ".join(f"{i + 1}. sütun {', '.join(c)}" for i, c in enumerate(columns))
+    deps_txt = "; ".join(f"{p['id']} {join(p['after'])} bitince başlar" for p in phases if p["after"])
+    gates_txt = ", ".join(f"{k} {n} ({join(ids)} çıkışı)" for k, n, ids in gates)
     o = [
-        f"<svg viewBox='0 0 1040 600' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
-        "<title id='tl-title'>Yol haritası zaman çizelgesi</title>",
-        f"<desc id='tl-desc'>{total} haftalık plan; {spans}. Kapılar: M1 ilk dikey dilim {m1}. hafta, "
-        f"M2 ilk ödeyen müşteri {m2}. hafta, M3 operasyon canlı {m3}. hafta, M4 CRM/Webshop {m4}. hafta.</desc>",
-        f"<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>{total} haftalık plan: ilk ödeyen müşteri {m2}., operasyon düzlemi {m3}. haftada</text>",
-        "<text x='24' y='60' fill='var(--fs-quiet)'>Göreli süre (hafta); fazlar bağımlılıkla zincirlenir, takvim tarihi yoktur (tahmin)</text>",
+        f"<svg viewBox='0 0 1040 520' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
+        "<title id='tl-title'>Yol haritası faz sırası</title>",
+        f"<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir: {levels_txt}. Oklar önkoşuldan bağımlı faza gider: {deps_txt}. "
+        f"P2, P1'deki Keycloak adımı bitince başlar. Kapılar: {gates_txt}. Takvim tarihi ve süre yoktur.</desc>",
+        "<defs><marker id='tl-arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'>"
+        "<path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>",
+        "<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Yol haritası faz sırası: her faz önkoşulu bitince başlar</text>",
+        "<text x='24' y='60' fill='var(--fs-quiet)'>Sütunlar bağımlılık düzeyidir; oklar önkoşuldan bağımlı faza gider; takvim tarihi ve süre yoktur</text>",
     ]
-    for w in range(0, total + 1, 6):
-        x = X(w)
-        o.append(f"<line x1='{x:.1f}' x2='{x:.1f}' y1='96' y2='{gy + 12}' stroke='var(--fs-grid)'/>")
-        o.append(f"<text x='{x:.1f}' y='88' text-anchor='middle' fill='var(--fs-quiet)'>{w}. hafta</text>")
-    o.append(f"<line x1='{L}' x2='{R}' y1='96' y2='96' stroke='var(--fs-line)' stroke-width='1.25'/>")
+    for p in phases:
+        pid = p["id"]
+        x, y = col_x[pid], ROW_Y[pid]
+        acc = pid == "P6"
+        stroke = "var(--fs-accent)" if acc else "var(--fs-line)"
+        fill = "var(--fs-accent-soft)" if acc else "var(--fs-surface)"
+        o.append(f"<rect x='{x}' y='{y}' width='{BOX_W}' height='{BOX_H}' rx='10' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>")
+        o.append(f"<text x='{x + 16}' y='{y + 26}' font-size='18' font-weight='650' fill='var(--fs-ink)'>{pid}</text>")
+        o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
+    for p in phases:
+        for pre in p["after"]:
+            x1, y1 = col_x[pre] + BOX_W, ROW_Y[pre] + BOX_H / 2
+            x2, y2 = col_x[p["id"]], ROW_Y[p["id"]] + BOX_H / 2
+            xm = x2 - 28
+            d = f"M{x1} {y1:.0f} L{x2} {y2:.0f}" if y1 == y2 else f"M{x1} {y1:.0f} L{xm} {y1:.0f} L{xm} {y2:.0f} L{x2} {y2:.0f}"
+            o.append(f"<path data-edge='{pre}-{p['id']}' d='{d}' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>")
+    # P1 → P2 ara kapısı: P1 bitmeden, Keycloak adımı bitince (kesikli ok).
+    gx = col_x["P1"] + 60
     o.append(
-        f"<line x1='{X(m2):.1f}' x2='{X(m2):.1f}' y1='96' y2='{gy + 12}' stroke='var(--fs-accent)' stroke-width='1.5' stroke-dasharray='5 5'/>"
+        f"<path data-edge='P1-P2-gate' d='M{gx} {ROW_Y['P1'] + BOX_H} L{gx} {ROW_Y['P2']}' fill='none' stroke='var(--fs-accent)' "
+        "stroke-width='1.5' stroke-dasharray='5 5' marker-end='url(#tl-arr)'/>"
     )
-    for i, (k, name, s, e) in enumerate(rows):
-        y = 140 + 52 * i
-        acc = k == "p6"
+    o.append(f"<text x='{gx + 10}' y='{(ROW_Y['P1'] + BOX_H + ROW_Y['P2']) / 2 + 6:.0f}' fill='var(--fs-accent-ink)'>Keycloak adımı</text>")
+    gy = 404
+    o.append(f"<text x='24' y='{gy}' font-weight='650' fill='var(--fs-ink)'>Kapılar (hangi fazın çıkışına bağlı)</text>")
+    for i, (k, name, ids) in enumerate(gates):
+        x = 24 + 500 * (i % 2)
+        y = gy + 36 + 34 * (i // 2)
+        acc = k == "M2"
         col = "var(--fs-accent)" if acc else "var(--fs-line)"
-        o.append(f"<line x1='{L}' x2='{X(s):.1f}' y1='{y}' y2='{y}' stroke='var(--fs-grid)'/>")
-        o.append(
-            f"<rect x='{X(s):.1f}' y='{y - 12}' width='{X(e) - X(s):.1f}' height='24' rx='7' fill='{col}' fill-opacity='0.18' stroke='{col}' stroke-width='1.5'/>"
-        )
-        o.append(f"<text x='{X(s) + 8:.1f}' y='{y - 18}' fill='var(--fs-quiet)'>{s}–{e}. hafta</text>")
         fw = " font-weight='650'" if acc else ""
-        o.append(f"<text x='24' y='{y + 6}'{fw} fill='var(--fs-ink)'>{name}</text>")
-    o.append(f"<text x='24' y='{gy + 6}' font-weight='650' fill='var(--fs-ink)'>Kapılar</text>")
-    for k, name, w, pos, anchor, fx in gates:
-        x = X(w)
-        col = "var(--fs-accent)" if k == "m2" else "var(--fs-line)"
-        o.append(f"<path d='M{x:.1f} {gy - 10}l10 10l-10 10l-10 -10z' fill='{col}'/>")
-        ny = gy - 20 if pos == "above" else gy + 36
-        fw = " font-weight='650'" if k == "m2" else ""
-        tx = fx if fx is not None else x
-        o.append(f"<text x='{tx:.1f}' y='{ny}' text-anchor='{anchor}'{fw} fill='var(--fs-ink)'>{name}</text>")
+        o.append(f"<path d='M{x + 10} {y - 14}l10 10l-10 10l-10 -10z' fill='{col}'/>")
+        o.append(f"<text x='{x + 32}' y='{y}'{fw} fill='var(--fs-ink)'>{k} {name} ({join(ids)} çıkışı)</text>")
     o.append("</svg>")
     caption = (
-        "P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini "
-        "içerir; P3 AI ve P4 HRMS TR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca açılır; "
-        "P5 ilk ödeyen müşteriden sonra gelir."
+        "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
+        "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
+        "P5, P4 bitince gelir."
     )
-    return figure("diagram-timeline", "Yol haritası zaman çizelgesi", "\n".join(o), caption, "Yol haritası zaman çizelgesi")
+    return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 
 
 def rails() -> str:
