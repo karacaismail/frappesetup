@@ -437,7 +437,7 @@ ATONOTA_SITE_TENANT1_SECRET=<kiracı tarayıcı istemcisi sırrı, en az 32 kara
 
 `<` ile `>` arasındaki metin yer tutucudur. Yer tutucu, gerçek değerin yerine yazılan açıklamadır.
 
-Bir değerin tamamı `<` ile `>` arasındaysa denetim onu yer tutucu sayar. Örneğin `<noreply@atonota.net>` reddedilir. Bu değeri `noreply@atonota.net` biçiminde yazın.
+Bir değerin tamamı `<` ile `>` arasındaysa denetim onu yer tutucu sayar. Örneğin `<noreply@alan-adi.example>` reddedilir. Bu değeri `noreply@alan-adi.example` biçiminde yazın.
 
 | Liste | Sunucudaki yeri | Ne zaman gerekir |
 | --- | --- | --- |
@@ -517,6 +517,8 @@ Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan li
 - identity-sync servisinin `config.py` dosyası,
 - `platform_core`, `hrms_tr` ve `press_tr` uygulamalarının site ayarı okumaları,
 - `stack.yaml`, `edge.yaml` ve sunucu betiklerindeki değişkenler.
+
+Kod ayarları başka bir adla da okuyabilir. Örneğin `from frappe import conf as c` satırı `c` adını verir. `cfg = frappe.get_site_config()` satırı da `cfg` adını verir. Tarama bu adları da izler.
 
 Kod bir ayarı değişken adıyla okuyabilir. Tarama bu adı kaynak koddan çözer. Örneğin modül sabitini, döngüdeki listeyi ve işlevin çağrılarını okur. Tarama bir adı çözemezse test düşer.
 

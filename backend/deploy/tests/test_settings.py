@@ -124,7 +124,8 @@ def site_reads(app_folder):
     """Every site_config key read by the Python code of one app.
 
     Read forms: frappe.conf.get(...), frappe.conf.x, frappe.conf[...], frappe.local.conf[...],
-    getattr(frappe.conf, ...), frappe.get_site_config() and frappe.get_conf(). A key held in a
+    getattr(frappe.conf, ...), frappe.get_site_config() and frappe.get_conf(), also through an import
+    alias (`from frappe import conf as c`) or a variable holding one of them. A key held in a
     variable is resolved from module constants, literal loops and the calls of the function.
     A read the scan cannot resolve is returned in `unresolved`, and the tests fail on it.
     """
@@ -138,8 +139,17 @@ def site_reads(app_folder):
                  for target in node.targets if isinstance(target, ast.Name)}
         conf_names = {"conf"}
         for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Attribute) and node.value.attr == "conf":
-                conf_names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+            # `from frappe import conf as c` makes `c` the site settings.
+            if isinstance(node, ast.ImportFrom) and node.module == "frappe":
+                conf_names.update(alias.asname for alias in node.names if alias.name == "conf" and alias.asname)
+            # `x = frappe.conf`, `x = frappe.get_site_config()` and `x = frappe.get_conf()`.
+            if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None and (
+                    (isinstance(node.value, ast.Attribute) and node.value.attr == "conf")
+                    or (isinstance(node.value, ast.Call) and isinstance(node.value.func, (ast.Attribute, ast.Name))
+                        and getattr(node.value.func, "attr", getattr(node.value.func, "id", None))
+                        in ("get_site_config", "get_conf"))):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                conf_names.update(target.id for target in targets if isinstance(target, ast.Name))
 
         def is_conf(node):
             if isinstance(node, ast.Attribute) and node.attr == "conf":
@@ -201,6 +211,15 @@ class ListFiles(unittest.TestCase):
         for name, target in settings.LISTS.items():
             for entry in settings.parse_list(SETTINGS / target.list_file):
                 if re.search(r"(?i)(secret|password|passwd|token|key)(?:_|$)", entry.key) and not entry.fixed:
+                    with self.subTest(name=name, key=entry.key):
+                        self.assertTrue(settings.is_placeholder(entry.value), entry.value)
+
+    def test_partial_placeholders_are_not_used(self):
+        # Review 1, finding K2: `<id>.apps.googleusercontent.com` is not a placeholder, so a copied
+        # line would pass the check. A value with `<` must be a placeholder from end to end.
+        for name, target in settings.LISTS.items():
+            for entry in settings.parse_list(SETTINGS / target.list_file):
+                if entry.value and "<" in entry.value:
                     with self.subTest(name=name, key=entry.key):
                         self.assertTrue(settings.is_placeholder(entry.value), entry.value)
 
@@ -315,6 +334,25 @@ class CodeScan(unittest.TestCase):
             "from_getattr", "from_site_config", "from_get_conf", "from_parameter", "from_loop", "from_loop_two",
             "from_comprehension",
         })
+
+    def test_scan_follows_conf_aliases(self):
+        # Review 1 of the second round, finding K1: an import alias and a variable holding
+        # get_site_config() or get_conf() are reads of the site settings too.
+        with tempfile.TemporaryDirectory() as folder:
+            app = Path(folder)
+            (app / "alias.py").write_text(
+                "from frappe import conf as c\n"
+                "a = c.get('from_import_alias')\n")
+            (app / "variable.py").write_text(
+                "import frappe\n"
+                "cfg = frappe.get_site_config()\n"
+                "a = cfg.get('from_site_config_variable')\n"
+                "def read():\n"
+                "    site = frappe.get_conf()\n"
+                "    return site['from_get_conf_variable']\n")
+            keys, unresolved = site_reads(app)
+        self.assertEqual(unresolved, [])
+        self.assertEqual(keys, {"from_import_alias", "from_site_config_variable", "from_get_conf_variable"})
 
     def test_unresolved_read_fails(self):
         with tempfile.TemporaryDirectory() as folder:
