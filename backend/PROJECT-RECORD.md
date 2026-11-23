@@ -353,6 +353,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
   - Bu karar önce O-43 numarasını taşıyordu. O-43 numarası anonim yapma kararına aittir. Karar 23 Kasım 2026 Pazartesi günü O-53 oldu.
 
+- **O-54. G-38 ayar katmanları dosya üzerinden denetlenir.**
+  - [Ayar listesi](docs/config-layers.md) ortak ve site ayarlarını gösterir.
+  - Betik yanlış katmandaki ayarın adını bildirir. Ayarın değerini yazmaz.
+  - Yerel test iki siteye ortak ayarın ulaştığını doğrular.
+  - [Press doğrulaması](docs/handoff/g38-config-layers.md) ayrı ortamda yapılır.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
