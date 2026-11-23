@@ -1649,15 +1649,6 @@
   },
   {
     "rule": "B105",
-    "file": "backend/identity/keycloak/tests/test_create_tenant_client.py",
-    "code": "self.clients[client_id] = {**body, \"id\": client_id, \"secret\": \"preserved-test-secret\"}",
-    "statementSha256": "e742a2aad28012da3a6ab1d5533d8c4eb1b499ce93dd59b643be2616145fa8e0",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "kimlik-realm",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
     "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
     "code": "FAKE_SECRET = \"fake-webhook-secret-for-the-argv-test-7f3a\"  # gitleaks:allow (synthetic test value)",
     "statementSha256": "7f70cb471c60d2c5d71384ba74072021a199e23f2a8568cf28208bab4a02c238",

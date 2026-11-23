@@ -247,7 +247,8 @@ Yerel yığın bu adımı kendisi yapar. Üretimde bu adımı Keycloak yönetici
    bin/create-tenant-client.py acme https://tenant.example.test https://identity.example.test --update-redirects
    ```
 
-5. Komut “Added redirect addresses” satırında eklenen adresleri yazar.
+5. Komut sorunca `UPDATE site-acme` yazın.
+6. Komut “Added redirect addresses” satırında eklenen adresleri yazar.
 
 Bu seçenek yalnız eksik dönüş adreslerini ekler. İstemcinin öteki ayarlarına ve sırrına dokunmaz.
 İstemcide şablonda olmayan bir dönüş adresi varsa komut yine durur. Keycloak yöneticisi bu adresi önce inceler.

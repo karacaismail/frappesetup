@@ -5,6 +5,7 @@ import runpy
 import unittest
 import uuid
 from io import BytesIO
+from secrets import token_hex
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import MagicMock, patch
@@ -46,7 +47,7 @@ class FakeKeycloak:
             client_id = body["clientId"]
             if client_id in self.clients:
                 raise HTTPError(request.full_url, 409, "Conflict", {}, BytesIO())
-            self.clients[client_id] = {**body, "id": client_id, "secret": "preserved-test-secret"}
+            self.clients[client_id] = {**body, "id": client_id, "secret": token_hex(16)}
             status, data = 201, None
         elif method == "GET" and path == "/client-scopes":
             status, data = 200, list(self.scopes.values())
@@ -83,7 +84,10 @@ class FakeKeycloak:
 
 
 class CreateTenantClientTest(unittest.TestCase):
-    def run_command(self, args=ARGS, *, tty=True, reply="CREATE site-acme", server=None):
+    def run_command(self, args=ARGS, *, tty=True, reply=None, server=None):
+        if reply is None:
+            action = "UPDATE" if "--update-redirects" in args else "CREATE"
+            reply = f"{action} site-acme"
         opener = MagicMock()
         if server is not None:
             opener.open.side_effect = server.open
@@ -241,8 +245,39 @@ class CreateTenantClientTest(unittest.TestCase):
         self.assertEqual(untouched(after), untouched(before))
         writes = [(call.get_method(), urlsplit(call.full_url).path) for call in server.calls if call.get_method() != "GET"]
         self.assertEqual(writes, [("PUT", "/admin/realms/platform/clients/site-acme")])
-        self.assertNotIn("secret", json.loads(next(call.data for call in server.calls if call.get_method() == "PUT")))
+        payload = json.loads(next(call.data for call in server.calls if call.get_method() == "PUT"))
+        self.assertEqual(payload.keys(), before.keys() - {"secret"})
         self.assertIn(self.SWITCH_ADDRESS, str(output.call_args_list))
+
+    def test_update_redirects_requires_update_confirmation(self):
+        code, opener, _, prompt = self.run_command([*ARGS, "--update-redirects"], reply="CREATE site-acme")
+        self.assertEqual(code, 2)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_update_redirects_checks_service_and_scope_before_writing(self):
+        for invalid in ("service", "scope"):
+            with self.subTest(invalid=invalid):
+                server = FakeKeycloak()
+                before = self.provision_client_without_switch_address(server)
+                if invalid == "service":
+                    server.clients["site-acme-service"]["serviceAccountsEnabled"] = False
+                else:
+                    server.scopes["aud-site-acme"]["protocol"] = "saml"
+
+                self.assertEqual(self.run_command([*ARGS, "--update-redirects"], server=server)[0], 1)
+                self.assertEqual(server.clients["site-acme"], before)
+                self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_missing_browser_client_is_not_created_before_service_validation(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        del server.clients["site-acme"]
+        server.clients["site-acme-service"]["serviceAccountsEnabled"] = False
+        server.calls.clear()
+
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
 
     def test_update_redirects_adds_a_missing_login_callback_too(self):
         server = FakeKeycloak()

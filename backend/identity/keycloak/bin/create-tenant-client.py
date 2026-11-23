@@ -123,17 +123,9 @@ def redirect_addresses(representation):
     return {"redirectUris": list(representation.get("redirectUris") or []), LOGOUT_ATTRIBUTE: logout}
 
 
-def ensure_client(request, client, update_redirects=False):
-    """Create a missing client or verify an existing one. Return the redirect addresses added.
-
-    A client made before a return address entered the template lacks that address. The missing
-    addresses are reported and, only with `update_redirects`, appended. Nothing else is written.
-    """
+def plan_client_update(existing, client, update_redirects):
+    """Validate a stored client and prepare any authorized redirect update."""
     client_id = client["clientId"]
-    existing = find_client(request, client_id)
-    if existing is None:
-        request("POST", "/clients", payload=client, expected=(201, 409))
-        existing = find_client(request, client_id)
     configuration = (
         "protocol",
         "publicClient",
@@ -177,7 +169,7 @@ def ensure_client(request, client, update_redirects=False):
     missing = {key: [address for address in wanted[key] if address not in current[key]] for key in wanted}
     added = [address for addresses in missing.values() for address in addresses]
     if not added:
-        return []
+        return None, []
     if not update_redirects:
         raise ProvisioningError(
             f"Existing client {client_id} is missing redirect addresses: "
@@ -190,36 +182,11 @@ def ensure_client(request, client, update_redirects=False):
         **(existing.get("attributes") or {}),
         LOGOUT_ATTRIBUTE: "##".join(current[LOGOUT_ATTRIBUTE] + missing[LOGOUT_ATTRIBUTE]),
     }
-    request("PUT", f"/clients/{urllib.parse.quote(existing['id'], safe='')}", payload=payload, expected=(204,))
-    return added
+    return payload, added
 
 
-def provision_tenant(request, client, scope, service_client, update_redirects=False):
-    """Create missing resources and add only optional mappings.
-
-    An existing tenant client is updated only for missing redirect addresses and only with
-    `update_redirects`. Return the addresses added.
-    """
-    service_paths = []
-    for name in SERVICE_CLIENTS:
-        service = find_client(request, name)
-        if service is None:
-            raise ProvisioningError(f"Required client {name} is missing.")
-        service_paths.append(f"/clients/{urllib.parse.quote(service['id'], safe='')}")
-
-    added = ensure_client(request, client, update_redirects)
-    added += ensure_client(request, service_client, update_redirects)
-
+def validate_scope(request, scope, existing_scope, service_paths):
     scope_name = scope["name"]
-    existing_scope = next((item for item in request("GET", "/client-scopes") if item["name"] == scope_name), None)
-    if existing_scope is None:
-        request("POST", "/client-scopes", payload=scope, expected=(201, 409))
-        existing_scope = next(
-            (item for item in request("GET", "/client-scopes") if item["name"] == scope_name),
-            None,
-        )
-    if existing_scope is None:
-        raise ProvisioningError(f"Scope {scope_name} was not found after creation.")
     scope_id = urllib.parse.quote(existing_scope["id"], safe="")
     scope_path = f"/client-scopes/{scope_id}"
     mappers = request("GET", f"{scope_path}/protocol-mappers/models")
@@ -243,12 +210,69 @@ def provision_tenant(request, client, scope, service_client, update_redirects=Fa
         if any(item["id"] == existing_scope["id"] for item in request("GET", path)):
             raise ProvisioningError(f"Scope {scope_name} already has a default binding at {path}.")
 
+    return scope_id
+
+
+def provision_tenant(request, client, scope, service_client, update_redirects=False):
+    """Validate existing resources before provisioning and return the addresses added."""
+    service_paths = []
+    for name in SERVICE_CLIENTS:
+        service = find_client(request, name)
+        if service is None:
+            raise ProvisioningError(f"Required client {name} is missing.")
+        service_paths.append(f"/clients/{urllib.parse.quote(service['id'], safe='')}")
+
+    missing_clients = []
+    updates = []
+    added = []
+    for template in (client, service_client):
+        existing = find_client(request, template["clientId"])
+        if existing is None:
+            missing_clients.append(template)
+        else:
+            payload, addresses = plan_client_update(existing, template, update_redirects)
+            if payload is not None:
+                updates.append(payload)
+                added.extend(addresses)
+
+    scope_name = scope["name"]
+    existing_scope = next((item for item in request("GET", "/client-scopes") if item["name"] == scope_name), None)
+    scope_id = None
+    if existing_scope is not None:
+        scope_id = validate_scope(request, scope, existing_scope, service_paths)
     check_other_bindings(request, scope_name)
+
+    for template in missing_clients:
+        request("POST", "/clients", payload=template, expected=(201, 409))
+        existing = find_client(request, template["clientId"])
+        payload, addresses = plan_client_update(existing, template, update_redirects)
+        if payload is not None:
+            updates.append(payload)
+            added.extend(addresses)
+
+    if existing_scope is None:
+        request("POST", "/client-scopes", payload=scope, expected=(201, 409))
+        existing_scope = next(
+            (item for item in request("GET", "/client-scopes") if item["name"] == scope_name),
+            None,
+        )
+        if existing_scope is None:
+            raise ProvisioningError(f"Scope {scope_name} was not found after creation.")
+        scope_id = validate_scope(request, scope, existing_scope, service_paths)
+        check_other_bindings(request, scope_name)
+
+    missing_bindings = []
     for path in service_paths:
         optional_path = f"{path}/optional-client-scopes"
         optional = request("GET", optional_path)
         if not any(item["id"] == existing_scope["id"] for item in optional):
-            request("PUT", f"{optional_path}/{scope_id}", expected=(204,))
+            missing_bindings.append(f"{optional_path}/{scope_id}")
+
+    for path in missing_bindings:
+        request("PUT", path, expected=(204,))
+    for payload in updates:
+        client_path = f"/clients/{urllib.parse.quote(payload['id'], safe='')}"
+        request("PUT", client_path, payload=payload, expected=(204,))
     return added
 
 
@@ -292,7 +316,8 @@ def main():
         print("Creation requires an interactive terminal.", file=sys.stderr)
         return 2
 
-    confirmation = f"CREATE {client_id}"
+    action = "UPDATE" if args.update_redirects else "CREATE"
+    confirmation = f"{action} {client_id}"
     try:
         if input(f"Type {confirmation} to continue: ") != confirmation:
             return 2
