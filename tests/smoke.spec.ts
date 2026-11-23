@@ -987,12 +987,22 @@ test.describe('requirements explorer', () => {
       await page.evaluate(() => {
         document.documentElement.style.fontSize = '200%';
       });
-      const code = page.locator('.req-card-detail code[tabindex="0"]').first();
+      // Kök yazı değişince betik kutuları ResizeObserver + rAF ile yeniden ölçer. Ölçüm bitmeden odak verilirse
+      // %100 düzenindeki ilk kutu odaklanır, ölçümden sonra `.first()` başka (daha önceki) bir kutuyu gösterir.
+      // Önce ölçümün %200 düzenine yetiştiğini bekle, sonra hedef kutuyu sıra numarasıyla sabitle.
+      await expect.poll(() => mismatched(page)).toBe(0);
+      const index = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('.req-card-detail code')).findIndex((c) => c.getAttribute('tabindex') === '0'),
+      );
+      expect(index).toBeGreaterThanOrEqual(0);
+      const code = page.locator('.req-card-detail code').nth(index);
       await code.focus();
       await expect(code).toBeFocused();
+      await expect(code).toHaveAttribute('tabindex', '0');
       release();
       await waitForHydration(page);
       await expect(code).toBeFocused();
+      await expect(code).toHaveAttribute('tabindex', '0');
       await expect(page.getByTestId('req-table')).toHaveCount(0);
       await page.getByRole('textbox', { name: 'Ara' }).focus();
       await expect(page.getByTestId('req-table')).toBeVisible();
