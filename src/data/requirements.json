@@ -62,7 +62,7 @@
  {
   "id": "G-7",
   "title": "press_tr uygulaması: Press uzantılarının tek evi ve takipli geçici yama",
-  "detail": "Press bench'ine kurulan `press_tr` Frappe uygulaması ödeme (iyzico), TRY, e-belge köprüsü, fixture temizliği, auth allowlist, MCP ticari araçları, Keycloak sarmalayıcıları ve Türkçe e-posta şablonlarını `hooks`, `override_doctype_class`, `doc_events`, Custom Field/Property Setter ile sağlar. Press'te düzeltme gerektiren üç nokta (`Site.validate_encryption_key` `or`→`and` ölü kodu, Agent 'Complete Setup Wizard' çağıranının olmaması, Site Plan/Team Tier fixture'ları) `press_tr`'de kapatılır ve upstream PR olarak açılır; semantic-release güncellemeleri staging'de denenir. Fork-sıfır mutlak kural değildir: upstream düzeltmesi bekleyen nokta için geçici yama yalnız yama kaydıyla (upstream issue/PR bağlantısı, sahip, kaldırılma koşulu, test) tutulur ve her yükseltmede yeniden doğrulanır (ör. Agent offsite yaması G-5).",
+  "detail": "Press bench'ine kurulan `press_tr` Frappe uygulaması ödeme (iyzico), TRY, e-belge köprüsü, fixture temizliği, auth allowlist, MCP ticari araçları, Keycloak sarmalayıcıları ve Türkçe e-posta şablonlarını `hooks`, `override_doctype_class`, `doc_events`, Custom Field/Property Setter ile sağlar. Press'te düzeltme gerektiren üç nokta (`Site.validate_encryption_key` `or`→`and` ölü kodu, Agent 'Complete Setup Wizard' çağıranının olmaması, Site Plan/Team Tier fixture'ları) `press_tr`'de kapatılır ve upstream PR olarak açılır; semantic-release güncellemeleri rc ortamında denenir. Fork-sıfır mutlak kural değildir: upstream düzeltmesi bekleyen nokta için geçici yama yalnız yama kaydıyla (upstream issue/PR bağlantısı, sahip, kaldırılma koşulu, test) tutulur ve her yükseltmede yeniden doğrulanır (ör. Agent offsite yaması G-5).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -102,7 +102,7 @@
  {
   "id": "G-11",
   "title": "Press auth allowlist, client ALLOWED_DOCTYPES ve Method Permission eklemeleri",
-  "detail": "press/auth.py System User olmayanlar için `/api/` altını reddeder; `press_tr` `before_request` kancası (Frappe v15'te validate_auth'tan önce çalışır, doğrulandı) her istekte idempotent olarak `ALLOWED_WILDCARD_PATHS` (`/api/method/press_tr.api.`), iyzico callback/webhook yolları ve `press_tr.mcp.handler` için `ALLOWED_PATHS` ve `ALLOWED_OPTIONS_ENDPOINTS` girişlerini garanti eder. Aynı yerde `press.api.client.ALLOWED_DOCTYPES` listesine Iyzico Payment Record, Iyzico Stored Card vb. eklenir; her sınıfta `dashboard_fields` ve takım filtreli `get_list_query`; doc method'lar için Press Method Permission `press_tr` fixture'ı; yetkisiz doctype erişimi negatif testle doğrulanır.",
+  "detail": "press/auth.py System User olmayanlar için `/api/` altını reddeder; `press_tr` `before_request` kancası (sıra Frappe v15'te doğrulandı: kanca validate_auth'tan önce çalışır; Press artık Frappe 16 üzerindedir (backend O-9), bu sıra Frappe 16'da yeniden doğrulanmalıdır) her istekte idempotent olarak `ALLOWED_WILDCARD_PATHS` (`/api/method/press_tr.api.`), iyzico callback/webhook yolları ve `press_tr.mcp.handler` için `ALLOWED_PATHS` ve `ALLOWED_OPTIONS_ENDPOINTS` girişlerini garanti eder. Aynı yerde `press.api.client.ALLOWED_DOCTYPES` listesine Iyzico Payment Record, Iyzico Stored Card vb. eklenir; her sınıfta `dashboard_fields` ve takım filtreli `get_list_query`; doc method'lar için Press Method Permission `press_tr` fixture'ı; yetkisiz doctype erişimi negatif testle doğrulanır.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -132,7 +132,7 @@
  {
   "id": "G-14",
   "title": "Release pipeline: App Source, Release Group'lar, zamanlanmış dağıtım ve pyproject kuralı",
-  "detail": "Her satılan uygulama için App + App Source (GitHub App entegrasyonu), `erpnext-v16-tr-staging` (enable_auto_deploy) ve `erpnext-v16-tr-prod` Release Group'ları; prod'da `Scheduled Deploy Settings.groups` ile zamanlanmış dağıtım ve Site düzeyinde `only_update_at_specified_time/update_trigger_time/skip_auto_updates` alanları (`press.api.site.update_auto_update_info`). `deploy_hours` hooks.py sabitidir ([1-5, 21-23], sunucu UTC, doğrulandı); bakım penceresi sözleşmeye bu saatlerle yazılır. Her depo pyproject.toml ve `[tool.bench.frappe-dependencies] frappe = \">=16.0.0 <17.0.0\"` taşır (Press CHANGELOG 03-02-2026 kuralı).",
+  "detail": "Her satılan uygulama için App + App Source (GitHub App entegrasyonu), `erpnext-v16-tr-staging` (enable_auto_deploy) ve `erpnext-v16-tr-prod` Release Group'ları (grup adındaki `staging` bir ortam adı değildir; canlı ortamlar alpha, beta, rc ve prod'dur); prod'da `Scheduled Deploy Settings.groups` ile zamanlanmış dağıtım ve Site düzeyinde `only_update_at_specified_time/update_trigger_time/skip_auto_updates` alanları (`press.api.site.update_auto_update_info`). `deploy_hours` hooks.py sabitidir ([1-5, 21-23], sunucu UTC, doğrulandı); bakım penceresi sözleşmeye bu saatlerle yazılır. Her depo pyproject.toml ve `[tool.bench.frappe-dependencies] frappe = \">=16.0.0 <17.0.0\"` taşır (Press CHANGELOG 03-02-2026 kuralı).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -352,7 +352,7 @@
  {
   "id": "G-36",
   "title": "Operasyon izleme: Incident Settings, Telegram/e-posta, Agent Update, güvenlik ajanları",
-  "detail": "Incident Settings (`enable_incident_detection`, gece/gündüz eşikleri) açık, Telegram + e-posta alıcıları tanımlı (telefon araması için Twilio MAY); Agent sürüm güncellemeleri yalnızca Agent Update doctype'ı ile ve önce staging sunucuda; Trace Server (self-host GlitchTip/Sentry) ve Analytics Server (Plausible) Press doctype'larıyla kurulur; Wazuh/YARA/auditd alanları ve Malware Scan kararı verilir.",
+  "detail": "Incident Settings (`enable_incident_detection`, gece/gündüz eşikleri) açık, Telegram + e-posta alıcıları tanımlı (telefon araması için Twilio MAY); Agent sürüm güncellemeleri yalnızca Agent Update doctype'ı ile ve önce rc ortamının sunucusunda; Trace Server (self-host GlitchTip/Sentry) ve Analytics Server (Plausible) Press doctype'larıyla kurulur; Wazuh/YARA/auditd alanları ve Malware Scan kararı verilir.",
   "rail": "R1 Press",
   "priority": "SHOULD",
   "phase": "P0",
@@ -572,7 +572,7 @@
  {
   "id": "G-58",
   "title": "Keycloak tekli oturum kapatma (RP-initiated + back-channel)",
-  "detail": "Frappe oauth2_logins yalnızca login_via_* içerir, logout yoktur (doğrulandı). `platform_core`: `on_session_creation` ile id_token saklanır; `on_logout` Keycloak `/protocol/openid-connect/logout?id_token_hint&post_logout_redirect_uri` yönlendirmesi; `allow_guest` whitelisted `platform_core.api.keycloak_backchannel_logout` logout_token JWT'sini realm JWKS ile doğrular ve `frappe.sessions.clear_sessions(user, force=True)` çağırır; Keycloak client'ta Backchannel logout URL ve 'session required' açık. Kabul: panel çıkışı sonrası Keycloak account console oturum göstermez; Keycloak 'Sign out all sessions' sonrası Frappe `frappe.auth.get_logged_user` 60 sn içinde 401. `press_tr` aynı mekanizmayı Press için uygular. `ops-bff` de back-channel logout alır: `logout_token` ya da yenileme hatasında BFF oturumu ile elindeki Keycloak ve değiştirilmiş belirteçler hemen düşer, Press anahtarı o oturumda kullanılmaz; kabul: çıkıştan 60 sn içinde BFF çağrısı 401; staging'de Keycloak düğümünden `operator.` back-channel logout yoluna erişim (Tailscale ACL Keycloak düğümlerinden yalnız `operator.` HTTPS servisine izin verir, yol kısıtı ters vekil/BFF yol izin listesindedir; ağ sahibi DevOps sorumlusu).",
+  "detail": "Frappe oauth2_logins yalnızca login_via_* içerir, logout yoktur (doğrulandı). `platform_core`: `on_session_creation` ile id_token saklanır; `on_logout` Keycloak `/protocol/openid-connect/logout?id_token_hint&post_logout_redirect_uri` yönlendirmesi; `allow_guest` whitelisted `platform_core.api.keycloak_backchannel_logout` logout_token JWT'sini realm JWKS ile doğrular ve `frappe.sessions.clear_sessions(user, force=True)` çağırır; Keycloak client'ta Backchannel logout URL ve 'session required' açık. Kabul: panel çıkışı sonrası Keycloak account console oturum göstermez; Keycloak 'Sign out all sessions' sonrası Frappe `frappe.auth.get_logged_user` 60 sn içinde 401. `press_tr` aynı mekanizmayı Press için uygular. `ops-bff` de back-channel logout alır: `logout_token` ya da yenileme hatasında BFF oturumu ile elindeki Keycloak ve değiştirilmiş belirteçler hemen düşer, Press anahtarı o oturumda kullanılmaz; kabul: çıkıştan 60 sn içinde BFF çağrısı 401; rc ortamında Keycloak düğümünden `operator.` back-channel logout yoluna erişim (Tailscale ACL Keycloak düğümlerinden yalnız `operator.` HTTPS servisine izin verir, yol kısıtı ters vekil/BFF yol izin listesindedir; ağ sahibi DevOps sorumlusu).",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -582,7 +582,7 @@
  {
   "id": "G-59",
   "title": "auth_hooks adaptörü: site aracı belirteçleri ve servis JWT'leri",
-  "detail": "Frappe `validate_oauth` yalnızca kendi OAuth Bearer Token kayıtlarını tanır (doğrulandı). `platform_core` `auth_hooks` iki tür bearer'ı yerelde doğrular: (1) kiracı sitesinin oturumdan bastığı kısa ömürlü aracı belirteci (G-148: site anahtarıyla imzalı, `aud` hedef servis + site, `exp` dakikalar, `jti` tek kullanım ve iptal listesi, kapsam), (2) Keycloak JWT'si: `azp` izinli listededir, her biri yalnız kendi kapsamıyla (`identity-sync` kullanıcı eşitleme, `press-service` Support Session aç/kapat, `ops-bff` kiracıda yalnız aktif ve rızalı Support Session içinde bilet ve salt okur görünüm, operasyon sitesinde operatör rolleriyle Müşteri 360); `aud` tek değerdir ve bu sitenin istemcisine tam eşittir (G-82); kiracıda `ops-bff` belirtecinin `(iss, sub)` çifti Support Session'daki operatörünkine eşittir; JWKS, `iss`, `exp`, sabit algoritma. Kullanıcı `(iss, sub)` ile eşlenir (G-120), e-postayla değil. Böylece agent servisi kiracı verisine kullanıcının kimliğiyle ve Frappe'nin olağan yetki katmanından geçerek erişir; aynı kütüphane `press_tr`'de Press için kullanılır; CSRF akışında uygulanmaz. K-25'te tarayıcı belirteci modeli seçilirse adaptör Keycloak kullanıcı belirtecini de aynı denetimlerle doğrular. P1 prototipleri (G-129 AI, SA-40 destek) bu adaptörün asgari halini staging'de kullanır.",
+  "detail": "Frappe `validate_oauth` yalnızca kendi OAuth Bearer Token kayıtlarını tanır (doğrulandı). `platform_core` `auth_hooks` iki tür bearer'ı yerelde doğrular: (1) kiracı sitesinin oturumdan bastığı kısa ömürlü aracı belirteci (G-148: site anahtarıyla imzalı, `aud` hedef servis + site, `exp` dakikalar, `jti` tek kullanım ve iptal listesi, kapsam), (2) Keycloak JWT'si: `azp` izinli listededir, her biri yalnız kendi kapsamıyla (`identity-sync` kullanıcı eşitleme, `press-service` Support Session aç/kapat, `ops-bff` kiracıda yalnız aktif ve rızalı Support Session içinde bilet ve salt okur görünüm, operasyon sitesinde operatör rolleriyle Müşteri 360); `aud` tek değerdir ve bu sitenin istemcisine tam eşittir (G-82); kiracıda `ops-bff` belirtecinin `(iss, sub)` çifti Support Session'daki operatörünkine eşittir; JWKS, `iss`, `exp`, sabit algoritma. Kullanıcı `(iss, sub)` ile eşlenir (G-120), e-postayla değil. Böylece agent servisi kiracı verisine kullanıcının kimliğiyle ve Frappe'nin olağan yetki katmanından geçerek erişir; aynı kütüphane `press_tr`'de Press için kullanılır; CSRF akışında uygulanmaz. K-25'te tarayıcı belirteci modeli seçilirse adaptör Keycloak kullanıcı belirtecini de aynı denetimlerle doğrular. P1 prototipleri (G-129 AI, SA-40 destek) bu adaptörün asgari halini beta ortamında kullanır.",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P3",
@@ -812,7 +812,7 @@
  {
   "id": "G-82",
   "title": "Servis kimlikleri ve delegasyon: client credentials, aracı belirteci, token exchange",
-  "detail": "`agent-service`, `identity-sync` ve `press-service` client credentials ile bağlanır; `identity-sync` ve `press-service` kiracıya giden belirteçte `scope` ile yalnız o kiracının audience kapsamını ister. `ops-bff`'de operatör authorization code + PKCE ile girer, belirteçler BFF sunucu oturumunda kalır ve her çağrıda standart token exchange V2 ile hedef audience'a daraltılır (`sub` = operatör; G-59). Kullanıcı adına delegasyon önerilen modelde (K-25) kiracı sitesinin bastığı aracı belirteciyle yapılır (G-148); agent bu belirteçle kiracı siteye (G-59), Press OAuth Client bearer'ıyla Press'e (G-28) gider. V2 (26.2'den beri varsayılan açık, yalnız iç istemciler arası; doğrulandı: Keycloak 26.8.0) ayrıca K-25'te tarayıcı belirteci modeli seçilirse kullanılır; harici exchange (preview) kullanılmaz. P1 asgarisi (SA-40, staging): `press-service` kapsamı, `ops-bff` girişi ve daraltması. Servis belirteci tek `aud` taşır: servis hesabına kendi işi dışında istemci rolü atanmaz (identity-sync'in Admin API rolleri ayrı kapsamda), varsayılan kapsamlarda audience eşleyicisi yoktur, identity-sync'in `press` audience'ı da `scope` ile istenir. Belirteçlerde `azp`, `aud` ve kapsam denetlenir; hiçbir servis kullanıcı adına uzun ömürlü API key saklamaz. Kabul: her servis belirtecinde `aud` tek değer.",
+  "detail": "`agent-service`, `identity-sync` ve `press-service` client credentials ile bağlanır; `identity-sync` ve `press-service` kiracıya giden belirteçte `scope` ile yalnız o kiracının audience kapsamını ister. `ops-bff`'de operatör authorization code + PKCE ile girer, belirteçler BFF sunucu oturumunda kalır ve her çağrıda standart token exchange V2 ile hedef audience'a daraltılır (`sub` = operatör; G-59). Kullanıcı adına delegasyon önerilen modelde (K-25) kiracı sitesinin bastığı aracı belirteciyle yapılır (G-148); agent bu belirteçle kiracı siteye (G-59), Press OAuth Client bearer'ıyla Press'e (G-28) gider. V2 (26.2'den beri varsayılan açık, yalnız iç istemciler arası; doğrulandı: Keycloak 26.8.0) ayrıca K-25'te tarayıcı belirteci modeli seçilirse kullanılır; harici exchange (preview) kullanılmaz. P1 asgarisi (SA-40, beta ortamı): `press-service` kapsamı, `ops-bff` girişi ve daraltması. Servis belirteci tek `aud` taşır: servis hesabına kendi işi dışında istemci rolü atanmaz (identity-sync'in Admin API rolleri ayrı kapsamda), varsayılan kapsamlarda audience eşleyicisi yoktur, identity-sync'in `press` audience'ı da `scope` ile istenir. Belirteçlerde `azp`, `aud` ve kapsam denetlenir; hiçbir servis kullanıcı adına uzun ömürlü API key saklamaz. Kabul: her servis belirtecinde `aud` tek değer.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P3",
@@ -1012,7 +1012,7 @@
  {
   "id": "G-102",
   "title": "Backend uygulama iskeleti ve yayın kontrol listesi",
-  "detail": "`bench new-app` tabanlı şablon: pyproject + frappe-dependencies, hooks (after_install idempotent, `setup_wizard_complete`, after_migrate, fixtures filtre ön eki), Module Def, çeviri dosyası `translations/tr.csv` (`.po` geçişi G-73'e bağlıdır ve sonraya kalır), testler (`bench run-tests`), ruff, Marketplace App metadata, after_install_script, CHANGELOG; yayın: version-16 dalı, semver etiket, App Release → staging Release Group → E2E aktivasyon testi → prod zamanlanmış deploy; `bench --site X install-app` idempotent çalışır.",
+  "detail": "`bench new-app` tabanlı şablon: pyproject + frappe-dependencies, hooks (after_install idempotent, `setup_wizard_complete`, after_migrate, fixtures filtre ön eki), Module Def, çeviri dosyası `translations/tr.csv` (`.po` geçişi G-73'e bağlıdır ve sonraya kalır), testler (`bench run-tests`), ruff, Marketplace App metadata, after_install_script, CHANGELOG; yayın: version-16 dalı, semver etiket, App Release → `erpnext-v16-tr-staging` Release Group → rc ortamında E2E aktivasyon testi → prod zamanlanmış deploy; `bench --site X install-app` idempotent çalışır.",
   "rail": "App çerçevesi",
   "priority": "MUST",
   "phase": "P4",
@@ -1091,8 +1091,8 @@
  },
  {
   "id": "G-110",
-  "title": "Ortamlar: yerel geliştirme (Colima), staging ve prod",
-  "detail": "Yerel: Colima üzerinde docker compose (Frappe v16 bench + MariaDB + Redis + Keycloak + agent), Press için ayrı v15 bench; staging: Hetzner'de küçültülmüş Press + 1 app/1 db sunucusu + staging Keycloak realm; prod: G-3 envanteri; ortamlar arası yapılandırma yalnızca Press doctype'ları ve env ile; Hetzner sunucularında Docker Engine kullanılır.",
+  "title": "Ortamlar: yerel geliştirme (Colima), alpha, beta, rc ve prod",
+  "detail": "Yerel: Colima üzerinde docker compose (Frappe v16 bench + MariaDB + Redis + Keycloak + agent), Press için ayrı Frappe 16 bench (O-9); canlı ortamlar alpha, beta, rc ve prod'dur ve her biri ayrı Docker Compose projesidir: alpha ana daldaki son kod (ana dal güncellenince kendiliğinden), beta ürün ekibinin iç denemesi, rc prod'un aynı tip sunucusunda son kabul denemesi, prod gerçek müşteri (G-3 envanteri); alpha ve beta bir sunucuyu paylaşır, rc ve prod ayrı sunucudadır; geçiş Jenkins'te elle basılan düğmeyle alpha → beta → rc → prod sırasıyla olur; ortamlar arası yapılandırma yalnızca Press doctype'ları ve env ile; Hetzner sunucularında Docker Engine kullanılır.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P0",
@@ -1102,7 +1102,7 @@
  {
   "id": "G-111",
   "title": "CI/CD boru hattı",
-  "detail": "GitHub Actions: backend ruff + `bench run-tests` (MariaDB servis), çeviri derleme, frontend lint/typecheck/unit/Playwright matrisi/Lighthouse bütçesi, bağımlılık ve secret taraması (OSV/`npm audit`/`pip-audit` kapısı, Actions tam commit SHA'sına sabitli, sürüm başına SBOM); etiketle App Release (Press GitHub App) → staging auto deploy → E2E aktivasyon testi (trial → etkinleştir → sidebar) → prod zamanlanmış deploy; Press ve Agent güncellemeleri staging'de denenir; Git yazar koruması ve bot co-author yasağı korunur, hook'lar atlanmaz.",
+  "detail": "GitHub Actions: backend ruff + `bench run-tests` (MariaDB servis), çeviri derleme, frontend lint/typecheck/unit/Playwright matrisi/Lighthouse bütçesi, bağımlılık ve secret taraması (OSV/`npm audit`/`pip-audit` kapısı, Actions tam commit SHA'sına sabitli, sürüm başına SBOM); etiketle App Release (Press GitHub App) → alpha ortamına kendiliğinden dağıtım → Jenkins düğmesiyle beta ve rc → rc ortamında E2E aktivasyon testi (trial → etkinleştir → sidebar) → prod zamanlanmış deploy; Press ve Agent güncellemeleri rc ortamında denenir; Git yazar koruması ve bot co-author yasağı korunur, hook'lar atlanmaz.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P1",
@@ -1242,7 +1242,7 @@
  {
   "id": "G-125",
   "title": "Ödeme–abonelik–kurulum durum makinesi ve telafi",
-  "detail": "Satın alma tek durum makinesidir: checkout başladı → ödeme onayı (iyzico callback + retrieve) → Subscription → Agent Job (install_app) → etkin; her geçiş idempotensi anahtarı taşır (iyzico `conversationId` = Press checkout/fatura adı, Agent Job adı). Yinelenen callback tek geçiş üretir; kaybolan iş sonucu mutabakat işiyle sorgulanır; ödeme alınıp kurulum başarısızsa yeniden deneme, sonra kredi iadesi veya iade + destek kaydı (telafi) çalışır; aynı uygulama için ikinci aktivasyon reddedilir. Kabul: yinelenen callback, kayıp iş sonucu, ödeme var/kurulum yok ve çift aktivasyon senaryoları staging'de geçer.",
+  "detail": "Satın alma tek durum makinesidir: checkout başladı → ödeme onayı (iyzico callback + retrieve) → Subscription → Agent Job (install_app) → etkin; her geçiş idempotensi anahtarı taşır (iyzico `conversationId` = Press checkout/fatura adı, Agent Job adı). Yinelenen callback tek geçiş üretir; kaybolan iş sonucu mutabakat işiyle sorgulanır; ödeme alınıp kurulum başarısızsa yeniden deneme, sonra kredi iadesi veya iade + destek kaydı (telafi) çalışır; aynı uygulama için ikinci aktivasyon reddedilir. Kabul: yinelenen callback, kayıp iş sonucu, ödeme var/kurulum yok ve çift aktivasyon senaryoları rc ortamında geçer.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P2",
@@ -1281,8 +1281,8 @@
  },
  {
   "id": "G-129",
-  "title": "P1 AI yetki devri prototipi (staging, tek araç)",
-  "detail": "İlk dikey dilimin AI adımı tam P3 teslimi değildir: staging'de tek araç (`hrms_tr.approve_leave`) site tarafından basılan kısa ömürlü aracı belirteciyle (G-148) kullanıcının kimliğinde çalışır, onay G-86 sözleşmesiyle sunucuda bağlanır ve AI Action Log'a yazılır. Kapsam dışı: niyet sınıflandırıcı, kredi ölçümü, müşteriye açılış. Kabul: yetkisiz kullanıcı için `denied`, onaysız yazma reddi, onaydan sonra belge değişmişse yeniden önizleme; tam teslim P3'te G-59, G-84..G-86 ile.",
+  "title": "P1 AI yetki devri prototipi (beta ortamı, tek araç)",
+  "detail": "İlk dikey dilimin AI adımı tam P3 teslimi değildir: beta ortamında tek araç (`hrms_tr.approve_leave`) site tarafından basılan kısa ömürlü aracı belirteciyle (G-148) kullanıcının kimliğinde çalışır, onay G-86 sözleşmesiyle sunucuda bağlanır ve AI Action Log'a yazılır. Kapsam dışı: niyet sınıflandırıcı, kredi ölçümü, müşteriye açılış. Kabul: yetkisiz kullanıcı için `denied`, onaysız yazma reddi, onaydan sonra belge değişmişse yeniden önizleme; tam teslim P3'te G-59, G-84..G-86 ile.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P1",
@@ -1432,7 +1432,7 @@
  {
   "id": "G-144",
   "title": "Keycloak sertleştirme kontrol listesi",
-  "detail": "Yönetim konsolu ve Admin REST API public host'ta reverse proxy düzeyinde engellenir; ayrı `hostname-admin` tek başına Admin REST API erişimini engellemez (doğrulandı: Keycloak hostname rehberi). Anonim dinamik istemci kaydı kapalı kalır ve doğrulanır, redirect URI'leri tam adrestir (joker yok), public istemci varsa PKCE S256 zorunlu, implicit ve parola grant kapalı; kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapatılır; brute-force koruması, passkey/WebAuthn ve yönetici olaylarının Log Server'a akışı açıktır; her minor yükseltme Upgrading Guide'a göre staging'de denenir. Kabul: public host'tan `/admin` ve `/admin/realms/*` 403; kontrol listesi her yükseltmede yeniden koşar.",
+  "detail": "Yönetim konsolu ve Admin REST API public host'ta reverse proxy düzeyinde engellenir; ayrı `hostname-admin` tek başına Admin REST API erişimini engellemez (doğrulandı: Keycloak hostname rehberi). Anonim dinamik istemci kaydı kapalı kalır ve doğrulanır, redirect URI'leri tam adrestir (joker yok), public istemci varsa PKCE S256 zorunlu, implicit ve parola grant kapalı; kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapatılır; brute-force koruması, passkey/WebAuthn ve yönetici olaylarının Log Server'a akışı açıktır; her minor yükseltme Upgrading Guide'a göre rc ortamında denenir. Kabul: public host'tan `/admin` ve `/admin/realms/*` 403; kontrol listesi her yükseltmede yeniden koşar.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P0",
@@ -1502,7 +1502,7 @@
  {
   "id": "G-151",
   "title": "Destek yaşam döngüsü ve yükseltme takvimi",
-  "detail": "Destek durumu son etiket tarihinden çıkarılmaz: ERPNext resmi destek tablosu (v15 2027 sonu, v16 2029 sonu, planlı; v14 31 Ocak 2026'da bitti) izlenir; Frappe Framework için ayrı tablo yoktur, ERPNext tablosu ve dal etkinliği izlenir; Press sürümleri (`master` etiketleri) ve Keycloak minor sürümleri takip edilir; Node/Python çalışma zamanı sonları kayıtlıdır. Rutin yükseltme: Frappe/ERPNext minor aylık, Press etiketi aylık staging denemesiyle, Keycloak her minor Upgrading Guide ile, frontend bağımlılıkları gruplu; acil güvenlik yaması bu takvimi beklemez (G-142). Staging'de bir sonraki sürüm için gece kanaryası. Kabul: aylık yaşam döngüsü raporu; her yükseltme staging E2E kanıtıyla.",
+  "detail": "Destek durumu son etiket tarihinden çıkarılmaz: ERPNext resmi destek tablosu (v15 2027 sonu, v16 2029 sonu, planlı; v14 31 Ocak 2026'da bitti) izlenir; Frappe Framework için ayrı tablo yoktur, ERPNext tablosu ve dal etkinliği izlenir; Press sürümleri (`master` etiketleri) ve Keycloak minor sürümleri takip edilir; Node/Python çalışma zamanı sonları kayıtlıdır. Rutin yükseltme: Frappe/ERPNext minor aylık, Press etiketi aylık rc ortamı denemesiyle, Keycloak her minor Upgrading Guide ile, frontend bağımlılıkları gruplu; acil güvenlik yaması bu takvimi beklemez (G-142). alpha ortamında bir sonraki sürüm için gece kanaryası. Kabul: aylık yaşam döngüsü raporu; her yükseltme rc ortamındaki E2E kanıtıyla.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P0",
@@ -1931,8 +1931,8 @@
  },
  {
   "id": "SA-40",
-  "title": "P1 destek görüntüleme prototipi (staging, tek oda)",
-  "detail": "İlk dikey dilimin destek adımı tam P6 teslimi değildir: staging'de Support Access → Support Session (yalnız görüntüle) → tek route için paylaşılan durum (rota, imleç, filtre; alan değeri yok) çalışır; Hocuspocus bağlantısı site tarafından basılan tek kullanımlık bilet ile açılır (G-148). Kapsam dışı: takip, kontrol, temsil, Administrator yükseltmesi, Helpdesk; talep `login_as_administrator=0`. Kabul: müşteri Revoke ettiğinde operatörün WebSocket bağlantısı 2 sn içinde kapanır ve yeniden bağlanma reddedilir; her servis belirtecinde `aud` tek değer (G-82); tam teslim P6'da SA-42..SA-44.",
+  "title": "P1 destek görüntüleme prototipi (beta ortamı, tek oda)",
+  "detail": "İlk dikey dilimin destek adımı tam P6 teslimi değildir: beta ortamında Support Access → Support Session (yalnız görüntüle) → tek route için paylaşılan durum (rota, imleç, filtre; alan değeri yok) çalışır; Hocuspocus bağlantısı site tarafından basılan tek kullanımlık bilet ile açılır (G-148). Kapsam dışı: takip, kontrol, temsil, Administrator yükseltmesi, Helpdesk; talep `login_as_administrator=0`. Kabul: müşteri Revoke ettiğinde operatörün WebSocket bağlantısı 2 sn içinde kapanır ve yeniden bağlanma reddedilir; her servis belirtecinde `aud` tek değer (G-82); tam teslim P6'da SA-42..SA-44.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P1",
