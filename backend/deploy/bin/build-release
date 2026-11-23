@@ -18,11 +18,8 @@ components=(
     "tenant|$backend|$backend/deploy/images/tenant.Dockerfile|"
     "keycloak|$backend/identity/keycloak|$backend/identity/keycloak/Dockerfile|prod"
     "identity-sync|$backend|$backend/identity/identity_sync/Dockerfile|"
+    "press|$backend|$backend/deploy/images/press.Dockerfile|"
 )
-# Press has no production image yet (blocker E-2). It joins the release when this file exists.
-if [[ -f "$backend/deploy/images/press.Dockerfile" ]]; then
-    components+=("press|$backend/..|$backend/deploy/images/press.Dockerfile|")
-fi
 
 image_arguments=()
 for entry in "${components[@]}"; do

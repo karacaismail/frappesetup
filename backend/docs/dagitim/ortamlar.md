@@ -95,7 +95,7 @@ Her ortamın kendi veritabanı, kendi birimleri ve kendi iç ağı vardır. Orta
 
 Her sunucuda tek bir ön vekil vardır. Ön vekil 80 ve 443 portlarını açar. Öteki hiçbir servis port açmaz.
 
-Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press. Veritabanları bu ağda değildir.
+Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press ön yüzü. Veritabanları bu ağda değildir.
 
 Ortamlar aynı ağı paylaşmaz. Bu yüzden alpha'daki bir konteyner beta'nın Keycloak'ına doğrudan ulaşamaz. `remote/apply` betiği ağı açar. Betik ön vekilin ağ listesini de `networks.yaml` dosyasına yazar.
 
@@ -120,13 +120,14 @@ Kural şudur: kod bir kez derlenir. Her ortam aynı paketi çalıştırır.
 
 ### Arka uç paketi
 
-Arka uç paketinde üç imaj vardır:
+Arka uç paketinde dört imaj vardır:
 
 - `atonota-tenant` imajı kiracı sitesini taşır. İçinde ERPNext, HRMS, `platform_core` ve `hrms_tr` vardır. İmajı `backend/deploy/images/tenant.Dockerfile` dosyası derler.
 - `atonota-keycloak` imajı Keycloak'ı taşır. İmajı `backend/identity/keycloak/Dockerfile` dosyasının `prod` hedefi derler.
 - `atonota-identity-sync` imajı kullanıcı eşitleme servisini taşır. İmajı `backend/identity/identity_sync/Dockerfile` dosyası derler.
+- `atonota-press` imajı Press'i taşır. İçinde Press v0.154.1, `press_tr` ve `oidc_verify` vardır. İmajı `backend/deploy/images/press.Dockerfile` dosyası derler. Ayrıntı [Press imajı belgesindedir](press-imaji.md).
 
-Press imajı henüz yok. Bu bir engeldir (E-2). Press imajı eklenince pakete dördüncü parça olarak girer.
+Press'in sunucu tarafı işleri henüz tam değildir. Kalan iş E-2 satırındadır.
 
 İmajlar GitHub Container Registry'ye yüklenir. Adres `ghcr.io/karacaismail/atonota-<parça>` olur. Depo açık kaynaktır. İmajlarda sır yoktur.
 
@@ -397,7 +398,7 @@ Sunucudaki sır dosyaları şunlardır:
 - `tenant.env` ve `tenant-db.env` dosyaları kiracı sitesinin ve MariaDB'nin sırlarını tutar.
 - `keycloak.env` ve `keycloak-db.env` dosyaları Keycloak'ın ve PostgreSQL'in sırlarını tutar. Anahtar adları `backend/identity/keycloak/production.env.example` dosyasındadır.
 - `identity-sync.env` dosyası eşitleme servisinin sırlarını tutar.
-- `press.env` dosyası Press'in sırlarını tutar. Bu dosya Press imajı gelince gerekir.
+- `press.env` dosyası Press'in sırlarını tutar. Press servisleri bu dosyayı okur.
 - `offsite.env` dosyası sunucu dışı yedeğin `rclone` adresini tutar.
 - `/etc/atonota/edge.env` dosyası sertifika uyarısının gideceği e-posta adresini tutar.
 
@@ -465,8 +466,8 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 
 | No | Engel | Önerilen çözüm | Sahibi |
 | --- | --- | --- | --- |
-| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
-| E-2 | Press'in üretim imajı yok. Press bugün açılışta kurulur. Python 3.14 yaması da açık (O-18) | press-tr işi `backend/deploy/images/press.Dockerfile` dosyasını yazar. Dosya gelince `build-release` Press'i pakete ekler | press-tr işi |
+| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. 23 Kasım 2026 Pazartesi günü üretim imajında ansible-core 2.21.6 yerel bir oyunu çalıştırdı. Gerçek sunucu kurma denenmedi | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi ([Press imajı belgesi](press-imaji.md)). Kalan iş şudur: `remote/backup`, `remote/restore` ve `remote/apply` Press sitesini yedeklemez, geri yüklemez ve Press sitesinde `migrate` çalıştırmaz. Press'in migrate adımı Press'in kendi denetimi için internetten chromedriver indirmeye çalışır. İmaj sunucuda ve amd64'te denenmedi | press-tr işi betiklere Press sitesini ekler. Ekleme bitmeden rc ve prod'a Press'li paket taşınmaz. DevOps sorumlusu ilk kurulumda Press sitesini açar | press-tr işi ve DevOps sorumlusu |
 | E-3 | `/panel` sayfası arayüz dosyalarını yüklemiyor. Sayfa yer tutucu metin gösteriyor | `panel.html`, arayüz paketinin Vite listesini okur. Sonra `/panel/assets/` dosyalarını yükler. İçerik güvenlik politikası bu yola izin verir | platform-core-kabuk işi |
 | E-4 | Üretim ayarlarının listesi yok. Örneğin Keycloak istemci sırları, sitenin kimlik ayarları ve eşitleme servisinin kiracı listesi | Her servis için üretim anahtar listesi yazılır. Liste `production.env.example` biçiminde olur | kimlik-realm işi ve DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |

@@ -180,6 +180,29 @@ Bu denetim geçmeden yalnız modül açılışı tam uyum kanıtı olmaz.
 
 [Press bağımlılık bildirimi](https://github.com/frappe/press/blob/v0.154.1/pyproject.toml#L24-L61)
 
+## Öneri 5: Telegram paketini isteğe bağlı yapın
+
+Bu öneri 23 Kasım 2026 Pazartesi günü üretim imajı işinde eklendi.
+Press, `python-telegram-bot==13.15` paketini ister.
+Bu paket Python 3.12 ve sonrasında içe aktarılamaz.
+Paketin içindeki urllib3 kopyası eski `six.moves` yolunu kullanır.
+Paketin yedek yolu `urllib3.contrib.appengine` modülünü ister. urllib3 2 bu modülü kaldırdı.
+`press/press/doctype/press_settings/press_settings.py` dosyası Telegram yardımcısını açılışta içe aktarır.
+Bu yüzden Press Settings belge türü de açılmaz.
+
+Üretim imajındaki `0004-optional-telegram.patch` yaması içe aktarmayı korumaya alır.
+Paket yoksa Press yine açılır. Telegram mesajı gönderilmez ve hata kaydı yazılır.
+Bakımcılar uzun vadede bakımı süren bir Telegram istemcisine geçmelidir.
+Örneğin Telegram Bot API'si doğrudan HTTP ile çağrılabilir.
+
+## Üretim imajındaki karşılıklar
+
+Öneriler üretim imajında yama dizisi olarak uygulandı (O-51).
+Yamalar `backend/deploy/images/press-patches/` klasöründedir.
+Öneri 4'ün bağımlılık kararları `0005-dependency-pins.patch` yamasının başında yazılıdır.
+Tam bağımlılık denetimi bu imajda iki bilinen satırla geçer.
+Ayrıntı [Press imajı belgesindedir](dagitim/press-imaji.md).
+
 ## Kabul sonucu
 
 İlk testler paket değişikliğinden önce çalıştırıldı.
