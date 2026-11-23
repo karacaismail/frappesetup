@@ -35,6 +35,7 @@ printf 'fake database\n' >"$out"
 """
 
 DAY = 24 * 60 * 60
+BASH = shutil.which("bash") or "/bin/bash"
 
 
 def pinned_sum():
@@ -86,7 +87,7 @@ class OsvSetupRefresh(unittest.TestCase):
         return path
 
     def run_setup(self, *args):
-        process = subprocess.run(["bash", str(SETUP), *args], env=self.env, capture_output=True, text=True)
+        process = subprocess.run([BASH, str(SETUP), *args], env=self.env, capture_output=True, text=True)
         downloads = self.log.read_text().split() if self.log.exists() else []
         return process, downloads
 

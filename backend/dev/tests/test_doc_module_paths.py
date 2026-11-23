@@ -14,7 +14,6 @@ dev/naming records the rename itself, so it is not checked.
 """
 
 import re
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -30,10 +29,17 @@ CONTRACT = re.compile(r"platform_core-[a-z-]+\.openapi\.yaml")
 NEW = dict(zip(OLD, ("identity", "shell", "ai", "model_gateway", "access", "mobile")))
 
 
+# Folders that hold installed or generated files, not project documents.
+IGNORED = {".git", ".venv", "venv", "node_modules", "__pycache__", "dist", "build", ".pytest_cache"}
+
+
 def documents():
-    names = subprocess.run(["git", "ls-files", "-z", "--", "*.md"], cwd=BACKEND, check=True,
-                           capture_output=True, text=True).stdout.split("\0")
-    return [name for name in names if name and not name.startswith(SKIP)]
+    names = []
+    for path in sorted(BACKEND.rglob("*.md")):
+        relative = path.relative_to(BACKEND)
+        if IGNORED.isdisjoint(relative.parts) and not relative.as_posix().startswith(SKIP):
+            names.append(relative.as_posix())
+    return names
 
 
 def renamed_beside(text, old, line):
