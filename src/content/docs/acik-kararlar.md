@@ -14,8 +14,8 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-2 | DNS yetkisi (G-2) | Teknik varsayım | Apex bölgenin tamamı Route 53 / yalnız `app.<marka>.com.tr` alt bölgesi | Alt bölge: kiracılar `<kiracı>.app.<marka>.com.tr`; `panel.`, `press.`, `operator.`, `ops.`, `agent.` GoDaddy'de kalır. Keycloak ayrı `atonota.net` alanındadır (K-61). DevOps sorumlusu kayıt değerlerini hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını yazar, DevOps sorumlusu wildcard sertifikayı doğrular | P0 |
 | K-3 | Güvenlik ajanları ve nöbet (G-36, G-115, X-08) | Ürün sahibi | Wazuh/YARA/Malware Scan kapsamı; yedek nöbetçi | Wazuh + auditd P0'da; birincil nöbet DevOps sorumlusu, yedek kişiyi ürün sahibi atar | P0 |
 | K-4 | Yinelenen tahsilat modeli (G-19, G-20) | Ürün sahibi | Press Usage Record + iyzico saklı karttan tahsilat / iyzico Subscription ürünü | Press defteri + saklı kart: ay içi plan değişimi, kredi ve Havale/EFT tek defterde kalır | P1 |
-| K-5 | App Release onay kapısı (G-14) | Ürün sahibi | `bypass_automated_audit` + otomatik Approved / App Release Approval Request | Staging'de otomatik, prod Release Group'ta Approval Request zorunlu | P1 |
-| K-6 | Keycloak teması (G-80) | Teknik varsayım | Keycloakify / FTL | Keycloakify; tokenlar `@platform/design-tokens`'tan tek kaynak; tema Java kodu içermez (G-152) | P1 |
+| K-5 | App Release onay kapısı (G-14) | Ürün sahibi | `bypass_automated_audit` + otomatik Approved / App Release Approval Request | alpha ve beta'da otomatik, rc ve prod Release Group'ta Approval Request zorunlu | P1 |
+| K-6 | Keycloak teması (G-80) | Teknik varsayım | Keycloakify / FTL | Kapandı: tema Keycloak'ın kendi tema yapısıyla (FTL) kurulur (backend O-4). Tema Java kodu içermez (G-152). Giriş sayfası ve panelin tokenları bugün iki ayrı dosyadadır. Tek kaynağa geçiş backend borcudur | P1 |
 | K-7 | SMTP relay (G-47) | Ürün sahibi | Hetzner'de Postfix / AB bölgeli sağlayıcı | AB bölgeli sağlayıcı (teslimat itibarı), KVKK envanterine eklenir; kurulum DevOps sorumlusu, DNS değerlerini alan adı sorumlusu uygular | P1 |
 | K-8 | Ürün parametreleri | Ürün sahibi | `rounding_method` (G-41), `session_expiry` 8–24 saat (G-43), `track_views` (G-64), `apply_strict_user_permissions` (G-52) | Banker's Rounding, 12 saat, track\_views yalnızca hassas doctype'larda, strict açık | P1 |
 | K-9 | GİB özel entegratörü ve e-belge kodu (G-22, G-65) | Mali müşavir + ürün sahibi | Hazır Frappe e-belge uygulaması / `tr_edocs` geliştirme; Sovos, Logo, Uyumsoft, eLogo | Entegratör mali müşavirle seçilir; UBL-TR katmanı tek kez yazılır, operasyon sitesi (`press_tr_finance`) ve kiracılar paylaşır | P2 |
@@ -88,10 +88,10 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 
 | Risk | Etki | Azaltım |
 | --- | --- | --- |
-| Press semantic-release güncellemesi `press_tr` override'larını kırar (G-1, G-7) | Aktivasyon ve fatura kapanışı durur | Her etiket staging Press'te `bench migrate` + aktivasyon E2E; prod bakım penceresinde; DevOps sorumlusu |
+| Press semantic-release güncellemesi `press_tr` override'larını kırar (G-1, G-7) | Aktivasyon ve fatura kapanışı durur | Her etiket rc ortamındaki Press'te `bench migrate` + aktivasyon E2E; prod bakım penceresinde; DevOps sorumlusu |
 | FC fixture'ları yerel plan ayarlarını ezer (G-8; doğrulandı) | Yanlış planlar panelde görünür | `press_tr.after_migrate` idempotent; migrate sonrası enabled plan sayısı testi |
 | TRY planında `price_usd` boş kalırsa ücretli uygulama ücretsiz sayılır (G-10; doğrulandı) | Gelir kaybı | Her TRY planına USD karşılığı; CI'da `can_install_paid_apps` kapı testi |
-| iyzico/EFT yollarında `transaction_amount` boş kalırsa fatura senkronu hiç tetiklenmez (SA-11; doğrulandı) | Operasyon sitesinde Sales Invoice ve e-belge üretilmez | `press_tr` tüm ödeme yollarında alanı Team para birimiyle doldurur; gece mutabakat raporu Paid-ama-senkronsuz faturayı sıfır olarak doğrular |
+| iyzico/EFT yollarında `transaction_amount` boş kalırsa fatura senkronu hiç tetiklenmez (SA-11; doğrulandı) | Operasyon sitesinde Sales Invoice ve e-belge üretilmez | `press_tr` tüm ödeme yollarında alanı Team para birimiyle doldurur; elle başlatılan mutabakat raporu (zamanlanmış iş yok, backend D-6) Paid-ama-senkronsuz faturayı sıfır olarak doğrular |
 | Press Support Agent rolü Support Access'siz çapraz-kiracı liste okuyabilir (SA-2, SA-37; doğrulandı) | KVKK ihlali riski | Rol ayrıcalıklı sayılır, yalnız `ops-support` grubuna; her `get_list` çağrısı Operator Audit'e; SA-37 görüntüleme denetimi |
 | Hocuspocus bağlantısı veya temsil oturumu iptalden sonra açık kalırsa | İzinsiz görüntüleme veya işlem | İptal ve süre dolumunda sunucu açık bağlantıları kapatır, yeniden kimlik doğrulamayı reddeder ve temsil oturumunu sonlandırır (SA-42); kabul: 2 sn içinde kesilme testi |
 | Agent offsite yaması upstream'e alınmaz (G-5) | Hetzner'e yedek yüklenmez | Yama Agent Update ile sürümlenir; `alert_on_sites_with_missing_backups` açık |
@@ -101,7 +101,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | Prompt injection ile yetki aşımı (G-85, G-89) | Veri sızıntısı | Araç çağrısı kullanıcı kimliğiyle; kırmızı takım eval seti CI kapısı |
 | Anthropic aktarımı KVKK (G-90) | İdari yaptırım | Veri envanteri + standart sözleşme; PII maskeleme; takım düzeyinde AI kapatma |
 | Tek SSO oturumunun ortak site oturumu sanılması, çapraz kiracı çerez/CSRF hatası (G-119) | Kiracılar arası erişim | Host'a bağlı oturum, CORS yok, negatif testler P1 kapısında |
-| Aynı ekonomik olayın iki yoldan kaydı (SA-41) | Çift veya eksik vergi kaydı | Tek olay–belge matrisi, idempotensi anahtarları, gece mutabakatı |
+| Aynı ekonomik olayın iki yoldan kaydı (SA-41) | Çift veya eksik vergi kaydı | Tek olay–belge matrisi, idempotensi anahtarları, elle başlatılan mutabakat |
 | Yetki kararı veri yüzeylerinde farklı (rapor, dışa aktarım, `get_all`) (G-121) | Yetkisiz veri | Yüzey kapsama matrisi ve UI'sız negatif testler |
 | Press host tek hata noktası (G-114) | Kontrol düzlemi kaybı | Binlog ile RPO ≤ 1 saat, RTO ≤ 8 saat runbook; yıllık DR tatbikatı |
 
@@ -109,10 +109,10 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 
 | Bağımlılık | Mevcut sürüm | İzlenen değişiklik | Kabul kapısı |
 | --- | --- | --- | --- |
-| frappe/press | v0.154.x hedef; son sürüm v0.155.3 (2026-10-08); `pyproject` frappe `>=15,<17` beyan eder, v16 çalışma uyumu doğrulanmadı | patches.txt, fixture'lar, auth.py, pyproject pinleri, frappe.io senkron kodu | Staging migrate + E2E (DevOps sorumlusu) |
-| frappe/agent | master | offsite endpoint PR; Agent Update | Staging sunucuda `auto_rollback` |
+| frappe/press | v0.154.x hedef; son sürüm v0.155.3 (2026-10-08); `pyproject` frappe `>=15,<17` beyan eder. Backend v0.154.1 sürümünü Frappe 16.56.0 ve Python 3.14.10 ile yalnız beş yamayla açtı (backend O-52, 23 Kasım 2026, yerel Colima denemesi). Sunucu kurma akışı Frappe 16'da çalışmıyor (E-1) | patches.txt, fixture'lar, auth.py, pyproject pinleri, frappe.io senkron kodu | rc ortamında migrate + E2E (DevOps sorumlusu) |
+| frappe/agent | master | offsite endpoint PR; Agent Update | rc sunucusunda `auto_rollback` |
 | frappe/frappe, erpnext | frappe v16.51.0, erpnext v16.50.0 (doğrulandı); destek: ERPNext v15 2027 sonu, v16 2029 sonu (planlı) | /api/v2, Social Login Key, Workspace Sidebar meta, `user.impersonate` | Çekirdek meta codegen diff CI |
-| frappe/crm, frappe/helpdesk | `main` (frappe &gt;=15,&lt;17) | develop dalının v17/Python 3.14 geçişi, telephony/whatsapp bağımlılıkları | Operasyon sitesi staging Deploy Candidate |
+| frappe/crm, frappe/helpdesk | `main` (frappe &gt;=15,&lt;17) | develop dalının v17/Python 3.14 geçişi, telephony/whatsapp bağımlılıkları | Operasyon sitesi rc Deploy Candidate |
 | frappe/mcp | main, "experimental" | v16 uyumu (doğrulanacak) | P3 kurulum testi |
 | ueberdosis/hocuspocus | v4.7.0 (MIT, doğrulandı) | extension-redis/webhook API'si, Yjs sürümü | Destek oturumu E2E |
 | Keycloak | 26.x (26.8.0, 2026-10-01, doğrulandı) | Upgrading Guide'daki minor/patch kırıcı değişiklikleri, güvenlik danışmanlıkları (G-142), Account Console v3 | Realm regresyon + tema E2E |
