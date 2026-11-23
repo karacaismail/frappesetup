@@ -12,7 +12,7 @@
  {
   "id": "G-2",
   "title": "Root Domain, Route 53 ve NS delegasyonu",
-  "detail": "Kiracı kök alanı `app.<marka>.com.tr`'dir; kiracı siteleri `<kiracı>.app.<marka>.com.tr` adresini alır (alt bölge delegasyonu kardeş host'ları kapsamaz; `panel.`, `press.`, `operator.`, `id.`, `ops.`, `agent.` GoDaddy'deki ana bölgede kalır). Bu alan için Press Root Domain kaydı `dns_provider='AWS Route 53'` ile açılır; DevOps sorumlusu hosted zone ve IAM politikasını hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını Route 53'e delege eder, DevOps sorumlusu wildcard sertifikanın alındığını doğrular. Press wildcard TLS için yalnızca certbot `--dns-route53` çağırır (doğrulandı).",
+  "detail": "Kiracı kök alanı `app.<marka>.com.tr`'dir; kiracı siteleri `<kiracı>.app.<marka>.com.tr` adresini alır (alt bölge delegasyonu kardeş host'ları kapsamaz; `panel.`, `press.`, `operator.`, `ops.`, `agent.` GoDaddy'deki ana bölgede kalır). Bu alan için Press Root Domain kaydı `dns_provider='AWS Route 53'` ile açılır; DevOps sorumlusu hosted zone ve IAM politikasını hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını Route 53'e delege eder, DevOps sorumlusu wildcard sertifikanın alındığını doğrular. Press wildcard TLS için yalnızca certbot `--dns-route53` çağırır (doğrulandı).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P0",
@@ -752,7 +752,7 @@
  {
   "id": "G-76",
   "title": "Keycloak kurulumu: HA, PostgreSQL, yedek ve olay günlüğü",
-  "detail": "Keycloak 26.x (sürüm: olası, kurulumda doğrulanır) Hetzner'de en az iki düğüm + PostgreSQL (streaming replika), Press proxy veya ayrı nginx arkasında `https://id.<marka>.com.tr`, Infinispan küme, günlük şifreli DB yedeği ikinci lokasyona, admin konsolu ve Admin REST API yalnızca Tailscale/özel ağdan, public host'ta reverse proxy düzeyinde kapalı (ayrı `hostname-admin` tek başına yetmez; G-144); kullanıcı ve admin olayları (login, logout, login_error, update_email, admin events) etkin ve Log Server'a aktarılır, saklama KVKK/5651 ile hizalı.",
+  "detail": "Keycloak 26.x (sürüm: olası, kurulumda doğrulanır) Hetzner'de en az iki düğüm + PostgreSQL (streaming replika), Press proxy veya ayrı nginx arkasında `https://api.login.atonota.net` (AtonotA Login; alpha, beta ve rc için `api.login.<ortam>.atonota.net`), Infinispan küme, günlük şifreli DB yedeği ikinci lokasyona, admin konsolu ve Admin REST API yalnızca Tailscale/özel ağdan, public host'ta reverse proxy düzeyinde kapalı (ayrı `hostname-admin` tek başına yetmez; G-144); kullanıcı ve admin olayları (login, logout, login_error, update_email, admin events) etkin ve Log Server'a aktarılır, saklama KVKK/5651 ile hizalı.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P0",
@@ -1332,7 +1332,7 @@
  {
   "id": "G-134",
   "title": "Ölçüm adapter çerçevesi ve rıza kapısı",
-  "detail": "Panel ve public yüzeyler tek olay veri yolu kullanır: normalleştirilmiş olay şeması (`page_view`, `sign_up`, `trial_started`, `purchase`, `app_activated`, yardım ve tur olayları `help_opened`, `tour_completed` ...), modül içi olay yolu (kanonik `event_id` ve takma kimlik küresel `window.dataLayer`'a yazılmaz; adapter yalnız kendi satıcı kapsamlı kimliğini gönderimde ekler), rota değişiminde tek `page_view` (yönlendirici düzeyinde, render başına değil), birinci taraf `event_id` ile tekilleştirme ve rota şablonu (`/ik/izin-talebi/:kimlik`) ile adres. Kullanıcı/oturum sürekliliği yalnız rastgele takma kimlikle sağlanır: (kiracı, amaç, satıcı) başına ayrı, e-posta/TCKN/kullanıcı kimliğinden türetilmez, eşleme yalnız birinci tarafta, rıza geri alma ve kiracı değişiminde yenilenir, eşlemesi rıza geri alma, silme talebi ve kiracı çıkışında silinir, kiracılar arasında bağlanmaz; takma kimlikli veri anonim sayılmaz. Satıcıya kanonik `event_id` değil, satıcı kapsamlı rastgele olay kimliği gider; GA4'e gitmez. Adapterlar platformda varsayılan kurulu ve etkindir; satıcıya veri aktarımı ancak (1) kiracı veya platform hesabı yapılandırılmışsa, (2) amaç (gerekirse satıcı) için rıza veya kayıtlı hukuki dayanak varsa ve (3) origin sınıfı, rotanın yüzey sınıfı ve hesap türü izin veriyorsa başlar; bu koşullar sağlanmadan satıcı betiği indirilmez. Origin sınıfı yalnız teslim biçimini seçer: oturum çerezi ya da belirteç basan uç barındıran origin'lerde (`panel.`, kiracının kayıtlı origin'leri, `operator.`, `ops.`, `press.`, `id.`) satıcı JS'i, oturum kaydı ve kiracı GTM'i yoktur, aktarım yalnız birinci taraf toplayıcıdan rızalı sunucu olayıyladır; tarayıcı SDK'sı yalnız oturumsuz public origin'de (pazarlama sitesi; Webshop vitrini yalnız ayrı oturumsuz origin'den sunulursa, K-11). Rıza geri alınınca gönderim durur, satıcı rıza API'si çağrılır, birinci taraf çerezleri silinir. Kiracılar arası olay ve kimlik karışmaz. Her rota bir yüzey sınıfı bildirir (sınıflanmamış rota hassas sayılır). Frappe'nin kendi telemetrisi (Pulse) yalnız `pulse_api_key` tanımlıysa açılır (doğrulandı: `frappe/utils/telemetry/pulse/client.py` v16.51.0); kiracı ve operasyon sitelerinde `pulse_api_key` ve `pulse_force_enabled` tanımlanmaz. Satıcı yükünde belge adı ve değeri yoktur: adres, referrer ve başlık şablondur, bunları geçersiz kılamayan SDK belge kimlikli rotada yüklenmez; işlem/sipariş kimliği (ör. GA4 `transaction_id`) dönüşüm başına (kiracı, amaç, satıcı) kapsamında rastgeledir, yeniden gönderimde aynıdır, eşlemesi P2'den takma kimlikle aynı tetiklerle silinir (süreler SA-36, dayanak K-28), belge eşlemesi yalnız birinci taraf sunucudadır. Kart, ödeme ve fatura verisinin işlendiği belgede satıcı SDK'sı yoktur; dönüşüm rızalı sunucu olayıyla bildirilir. Kabul: rıza yok → satıcıya istek yok (ağ kanıtı); geri alma sonrası istek yok; hassas ekranda yalnız birinci taraf RUM; satıcı yükünde belge adı, gerçek adres ve kanonik `event_id` yok; belgelerde `Referrer-Policy: strict-origin`, belirteçli paylaşım sayfasında `no-referrer` (G-131); ödeme ve fatura belgesinde satıcı betiği yok; oturumlu origin'de satıcı origin'ine tarayıcı isteği yok; `window.dataLayer`'da kanonik kimlik yok.",
+  "detail": "Panel ve public yüzeyler tek olay veri yolu kullanır: normalleştirilmiş olay şeması (`page_view`, `sign_up`, `trial_started`, `purchase`, `app_activated`, yardım ve tur olayları `help_opened`, `tour_completed` ...), modül içi olay yolu (kanonik `event_id` ve takma kimlik küresel `window.dataLayer`'a yazılmaz; adapter yalnız kendi satıcı kapsamlı kimliğini gönderimde ekler), rota değişiminde tek `page_view` (yönlendirici düzeyinde, render başına değil), birinci taraf `event_id` ile tekilleştirme ve rota şablonu (`/ik/izin-talebi/:kimlik`) ile adres. Kullanıcı/oturum sürekliliği yalnız rastgele takma kimlikle sağlanır: (kiracı, amaç, satıcı) başına ayrı, e-posta/TCKN/kullanıcı kimliğinden türetilmez, eşleme yalnız birinci tarafta, rıza geri alma ve kiracı değişiminde yenilenir, eşlemesi rıza geri alma, silme talebi ve kiracı çıkışında silinir, kiracılar arasında bağlanmaz; takma kimlikli veri anonim sayılmaz. Satıcıya kanonik `event_id` değil, satıcı kapsamlı rastgele olay kimliği gider; GA4'e gitmez. Adapterlar platformda varsayılan kurulu ve etkindir; satıcıya veri aktarımı ancak (1) kiracı veya platform hesabı yapılandırılmışsa, (2) amaç (gerekirse satıcı) için rıza veya kayıtlı hukuki dayanak varsa ve (3) origin sınıfı, rotanın yüzey sınıfı ve hesap türü izin veriyorsa başlar; bu koşullar sağlanmadan satıcı betiği indirilmez. Origin sınıfı yalnız teslim biçimini seçer: oturum çerezi ya da belirteç basan uç barındıran origin'lerde (`panel.`, kiracının kayıtlı origin'leri, `operator.`, `ops.`, `press.`, `api.login.atonota.net`) satıcı JS'i, oturum kaydı ve kiracı GTM'i yoktur, aktarım yalnız birinci taraf toplayıcıdan rızalı sunucu olayıyladır; tarayıcı SDK'sı yalnız oturumsuz public origin'de (pazarlama sitesi; Webshop vitrini yalnız ayrı oturumsuz origin'den sunulursa, K-11). Rıza geri alınınca gönderim durur, satıcı rıza API'si çağrılır, birinci taraf çerezleri silinir. Kiracılar arası olay ve kimlik karışmaz. Her rota bir yüzey sınıfı bildirir (sınıflanmamış rota hassas sayılır). Frappe'nin kendi telemetrisi (Pulse) yalnız `pulse_api_key` tanımlıysa açılır (doğrulandı: `frappe/utils/telemetry/pulse/client.py` v16.51.0); kiracı ve operasyon sitelerinde `pulse_api_key` ve `pulse_force_enabled` tanımlanmaz. Satıcı yükünde belge adı ve değeri yoktur: adres, referrer ve başlık şablondur, bunları geçersiz kılamayan SDK belge kimlikli rotada yüklenmez; işlem/sipariş kimliği (ör. GA4 `transaction_id`) dönüşüm başına (kiracı, amaç, satıcı) kapsamında rastgeledir, yeniden gönderimde aynıdır, eşlemesi P2'den takma kimlikle aynı tetiklerle silinir (süreler SA-36, dayanak K-28), belge eşlemesi yalnız birinci taraf sunucudadır. Kart, ödeme ve fatura verisinin işlendiği belgede satıcı SDK'sı yoktur; dönüşüm rızalı sunucu olayıyla bildirilir. Kabul: rıza yok → satıcıya istek yok (ağ kanıtı); geri alma sonrası istek yok; hassas ekranda yalnız birinci taraf RUM; satıcı yükünde belge adı, gerçek adres ve kanonik `event_id` yok; belgelerde `Referrer-Policy: strict-origin`, belirteçli paylaşım sayfasında `no-referrer` (G-131); ödeme ve fatura belgesinde satıcı betiği yok; oturumlu origin'de satıcı origin'ine tarayıcı isteği yok; `window.dataLayer`'da kanonik kimlik yok.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P2",
@@ -1998,5 +1998,115 @@
   "phase": "P3",
   "source": "develop",
   "owner": "Platform ekibi (backend)"
+ },
+ {
+  "id": "G-157",
+  "title": "AtonotA Login ürün ve lisans sınırı",
+  "detail": "AtonotA Login bağımsız bir giriş ürünüdür (K-61). Ürün Keycloak üzerine kurulur. Keycloak kodu çatallanmaz. Ürünün kendi kodu MIT lisanslıdır. Bu kod tema, eklenti, Frappe uygulaması ve kurulum dosyalarıdır. Keycloak Apache-2.0 lisanslıdır. İki lisans aynı dosyada karışmaz. Görünen ad her yerde \"AtonotA Login\" olarak yazılır. MVP'de realm adı, istemci kimlikleri ve tema klasörü değişmez. Kabul: lisans dosyaları ve bağımlılık listesi iki lisansı ayrı gösterir. Giriş ekranında, e-posta şablonlarında ve hata sayfalarında görünen ad doğru yazılır.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Platform ekibi; ürün sahibi (marka)"
+ },
+ {
+  "id": "G-158",
+  "title": "Giriş adresi: `api.login.atonota.net`",
+  "detail": "Canlı ortamın giriş adresi `api.login.atonota.net` olur. alpha, beta ve rc ortamlarında adres `api.login.<ortam>.atonota.net` olur. Eski `id.` adı kalkar. Ürün canlıda olmadığı için yönlendirme ve takma ad yoktur. Adres koda sabit yazılmaz, ortam ayarından gelir. Keycloak `hostname` ayarı bu adı kullanır. Yönetim konsolu bu adda kapalı kalır (G-144). DevOps sorumlusu kayıt değerlerini hazırlar. Alan adı sorumlusu kaydı `atonota.net` bölgesinde yazar. Kabul: her ortamda keşif belgesindeki `issuer` değeri ortamın adresiyle aynıdır. Eski `id.` adı yanıt vermez.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "configure",
+  "owner": "DevOps sorumlusu; alan adı sorumlusu (DNS kaydı)"
+ },
+ {
+  "id": "G-159",
+  "title": "Platformla giriş: liste veriden gelir",
+  "detail": "Kullanıcı birçok platformla oturum açabilir. Örnekler Google, Facebook, LinkedIn ve X'tir. Platform sayısı sınırlı değildir. Her platform Keycloak'ta bir kimlik sağlayıcı kaydıdır. Kayıtlar sürümlü veri dosyasından yüklenir. Giriş ekranındaki düğmeler bu kayıtlardan çizilir. Kodda platform listesi yoktur. Tarayıcı önce platformun kendi adresine gider. Örneğin Google için adres `accounts.google.com` olur. Platform işini bitirince tarayıcı `https://api.login.atonota.net/realms/<realm>/broker/<platform>/endpoint` yoluna döner. Bu dönüş adresi platformun panelinde tam adres olarak kayıtlıdır. Platformun gizli anahtarı veri dosyasına yazılmaz, sır deposundan gelir. Kabul: yeni bir platform yalnız veri kaydıyla açılır, kod değişmez. Kapatılan platformun düğmesi kaybolur. Bilinmeyen dönüş adresi reddedilir.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Platform ekibi; DevOps sorumlusu (sırlar)"
+ },
+ {
+  "id": "G-160",
+  "title": "Dış hesap bağlama ve zorunlu kurumsal giriş",
+  "detail": "Dış hesap, platformun adı ve değişmeyen kullanıcı numarasıyla bağlanır. E-posta eşleşmesi tek başına bağ kurmaz. Var olan hesaba yeni bağ eklenirken kullanıcı yeniden doğrulanır. Kuruluş kurumsal girişi zorunlu kıldıysa sosyal giriş ve e-posta bağlantısı bu kuralı aşamaz. Hesap değiştirmek kimlikleri birleştirmez. Kabul: aynı e-postalı ikinci platform hesabı sessizce bağlanmaz. Zorunlu kurumsal girişi olan kuruluşta Google ile giriş reddedilir.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-161",
+  "title": "Frappe tamamlayıcı katmanı: üyelik ve işlem kararı",
+  "detail": "Keycloak giriş, giriş yöntemi ve oturumu yönetir. Frappe üyeliği, işlem kuralını, kanıt bağını ve inceleme kaydını yönetir. Bu kayıtlar Keycloak'ta yoktur. Sunucu her işlemi ayrı değerlendirir. Örneğin form gönderme, deneme başlatma ve sipariş verme farklı koşullar ister. Her kontrol üç soruyla ölçülür: Kontrol bu işleme uygulanıyor mu? Uygulanıyorsa şart mı? Güncel kanıt ne diyor? Bilinmeyen zorunlu koşul hazır sonucu üretmez. Hazır sonucu yalnız o işlem içindir. Son işlemde sunucu yetkiyi ve kanıtı yeniden denetler. Yetki kararı tokendaki eski role bırakılmaz. Kabul: kimliği onaylı ama üyeliği olmayan kişi sipariş veremez. Kural işlem sırasında değişirse hazır sonuç geçersiz olur.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Platform ekibi (backend)"
+ },
+ {
+  "id": "G-162",
+  "title": "E-posta bağlantısıyla giriş hesabın varlığını göstermez",
+  "detail": "Kişi e-posta adresini yazınca sistem herkese aynı yanıtı verir: \"E-postanızı kontrol edin.\" Yanıtın biçimi ve süresi hesabın var olup olmadığını göstermez. Bağlantı tek kullanımlıktır. Bağlantı belirli bir amaca ve oturuma bağlıdır. Bağlantıyı açmak girişi başlatmaz. Kişi ekrandaki işlemi ayrıca onaylar. Böylece e-posta tarayıcısı bağlantıyı tüketemez. Sistem gönderim sıklığını sınırlar. Kod kayıtlara yazılmaz. Uygulama yolu K-38 kararına bağlıdır. Kabul: var olan ve olmayan adreste yanıt aynıdır. Süresi dolmuş ya da kullanılmış bağlantı reddedilir.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-163",
+  "title": "Güçlü giriş, kurtarma, cihaz ve çıkış",
+  "detail": "Yöneticiler geçiş anahtarı ya da donanım anahtarı kullanır. Hassas işlem yeniden güçlü doğrulama ister. İlk anahtar kaydı ile kayıp anahtar değişimi ayrı akışlardır. E-posta bağlantısı yeni güçlü anahtar eklemeye yetmez. Hesap kurtarma ayrı bir inceleme kaydıyla yürür. Kayıtlı cihaz kimlik kanıtı değildir. Cihazı unutmak o cihazın oturumlarını iptal eder. Çıkış ekranı kapsamı sorar: bu oturum, başka bir oturum ya da bütün cihazlar. Erişim belirteci kısa ömürlüdür. Sunucu her korunan işlemde iptali denetler. Kabul: e-posta erişimi tek başına hesabı kurtarmaz. Bütün cihazlardan çıkış Frappe oturumlarını da kapatır.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Platform ekibi; DevOps sorumlusu (Keycloak ayarları)"
+ },
+ {
+  "id": "G-164",
+  "title": "Dış kimlik doğrulama sonuçları güvenle işlenir",
+  "detail": "Belge ve yüz kontrolü dış sağlayıcıdadır. Sağlayıcı henüz seçilmedi. Sağlayıcı seçilmeden zorunlu kontrol başlamaz ve sonuç \"yapılandırma gerekiyor\" olur. Sağlayıcının bildirimi önce imza denetiminden geçer. İmza işlenmemiş istek gövdesinden doğrulanır. Geçerli bildirim kalıcı gelen kutusuna yazılır. Arka plan işi aynı bildirimi iki kez işlemez. Eski deneme yeni kararı değiştiremez. Tarayıcıdaki \"tamamlandı\" yazısı onay sayılmaz. Ham belge ve yüz verisi karar kaydına kopyalanmaz. Kabul: imzası geçersiz bildirim reddedilir. Aynı bildirim ikinci kez gelince sonuç değişmez.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "integrate",
+  "owner": "Platform ekibi (backend); ürün sahibi (sağlayıcı seçimi)"
+ },
+ {
+  "id": "G-165",
+  "title": "Tanıtım sayfası değer önerilerini anlatır",
+  "detail": "AtonotA Login'in bir tanıtım sayfası olur. Sayfa ürünün değer önerilerini anlatır. Sayfa yalnız var olan yeteneği anlatır. Yapılmamış özellik \"yakında\" diye ayrı gösterilir. Fiyat kararı kapanmadan sayfada fiyat yazmaz. Sayfa oturumsuz bir adresten sunulur. Rıza yokken ölçüm satıcısına istek gitmez (G-134). Sayfa sitenin arayüz kurallarına uyar. Örneğin metin en az 1rem olur ve sayfa 320 pikselde taşmaz. İçerik ve kurallar ürün sayfasındadır. Kabul: sayfadaki her değer önerisi bir gereksinime bağlıdır.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Frontend ekibi; ürün sahibi (metin onayı)"
+ },
+ {
+  "id": "G-166",
+  "title": "Ücretli kullanım: plan ve fiyat açık karar",
+  "detail": "Müşteri AtonotA Login'i ücret karşılığında kullanır. Plan, fiyat ve ölçü birimi açık karardır (K-61). Bu kararlar ürün sahibinindir. Belgede ve kodda fiyat uydurulmaz. Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapısı kurulmaz. Ödeme yapılmayan müşteri hesabının ne olacağı da aynı kararın parçasıdır. Kabul: fiyat kararı kapanmadan ücretli plan açılamaz.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "develop",
+  "owner": "Ürün sahibi; Platform ekibi"
+ },
+ {
+  "id": "G-167",
+  "title": "Değer bekleyen kurallar boşken işlem açılmaz",
+  "detail": "Bazı kuralların değeri henüz belirlenmedi. Örnekler: doğrulama sağlayıcısı, ülke ve belge kuralı, giriş ve kanıt süreleri, yeniden deneme sınırları, veri saklama bölgesi ve misafire açık işlem listesi. Değer boşsa ilgili zorunlu işlem açılmaz. Sonuç \"yapılandırma gerekiyor\" olur. Örnek değerler ürün kararı sayılmaz. Her kuralın karar sahibi kayıtta yazılıdır. Kabul: boş kuralla zorunlu işlem denenince sistem işlemi açmaz ve kural sahibine iş oluşturur.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P7",
+  "source": "configure",
+  "owner": "Ürün sahibi; güvenlik ve uyum sorumluları"
  }
 ]

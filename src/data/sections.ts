@@ -76,7 +76,12 @@ export const SECTIONS: Record<string, SectionMeta> = {
   gereksinimler: { group: 'Teslim', icon: 'list', summary: 'G ve SA serisi gereksinimlerin ana listesi, süzülebilir gezgin.' },
   'admin-shell': { group: 'Teslim', icon: 'sidebar', summary: 'Her SaaS admin shell için olmazsa olmazlar.' },
   'app-cercevesi': { group: 'Teslim', icon: 'apps', summary: 'Satılan her app için çerçeve şablonu.' },
-  'yol-haritasi': { group: 'Teslim', icon: 'map', summary: 'P0–P6 fazları, kapılar ve ilk dikey dilim.' },
+  'yol-haritasi': { group: 'Teslim', icon: 'map', summary: 'P0–P7 fazları, kapılar ve ilk dikey dilim.' },
+  'atonota-login': {
+    group: 'Teslim',
+    icon: 'key',
+    summary: 'Bağımsız giriş ürünü: Keycloak ile Frappe iş bölümü, giriş yolu, platformlar ve ücretli kullanım.',
+  },
   'acik-kararlar': { group: 'Teslim', icon: 'alert', summary: 'Açık kararlar, riskler ve dış bağımlılıklar.' },
   izlenebilirlik: {
     group: 'Teslim',

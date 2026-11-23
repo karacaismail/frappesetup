@@ -36,7 +36,7 @@ Tek Keycloak SSO oturumu her siteye etkileşimsiz OIDC dönüşüyle ayrı bir s
 | Doğrulanmış özel alan adı | Aynı kiracı sitesi; kiracının kayıtlı origin'i (G-119) | O host'a bağlı `sid` | Aynı | Yok | Aynı origin; redirect URI tam adres (G-124) |
 | `ops.<marka>.com.tr` | Operasyon sitesi (personel Desk); operatör modu buraya yalnız `ops-bff` üzerinden erişir | Host'a bağlı `sid` | Desk / www | Yok | — |
 | `agent.` ve Hocuspocus | Agent servisi, Hocuspocus | Çerez yok; aracı belirteci / tek kullanımlık bilet (G-148) | Gerekmez | Aracı belirteci ve müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden (kiracı host'u ve doğrulanmış özel alan adları, G-119), operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok); kimlik bilgisiz | Bilet + aktif Support Session |
-| `id.<marka>.com.tr` | Keycloak | Yalnız Keycloak SSO oturumu | Keycloak | Yok | — |
+| `api.login.atonota.net` (AtonotA Login, K-61) | Keycloak | Yalnız Keycloak SSO oturumu | Keycloak | Yok | — |
 
 ## 2. Akışlar
 
@@ -161,7 +161,7 @@ Realm rolleri yalnızca servis hesapları ve `platform-operator` grubu için tan
 
 ## 6. Press SSO (G-12)
 
-Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://id.<marka>.com.tr/realms/platform`, `/protocol/openid-connect/{auth,token,userinfo}`, `auth_url_data {response_type: code, scope: openid}`, `sign_ups='Allow'`, `user_id_property='sub'`. press\_tr `before_request`: `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` → 403; `/login`, `/signup`, `/dashboard/login` → panel. MFA Keycloak'ta, Press User 2FA zorunluluğu kapalı (G-78). Agent delegasyonu Press OAuth Client ile (G-28).
+Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://api.login.atonota.net/realms/platform`, `/protocol/openid-connect/{auth,token,userinfo}`, `auth_url_data {response_type: code, scope: openid}`, `sign_ups='Allow'`, `user_id_property='sub'`. press\_tr `before_request`: `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` → 403; `/login`, `/signup`, `/dashboard/login` → panel. MFA Keycloak'ta, Press User 2FA zorunluluğu kapalı (G-78). Agent delegasyonu Press OAuth Client ile (G-28).
 
 ## 7. Realm politikaları (G-43, G-78, G-80)
 
@@ -172,7 +172,7 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 | İş | Sahip |
 | --- | --- |
 | 2 Keycloak düğümü (26.x, Docker Engine), Infinispan küme, PostgreSQL streaming replika (sürüm Keycloak uyumluluk matrisinden, doğrulanacak), nginx TLS, admin konsolu yalnızca Tailscale/özel ağ | DevOps sorumlusu |
-| `id.<marka>.com.tr` A/AAAA kaydı: değerleri DevOps sorumlusu hazırlar; apex GoDaddy'de kaldığı sürece alan adı sorumlusu uygular, Route 53'e taşınırsa DevOps sorumlusu | DevOps sorumlusu / alan adı sorumlusu |
+| `api.login.atonota.net` için A ve AAAA kaydı. alpha, beta ve rc için ad `api.login.<ortam>.atonota.net` olur (K-61). Değerleri DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı `atonota.net` bölgesine yazar. | DevOps sorumlusu / alan adı sorumlusu |
 | Günlük şifreli PostgreSQL yedeği (fsn1 → nbg1), haftalık realm export, RPO ≤ 1 saat (WAL), çeyreklik geri yükleme tatbikatı (G-114) | DevOps sorumlusu |
 | Login/admin event'leri Log Server'a (KVKK/5651 saklama, G-117), metrikler Monitor Server'a (X-05) | DevOps sorumlusu |
 | identity-sync konteyneri, sırlar age/sops (G-112) | DevOps sorumlusu |

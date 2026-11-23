@@ -34,8 +34,9 @@ def timeline() -> str:
     for p in phases:
         columns[level[p["id"]]].append(p["id"])
     # Düzen: düzey başına bir sütun. Satırlar P1/P3, P0/P4/P5 ve P2/P6 hizalanır. Böylece komşu oklar düz kalır.
-    ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190}
-    BOX_W, BOX_H, COL_X0, COL_STEP, BELOW_Y = 200, 64, 40, 256, 372
+    # P7 (P1 ve P2 sonrası) P6'nın altındaki dördüncü satırdadır. Sütun atlayan oklar P7'nin altından dolaşır.
+    ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190, "P7": 370}
+    BOX_W, BOX_H, COL_X0, COL_STEP, BELOW_Y = 200, 64, 40, 256, 462
     col_x = {pid: COL_X0 + COL_STEP * lvl for pid, lvl in level.items()}
     name_of = lambda pid: by_id[pid]["title"].split(" ", 1)[1]  # noqa: E731
     gates = [  # (kimlik, ad, çıkışına bağlı olduğu fazlar)
@@ -49,7 +50,7 @@ def timeline() -> str:
     deps_txt = " ".join(f"{p['id']}, {join(p['after'])} bitince başlar." for p in phases if p["after"])
     gates_txt = ", ".join(f"{k} {n} ({join(ids)} çıkışı)" for k, n, ids in gates)
     o = [
-        f"<svg viewBox='0 0 1040 520' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
+        f"<svg viewBox='0 0 1040 610' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
         "<title id='tl-title'>Yol haritası faz sırası</title>",
         f"<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir. {levels_txt} Oklar önkoşuldan bağımlı faza gider. {deps_txt} "
         f"P2, P1'deki Keycloak adımı bitince başlar. Kapılar: {gates_txt}. Takvim tarihi ve süre yoktur.</desc>",
@@ -88,7 +89,7 @@ def timeline() -> str:
         "stroke-width='1.5' stroke-dasharray='5 5' marker-end='url(#tl-arr)'/>"
     )
     o.append(f"<text x='{gx + 10}' y='{(ROW_Y['P1'] + BOX_H + ROW_Y['P2']) / 2 + 6:.0f}' fill='var(--fs-accent-ink)'>Keycloak adımı</text>")
-    gy = 404
+    gy = 494
     o.append(f"<text x='24' y='{gy}' font-weight='650' fill='var(--fs-ink)'>Kapılar (hangi fazın çıkışına bağlı)</text>")
     for i, (k, name, ids) in enumerate(gates):
         x = 24 + 500 * (i % 2)
@@ -102,7 +103,8 @@ def timeline() -> str:
     caption = (
         "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
         "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
-        "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır."
+        "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. "
+        "P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
     )
     return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 

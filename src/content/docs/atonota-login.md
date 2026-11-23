@@ -1,0 +1,263 @@
+---
+title: "AtonotA Login: bağımsız giriş ürünü"
+nav: "AtonotA Login"
+order: 28
+---
+
+AtonotA Login bir giriş ürünüdür. Kullanıcı uygulamaya bu ürünle girer. Ürünün adı tam olarak "AtonotA Login" yazılır. Ad büyük A ile başlar ve büyük A ile biter.
+
+Ürünün kararlarını proje sahibi 23 Kasım 2026 Pazartesi günü verdi. Kararlar kesindir. Sitedeki karar kaydı K-61'dir. Ürünün geliştirilmesi MVP sonrasıdır. MVP, ilk kullanılabilir sürüm demektir. Bu yüzden ürün P7 fazındadır.
+
+Bu sayfa bir tasarım çerçevesidir. Ürün henüz kurulmadı. Sayfadaki kurallar gereksinimdir. Çalışan bir sistemin özelliği değildir.
+
+## Ürün nedir?
+
+AtonotA Login, uygulamalar için ortak bir giriş kapısıdır. Kullanıcı bir uygulamada "AtonotA Login" düğmesine basar. Giriş ekranı açılır. Kullanıcı kimliğini doğrular ve uygulamaya döner.
+
+Ürün üç gruba hizmet eder:
+
+- **Platformun kendi uygulamaları.** Panel, kiracı siteleri ve sonraki uygulamalar bu kapıyı kullanır.
+- **Ücretli müşteriler.** Bir şirket kendi uygulaması için AtonotA Login'i satın alabilir.
+- **Son kullanıcılar.** Kullanıcı tek hesapla birçok uygulamaya girer.
+
+Ürün bağımsızdır. Bunun üç nedeni vardır:
+
+1. Müşteri ürünü platformun geri kalanını almadan kullanabilir.
+2. Giriş ayrı bir alan adında durur. Bu alan adı `atonota.net` olur.
+3. Ürünün kendi tanıtım sayfası ve kendi fiyatı olur.
+
+## Önce Keycloak, eksikleri Frappe tamamlar
+
+Keycloak açık kaynak bir giriş sunucusudur. Ürün önce Keycloak üzerine kurulur. Keycloak'ın kodu değiştirilmez. Keycloak'ta eksik kalan işleri Frappe tamamlar. Frappe, platformun uygulama çatısıdır.
+
+İş bölümü şöyledir:
+
+| Konu | Kim yürütür? | Ne yapar? |
+| --- | --- | --- |
+| Giriş | Keycloak | Kişinin giriş kanıtını doğrular. Giriş yöntemlerini ve oturumu yönetir. |
+| Platformla giriş | Keycloak | Google gibi platformlara gider ve sonucu alır. |
+| Üyelik ve rol | Frappe | Kişinin hangi kuruluşa üye olduğunu ve rolünü tutar. |
+| İşlem kararı | Frappe | Kişinin seçtiği işlemi yapıp yapamayacağını denetler. |
+| Kimlik kontrolü | Dış sağlayıcı ve Frappe | Sağlayıcı belgeyi inceler. Frappe sonucu kendi kurallarıyla değerlendirir. |
+| İnceleme kaydı | Frappe | Denemeleri, kararları ve itirazları kaydeder. |
+
+Keycloak tek başına şu işleri yapmaz. Bu işleri Frappe yapar:
+
+- **Giriş yetki değildir.** Örneğin kişi giriş yapmıştır ama kuruluş üyeliği yoktur. Bu kişi sipariş veremez.
+- **Her işlemin koşulu ayrıdır.** Örneğin açık bir formu misafir gönderebilir. Deneme başlatmak ise doğrulanmış hesap ister.
+- **Bekleme durumu ayrı tutulur.** Örneğin şirket girişi tamamdır ama üyelik bilgisi henüz gelmemiştir. Frappe bu durumu "hizmet sonucu bekleniyor" diye tutar.
+- **Sınırlı hak tek kez tüketilir.** Örneğin son lisans yeri iki farklı istekle iki kez kullanılamaz.
+- **Kural değişirse sonuç yenilenir.** Örneğin kural işlem sırasında değişirse eski "hazır" sonucu geçersiz olur.
+
+Frappe her işlemde üç soru sorar:
+
+1. Bu kontrol bu işleme uygulanıyor mu?
+2. Kontrol uygulanıyorsa şart mı?
+3. Güncel kanıt ne diyor?
+
+Bilinmeyen zorunlu koşul işlemi açmaz. Bu kuralın gereksinimi G-161'dir.
+
+## Giriş yolu ve adresler
+
+Kullanıcının tarayıcısı şu adreslerden geçer:
+
+1. Kullanıcı bir uygulamada "AtonotA Login" düğmesine basar.
+2. Tarayıcı giriş ekranını açar. Adres çubuğunda `api.login.atonota.net` görünür.
+3. Kullanıcı "Google ile oturum aç" düğmesine basabilir. O zaman tarayıcı `accounts.google.com` adresine gider. Bu adres Google'ındır ve değiştirilemez.
+4. Google işini bitirir. Tarayıcı `api.login.atonota.net` adresine geri döner.
+5. Giriş sunucusu tarayıcıyı uygulamaya geri gönderir.
+
+Dönüş yolunun örneği şudur: `https://api.login.atonota.net/realms/platform/broker/google/endpoint`. Yoldaki `platform` realm adıdır. Realm, Keycloak'taki kullanıcı ve ayar kümesidir. MVP'de realm adı değişmez. Öteki platformlar da aynı yolu izler. Tarayıcı önce platformun kendi adresine, sonra `api.login.atonota.net` adresine gider.
+
+**Google ile giriş yolu**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as Kullanıcı
+  participant A as Uygulama
+  participant L as AtonotA Login
+  participant G as Google
+  participant F as Frappe
+  U->>A: AtonotA Login düğmesine basar
+  A-->>U: Tarayıcıyı giriş ekranına gönderir
+  U->>L: api.login.atonota.net giriş ekranı açılır
+  U->>L: Google ile oturum aç düğmesine basar
+  L-->>U: Tarayıcıyı Google'a gönderir
+  U->>G: accounts.google.com adresinde Google girişi
+  G-->>U: Tarayıcıyı geri gönderir
+  U->>L: /realms/platform/broker/google/endpoint
+  L->>L: Dış hesabı değişmeyen numarayla bağlar
+  L-->>U: Tarayıcıyı uygulamaya gönderir
+  U->>A: Giriş kodu ile döner
+  A->>F: Üyelik ve işlem yetkisini sorar
+  F-->>A: Hazır ya da eksik koşul
+```
+
+Ortamların adresleri şöyledir:
+
+| Ortam | Giriş adresi |
+| --- | --- |
+| Canlı ortam | `api.login.atonota.net` |
+| alpha | `api.login.alpha.atonota.net` |
+| beta | `api.login.beta.atonota.net` |
+| rc | `api.login.rc.atonota.net` |
+
+Ortam adresi `<servis>.<ortam tabanı>` kuralına uyar. Adres koda yazılmaz, ortam ayarından gelir. Eski `id.` adı kalktı. Ürün canlıda olmadığı için yönlendirme gerekmez. Bu kuralların gereksinimi G-158'dir.
+
+DNS kaydını iki kişi hazırlar. DevOps sorumlusu kaydın değerlerini yazar. Alan adı sorumlusu kaydı `atonota.net` bölgesine girer. Sonra DevOps sorumlusu adresin çalıştığını doğrular.
+
+## Birden çok platformla giriş
+
+Kullanıcı birçok platformla oturum açabilir. Örnekler şunlardır: Google, Facebook, LinkedIn ve X. X'in eski adı Twitter'dır. Platform sayısı sınırlı değildir.
+
+Platform listesi veriyle gelir. Kodda sabit liste olmaz. Bu kural şöyle çalışır:
+
+1. Her platform Keycloak'ta bir kimlik sağlayıcı kaydıdır.
+2. Kayıtlar sürümlü bir veri dosyasından yüklenir.
+3. Giriş ekranı düğmeleri bu kayıtlardan çizer.
+4. Yeni platform için yalnız yeni kayıt eklenir. Kod değişmez.
+
+Platformun gizli anahtarı veri dosyasına yazılmaz. Anahtar sır deposundan gelir. Dönüş adresi platformun panelinde tam adres olarak kayıtlıdır. Bu kuralların gereksinimi G-159'dur.
+
+Dış hesap e-postayla bağlanmaz. Bağ, platformun adı ve değişmeyen kullanıcı numarasıyla kurulur. Kuruluş şirket girişini zorunlu kıldıysa sosyal giriş bu kuralı aşamaz. Bu kuralların gereksinimi G-160'tır.
+
+## Kullanıcı yolculukları
+
+Kaynak analiz 24 örnek yolculuk tanımlar. Her yolculuk ilk ziyaretten işlem yetkisine kadar gider. Aşağıdaki tablo bazı örnekleri kendi sözlerimizle özetler.
+
+| Yolculuk | Ne olur? | Sonuç |
+| --- | --- | --- |
+| İlk ziyaret ve yeni deneme | Kişi e-postasını kanıtlar. Geçiş anahtarı kurar. Deneme hakkı uygundur. | Kişi son özeti onaylar. Sunucu denemeyi açar. |
+| Davet yanlış hesapta | Tarayıcıda başka hesap açıktır. Davet bu hesaba ait değildir. | Kişi doğru hesabı seçer. Sistem daveti yeniden denetler. |
+| Şirket girişi tamam, üyelik bekliyor | Kişi şirket hesabıyla girer. Şirketten üyelik bilgisi henüz gelmemiştir. | Sistem bekler. Bekleme uzarsa yöneticiye iş açar. |
+| Misafir açık form gönderir | Form herkese açıktır. Hesap gerekmez. | Veri ve kötüye kullanım denetimi yine çalışır. |
+| Lisans yeri kalmamış | Kuruluşta boş lisans yeri yoktur. | Sistem işlemi açmaz. Yönetici yer ekleyebilir. |
+| Kamera açılmıyor | Kimlik kontrolü için kamera gerekir. Kamera açılmaz. | Kişi telefona geçebilir ya da izin verilen başka yolu seçer. |
+| Aynı bildirim iki kez gelmiş | Sağlayıcı aynı sonucu iki kez gönderir. | Sistem ikinci bildirimi işlemez. |
+| Hesap kapalı | Hesap kapatılmıştır. | Giriş açılmaz. Kişi güvenli bir yardım yolu görür. |
+
+Bir kişi aynı anda iki durumda olabilir. Örneğin kişi giriş yapmıştır ve üyelik bekler. Bu yüzden giriş, üyelik, kimlik kanıtı ve işlem yetkisi ayrı sonuçlardır.
+
+## Güvenlik kuralları
+
+Analizin güvenlik kuralları şöyle özetlenir:
+
+- **E-posta bağlantısı hesabı ele vermez.** Sistem herkese aynı yanıtı verir: "E-postanızı kontrol edin." Bağlantı tek kullanımlıktır. Kişi bağlantıyı açınca ayrıca onaylar (G-162).
+- **Yöneticiler güçlü giriş kullanır.** Geçiş anahtarı ya da donanım anahtarı gerekir. Hassas işlem yeniden doğrulama ister (G-163).
+- **Kurtarma ayrı incelemedir.** E-posta erişimi tek başına hesabı kurtarmaz. Yüz kontrolü de tek başına yetmez.
+- **Kayıtlı cihaz kimlik kanıtı değildir.** Cihazı unutmak o cihazın oturumlarını iptal eder.
+- **Çıkışın kapsamı sorulur.** Kişi bu oturumu, başka bir oturumu ya da bütün cihazları seçer.
+- **Davet tek başına yetmez.** Daveti yalnız doğru alıcı kabul eder. Sistem süreyi ve iptali denetler.
+- **Hesap değiştirmek kimlikleri birleştirmez.** Açık sekme eski hesabın yetkisiyle işlem yapamaz.
+- **Destek çalışanı koşulları atlayamaz.** Zorunlu koşul eksikse destek de "hazır" sonucu veremez.
+
+Oturum çerezi betiklere kapalıdır ve yalnız şifreli bağlantıda gider. Giriş akışı PKCE kullanır. PKCE, giriş kodunun çalınmasına karşı bir korumadır. Dönüş adresi izinli adresle tam eşleşir.
+
+## Sunucu görevleri
+
+Sunucu tarafında iş şöyle bölünür:
+
+- Keycloak girişi, giriş yöntemlerini ve oturumu yönetir.
+- Frappe üyeliği, işlem kuralını, kanıt bağını ve inceleme kaydını yönetir.
+- İş kuralı yalnız Keycloak belirtecindeki eski role bırakılmaz. Sunucu her korunan istekte yeniden denetler.
+- Her kaydın değişmeyen bir kimliği ve kuruluş kapsamı vardır.
+- Ham belge ve yüz verisi karar kaydına kopyalanmaz.
+- Dış sağlayıcının bildirimi imza denetiminden geçer. Sonra kalıcı gelen kutusuna yazılır. Aynı bildirim iki kez işlenmez (G-164).
+
+Analiz Frappe'de on kayıt türü önerir. Kayıt türleri şunlardır:
+
+- işlem niyeti,
+- üyelik,
+- doğrulama dosyası,
+- doğrulama denemesi,
+- kanıt bağı,
+- gerekli kişi kümesi,
+- inceleme kararı,
+- gelen bildirim kutusu,
+- giden olay kutusu,
+- işlem kaydı.
+
+Bu kayıtlar henüz yoktur. Adları kurulumda kesinleşir.
+
+Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcısı seçilmedi. Değer boşken ilgili zorunlu işlem açılmaz (G-167).
+
+## Tanıtım sayfası
+
+Ürünün bir tanıtım sayfası olur. Sayfa bu işte yapılmadı. Sayfanın içeriği ve kuralları aşağıdadır (G-165).
+
+Sayfa şu değer önerilerini anlatır:
+
+- **Tek giriş kapısı.** Kullanıcı tek hesapla birçok uygulamaya girer.
+- **Birçok platform.** Kullanıcı Google, Facebook, LinkedIn, X ve başka platformlarla girer. Yeni platform kod değişmeden eklenir.
+- **Giriş ile yetki ayrıdır.** Giriş yapan kişi her işlemi yapamaz. Her işlemin koşulu ayrı denetlenir.
+- **Güçlü giriş.** Geçiş anahtarı ve donanım anahtarı desteklenir.
+- **Açık kaynak temel.** Ürün Keycloak üzerine kuruludur. Ürünün kodu MIT lisanslıdır.
+- **Veri Hetzner'de durur.** Bu kural platformun veri kararından gelir.
+
+Sayfanın kuralları şunlardır:
+
+1. Sayfa yalnız var olan yeteneği "var" diye anlatır.
+2. Yapılmamış özellik ayrı bir "yakında" bölümünde durur.
+3. Fiyat kararı kapanmadan sayfada fiyat yazmaz.
+4. Sayfa oturumsuz bir adresten sunulur.
+5. Rıza yokken ölçüm satıcısına istek gitmez (G-134).
+6. Sayfa sitenin arayüz kurallarına uyar. Örneğin sayfa 320 pikselde taşmaz.
+7. Her değer önerisi bir gereksinime bağlıdır.
+
+## Ücretli kullanım
+
+Müşteri ürünü ücret karşılığında alıp kullanabilir. Plan, fiyat ve ölçü birimi açık karardır. Bu kararlar ürün sahibinindir. Bu sayfa fiyat yazmaz.
+
+Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapısı kurulmaz. Fiyat kararı kapanmadan ücretli plan açılmaz (G-166).
+
+## Lisans
+
+İki lisans birbirinden ayrıdır:
+
+| Parça | Lisans |
+| --- | --- |
+| AtonotA Login'in kodu: tema, eklentiler, Frappe uygulaması ve kurulum dosyaları | MIT |
+| Keycloak | Apache-2.0 |
+
+Keycloak'ın kodu ürüne kopyalanmaz ve değiştirilmez. Ürün Keycloak'ın eklenti yollarını kullanır. Bu kuralın gereksinimi G-157'dir.
+
+## Faz kararı
+
+Ürün yeni P7 fazına bağlandı. P7, P1 ve P2 bitince açılır.
+
+Kararın gerekçesi şudur:
+
+- Ürünün geliştirilmesi MVP sonrasıdır. Var olan fazlar platformun kendi işlerini taşır.
+- Ürün Keycloak girişine dayanır. Keycloak girişi P1'de kurulur.
+- Ürün ücretlidir. Tahsilat P2'de kurulur.
+- Ürün ayrı satılır. Bu yüzden kendi çıkış ölçütü olmalıdır.
+
+MVP'de yalnız bu kararla çelişen yerler düzeltilir. Örneğin eski `id.` adresi `api.login.atonota.net` oldu.
+
+## Gereksinimler
+
+Ürünün gereksinimleri G-157 ile G-167 arasıdır. Kalemler [Gereksinimler](/frappesetup/gereksinimler/) sayfasında P7 süzgeciyle görünür.
+
+| Kimlik | Konu |
+| --- | --- |
+| G-157 | Ürün ve lisans sınırı |
+| G-158 | Giriş adresi ve ortam adresleri |
+| G-159 | Platform listesi veriden gelir |
+| G-160 | Dış hesap bağlama ve zorunlu şirket girişi |
+| G-161 | Frappe'de üyelik ve işlem kararı |
+| G-162 | E-posta bağlantısıyla giriş |
+| G-163 | Güçlü giriş, kurtarma, cihaz ve çıkış |
+| G-164 | Dış kimlik doğrulama sonuçları |
+| G-165 | Tanıtım sayfası |
+| G-166 | Ücretli kullanım |
+| G-167 | Değer bekleyen kurallar |
+
+## Kaynak
+
+Bu sayfa iki kaynağa dayanır:
+
+- Proje sahibinin AtonotA Login kararları, 23 Kasım 2026 Pazartesi günü.
+- "Kurumsal kimlik ve erişim" analizi, 23 Kasım 2026 Pazartesi günü. Proje sahibi bu analizi yeterli buldu.
+
+Analiz başka ürünlerin belgelerinden alıntılar ve görseller içerir. Bu içerik depoya kopyalanmadı. Sayfa analizi kendi sözleriyle özetler.

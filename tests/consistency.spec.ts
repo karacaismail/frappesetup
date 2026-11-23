@@ -126,6 +126,7 @@ test.describe('content consistency', () => {
       P4: ['P1'],
       P6: ['P2'],
       P5: ['P2', 'P4'],
+      P7: ['P1', 'P2'],
     });
     expect(ph.P2.entryGate).toMatch(/Keycloak/);
     expect(ph.P2.entryGate).toMatch(/G-12.*G-16.*G-79.*G-81/);
