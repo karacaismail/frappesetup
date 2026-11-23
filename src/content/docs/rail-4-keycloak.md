@@ -33,7 +33,7 @@ Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha
 
 | Host | Sunan | Oturum | CSRF kaynağı | CORS | Realtime / WS kimliği |
 | --- | --- | --- | --- | --- | --- |
-| `panel.atonota.net` (MVP sonrası hedef) | Press müşteri paneli (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
+| `panel.atonota.net` (MVP sonrası hedef. Backend MVP'de bu adı açmaz, `ortamlar.md` madde 4) | Press müşteri paneli (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
 | `operator.atonota.net` (MVP sonrası hedef) | Aynı SPA'nın operatör modu ve operatör BFF'i (`ops-bff`), ters vekil arkasında aynı origin; yalnız Tailscale/özel ağ (`press.` ile aynı sınır, Press Desk'ten ayrı origin); satıcı betiği yok (G-134) | BFF'in host'a bağlı HttpOnly sunucu oturumu; Keycloak belirteçleri yalnız bu oturumda (G-148); dönüş ve back-channel logout adresi bu origin'de (G-58) | BFF oturumuna bağlı CSRF belirteci | Yok (aynı origin); tarayıcı `ops.` host'una istek atmaz (K-16) | Operatör bileti: `ops-bff` kiracı sitesinden alır; Hocuspocus yalnız bu origin'den kabul eder |
 | `press.atonota.net` | Press Desk (operatör; yalnız Tailscale) | Ayrı `sid` | Desk | Yok | Desk |
 | `<kiracı>.app.atonota.net` (ilk kiracı `demo.app.atonota.net`) | Kiracı sitesi (platform\_core www, SPA). Kiracının paneli bu adresin `/panel` yoludur | Host'a bağlı `sid` | `www/<panel>.py` | Yok | Kiracı socket.io, aynı origin |

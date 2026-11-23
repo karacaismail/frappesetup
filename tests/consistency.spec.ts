@@ -485,7 +485,7 @@ test.describe('content consistency', () => {
     const RULES: [RegExp, string][] = [
       // Adın geçersiz olduğunu söyleyen yasak cümleleri ("... adı kullanılmaz", "... açılmaz") muaftır.
       [/(?<![_\w])press\.api\.ops(?!.{0,40}(kullanılmaz|açılmaz))/, 'press.api.ops (press_tr.api.ops olmalı)'],
-      [/<kiracı>\.<marka>\.com\.tr/, '<kiracı>.<marka>.com.tr (app. alt bölgesi olmalı)'],
+      [/<marka>\.com\.tr|<kiracı>\.atonota\.net/, 'eski ad: kiracı <kiracı>.app.atonota.net, marka alanı atonota.net olmalı (backend ad haritası)'],
       [/buy_credits_iyzico|press\.api\.billing\.create_iyzico/, 'iyzico ucu press_tr.api.billing.create_iyzico_checkout_form olmalı'],
       [/kullanıcının Keycloak token/, 'kiracı verisi kullanıcının Keycloak belirteciyle değil aracı belirteciyle (G-148)'],
     ];
