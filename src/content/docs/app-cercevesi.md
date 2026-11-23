@@ -62,7 +62,7 @@ Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmu
 - Aktivasyon E2E'si 320 px ve masaüstünde geçer; Marketplace App Subscription Active, `site_config` içinde `sk_<app>`, sidebar'da uygulama başlığı ve Workspace çocukları görünür (G-29, G-94, SA-16).
 - Yetki matrisi ve AI negatif testleri (yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, confirm'siz yıkıcı aksiyon) reddedilir ve AI Action Log'a `denied` düşer (G-85, G-64).
 - `user_data_fields` ile Personal Data Download/Deletion talebi uygulamanın tüm kişisel veri doctype'larını kapsar (G-52).
-- Türkçe `tr.po` tam; panel metinleri i18n kataloğunda (G-73).
+- Backend metinleri `_()` ile bağlamla sarılır. Türkçe çeviri `translations/tr.csv` dosyasında tamdır. Panel metinleri dil kataloğundadır (G-73).
 - İlk Paid Invoice operasyon sitesinde `APP-<ad>` satırıyla Sales Invoice olarak görünür (SA-19).
 
 HRMS TR bu çerçevenin ilk uygulamasıdır (P4); CRM ve Webshop aynı manifestle P5'te yayına alınır, çerçevede değişiklik gerekirse önce manifest güncellenir, sonra üç uygulama birlikte yeniden doğrulanır.
