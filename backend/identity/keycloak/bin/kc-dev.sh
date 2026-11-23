@@ -61,11 +61,22 @@ load_environment() {
   prepare_env
   # The file is read the way "docker run --env-file" and e2e/stack read it: the rest of the line
   # is the value, with no shell quoting. So a value with a space, like "AtonotA Login", stays whole.
-  local line
+  # Quotes and a trailing "# comment" stay in the value, as with docker. A final "\r" (CRLF file) is
+  # removed. Blank lines and lines starting with "#" are skipped. Any other line must be KEY=value.
+  local line key number=0
   while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      [A-Za-z_]*=*) export "${line%%=*}=${line#*=}" ;;
+    number=$((number + 1))
+    line="${line%$'\r'}"
+    case "${line#"${line%%[![:space:]]*}"}" in
+      '' | '#'*) continue ;;
     esac
+    key="${line%%=*}"
+    if [ "$key" = "$line" ] || ! [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      printf '%s:%s: expected KEY=value. Write the value without quotes and without "export".\n' \
+        "$ENV_FILE" "$number" >&2
+      exit 2
+    fi
+    export "$key=${line#*=}"
   done < "$ENV_FILE"
   export KC_PORT="$PANE_PORT"
   export KC_PUBLIC_URL="http://identity.localhost:$PANE_PORT"
