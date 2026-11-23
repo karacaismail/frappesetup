@@ -410,6 +410,65 @@ def configure_press(compose, environment):
     )
 
 
+VITE_ORIGIN = "http://localhost:5180"
+TENANT_CALLBACK = "/api/method/platform_core.api.auth.keycloak_callback"
+
+
+def tenant_browser_origin(environment):
+    if environment.get("FS_STACK_VITE") == "1":
+        return VITE_ORIGIN
+    return environment["ATONOTA_SITE_TENANT1_URL"]
+
+
+def tenant_login_settings(environment):
+    origin = tenant_browser_origin(environment)
+    return {
+        "host_name": origin,
+        "keycloak_public_url": environment["KC_PUBLIC_URL"],
+        "keycloak_internal_url": environment["KC_PUBLIC_URL"],
+        "keycloak_client_id": "site-tenant1",
+        "keycloak_client_secret": environment["ATONOTA_SITE_TENANT1_SECRET"],
+        "identity_brand_name": "Atonota",
+        "platform_panel_url": origin + "/panel",
+    }
+
+
+def configure_tenant_login(compose, environment):
+    script = """import json, sys
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+path = Path("sites/tenant1.localhost/site_config.json")
+config = json.loads(path.read_text())
+config.update(json.load(sys.stdin))
+with NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
+    temporary = Path(stream.name)
+    try:
+        json.dump(config, stream, indent=2)
+        stream.write(chr(10))
+        stream.flush()
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+"""
+    run(
+        [*compose, "run", "--rm", "--no-deps", "-T", "tenant-web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(tenant_login_settings(environment)),
+        text=True,
+    )
+
+
+def stack_realm(realm, environment):
+    origin = tenant_browser_origin(environment)
+    if origin != environment["ATONOTA_SITE_TENANT1_URL"]:
+        tenant = next(client for client in realm["clients"] if client["clientId"] == "site-tenant1")
+        tenant["redirectUris"].append(origin + TENANT_CALLBACK)
+        logout_uris = tenant["attributes"]["post.logout.redirect.uris"]
+        tenant["attributes"]["post.logout.redirect.uris"] = logout_uris + "##" + origin + "/panel"
+    return realm
+
+
 REALM_SYNC = BACKEND / "identity/keycloak/bin/sync-dev-realm.py"
 REALM_FILE = BACKEND / "identity/keycloak/realm/platform-realm.json"
 
@@ -439,7 +498,7 @@ def sync_realm(compose, environment):
     names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)", realm_text))
     payload = {
         "keycloak_url": environment["KC_PUBLIC_URL"],
-        "realm": json.loads(realm_text),
+        "realm": stack_realm(json.loads(realm_text), environment),
         "values": {name: environment[name] for name in sorted(names) if name in environment},
         "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
         "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
@@ -457,6 +516,8 @@ def up(engine, compose, environment):
     # Fail before any container work, not after a long startup.
     require_press_settings(environment)
     require_realm_sync_settings(environment)
+    if not environment.get("ATONOTA_SITE_TENANT1_SECRET"):
+        raise ValueError("Tenant sign-in requires ATONOTA_SITE_TENANT1_SECRET in E2E_ENV_FILE.")
     check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
@@ -518,6 +579,7 @@ def up(engine, compose, environment):
         ],
         environment,
     )
+    configure_tenant_login(compose, environment)
     run(
         [*compose, "up", "-d", "--no-build", "tenant-web", "tenant-socket", "web"],
         environment,

@@ -66,6 +66,19 @@ Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
 `e2e/stack up` Keycloak hazır olunca realm eşitleme adımını çalıştırır. Bu adım realm dosyasındaki istemci ve kapsamları korunan veritabanına uygular. Adım kullanıcı ve oturum silmez. Ayrıntı `identity/keycloak/README.md` dosyasının "Korunan veritabanında realm eşitleme" bölümündedir.
 
+Ayrı Vite arayüzü için yerel yığını şu komutla açın.
+
+```sh
+PANE_PORT=7400 FS_STACK_VITE=1 backend/e2e/stack up
+```
+
+Girişi `http://localhost:5180` üzerinden başlatın.
+Vite, giriş ve dönüş isteklerini `http://tenant1.localhost:7401` adresine iletir.
+Vite ayarında `VITE_DEV_SITE_NAME=tenant1.localhost` değerini kullanın.
+Keycloak aynı Vite adresine döner. Frappe oturum çerezini bu adreste açar.
+Frappe girişten sonra `http://localhost:5180/panel` adresine yönlendirir.
+`FS_STACK_VITE=1` yoksa giriş kiracı adresini kullanır.
+
 ### Colima profilleri
 
 - **Mevcut Factory ortamı.** Betik yalnız mevcut imajı ve siteyi yeniden kullanır. Factory diskinde en az 5 GiB boş alan gerekir.
