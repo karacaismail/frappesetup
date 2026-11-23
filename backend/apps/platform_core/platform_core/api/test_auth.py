@@ -1,12 +1,16 @@
 """Negative access checks through Frappe's HTTP dispatch."""
 
+import copy
 import secrets
 from unittest.mock import patch
 
+import frappe
+import redis
 from frappe.tests.test_api import FrappeAPITestCase
+from frappe.utils import add_days, now_datetime
 from frappe.utils.password import update_password
 
-from platform_core.identity import provider_setup
+from platform_core.identity import provider_setup, session_policy
 from platform_core.identity.tests import helpers as h
 
 PREFIX = "/api/method/platform_core.api.auth."
@@ -162,6 +166,7 @@ class TestAuthEndpointAccess(FrappeAPITestCase):
 		response = h.request(client.get, TOKEN_PATH)
 		self.assertEqual(response.status_code, 200)
 		directives = {part.strip() for part in response.headers.get("Cache-Control", "").split(",")}
+		self.assertIn("private", directives)
 		self.assertIn("no-store", directives)
 		self.assertNotIn("ETag", response.headers)
 		self.assertNotIn("Last-Modified", response.headers)
@@ -198,3 +203,74 @@ class TestAuthEndpointAccess(FrappeAPITestCase):
 		response = h.request(client.get, TOKEN_PATH)
 		self.assertEqual(response.status_code, 429)
 		self.assertEqual(response.json["exc_type"], "RateLimitExceededError")
+
+	def test_get_csrf_token_expired_session(self):
+		"""Frappe opens an expired session as Guest and marks `session_expired` (frappe/sessions.py:346).
+		A whitelisted method that guests may not call then raises `SessionExpired` (frappe/__init__.py:483)."""
+		for case in ("frappe_expiry", "idle_timeout"):
+			with self.subTest(case=case):
+				client = self.login(h.AYSE, "fixture-first")
+				sid = client.get_cookie("sid").value
+				if case == "frappe_expiry":
+					sessions = frappe.qb.DocType("Sessions")
+					frappe.qb.update(sessions).set(sessions.lastupdate, add_days(now_datetime(), -30)).where(
+						sessions.sid == sid
+					).run()
+					frappe.cache.hdel("session", sid)
+					h.refresh()
+					response = h.request(client.get, TOKEN_PATH)
+				else:
+					with patch.object(session_policy, "IDLE_SECONDS", 0):
+						response = h.request(client.get, TOKEN_PATH)
+				self.assertEqual(response.status_code, 401, response.data[:200])
+				self.assertEqual(response.json["exc_type"], "SessionExpired")
+				self.assertNotIn("message", response.json)
+				self.assertEqual(h.logged_user(client), "Guest")
+
+	def test_get_csrf_token_waiting_request_reads_the_stored_token(self):
+		"""Two tabs share one session without a token and call the endpoint at the same time.
+
+		The test client runs one request at a time, so the race is staged inside the lock: while the
+		second tab waits for the lock, the first tab stores its token in the shared session record.
+		The waiting tab must return that token and must not create a second one."""
+		client = self.password_login(h.AYSE)
+		sid = client.get_cookie("sid").value
+		first_tab = secrets.token_hex(16)
+		order = []
+		real_lock = redis.Redis.lock
+
+		def store_as_first_tab():
+			# Another worker process writes Redis only. This request keeps its stale copy without a token.
+			stale = copy.deepcopy(frappe.cache.hget("session", sid))
+			self.assertFalse(stale["data"].get("csrf_token"))
+			stored = copy.deepcopy(stale)
+			stored["data"]["csrf_token"] = first_tab
+			frappe.cache.hset("session", sid, stored)
+			frappe.local.cache[frappe.cache.make_key("session")][sid] = stale
+			order.append("first tab stored")
+
+		def lock(cache, name, *args, **kwargs):
+			held = real_lock(cache, name, *args, **kwargs)
+			if "csrf_token" not in str(name):
+				return held
+			self.assertNotIn(sid, str(name))
+			acquire = held.acquire
+
+			def acquire_after_first_tab(*acquire_args, **acquire_kwargs):
+				order.append("waiting")
+				store_as_first_tab()
+				return acquire(*acquire_args, **acquire_kwargs)
+
+			held.acquire = acquire_after_first_tab
+			return held
+
+		generate = frappe.sessions.generate_csrf_token
+		with (
+			patch.object(type(frappe.cache), "lock", lock),
+			patch.object(frappe.sessions, "generate_csrf_token", wraps=generate) as generated,
+		):
+			token = self.csrf_token(client)
+		self.assertEqual(order, ["waiting", "first tab stored"])
+		self.assertEqual(token, first_tab)
+		generated.assert_not_called()
+		self.assertEqual(self.csrf_token(client), first_tab)

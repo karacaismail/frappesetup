@@ -581,9 +581,15 @@ paths:
         The frontend sends the returned value in the `X-Frappe-CSRF-Token` header of every writing request.
 
         The endpoint needs an open Frappe session. The `sid` cookie must point at the session of the signed-in user.
-        A guest request gets 403. An expired session gets 401.
+        A request without a session cookie gets 403 and `PermissionError`.
+        A cookie of an expired or closed session gets 401 and `SessionExpired`.
+        Frappe opens such a request as Guest and marks the session as expired (frappe/sessions.py:346).
+        The endpoint is not open to guests, so Frappe raises `SessionExpired` (frappe/__init__.py:483).
+        The idle timeout of 1 hour gives the same 401 (O-25). The test `test_get_csrf_token_expired_session` checks both cases.
         If the session has no token yet, the endpoint creates one with `frappe.sessions.get_csrf_token()` and stores it in the session.
-        Repeated calls return the same token while the session lives.
+        Only one request per session creates the first token. It holds a short Redis lock for this session.
+        A request that waited for the lock reads the stored token from the shared session record.
+        So two tabs of one session get the same token. Repeated calls return the same token while the session lives.
 
         The response is never cached. It carries `Cache-Control: private, no-store` and `Vary: Cookie, Authorization`.
         It has no `ETag` and does not answer conditional requests.
@@ -618,7 +624,8 @@ paths:
           $ref: "#/components/responses/IstekSiniri"
         "403":
           description: |
-            Guest request, or the request method is not GET. The `exc_type` value is `PermissionError`.
+            The request has no session cookie, or the request method is not GET. The `exc_type` value is `PermissionError`.
+            A cookie of an expired session gets 401, not 403.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
