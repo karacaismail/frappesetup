@@ -1,0 +1,27 @@
+name: Playwright browsers
+description: >-
+  Chromium, Firefox ve WebKit'i sistem bağımlılıklarıyla kurar. Tarayıcılar ve apt paketleri
+  önbellekten gelir; önbellek yoksa ağdan kurulur ve kaydedilir. npm ci'dan sonra çağrılır.
+runs:
+  using: composite
+  steps:
+    - id: meta
+      shell: bash
+      run: |
+        echo "pw=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        # apt paketleri koşucu imajına bağlıdır: imaj sürümü değişince önbellek yenilenir.
+        echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: pw-browsers-${{ runner.os }}-${{ runner.arch }}-${{ steps.meta.outputs.pw }}
+    - id: debs
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/pw-debs
+        key: pw-debs-${{ steps.meta.outputs.image }}-${{ runner.arch }}-${{ steps.meta.outputs.pw }}
+    - name: Install system dependencies and browsers
+      shell: bash
+      env:
+        DEBS_HIT: ${{ steps.debs.outputs.cache-hit }}
+      run: bash "$GITHUB_ACTION_PATH/install.sh"
