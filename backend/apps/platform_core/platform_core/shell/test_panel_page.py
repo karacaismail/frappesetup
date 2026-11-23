@@ -2,6 +2,7 @@
 
 import json
 import os
+import secrets
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -36,6 +37,8 @@ def app_policy(nonce):
 
 class TestPanelPage(IntegrationTestCase):
 	def setUp(self):
+		# A fresh value per test: a fixed default here looks like a hard coded password (Bandit B107).
+		self.token = secrets.token_hex(16)
 		self.folder = tempfile.TemporaryDirectory()
 		self.addCleanup(self.folder.cleanup)
 		self.manifest = Path(self.folder.name) / ".vite" / "manifest.json"
@@ -55,11 +58,11 @@ class TestPanelPage(IntegrationTestCase):
 		self.conf.start()
 		self.addCleanup(self.conf.stop)
 
-	def render(self, signed_in=True, token="csrf-sample"):
+	def render(self, signed_in=True):
 		context = frappe._dict()
 		with (
 			patch.object(panel, "has_session_cookie", return_value=signed_in),
-			patch.object(panel, "get_csrf_token", return_value=token),
+			patch.object(panel, "get_csrf_token", return_value=self.token),
 		):
 			panel.get_context(context)
 		return context, dict(frappe.local.response_headers)
@@ -69,7 +72,7 @@ class TestPanelPage(IntegrationTestCase):
 		self.assertEqual(context.panel_assets.script, "/panel/assets/index-1.js")
 		self.assertEqual(context.panel_assets.styles, ("/panel/assets/index-3.css",))
 		self.assertEqual(context.panel_assets.preloads, ("/panel/assets/vendor-2.js",))
-		self.assertEqual(context.panel_csrf_token, "csrf-sample")
+		self.assertEqual(context.panel_csrf_token, self.token)
 		self.assertGreaterEqual(len(context.panel_csp_nonce), 22)
 		self.assertEqual(headers["Content-Security-Policy"], app_policy(context.panel_csp_nonce))
 		self.assertEqual(headers["Cache-Control"], "private, no-store")
@@ -93,7 +96,7 @@ class TestPanelPage(IntegrationTestCase):
 			context, headers = self.render()
 		self.assertIsNone(context.panel_assets)
 		self.assertIsNone(context.get("panel_csp_nonce"))
-		self.assertEqual(context.panel_csrf_token, "csrf-sample")
+		self.assertEqual(context.panel_csrf_token, self.token)
 		self.assertEqual(headers["Content-Security-Policy"], PLACEHOLDER_POLICY)
 
 	def test_guest_is_redirected_without_token_or_assets(self):

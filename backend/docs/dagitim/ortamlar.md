@@ -204,6 +204,8 @@ Sayfa şöyle çalışır:
 6. `/panel/<yol>` biçimindeki adresler de aynı sayfayı açar. Böylece arayüzün kendi sayfaları doğrudan açılabilir.
 7. Oturumsuz istek giriş sayfasına yönlenir. Giriş sonrası kullanıcı aynı adrese döner.
 
+Geliştirme ortamında ön vekil yoktur. Bu yüzden `/panel/assets/` istekleri de Frappe'ye gider. Frappe bu isteklere dosya yerine panel sayfasının HTML'ini verir. Bu davranış beklenir. Yerelde arayüz dosyalarını Vite'ın kendi sunucusu verir. Canlıda ön vekil bu yolu Frappe'den önce karşılar.
+
 İçerik güvenlik politikası şudur. Bu politika tarayıcıya hangi kaynakların yüklenebileceğini söyler.
 
 - Betik ve stil yalnız sitenin kendi kökeninden gelir.
@@ -212,7 +214,7 @@ Sayfa şöyle çalışır:
 - Nonce `<meta property="csp-nonce">` öğesinde durur. Satır içi betik yoktur.
 - Sayfa başka sitede çerçeve içinde açılmaz.
 
-Taşıma betiği paketi kurmadan önce Vite listesini denetler. Liste yoksa ya da giriş betiği pakette yoksa taşıma durur. Şu anki paket değişmez.
+Taşıma betiği paketi kurmadan önce Vite listesini denetler. Kural `/panel` sayfasının kuralıyla aynıdır. Giriş betiği, stil dosyaları ve bütün içe aktarmalar `assets/` klasörünün hemen altında olmalıdır. Bu dosyalar pakette de bulunmalıdır. Kurala uymayan paket kurulmaz ve şu anki paket değişmez. Böylece sayfa taşımadan sonra yer tutucuya düşmez.
 
 Arka uç tarafı hazırdır. Arayüz tarafındaki ayar ayrı bir iştir (E-3).
 
@@ -496,7 +498,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | --- | --- | --- | --- |
 | E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
 | E-2 | Press'in üretim imajı yok. Press bugün açılışta kurulur. Python 3.14 yaması da açık (O-18) | press-tr işi `backend/deploy/images/press.Dockerfile` dosyasını yazar. Dosya gelince `build-release` Press'i pakete ekler | press-tr işi |
-| E-3 | Arka uç tarafı hazır. `/panel` sayfası Vite listesini okur ve `/panel/assets/` dosyalarını yükler. Arayüz henüz bu adrese göre ayarlanmadı | atonota-web işi üç ayar yapar. Yönlendiricinin kök yolu `/panel` olur. Arayüz kütüphanesi nonce'u `csp-nonce` öğesinden alır. Jenkins derlemesi `--manifest` seçeneğini zaten verir | atonota-web işi |
+| E-3 | Arka uç tarafı hazır. `/panel` sayfası Vite listesini okur ve `/panel/assets/` dosyalarını yükler. Arayüz henüz bu adrese göre ayarlanmadı | atonota-web işi altı ayar yapar. (1) Yönlendiricinin kök yolu `/panel` olur. (2) Ant Design `ConfigProvider` nonce'u `csp-nonce` öğesinin `.nonce` özelliğinden alır. (3) Küçük dosyalar `data:` adresine çevrilmez. Gerekirse `build.assetsInlineLimit: 0` verilir. (4) Kök öğenin kimliği `root` olur. (5) `public/` klasörü kullanılmaz. Ön vekil `/panel/<ad>` adresini sunmaz. (6) Yerel derleme de `--base=/panel/ --manifest` kullanır. Jenkins bu seçenekleri zaten verir. Ayrıca atonota-web işi tarayıcıda politika ihlali olup olmadığını denetler. Örneğin `setAttribute('style', ...)` ile yazılan stil engellenir | atonota-web işi |
 | E-4 | Üretim ayarlarının listesi yok. Örneğin Keycloak istemci sırları, sitenin kimlik ayarları ve eşitleme servisinin kiracı listesi | Her servis için üretim anahtar listesi yazılır. Liste `production.env.example` biçiminde olur | kimlik-realm işi ve DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |

@@ -64,16 +64,48 @@ print(d)' "$@"
 }
 
 # panel_entry <web bundle folder>: print the entry script that .vite/manifest.json names, relative
-# to assets/. The /panel page of Frappe loads it from /panel/assets/ (E-3). Fails when the manifest
-# is missing, names a file outside assets/ or names a file the bundle does not have.
+# to assets/. The /panel page of Frappe loads it from /panel/assets/ (E-3). The check follows the
+# rules of platform_core/shell/panel_assets.py: the entry, every CSS file and every static import
+# must be a file straight under assets/ (scripts .js or .mjs, styles .css) and must be in the
+# bundle. Otherwise the page would fall back to the placeholder after the release (review 1, K-1).
 panel_entry() {
     local entry
-    entry="$(python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1]))["index.html"]
-assert m.get("isEntry") is True
-print(m["file"])' "$1/.vite/manifest.json" 2>/dev/null)" ||
-        fail "the bundle has no Vite manifest with an index.html entry"
-    [[ "$entry" =~ ^assets/[A-Za-z0-9][A-Za-z0-9._-]*\.m?js$ && -f "$1/$entry" ]] ||
-        fail "the Vite manifest names a missing entry script: $entry"
+    entry="$(python3 -I -c 'import json, os, re, sys
+folder = sys.argv[1]
+try:
+    with open(os.path.join(folder, ".vite", "manifest.json"), "rb") as stream:
+        manifest = json.load(stream)
+    entry = manifest["index.html"]
+except (OSError, ValueError, KeyError, TypeError):
+    sys.exit("the bundle has no readable Vite manifest with an index.html entry")
+script = re.compile(r"assets/[A-Za-z0-9][A-Za-z0-9._-]*\.m?js")
+style = re.compile(r"assets/[A-Za-z0-9][A-Za-z0-9._-]*\.css")
+def check(file, pattern):
+    if not (isinstance(file, str) and pattern.fullmatch(file) and ".." not in file and os.path.isfile(os.path.join(folder, file))):
+        sys.exit("the Vite manifest names a missing or unexpected file: %r" % (file,))
+def items(chunk, field):
+    value = chunk.get(field, [])
+    if not isinstance(value, list):
+        sys.exit("the Vite manifest field %r is not a list" % field)
+    return value
+if not isinstance(entry, dict) or entry.get("isEntry") is not True:
+    sys.exit("the Vite manifest entry index.html is not an entry")
+check(entry.get("file"), script)
+seen, todo = {"index.html"}, [entry]
+while todo:
+    chunk = todo.pop()
+    for file in items(chunk, "css"):
+        check(file, style)
+    for key in items(chunk, "imports"):
+        if key not in seen:
+            seen.add(key)
+            imported = manifest.get(key)
+            if not isinstance(imported, dict):
+                sys.exit("the Vite manifest has no chunk %r" % (key,))
+            check(imported.get("file"), script)
+            todo.append(imported)
+print(entry["file"])' "$1")" ||
+        fail "the bundle has no valid Vite manifest with an index.html entry"
     printf '%s\n' "${entry#assets/}"
 }
 

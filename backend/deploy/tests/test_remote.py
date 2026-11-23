@@ -115,13 +115,14 @@ class RemoteScripts(unittest.TestCase):
             components["press"] = {"image": f"ghcr.io/karacaismail/atonota-press@sha256:{number:064x}"}
         return release.new_manifest("backend", commit(number), number, components)
 
-    def web(self, number, vite_manifest=True, entry=None):
+    def web(self, number, vite_manifest=True, entry=None, chunk=None, extra=None, files=()):
         buffer = io.BytesIO()
         entry = entry or f"assets/index-{number}.js"
-        files = [("index.html", b"<!doctype html>"), (f"assets/index-{number}.js", b"1")]
+        files = [("index.html", b"<!doctype html>"), (f"assets/index-{number}.js", b"1"), *files]
         if vite_manifest:
             # The /panel page reads this file (E-3). Vite writes it with build.manifest.
-            files.append((".vite/manifest.json", json.dumps({"index.html": {"file": entry, "isEntry": True}}).encode()))
+            vite = {"index.html": {"file": entry, "isEntry": True, **(chunk or {})}, **(extra or {})}
+            files.append((".vite/manifest.json", json.dumps(vite).encode()))
         with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
             for name, data in files:
                 info = tarfile.TarInfo(name)
@@ -527,6 +528,44 @@ class RemoteScripts(unittest.TestCase):
                 self.assertIn("manifest", result.stderr)
                 self.assertFalse((self.root / "web" / "alpha" / "current").exists())
                 self.assertFalse((self.root / "web" / "alpha" / "releases" / manifest["release_id"]).exists())
+
+    def test_web_release_checks_styles_and_imports_like_the_panel_page(self):
+        # platform_core/shell/panel_assets.py refuses these names, so /panel would show the
+        # placeholder after the release (review 1, K-1). The release is refused instead.
+        css = ("assets/index-1.css", b"a{}")
+        vendor = ("assets/vendor-1.js", b"2")
+        for name, (manifest, bundle) in {
+            "style in a sub folder": self.web(1, chunk={"css": ["assets/sub/a.css"]}, files=[("assets/sub/a.css", b"")]),
+            "style is not css": self.web(1, chunk={"css": ["assets/index-1.js"]}),
+            "style not in the bundle": self.web(1, chunk={"css": ["assets/missing.css"]}),
+            "css is not a list": self.web(1, chunk={"css": "assets/index-1.css"}, files=[css]),
+            "import has no chunk": self.web(1, chunk={"imports": ["_vendor.js"]}),
+            "import outside assets": self.web(
+                1, chunk={"imports": ["_vendor.js"]}, extra={"_vendor.js": {"file": "../vendor-1.js"}}
+            ),
+            "style of an import in a sub folder": self.web(
+                1,
+                chunk={"imports": ["_vendor.js"]},
+                extra={"_vendor.js": {"file": "assets/vendor-1.js", "css": ["assets/x/b.css"]}},
+                files=[vendor],
+            ),
+            "entry flag missing": self.web(1, chunk={"isEntry": False}),
+        }.items():
+            with self.subTest(name):
+                result = self.apply("alpha", manifest, bundle)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("manifest", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertFalse((self.root / "web" / "alpha" / "current").exists())
+        manifest, bundle = self.web(
+            1,
+            chunk={"css": ["assets/index-1.css"], "imports": ["_vendor.js"]},
+            extra={"_vendor.js": {"file": "assets/vendor-1.js", "imports": ["index.html"]}},
+            files=[css, vendor],
+        )
+        result = self.apply("alpha", manifest, bundle)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.run_remote("alpha", "status", "web-asset").stdout.strip(), "index-1.js")
 
     def test_web_release_keeps_the_backend_scripts_of_the_server(self):
         # Scripts come from each release's own commit (Ö8). An older web release must not put its
