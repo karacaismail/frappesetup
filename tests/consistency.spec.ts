@@ -19,6 +19,7 @@ const docs = readdirSync(docsDir)
 const ids = new Set(reqs.map((r) => r.id));
 type TaskItem = { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[] } };
 type TaskBoard = {
+  audit: { date: string; commit: string; note: string; addedAfter: string[] };
   epics: { id: string; title: string; goal: string }[];
   statuses: { id: string; label: string; rule: string }[];
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
@@ -101,7 +102,13 @@ test.describe('content consistency', () => {
       expect(() => execFileSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: fileURLToPath(root), stdio: 'ignore' }), `commit ${c}`).not.toThrow();
     }
     // Denetlenmemiş kalem bitti ya da sürüyor sayılmaz: denetim yalnız P0..P4 MUST kalemlerini okudu.
-    const audited = (r: Req) => r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase);
+    // Denetimden sonra eklenen kalemler (audit.addedAfter) ayrıca adlandırılır; bunlar da denetim dışıdır.
+    const addedAfter = new Set(board.audit.addedAfter);
+    expect([...addedAfter].filter((id) => !ids.has(id)), 'addedAfter bilinmeyen kimlik').toEqual([]);
+    expect(addedAfter.size, 'addedAfter tekrarsız').toBe(board.audit.addedAfter.length);
+    expect(board.statuses.find((s) => s.id === 'unverified')!.rule).toContain('denetimden sonra eklen');
+    const audited = (r: Req) =>
+      !addedAfter.has(r.id) && r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase);
     const claimed = reqs.filter((r) => !audited(r) && board.items[r.id].status !== 'unverified').map((r) => r.id);
     expect(claimed, 'denetim dışı kalemde durum iddiası').toEqual([]);
   });

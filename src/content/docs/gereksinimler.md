@@ -20,7 +20,7 @@ Sayılar derleme anında `requirements.json` dosyasından hesaplanır.
 
 <div data-embed="req-summary"></div>
 
-## Görev panosu
+## Görev panosu kuralları
 
 Yukarıdaki pano her gereksinimi bir görev olarak gösterir. Gereksinim kaydı değişmez. Görevin durumu, olgunluk düzeyi ve epiği ayrı bir dosyadadır. Bu dosya `src/data/task-board.json` dosyasıdır. Aşağıdaki tablolar bu dosyadan derleme anında üretilir.
 
