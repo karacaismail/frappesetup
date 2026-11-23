@@ -328,12 +328,135 @@ class StackServesPress(unittest.TestCase):
             with self.subTest(service=name):
                 self.assertNotIn("internal", networks[name])
                 self.assertIn("press-internal", networks[name])
-        self.assertEqual(networks["press-frontend"], {"press-internal", "edge"})
+        self.assertEqual(networks["press-frontend"], {"press-internal", "edge", "identity-press"})
+        self.assertEqual(networks["press-web"], {"press-internal", "press-identity"})
         self.assertEqual(networks["tenant-db"], {"internal", "press-internal"})
         for name in set(networks) - press - {"tenant-db"}:
             with self.subTest(service=name):
                 self.assertNotIn("press-internal", networks[name])
                 self.assertTrue(networks[name])
+
+    def test_press_reaches_identity_sync_only_on_a_closed_network(self):
+        # Review 2, finding 1: Press left the network "internal", so the only way left to reach
+        # identity-sync was a public address. The deletion and session revocation endpoints must
+        # not reach the edge. press-web and identity-sync share a network without a gateway.
+        text = self.stack()
+        networks = service_networks(text)
+        top = text.split("\nnetworks:\n")[-1]
+        self.assertRegex(top, r"(?m)^  press-identity: \{internal: true\}$")
+        members = {name for name, nets in networks.items() if "press-identity" in nets}
+        self.assertEqual(members, {"press-web", "identity-sync"})
+        self.assertEqual(networks["identity-sync"], {"internal", "press-identity", "identity-press"})
+        self.assertNotIn("press-internal", networks["identity-sync"])
+        edge = {name for name, nets in networks.items() if "edge" in nets}
+        self.assertEqual(edge, {"tenant-frontend", "keycloak", "press-frontend"})
+        for name in ("site.caddy.template", "Caddyfile", "edge.yaml"):
+            with self.subTest(edge_file=name):
+                edge_text = (DEPLOY / "compose" / name).read_text()
+                self.assertNotIn("identity-sync", edge_text)
+                self.assertNotIn("6115", edge_text)
+                self.assertNotIn("/v1/", edge_text)
+        self.assertNotIn("identity-sync by their public HTTPS addresses", text)
+        settings = (DEPLOY / "settings" / "press-site.production.env.example").read_text()
+        self.assertRegex(settings, r"(?m)^identity_sync_url=http://identity-sync:6115$")
+
+    def test_identity_sync_reaches_press_only_on_a_closed_network(self):
+        # O-55 closes the Press APIs on the edge, so identity-sync calls Press over identity-press:
+        # a network with identity-sync and press-frontend only, without a gateway. press-frontend
+        # carries the Press host name there, so nginx picks the Press site from the Host header.
+        text = self.stack()
+        networks = service_networks(text)
+        top = text.split("\nnetworks:\n")[-1]
+        self.assertRegex(top, r"(?m)^  identity-press: \{internal: true\}$")
+        members = {name for name, nets in networks.items() if "identity-press" in nets}
+        self.assertEqual(members, {"press-frontend", "identity-sync"})
+        frontend = re.search(r"(?ms)^  press-frontend:\n(.*?)(?=^  \S|\Z)", text.split("\nservices:\n", 1)[1]).group(1)
+        self.assertRegex(frontend, r'(?m)^      identity-press: \{aliases: \["\$\{ATONOTA_PRESS_HOST:\?\}"\]\}$')
+        settings = (DEPLOY / "settings" / "identity-sync.production.env.example").read_text()
+        self.assertRegex(settings, r"(?m)^IDENTITY_SYNC_PRESS_URL=<http://Press adı:8080>$")
+
+    PRESS_CUSTOMER_PATHS = {
+        "/account-deletion",
+        "/account-deletion/",
+        "/assets/*",
+        "/website_script.js",
+        "/api/method/press_tr.api.auth.get_login_url",
+        "/api/method/press_tr.api.auth.keycloak_callback",
+        "/api/method/press_tr.api.keycloak_backchannel_logout",
+        "/api/method/press_tr.api.account.request_deletion",
+    }
+
+    def press_block(self):
+        template = (DEPLOY / "compose" / "site.caddy.template").read_text()
+        return re.search(r"(?ms)^__PRESS_HOST__ \{\n(.*?)^\}", template).group(1)
+
+    @staticmethod
+    def press_routes_outside_press_block(template):
+        """Lines that reach the Press container, other than the two in the Press block.
+
+        Any upstream whose name ends in "-press" or names press-frontend counts, in any site block.
+        """
+        block = re.search(r"(?ms)^__PRESS_HOST__ \{\n(.*?)^\}", template)
+        inside = block.group(1) if block else ""
+        pattern = re.compile(r"(?m)^.*(?:__ENV__-press\b|\bpress-frontend\b|-press:\d+).*$")
+        outside = template.replace(inside, "", 1) if inside else template
+        lines = [line.strip() for line in pattern.findall(outside) if not line.strip().startswith("#")]
+        if len(pattern.findall(inside)) != 2:
+            lines.append(f"Press block has {len(pattern.findall(inside))} proxies, expected 2")
+        return lines
+
+    def test_only_the_press_block_reaches_the_press_container(self):
+        # Review r3-1, finding Ö1: the test read only the Press block. A tenant line or a second
+        # site block that proxies to Press would open Desk to everyone.
+        template = (DEPLOY / "compose" / "site.caddy.template").read_text()
+        self.assertEqual(self.press_routes_outside_press_block(template), [])
+        mutations = {
+            "tenant block": template.replace(
+                "\treverse_proxy __ENV__-tenant:8080", "\treverse_proxy /desk* __ENV__-press:8080\n\treverse_proxy __ENV__-tenant:8080", 1),
+            "new site block": template + "\nadmin.__PRESS_HOST__ {\n\treverse_proxy __ENV__-press:8080\n}\n",
+            "container name": template + "\nother.__BASE_HOST__ {\n\treverse_proxy press-frontend:8080\n}\n",
+        }
+        for name, text in mutations.items():
+            with self.subTest(mutation=name):
+                self.assertNotEqual(text, template)
+                self.assertNotEqual(self.press_routes_outside_press_block(text), [])
+
+    def test_press_desk_and_apis_stay_on_the_private_network(self):
+        # Orchestrator security item (O-55, G-6, G-13, G-119): the press. host serves Desk and the
+        # Press APIs only to Tailscale. Customers get only the paths of the account deletion flow.
+        block = self.press_block()
+        lines = [line.strip() for line in block.splitlines() if line.strip() and not line.strip().startswith("#")]
+        self.assertIn("@press_private remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48", lines)
+        self.assertNotRegex(block, r"private_ranges|0\.0\.0\.0/0|::/0|\b10\.\d|172\.(1[6-9]|2\d|3[01])\.|192\.168\.")
+        public = re.search(r"(?m)^\s*@press_customer \{\n((?:\s*path .*\n)+)\s*\}", block)
+        self.assertIsNotNone(public)
+        paths = {word for line in public.group(1).splitlines() for word in line.split()[1:]}
+        self.assertEqual(paths, self.PRESS_CUSTOMER_PATHS)
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertNotRegex(path, r"^/(app|desk|dashboard|api/resource|api/v[12])\b|^/api/\*$|^/\*$")
+        # Every proxy sits behind one of the two matchers; anything else gets 404.
+        handles = re.findall(r"(?ms)^\thandle( @\w+)? \{\n(.*?)^\t\}", block)
+        self.assertEqual([name.strip() for name, _ in handles],
+                         ["@press_private", "@press_refused", "@press_refused_path", "@press_customer", ""])
+        self.assertEqual(block.count("reverse_proxy"), 2)
+        for name, body in handles:
+            with self.subTest(handle=name):
+                if name.strip() in ("@press_customer", "@press_private"):
+                    self.assertEqual(body.strip(), "reverse_proxy __ENV__-press:8080")
+                else:
+                    self.assertEqual(body.strip(), "respond 404")
+        self.assertNotRegex(block, r"(?m)^\treverse_proxy")
+
+    def test_press_refuses_rpc_by_cmd_and_dot_segments_first(self):
+        # Frappe 16 runs a "cmd" field before it looks at the path (frappe/app.py). A public path
+        # with "?cmd=" would reach any Press method. Dot segments could reach /app past nginx.
+        block = self.press_block()
+        # The lines inside one Caddy matcher must all hold, so each refusal is its own matcher.
+        self.assertRegex(block, r"(?m)^\t@press_refused query cmd=\*$")
+        self.assertRegex(block, r"(?m)^\t@press_refused_path vars_regexp \{http\.request\.orig_uri\.path\} \(\?i\)\(\\\.\\\.\|%2e\|%2f\|%5c\|")
+        self.assertLess(block.index("handle @press_refused_path {"), block.index("handle @press_customer"))
+        self.assertLess(block.index("handle @press_refused {"), block.index("handle @press_customer"))
 
     def test_edge_sends_the_press_host_to_the_press_frontend(self):
         template = (DEPLOY / "compose" / "site.caddy.template").read_text()

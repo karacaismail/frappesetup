@@ -3243,5 +3243,23 @@
     "reason": "Test runs the repository's own build-release script with a fake docker, fixed arguments and no shell.",
     "owner": "press-tr",
     "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_osv_setup.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; the one subprocess call in this test is reviewed separately.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_osv_setup.py",
+    "code": "process = subprocess.run([BASH, str(SETUP), *args], env=self.env, capture_output=True, text=True)",
+    "statementSha256": "ac44c177b0d33a38943edf544b0a6a94caf9e5469d7ad0b32944960b4ec2f2f5",
+    "reason": "Runs the repository's own osv-setup script with bash and no shell string. The arguments are fixed test values, PATH points curl at a fake that writes only inside a temporary folder.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
   }
 ]

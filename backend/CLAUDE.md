@@ -31,20 +31,20 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `dev/compose.keycloak.yaml` | Keycloak ve onun veritabanı | kimlik-realm |
 | `dev/compose.press.yaml` | Press bench'i | press-tr |
 | `apps/platform_core/` iskeleti | `hooks.py`, `pyproject.toml`, `modules.txt` | dev-ortam |
-| `apps/platform_core/platform_core/kimlik/` | Giriş, çıkış, kimlik bağı, servis belirteci | platform-core-kimlik |
+| `apps/platform_core/platform_core/identity/` | Giriş, çıkış, kimlik bağı, servis belirteci | platform-core-kimlik |
 | `platform_core/api/__init__.py`, `api/auth.py`, `api/identity.py` | Kimlik uçları | platform-core-kimlik |
-| `apps/platform_core/platform_core/kabuk/` | Açılış verisi ve DocType tanımı | platform-core-kabuk |
+| `apps/platform_core/platform_core/shell/` | Açılış verisi ve DocType tanımı | platform-core-kabuk |
 | `platform_core/api/shell.py`, `api/meta.py`, `www/panel.*` | Kabuk uçları ve `/panel` sayfası | platform-core-kabuk |
-| `apps/platform_core/platform_core/yapay_zeka/` | Yapay zekâ erişim katmanı | platform-core-yz |
-| `apps/platform_core/platform_core/model_gecidi/`, `api/model.py` | Sağlayıcı kaydı ve model geçidi | platform-core-gecit |
+| `apps/platform_core/platform_core/ai/` | Yapay zekâ erişim katmanı | platform-core-yz |
+| `apps/platform_core/platform_core/model_gateway/`, `api/model.py` | Sağlayıcı kaydı ve model geçidi | platform-core-gecit |
 | `apps/press_tr/` | Press'in Türkiye uygulaması | press-tr |
 | `identity/keycloak/realm/` | Realm tanımı | kimlik-realm |
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
-| `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
+| `apps/platform_core/platform_core/access/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
 | `dev/guvenlik/`, `dev/bin/guvenlik-denetimi`, `dev/security/`, `dev/bin/security-full`, `dev/bin/dast-scan`, `dev/bin/release-report`, `dev/bin/security-scorecard` | Güvenlik kapısı ve elle başlatılan taramalar | security-tooling |
-| `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
+| `apps/platform_core/platform_core/mobile/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/hrms_tr/`, `dev/hrms/` | HRMS TR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
 | `dev/naming/` | Geçmiş adların düzeltilmesi | naming-history-fix |

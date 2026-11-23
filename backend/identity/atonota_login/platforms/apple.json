@@ -1,0 +1,19 @@
+{
+  "alias": "apple",
+  "providerId": "apple",
+  "displayName": "Apple",
+  "authorizationHost": "appleid.apple.com",
+  "secrets": {
+    "clientId": "ATONOTA_APPLE_CLIENT_ID",
+    "clientSecret": "ATONOTA_APPLE_P8_KEY",
+    "teamId": "ATONOTA_APPLE_TEAM_ID",
+    "keyId": "ATONOTA_APPLE_KEY_ID"
+  },
+  "config": {
+    "defaultScope": "name email",
+    "syncMode": "IMPORT",
+    "filteredByClaim": "true",
+    "claimFilterName": "email_verified",
+    "claimFilterValue": "true"
+  }
+}

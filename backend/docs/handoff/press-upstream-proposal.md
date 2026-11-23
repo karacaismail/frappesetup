@@ -4,7 +4,7 @@ Bu not, Press uyum önerisinin nasıl gönderileceğini anlatır.
 Öneri 23 Kasım 2026 Pazartesi günü depoda hazırlandı.
 Öneri Press'e gönderilmedi.
 Gönderim proje sahibinin onayını bekler.
-Ajanlar öneriyi göndermez. Karar O-55 kaydındadır.
+Ajanlar öneriyi göndermez. Karar O-57 kaydındadır.
 
 ## Önerinin parçaları
 
@@ -46,7 +46,7 @@ Bu dosyaya yeni bir import satırı eklenmiş. Değişiklik aynı kalır, yalnı
 Bu adımları proje sahibi onay verdikten sonra uygulayın.
 Onay yoksa hiçbir adımı uygulamayın.
 
-1. Proje sahibinden yazılı onay alın. Onayı bu nota ve O-55 kaydına yazın.
+1. Proje sahibinden yazılı onay alın. Onayı bu nota ve O-57 kaydına yazın.
 2. GitHub'da `frappe/press` deposunun bir kopyasını açın. Kopya proje sahibinin hesabında olsun.
 3. Kopyayı yerel bilgisayara indirin.
 4. `develop` dalından `fix/python-313-frappe-16-imports` adlı bir dal açın.

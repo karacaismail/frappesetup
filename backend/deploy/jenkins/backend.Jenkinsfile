@@ -11,7 +11,8 @@
 // Binding, Copy Artifact, Timestamper. Credentials of the folder "atonota-delivery":
 // atonota-deploy-ssh-alpha and atonota-deploy-ssh-beta (one key per environment and server user),
 // atonota-registry (GHCR user and token). Agents with label atonota-build: Docker, Python 3.9+, uv,
-// ssh on the Tailscale network.
+// curl, ssh on the Tailscale network, and HTTPS access to github.com and
+// osv-vulnerabilities.storage.googleapis.com for the stage "Security tools".
 //
 // Every stage after the first one starts from an empty workspace and takes the scripts and the
 // release from this build's stashes. A later stage never checks out a newer main.
@@ -83,6 +84,14 @@ pipeline {
                             env.DEPLOY_COMMIT = scmVars.GIT_COMMIT
                         }
                         stash name: 'deploy', includes: 'backend/deploy/**'
+                    }
+                }
+                // security-audit scans the Press lock offline with the pinned OSV-Scanner and a
+                // database at most seven days old (review 2, finding 2). Scheduled jobs are not
+                // allowed, so every build refreshes a database that is six days old or more.
+                stage('Security tools') {
+                    steps {
+                        sh 'backend/dev/security/osv-setup --if-stale'
                     }
                 }
                 stage('Gates') {

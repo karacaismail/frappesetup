@@ -20,9 +20,9 @@ Mevcut parçalar yeniden kullanılabilir:
 | Parça | Sağladığı iş | Eksik iş |
 | --- | --- | --- |
 | `oidc_verify` | İmza, sağlayıcı, hedef, istemci ve süre denetimi | Frappe kullanıcısı ve oturum yaşamı |
-| `kimlik.api.verify_mobile_token` | Telefon kimliğini doğrulama | MCP kapsamı ve MCP hedefi |
-| `kimlik.sign_out` | Frappe oturumlarını kapatma | Dış MCP oturumunu kapatma sözleşmesi |
-| `yapay_zeka.agent_token` | Kısa süre, çağrı sınırı ve insan ayrımı | Keycloak belirtecini kabul etme |
+| `identity.api.verify_mobile_token` | Telefon kimliğini doğrulama | MCP kapsamı ve MCP hedefi |
+| `identity.sign_out` | Frappe oturumlarını kapatma | Dış MCP oturumunu kapatma sözleşmesi |
+| `ai.agent_token` | Kısa süre, çağrı sınırı ve insan ayrımı | Keycloak belirtecini kabul etme |
 
 Kimlik modülünün açık arayüzü yalnız telefon belirtecini doğrular.
 Bu işlev `mobile` kapsamını ve telefon kurulum başlığını ister.

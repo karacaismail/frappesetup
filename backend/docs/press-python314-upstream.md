@@ -5,7 +5,7 @@ Press v0.154.1, Python 3.14 ve Frappe 16 ile yamasız açılamadı.
 O-18 borcu açıktır. Mevcut geliştirme yaması kaldırılmadı.
 Bu belge Press bakımcılarına gönderilecek öneridir. Henüz gönderilmedi.
 Üç kaynak önerisinin yama dizisi ve İngilizce PR metni [öneri klasöründedir](upstream/press-python314/).
-Gönderim adımları [devir notundadır](handoff/press-upstream-proposal.md) (O-55).
+Gönderim adımları [devir notundadır](handoff/press-upstream-proposal.md) (O-57).
 
 ## Kaynak ve çalışma ortamı
 
@@ -196,6 +196,30 @@ Bu yüzden Press Settings belge türü de açılmaz.
 Paket yoksa Press yine açılır. Telegram mesajı gönderilmez ve hata kaydı yazılır.
 Bakımcılar uzun vadede bakımı süren bir Telegram istemcisine geçmelidir.
 Örneğin Telegram Bot API'si doğrudan HTTP ile çağrılabilir.
+
+## Geçici yama kaydı
+
+[Yama kaydı](../dev/press/patch-registry.json) geliştirme ve üretim yamalarını listeler.
+Her kayıtta yamanın sahibi, testi ve kaldırma koşulu bulunur.
+Kayıt sahibi, yamayı çıkarıp koşulu sabitlenen Press sürümünde doğrular.
+
+Geliştirme betiğinde her yama için bir `patch-id` satırı açın.
+Aynı komut birden çok yamayı uygulayabilir. Her yama ayrı kayıt alır.
+Üretim yamaları dosya adlarıyla kayda girer.
+Geliştirmede geçici bağımlılık seçimi tek dosya olarak kayda girer.
+Test, yeni üretim yamalarını ve yeni `patch-id` satırlarını kayıtla karşılaştırır.
+Test, işaretsiz betik değişikliğini dosyanın SHA-256 özetiyle yakalar.
+Özet, dosya değişince değişen bir değerdir.
+Betiği veya geçici bağımlılık dosyasını değiştirirseniz kayıtları gözden geçirin.
+Ardından dosyanın özetini güncelleyin.
+
+Kayıt denetimini depo kökünde çalıştırın.
+
+```sh
+~/.local/bin/python3.14 -B -m unittest discover -s backend/dev/tests -p test_press_patch_registry.py
+```
+
+Bu denetim yerel dosyaları okur. Press imajını çalıştırmaz.
 
 ## Üretim imajındaki karşılıklar
 

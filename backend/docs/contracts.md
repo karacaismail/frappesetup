@@ -569,7 +569,7 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 #### Kullanım günlüğü temizliğinin modül arayüzü
 
-- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False, names=None)` olur.
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gateway.api.purge_usage_logs(*, dry_run=False, names=None)` olur.
 - İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
 - Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
 - `dry_run=True` iken işlev hiçbir kaydı silmez. `{"eligible": <sayı>, "deleted": 0, "names": [...]}` döner. `names` bu çalıştırmada silinecek kayıtların adlarıdır, en çok 500 tanedir.

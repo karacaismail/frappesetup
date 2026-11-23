@@ -1,4 +1,4 @@
-"""The Press upstream proposal is ready in the repository and has not been sent (decision O-55).
+"""The Press upstream proposal is ready in the repository and has not been sent (decision O-57).
 
 The proposal removes the need for the source parts of dev/press/patch-py314.sh. It is a Git mbox
 patch series for Press v0.154.1 and an English pull request text. The project owner sends it.
@@ -121,7 +121,7 @@ class NotSentYet(unittest.TestCase):
 
     def test_record_and_note_point_at_the_proposal(self):
         record = RECORD.read_text()
-        self.assertIn("- **O-55. Press'e gidecek öneri depoda hazırdır ve gönderilmez.**", record)
+        self.assertIn("- **O-57. Press'e gidecek öneri depoda hazırdır ve gönderilmez.**", record)
         self.assertIn("docs/upstream/press-python314/", record)
         self.assertIn("upstream/press-python314/", NOTE.read_text())
 
