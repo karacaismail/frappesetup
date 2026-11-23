@@ -7,9 +7,9 @@ settings, and seeds one synthetic deletion fixture. Secrets travel on stdin, nev
 import json
 import runpy
 import secrets
-import subprocess
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 STACK = Path(__file__).resolve().parents[1] / "stack"
@@ -30,6 +30,7 @@ def stack_environment():
         "IDENTITY_BRAND_NAME": "Atonota",
         "KC_BOOTSTRAP_ADMIN_USERNAME": secrets.token_hex(8),
         "KC_BOOTSTRAP_ADMIN_PASSWORD": secrets.token_urlsafe(16),
+        "ATONOTA_IDENTITY_SYNC_SECRET": secrets.token_urlsafe(16),
     }
 
 
@@ -82,7 +83,7 @@ class StackTenantTest(unittest.TestCase):
         def execute(command, env, **kwargs):
             commands.append(list(command))
             stdout = "0123456789ab" if command[-1] == "-q" else "realm-id-1"
-            return subprocess.CompletedProcess(command, 0, stdout=stdout)
+            return SimpleNamespace(returncode=0, stdout=stdout)
 
         with patch.dict(
             namespace["up"].__globals__,
@@ -134,8 +135,10 @@ class StackDeletionSeedTest(unittest.TestCase):
     def test_seed_runs_keycloak_tenant_and_press_scripts_with_secrets_on_stdin(self):
         namespace = runpy.run_path(str(STACK))
         environment = stack_environment()
+        # Made at run time so no credential-like literal sits in the source.
+        reader_secret, service_token = secrets.token_urlsafe(16), secrets.token_urlsafe(24)
         outputs = {
-            "stack-deletion-keycloak.py": {"subject": "kc-user-1", "reader_client": "e2e-stack-reader", "reader_secret": "r-secret"},
+            "stack-deletion-keycloak.py": {"subject": "kc-user-1", "reader_client": "e2e-stack-reader", "reader_secret": reader_secret, "service_token": service_token},
             "stack-deletion-tenant.py": {"E2E_DELETE_EMPLOYEE": "HR-EMP-00001", "E2E_DELETE_TENANT_ANONYMOUS_USER": "deleted-user-0123456789abcdef@deleted.invalid", "E2E_DELETE_TENANT_READER_COOKIE": "sid=tenant-sid"},
             "stack-deletion-press.py": {"E2E_DELETE_PRESS_ANONYMOUS_USER": "deleted-0123@invalid.example", "E2E_DELETE_PRESS_READER_COOKIE": "sid=press-sid"},
         }
@@ -146,7 +149,7 @@ class StackDeletionSeedTest(unittest.TestCase):
             calls.append((list(command), kwargs))
             for name, text in scripts.items():
                 if text in command:
-                    return subprocess.CompletedProcess(command, 0, stdout=json.dumps(outputs[name]) + "\n")
+                    return SimpleNamespace(returncode=0, stdout=json.dumps(outputs[name]) + "\n")
             self.fail(f"Unexpected command: {command[:4]}")
 
         with patch.dict(namespace["seed_deletion"].__globals__, {"run": execute}):
@@ -157,6 +160,7 @@ class StackDeletionSeedTest(unittest.TestCase):
         keycloak_payload = json.loads(keycloak[1]["input"])
         self.assertEqual(keycloak_payload["keycloak_url"], environment["KC_PUBLIC_URL"])
         self.assertEqual(keycloak_payload["admin_password"], environment["KC_BOOTSTRAP_ADMIN_PASSWORD"])
+        self.assertEqual(keycloak_payload["identity_sync_secret"], environment["ATONOTA_IDENTITY_SYNC_SECRET"])
         self.assertRegex(keycloak_payload["email"], r"^e2e-delete-[a-z0-9]+@example\.test$")
         self.assertGreaterEqual(len(keycloak_payload["password"]), 20)
         self.assertEqual(tenant[0][:6], ["compose", "exec", "-T", "tenant-web", "env/bin/python", "-c"])
@@ -168,13 +172,15 @@ class StackDeletionSeedTest(unittest.TestCase):
         for command, kwargs in calls:
             joined = " ".join(command)
             self.assertNotIn(environment["KC_BOOTSTRAP_ADMIN_PASSWORD"], joined)
+            self.assertNotIn(environment["ATONOTA_IDENTITY_SYNC_SECRET"], joined)
             self.assertNotIn(keycloak_payload["password"], joined)
         self.assertEqual(fixture["E2E_PRESS_DELETION"], "1")
         self.assertEqual(fixture["E2E_DELETE_EMAIL"], keycloak_payload["email"])
         self.assertEqual(fixture["E2E_DELETE_PASSWORD"], keycloak_payload["password"])
         self.assertEqual(fixture["E2E_DELETE_SUBJECT"], "kc-user-1")
         self.assertEqual(fixture["E2E_LIFECYCLE_READER_CLIENT"], "e2e-stack-reader")
-        self.assertEqual(fixture["E2E_LIFECYCLE_READER_SECRET"], "r-secret")
+        self.assertEqual(fixture["E2E_LIFECYCLE_READER_SECRET"], reader_secret)
+        self.assertEqual(fixture["E2E_DELETE_SERVICE_TOKEN"], service_token)
         self.assertEqual(fixture["E2E_DELETE_EMPLOYEE"], "HR-EMP-00001")
         self.assertEqual(fixture["E2E_DELETE_PRESS_READER_COOKIE"], "sid=press-sid")
         self.assertTrue(all(key.startswith("E2E_") for key in fixture))
@@ -187,9 +193,10 @@ class StackDeletionSeedTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir=root) as folder:
             path = Path(folder) / "deletion.env"
-            namespace["write_fixture"](path, {"E2E_DELETE_EMAIL": "e2e-delete-a1@example.test", "E2E_DELETE_PASSWORD": "Aa9!x y"})
+            password = "Aa9! " + secrets.token_urlsafe(8)
+            namespace["write_fixture"](path, {"E2E_DELETE_EMAIL": "e2e-delete-a1@example.test", "E2E_DELETE_PASSWORD": password})
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            self.assertEqual(path.read_text(), "E2E_DELETE_EMAIL=e2e-delete-a1@example.test\nE2E_DELETE_PASSWORD=Aa9!x y\n")
+            self.assertEqual(path.read_text(), f"E2E_DELETE_EMAIL=e2e-delete-a1@example.test\nE2E_DELETE_PASSWORD={password}\n")
             with self.assertRaises(ValueError):
                 namespace["write_fixture"](path, {"PATH": "x"})
             with self.assertRaises(ValueError):

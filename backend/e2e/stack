@@ -687,6 +687,8 @@ def seed_deletion(compose, environment):
     """
     require_tenant_settings(environment)
     require_realm_sync_settings(environment)
+    if not environment.get("ATONOTA_IDENTITY_SYNC_SECRET"):
+        raise ValueError("The deletion fixture needs ATONOTA_IDENTITY_SYNC_SECRET in E2E_ENV_FILE.")
     email = f"e2e-delete-{secrets.token_hex(4)}@example.test"
     password = "Aa9!" + secrets.token_urlsafe(24)
     issuer = environment["KC_PUBLIC_URL"] + "/realms/platform"
@@ -700,6 +702,7 @@ def seed_deletion(compose, environment):
                     "keycloak_url": environment["KC_PUBLIC_URL"],
                     "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
                     "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+                    "identity_sync_secret": environment["ATONOTA_IDENTITY_SYNC_SECRET"],
                     "email": email,
                     "password": password,
                 }
@@ -735,6 +738,7 @@ def seed_deletion(compose, environment):
         "E2E_DELETE_SUBJECT": account["subject"],
         "E2E_LIFECYCLE_READER_CLIENT": account["reader_client"],
         "E2E_LIFECYCLE_READER_SECRET": account["reader_secret"],
+        "E2E_DELETE_SERVICE_TOKEN": account["service_token"],
         **tenant,
         **press,
     }

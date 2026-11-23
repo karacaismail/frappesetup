@@ -113,3 +113,9 @@ export async function keycloakReaderToken(request: APIRequestContext) {
   if (typeof token !== 'string' || !token) throw new Error('Keycloak reader token is missing.');
   return token;
 }
+
+/** Closes a fixture session on a Frappe site. The seed opened it for one test run. */
+export async function closeSession(request: APIRequestContext, origin: string, cookie: string) {
+  const response = await request.post(origin + '/api/method/logout', { headers: { Cookie: cookie }, maxRedirects: 0 });
+  expect(response.status(), 'close fixture session on ' + origin).toBe(200);
+}

@@ -4,7 +4,8 @@ FROM ${KIRACI_IMAGE} AS hrms
 # The shared tenant image (dev/Dockerfile.tenant) already carries HRMS at this commit. Reuse it then.
 RUN if [ ! -d apps/hrms ]; then git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git apps/hrms; fi \
     && test "$(git -C apps/hrms rev-parse HEAD)" = a01032350ba1b799345b862cb122fa408bf6780e \
-    && uv pip install --python env/bin/python -e apps/hrms \
+    && uv pip install --python env/bin/python --no-deps -e apps/hrms \
+    && uv pip check --python env/bin/python \
     && { grep -qxF hrms sites/apps.txt || printf '\nhrms\n' >> sites/apps.txt; }
 
 FROM hrms AS hrms_tr

@@ -145,9 +145,10 @@ Zincir şöyle ilerler:
 
 1. Müşteri Press'te hesabını silmek ister. Press, Keycloak'ta yeni bir giriş ister.
 2. Press, isteği kimlik eşitleme servisine gönderir.
-3. Servis Press'i ve kiracıyı sırayla kapatır ve anonim yapar. Kiracı 200 ile `anonymized: true` ve `found: true` döner (O-44).
-4. Servis en son Keycloak hesabını siler. Test bu silmeyi bekler. Böylece kiracı yanıtı kanıtlanır (O-43).
-5. Test kiracıdaki “User” ve “Employee” kayıtlarını okur. Kişisel alanlar temizlenmiş olmalıdır.
+3. Servis Press'i ve kiracıyı sırayla kapatır ve anonim yapar.
+4. Servis en son Keycloak hesabını siler. Test bu silmeyi bekler. Silme, önceki adımların bittiğini gösterir.
+5. Test kiracının anonim yapma ucunu servis belirteciyle yeniden çağırır. Kiracı 200 ile `anonymized: true`, `found: true`, anonim kullanıcı adı ve “Anonymized” durumunu döner (O-44). Tekrar çağrı aynı gövdeyi verir.
+6. Test kiracıdaki “User”, “Employee”, silme kaydı ve kimlik bağı kayıtlarını okur. Kişisel alanlar temizlenmiş, bağ silinmiş olmalıdır.
 
 Komutları depo kökünden çalıştırın.
 
@@ -159,8 +160,10 @@ npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=c
 
 `seed-deletion` yeni bir deneme hesabı, bir şirket ve kişisel alanları dolu bir çalışan kaydı açar.
 Komut ayrıca yalnız kullanıcı okuyan bir Keycloak istemcisi hazırlar. Test bu istemciyle Keycloak hesabının silindiğini doğrular.
+Komut kimlik eşitleme servisinin kısa ömürlü belirtecini de alır. Belirteç 300 saniye yaşar. Testi bu süre içinde çalıştırın.
 Her test koşusu için komutu yeniden çalıştırın. Silinen hesap bir daha açılamaz.
-Test ayar dosyasını Git'e eklemeyin. Dosya parola taşır.
+Test ayar dosyasını Git'e eklemeyin. Dosya parola, servis belirteci ve iki yönetici oturumu taşır.
+Yönetici oturumları kiracıda ve Press'te okuma içindir. Test bitince bu oturumları kapatır. Test hiç çalışmazsa oturumlar süresi dolana kadar açık kalır.
 
 ## Hesap ve oturum testleri
 

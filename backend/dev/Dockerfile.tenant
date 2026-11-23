@@ -1,9 +1,12 @@
 FROM frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
 # HRMS is pinned to one commit and comes first, so this layer is cached independently of the platform code.
 # The tenant that Press is bound to runs HRMS TR (MVP test 2, row 5e); dev/hrms/Dockerfile builds on this image.
+# The pinned base image already holds every package HRMS needs. `--no-deps` keeps those versions,
+# and `uv pip check` fails the build if HRMS ever asks for a package the image lacks.
 RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git apps/hrms \
     && test "$(git -C apps/hrms rev-parse HEAD)" = a01032350ba1b799345b862cb122fa408bf6780e \
-    && uv pip install --python env/bin/python -e apps/hrms \
+    && uv pip install --python env/bin/python --no-deps -e apps/hrms \
+    && uv pip check --python env/bin/python \
     && printf '\nhrms\n' >> sites/apps.txt
 COPY --chown=frappe:frappe apps/platform_core /home/frappe/frappe-bench/apps/platform_core
 COPY --chown=frappe:frappe apps/hrms_tr /home/frappe/frappe-bench/apps/hrms_tr
