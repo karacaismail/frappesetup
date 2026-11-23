@@ -48,8 +48,8 @@ info:
     The English source text of the label is “Sign in with {0}”. The brand name fills `{0}`.
     The Turkish text comes from `translations/tr.csv`. Its row carries the module context in the third column.
     The button goes to the `start_login` endpoint.
-    While the `kimlik_yalniz_keycloak` setting is on, the page has only this button. There is no password form.
-    While the setting is off, the page also has a plain password form. The form uses the Frappe `/api/method/login` endpoint.
+    While `identity_keycloak_only` is on, the page redirects guests to `start_login` without rendering a form.
+    While the setting is off, the page offers the brand button and a password form. The form uses the Frappe `/api/method/login` endpoint.
     The page takes the `redirect-to` query field. If the value is safe, the page passes it to `start_login` as `redirect_to`.
 
     The success body is the Frappe wrapper: `{"message": <result>}`.
@@ -176,7 +176,7 @@ x-yerel-giris-kapisi:
     The closing applies to the called function, not to the address. The `override_whitelisted_methods` hook is used for this.
     The `/api/method`, `/api/v1/method`, `/api/v2/method` and `cmd` forms are all covered.
     `start_login`, `keycloak_callback` and the other endpoints in this file are not affected.
-    While the gate is on, the `/login` page has only the brand button. The button goes to the `start_login` endpoint. There is no password form.
+    While the gate is on, the `/login` page redirects guests to `start_login` without rendering a password form.
     The admin recovery path opens only through the site setting. An admin with server access writes the setting.
   parola_girisi:
     description: Password sign-in returns 401 and `AuthenticationError`.
@@ -2131,7 +2131,7 @@ components:
     YerelGirisKapali:
       description: |
         Local sign-in is closed. The `kimlik_yalniz_keycloak` setting is 1. The `exc_type` value is `PermissionError`.
-        The user signs in with the brand button on the sign-in page.
+        The tenant sign-in page redirects guests to the identity provider's sign-in flow.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
