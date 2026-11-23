@@ -3,9 +3,9 @@
 ---
 <figure class="diagram diagram-timeline">
 <div class="diagram-scroll" tabindex="0" role="region" aria-label="Yol haritası faz sırası (yatay kaydırılabilir)">
-<svg viewBox='0 0 1040 520' role='img' aria-labelledby='tl-title tl-desc' font-size='16' style='font-family: var(--mantine-font-family), "Outfit Variable", Outfit, system-ui, sans-serif'>
+<svg viewBox='0 0 1040 610' role='img' aria-labelledby='tl-title tl-desc' font-size='16' style='font-family: var(--mantine-font-family), "Outfit Variable", Outfit, system-ui, sans-serif'>
 <title id='tl-title'>Yol haritası faz sırası</title>
-<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir. 1. sütun P0. 2. sütun P1 ve P2. 3. sütun P3, P4 ve P6. 4. sütun P5. Oklar önkoşuldan bağımlı faza gider. P1, P0 bitince başlar. P2, P0 bitince başlar. P3, P1 bitince başlar. P4, P1 bitince başlar. P6, P2 bitince başlar. P5, P2 ve P4 bitince başlar. P2, P1'deki Keycloak adımı bitince başlar. Kapılar: M1 İlk dikey dilim (P1 çıkışı), M2 İlk ödeyen müşteri (P2 ve P4 çıkışı), M3 Operasyon canlı (P6 çıkışı), M4 CRM/Webshop (P5 çıkışı). Takvim tarihi ve süre yoktur.</desc>
+<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir. 1. sütun P0. 2. sütun P1 ve P2. 3. sütun P3, P4, P6 ve P7. 4. sütun P5. Oklar önkoşuldan bağımlı faza gider. P1, P0 bitince başlar. P2, P0 bitince başlar. P3, P1 bitince başlar. P4, P1 bitince başlar. P6, P2 bitince başlar. P5, P2 ve P4 bitince başlar. P7, P1 ve P2 bitince başlar. P2, P1'deki Keycloak adımı bitince başlar. Kapılar: M1 İlk dikey dilim (P1 çıkışı), M2 İlk ödeyen müşteri (P2 ve P4 çıkışı), M3 Operasyon canlı (P6 çıkışı), M4 CRM/Webshop (P5 çıkışı). Takvim tarihi ve süre yoktur.</desc>
 <defs><marker id='tl-arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>
 <text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Yol haritası faz sırası: her faz önkoşulu bitince başlar</text>
 <text x='24' y='60' fill='var(--fs-quiet)'>Sütunlar bağımlılık düzeyidir. Oklar önkoşuldan bağımlı faza gider. Takvim tarihi ve süre yoktur.</text>
@@ -30,25 +30,30 @@
 <rect x='808' y='190' width='200' height='64' rx='10' fill='var(--fs-surface)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <text x='824' y='216' font-size='18' font-weight='650' fill='var(--fs-ink)'>P5</text>
 <text x='824' y='240' fill='var(--fs-ink)'>CRM · Webshop</text>
+<rect x='552' y='370' width='200' height='64' rx='10' fill='var(--fs-surface)' stroke='var(--fs-line)' stroke-width='1.5'/>
+<text x='568' y='396' font-size='18' font-weight='650' fill='var(--fs-ink)'>P7</text>
+<text x='568' y='420' fill='var(--fs-ink)'>AtonotA Login ürünü</text>
 <path data-edge='P0-P1' d='M240 222 L268 222 L268 132 L296 132' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P0-P2' d='M240 222 L268 222 L268 312 L296 312' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P1-P3' d='M496 132 L552 132' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P1-P4' d='M496 132 L524 132 L524 222 L552 222' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P2-P6' d='M496 312 L552 312' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
-<path data-edge='P2-P5' d='M396 344 L396 372 L908 372 L908 254' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
+<path data-edge='P2-P5' d='M396 344 L396 462 L908 462 L908 254' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P4-P5' d='M752 222 L808 222' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
+<path data-edge='P1-P7' d='M496 132 L524 132 L524 402 L552 402' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
+<path data-edge='P2-P7' d='M496 312 L524 312 L524 402 L552 402' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P1-P2-gate' d='M356 164 L356 280' fill='none' stroke='var(--fs-accent)' stroke-width='1.5' stroke-dasharray='5 5' marker-end='url(#tl-arr)'/>
 <text x='366' y='228' fill='var(--fs-accent-ink)'>Keycloak adımı</text>
-<text x='24' y='404' font-weight='650' fill='var(--fs-ink)'>Kapılar (hangi fazın çıkışına bağlı)</text>
-<path d='M34 426l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
-<text x='56' y='440' fill='var(--fs-ink)'>M1 İlk dikey dilim (P1 çıkışı)</text>
-<path d='M534 426l10 10l-10 10l-10 -10z' fill='var(--fs-accent)'/>
-<text x='556' y='440' font-weight='650' fill='var(--fs-ink)'>M2 İlk ödeyen müşteri (P2 ve P4 çıkışı)</text>
-<path d='M34 460l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
-<text x='56' y='474' fill='var(--fs-ink)'>M3 Operasyon canlı (P6 çıkışı)</text>
-<path d='M534 460l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
-<text x='556' y='474' fill='var(--fs-ink)'>M4 CRM/Webshop (P5 çıkışı)</text>
+<text x='24' y='494' font-weight='650' fill='var(--fs-ink)'>Kapılar (hangi fazın çıkışına bağlı)</text>
+<path d='M34 516l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
+<text x='56' y='530' fill='var(--fs-ink)'>M1 İlk dikey dilim (P1 çıkışı)</text>
+<path d='M534 516l10 10l-10 10l-10 -10z' fill='var(--fs-accent)'/>
+<text x='556' y='530' font-weight='650' fill='var(--fs-ink)'>M2 İlk ödeyen müşteri (P2 ve P4 çıkışı)</text>
+<path d='M34 550l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
+<text x='56' y='564' fill='var(--fs-ink)'>M3 Operasyon canlı (P6 çıkışı)</text>
+<path d='M534 550l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
+<text x='556' y='564' fill='var(--fs-ink)'>M4 CRM/Webshop (P5 çıkışı)</text>
 </svg>
 </div>
-<figcaption class="diagram-note">P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır.</figcaption>
+<figcaption class="diagram-note">P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır.</figcaption>
 </figure>

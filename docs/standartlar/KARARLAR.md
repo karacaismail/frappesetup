@@ -1,6 +1,6 @@
 # Proje sahibinin kararları
 
-Bu dosya 20 Kasım 2026 Cuma, 21 Kasım 2026 Cumartesi ve 22 Kasım 2026 Pazar günlerinin kararlarını toplar.
+Bu dosya dört günün kararlarını toplar. İlk gün 20 Kasım 2026 Cuma günüdür. Son gün 23 Kasım 2026 Pazartesi günüdür.
 
 Çalışma Frappe için kod standartlarıyla başladı. Sonra mobil uygulamaya ve KVKK uyumuna genişledi.
 
@@ -61,7 +61,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 14. Düzenli silme için şimdilik cron kurulmaz.
 15. KVKK ve GDPR uyum çalışması şimdilik durdu.
 16. Backend geliştirmesi MVP seviyesinde başladı. Kod frappesetup deposundadır.
-17. Giriş Keycloak ile olur. Keycloak'ın markası Atonota'dır. Atonota ayrı alan adında durur.
+17. Giriş Keycloak ile olur. Giriş ürününün adı AtonotA Login'dir. Giriş adresi `api.login.atonota.net` olur (Karar 42).
 18. İlk turda Press de geliştirilir.
 19. Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde çalışır.
 20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
@@ -69,6 +69,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 22. Sisteme n tane yapay zekâ sağlayıcısı, hesabı ve API'si eklenebilir.
 23. Bütün kod adları İngilizce ve ASCII olur. Eski adlar da kurallara göre güncellenir (Karar 40).
 24. Kural dosyasının sınırı varsayılan olarak 36.000 bayttır. Özel durumda en çok 39.000 bayttır (Karar 41).
+25. AtonotA Login bağımsız ve ücretli bir üründür. Ürünün geliştirilmesi MVP sonrasıdır (Karar 42).
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -697,10 +698,10 @@ Claude markanın adını sordu. Proje sahibi şöyle cevap verdi:
 
 Sonuç şudur:
 
-- Kimlik markası Atonota'dır. Düğme metni “Atonota ile oturum aç” olur.
+- Kimlik markası Atonota'dır. Düğme metni “Atonota ile oturum aç” olur. Karar 42 bu adı “AtonotA Login” yaptı.
 - Claude adı alan adından türetti. Proje sahibi adın yazımını ayrıca onaylamadı.
 - Keycloak atonota.net alan adında, platformdan ayrı durur.
-- Tam sunucu adı açık karardır. Örneğin ad `atonota.net` ya da `id.atonota.net` olabilir.
+- Tam sunucu adı Karar 42 ile kapandı. Ad `api.login.atonota.net` oldu.
 - Marka adı ve alan adı koda sabit yazılmaz. İkisi de ayardan gelir.
 
 ### Karar 34. Backend'in seviyesi, yeri ve kapsamı belirlendi
@@ -781,7 +782,7 @@ Sonuç şudur. Claude açık kararları kapattı. Kararların tam listesi `backe
 
 | Konu | Karar |
 |---|---|
-| Keycloak'ın sunucu adı | `id.atonota.net` |
+| Keycloak'ın sunucu adı | `api.login.atonota.net`. Bu ad Karar 42'den gelir. |
 | Giriş teması | Keycloak'ın kendi tema yapısı. Keycloakify sonra yeniden değerlendirilir. |
 | Sihirli bağlantı ve Apple ile giriş | MVP'ye girer. Eklentinin lisansı Apache-2.0 ya da MIT olur. |
 | `press_tr` lisansı | AGPL-3.0. Press AGPL-3.0'dır. Hukuk görüşü alınmadı. |
@@ -873,6 +874,34 @@ Sonuç şudur:
 - Python dışı ve ayrı arayüz dosyalarının sınırı 36.000 bayt oldu. Bu iki sınır önce 32.768 bayttı.
 - Mobil dosyanın sınırı 36.000 bayt olarak kalır.
 - Bir kural dosyası `AGENTS.md` olarak kullanılırsa 32.768 bayt sınırı ayrıca geçerlidir. Codex bu dosyanın fazlasını okumaz.
+
+## 23 Kasım 2026 Pazartesi günü
+
+### Karar 42. AtonotA Login bağımsız bir ürün olacak
+
+Proje sahibi giriş ürününün kararlarını verdi. Kararlar kesindir. Sonuç şudur:
+
+- Ürünün adı “AtonotA Login” olur. Ad tam olarak böyle yazılır.
+- Ürün bağımsızdır. Müşteri ürünü ücret karşılığında alıp kullanabilir.
+- Ürün önce Keycloak üzerine kurulur. Keycloak'ta eksik kalan işleri Frappe tamamlar.
+- Ürünün bir tanıtım sayfası olur. Sayfa ürünün değer önerilerini anlatır.
+- Ürünün kodu MIT lisanslıdır. Keycloak Apache-2.0 lisanslıdır. İki lisans karıştırılmaz.
+- Kullanıcı birçok platformla oturum açabilir. Örnekler Google, Facebook, LinkedIn ve X'tir. Platform listesi veriyle gelir.
+- Giriş adresi `api.login.atonota.net` olur.
+- Kullanıcı “Google ile oturum aç” düğmesine basarsa tarayıcı `accounts.google.com` adresine gider. Sonra tarayıcı `api.login.atonota.net` adresine döner.
+
+Proje sahibi backend kararlarını orkestratöre bıraktı. Orkestratör şunlara karar verdi:
+
+- alpha, beta ve rc ortamlarında adres `api.login.<ortam>.atonota.net` olur.
+- Eski `id.atonota.net` adı kalkar. Ürün canlıda olmadığı için yönlendirme gerekmez.
+- MVP'de realm adı, istemci kimlikleri ve tema klasörü değişmez. Yalnız görünen ad “AtonotA Login” olur.
+- Ürünün geliştirilmesi MVP sonrasıdır. MVP'de yalnız bu kararla çelişen yerler düzeltilir.
+
+Sitedeki karşılığı şudur:
+
+- Ürün sayfası sitenin “AtonotA Login” bölümüdür.
+- Sitedeki karar kaydı K-61'dir.
+- Ürünün fazı P7'dir. Gereksinimler G-157 ile başlar.
 
 ## Modellerin kararları
 

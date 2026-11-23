@@ -1,6 +1,6 @@
 # frappesetup
 
-Frappe üzerinde çok kiracılı SaaS için **mimari karar çerçevesi ve yol haritası** — Press kontrol düzlemi (Frappe v15), ERPNext v16 müşteri siteleri, Keycloak kimlik, Ant Design tabanlı headless React panel, MCP/Claude Agent SDK AI katmanı ve superadmin operasyon düzlemi. On sabit karar, altı ray, ürün sözleşmeleri (kalite kuralları, URL ve paylaşım, ölçüm, yardım ve tur), 200 numaralı gereksinim (G-1..G-156, SA-1..SA-44) ve yedi fazlı yol haritası. SaaS henüz kurulmadı: sayfalardaki kontroller tasarım sözleşmesidir, uygulanmış güvenlik sayılmaz.
+Frappe üzerinde çok kiracılı SaaS için **mimari karar çerçevesi ve yol haritası** — Press kontrol düzlemi (Frappe v15), ERPNext v16 müşteri siteleri, Keycloak kimlik, Ant Design tabanlı headless React panel, MCP/Claude Agent SDK AI katmanı ve superadmin operasyon düzlemi. On sabit karar, altı ray, ürün sözleşmeleri (kalite kuralları, URL ve paylaşım, ölçüm, yardım ve tur), 211 numaralı gereksinim (G-1..G-167, SA-1..SA-44) ve sekiz fazlı yol haritası. SaaS henüz kurulmadı: sayfalardaki kontroller tasarım sözleşmesidir, uygulanmış güvenlik sayılmaz.
 
 Yayın: **https://karacaismail.github.io/frappesetup/**
 
@@ -17,9 +17,9 @@ Yayın: **https://karacaismail.github.io/frappesetup/**
 
 ```
 src/
-  content/docs/            28 bölüm (frontmatter: title, nav, order)
+  content/docs/            29 bölüm (frontmatter: title, nav, order)
   data/requirements.json   gereksinimlerin tek kaynağı (id, title, detail, rail, priority, phase, source, owner)
-  data/phases.json         P0–P6 faz hedefi, çıkış ölçütü, sahip, önkoşul (`after`)
+  data/phases.json         P0–P7 faz hedefi, çıkış ölçütü, sahip, önkoşul (`after`)
   data/sections.ts         bölüm grubu, ikon, özet
   components/Shell.tsx     MantineProvider + AppShell adası (gezinme, TOC, tema düğmesi)
   components/RequirementsExplorer.tsx   süzülebilir gereksinim gezgini (Gereksinimler sayfası)

@@ -11,7 +11,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | # | Karar | Tür | Seçenekler | Öneri | Faz |
 | --- | --- | --- | --- | --- | --- |
 | K-1 | Platform uygulamalarının lisansı (G-118) | Ürün sahibi + hukuk | AGPL-3.0 / GPL-3.0 / MIT, uygulama bazında | Öneri yok: bağımlılık lisansları girdidir (Frappe Framework MIT, ERPNext/HRMS GPL-3.0, Press/Agent/CRM/Helpdesk AGPL-3.0); kod ilişkisi ve dağıtım biçimiyle hukuk değerlendirir, ürün sahibi onaylar | P0 |
-| K-2 | DNS yetkisi (G-2) | Teknik varsayım | Apex bölgenin tamamı Route 53 / yalnız `app.<marka>.com.tr` alt bölgesi | Alt bölge: kiracılar `<kiracı>.app.<marka>.com.tr`; `panel.`, `press.`, `operator.`, `id.`, `ops.`, `agent.` GoDaddy'de kalır. DevOps sorumlusu kayıt değerlerini hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını yazar, DevOps sorumlusu wildcard sertifikayı doğrular | P0 |
+| K-2 | DNS yetkisi (G-2) | Teknik varsayım | Apex bölgenin tamamı Route 53 / yalnız `app.<marka>.com.tr` alt bölgesi | Alt bölge: kiracılar `<kiracı>.app.<marka>.com.tr`; `panel.`, `press.`, `operator.`, `ops.`, `agent.` GoDaddy'de kalır. Keycloak ayrı `atonota.net` alanındadır (K-61). DevOps sorumlusu kayıt değerlerini hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını yazar, DevOps sorumlusu wildcard sertifikayı doğrular | P0 |
 | K-3 | Güvenlik ajanları ve nöbet (G-36, G-115, X-08) | Ürün sahibi | Wazuh/YARA/Malware Scan kapsamı; yedek nöbetçi | Wazuh + auditd P0'da; birincil nöbet DevOps sorumlusu, yedek kişiyi ürün sahibi atar | P0 |
 | K-4 | Yinelenen tahsilat modeli (G-19, G-20) | Ürün sahibi | Press Usage Record + iyzico saklı karttan tahsilat / iyzico Subscription ürünü | Press defteri + saklı kart: ay içi plan değişimi, kredi ve Havale/EFT tek defterde kalır | P1 |
 | K-5 | App Release onay kapısı (G-14) | Ürün sahibi | `bypass_automated_audit` + otomatik Approved / App Release Approval Request | Staging'de otomatik, prod Release Group'ta Approval Request zorunlu | P1 |
@@ -43,6 +43,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-33 | Destek kapsam süreleri (SA-42) | Ürün sahibi + hukuk | Görüntüle/takip Support Access süresi (3–168 saat); kontrol devri; temsil; Administrator yükseltmesi | Öneri: kontrol devri ≤ 30 dk, temsil ≤ 60 dk, Administrator yükseltmesi ≤ 15 dk; kabul edilene kadar taahhüt değildir | P6 |
 | K-34 | Hassas müşteri izolasyon kademesi (G-147) | Ürün sahibi + DevOps sorumlusu | Paylaşımlı bench / ayrı bench + ayrı DB kullanıcısı ve anahtar / ayrı sunucu-VM | Veri hassasiyeti ve sözleşmeyle seçilir; Release Group tek başına güvenlik sınırı değildir | P5 |
 | K-35 | Tur erteleme süresi ve öneri sıklığı (G-139, G-140) | Ürün sahibi | Erteleme bir sonraki oturuma / N güne; oturum başına öneri sayısı | Kullanım ölçümüyle (G-149) belirlenir | P4 |
+| K-61 | AtonotA Login ürünü, adresi ve ücretli kullanımı (G-157..G-167) | Ürün sahibi | Ürün, ad, adres ve lisans kapandı (23 Kasım 2026 Pazartesi). Plan, fiyat ve ölçü birimi açık | Ürün bağımsızdır. Giriş adresi `api.login.atonota.net` olur. alpha, beta ve rc için adres `api.login.<ortam>.atonota.net` olur. Ürün kodu MIT, Keycloak Apache-2.0 lisanslıdır. Fiyatı ürün sahibi belirler. Belgede fiyat yazılmaz. Ayrıntı [AtonotA Login](/frappesetup/atonota-login/) sayfasındadır | P7 |
 
 ### Bu dokümantasyon deposuna ait kararlar
 
@@ -70,7 +71,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-46 | Organizations (KM-02) | Teknik | MVP'de kullanılmaz / repo: her Press Team bir Organization (G-77), identity-sync açar | Onay bekliyor | — |
 | K-47 | Frappe kimlik köprüsü (KM-03) | Teknik + güvenlik | Kendi köprü; ilk bağ doğrulanmış e-postayla; e-posta değişikliği köprüde / repo: Social Login Key + `(iss, sub)` kancası, önceden provizyonlu kullanıcı, e-posta değişikliği identity-sync `rename_doc` (G-44, G-12, G-120) | Onay bekliyor | — |
 | K-48 | Kimlik veri modeli (KM-05) | Ürün sahibi + teknik | Notun DocType'ları / repo: Custom Field + Press Team (G-120, G-16, G-77); KYC/KYB repoda yok | Onay bekliyor | — |
-| K-49 | Alan adı düzeni (KM-06) | Teknik | Tek ana alan, `/crm` yolları / repo: `id.`, `panel.`, `<kiracı>.app.`, `operator.`, `ops.` (K-2) | Onay bekliyor | — |
+| K-49 | Alan adı düzeni (KM-06) | Teknik | Tek ana alan, `/crm` yolları / repo: `panel.`, `<kiracı>.app.`, `operator.`, `ops.` (K-2). Giriş adresi `api.login.atonota.net` olur (K-61) | Onay bekliyor | — |
 | K-50 | Passkey zorunluluğu (KM-07) | Ürün sahibi + güvenlik | Yönetici ve KYC için passkey zorunlu / repo: TOTP ve passkey kabul (G-78) | Onay bekliyor | — |
 | K-51 | Depo düzeni (KM-08) | Teknik | Dört depo / repo: `press_tr`, `platform_core`, pnpm monorepo | Onay bekliyor | — |
 | K-52 | Lisans kapısı (KM-09) | Ürün sahibi + hukuk | AGPL yasak, SBOM her PR / repo: AGPL bileşenleri kullanılır (K-1 açık), SEC-09 her sürümde SBOM | Onay bekliyor | — |
