@@ -181,7 +181,7 @@ services:
       keycloak: {condition: service_healthy}
     # press-identity: press-web sends account deletion requests here. identity-sync does not join
     # press-internal, so it cannot reach the Press Redis.
-    # identity-press: identity-sync calls the Press APIs at http://<Press host>:8080 (O-54).
+    # identity-press: identity-sync calls the Press APIs at http://<Press host>:8080 (O-55).
     networks: [internal, press-identity, identity-press]
 
   # Press image: deploy/images/press.Dockerfile. remote/apply turns this profile on only when the
@@ -261,7 +261,7 @@ services:
       CLIENT_MAX_BODY_SIZE: 50m
     depends_on: [press-web, press-socket]
     # identity-press: identity-sync calls the Press APIs here, because the edge opens only the
-    # customer paths of O-54. The alias lets nginx pick the Press site from the Host header.
+    # customer paths of O-55. The alias lets nginx pick the Press site from the Host header.
     networks:
       press-internal: {}
       edge: {aliases: ["${ATONOTA_ENV:?}-press"]}

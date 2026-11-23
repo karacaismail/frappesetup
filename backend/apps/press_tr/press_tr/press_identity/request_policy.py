@@ -155,7 +155,7 @@ def block_team_invitation(target, arguments):
 
 def reject_mismatched_command(path):
 	# Frappe 16 runs a "cmd" field before it reads the path (frappe/app.py). The edge proxy opens
-	# only a few paths to customers (O-54), so a "cmd" must name the method of its own path.
+	# only a few paths to customers (O-55), so a "cmd" must name the method of its own path.
 	command = frappe.form_dict.get("cmd")
 	if command and path not in {prefix + str(command) for prefix in API_PREFIXES}:
 		deny_request()

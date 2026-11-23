@@ -387,7 +387,7 @@ class RequestGuardsTest(unittest.TestCase):
 					request_policy.block_team_invitation(target, {})
 
 	def test_command_field_must_name_the_method_of_its_path(self):
-		# O-54: Frappe 16 runs "cmd" before it reads the path (frappe/app.py). A "cmd" body field on
+		# O-55: Frappe 16 runs "cmd" before it reads the path (frappe/app.py). A "cmd" body field on
 		# a customer path would otherwise call any Press method past the edge allowlist.
 		with (
 			patch.object(request_policy, "_", side_effect=lambda message, **_translation_options: message),

@@ -361,7 +361,7 @@ class StackServesPress(unittest.TestCase):
         self.assertRegex(settings, r"(?m)^identity_sync_url=http://identity-sync:6115$")
 
     def test_identity_sync_reaches_press_only_on_a_closed_network(self):
-        # O-54 closes the Press APIs on the edge, so identity-sync calls Press over identity-press:
+        # O-55 closes the Press APIs on the edge, so identity-sync calls Press over identity-press:
         # a network with identity-sync and press-frontend only, without a gateway. press-frontend
         # carries the Press host name there, so nginx picks the Press site from the Host header.
         text = self.stack()
@@ -391,7 +391,7 @@ class StackServesPress(unittest.TestCase):
         return re.search(r"(?ms)^__PRESS_HOST__ \{\n(.*?)^\}", template).group(1)
 
     def test_press_desk_and_apis_stay_on_the_private_network(self):
-        # Orchestrator security item (O-54, G-6, G-13, G-119): the press. host serves Desk and the
+        # Orchestrator security item (O-55, G-6, G-13, G-119): the press. host serves Desk and the
         # Press APIs only to Tailscale. Customers get only the paths of the account deletion flow.
         block = self.press_block()
         lines = [line.strip() for line in block.splitlines() if line.strip() and not line.strip().startswith("#")]

@@ -14,10 +14,10 @@ __ID_HOST__ {
 	reverse_proxy __ENV__-keycloak:8080
 }
 
-# Press (O-54, G-6, G-13, G-119). Desk, dashboard and every Press API answer only on Tailscale.
+# Press (O-55, G-6, G-13, G-119). Desk, dashboard and every Press API answer only on Tailscale.
 # Customers reach only the account deletion flow (O-27): the page, its files, the Keycloak login
 # and return, Keycloak's logout notice and the deletion request. A new customer path is added here
-# one by one, with its reason in O-54. Everything else gets 404.
+# one by one, with its reason in O-55. Everything else gets 404.
 # Only the Tailscale ranges count as private. Docker's own 172.16.0.0/12 addresses do not: a public
 # IPv6 client can reach Caddy from the Docker gateway address.
 __PRESS_HOST__ {
