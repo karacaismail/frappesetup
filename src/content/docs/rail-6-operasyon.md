@@ -29,7 +29,7 @@ order: 9
 
 ## Superadmin paneli (operatör modu)
 
-Panel, tenant SPA ile aynı kabuktur ve yalnız özel ağdaki `operator.<marka>.com.tr` origin'inde sunulur (G-119); Keycloak 'platform' realm'indeki `platform-operator` grubunun `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Gece mutabakat farkları**.
+Panel, tenant SPA ile aynı kabuktur ve yalnız özel ağdaki `operator.atonota.net` origin'inde sunulur (MVP sonrası hedef, backend ad haritasında yok; G-119); Keycloak 'platform' realm'indeki `platform-operator` grubunun `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Gece mutabakat farkları**.
 
 Press erişimi iki katmanlıdır ve gerekçesi koddur: `press.api.client` `get/set_value/delete/run_doc_method` Support Access'i tanır (client.py L246-260, L336-375), fakat başka takımın Team/Invoice/BT tekil yazması yalnız `frappe.local.system_user()` ile açılır (client.py L442-447, takım sahipliği ownership.py L80-105; v0.155.3). Bu yüzden **site düzeyi destek eylemleri** Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden, **ticari yazmalar** ise System User servis hesabı + `press_tr.api.ops` üzerinden yapılır. Operatör BFF'i (`ops-bff`; `operator.` origin'inde, operatör moduyla aynı origin'de, G-119) operatör başına Press API key/secret ve `X-Press-Team` başlığı kullanır; paylaşımlı anahtar yoktur. `press.api.client.get_list` + `skip_team_filter_for_system_user_and_support_agent` bayrağı Press Support Agent'a Support Access'siz çapraz-kiracı liste okuması verdiği için (client.py L164-170) bu rol KVKK envanterinde ayrıcalıklı sayılır ve her çağrı loglanır. Gerçek zamanlılık: panel verisi TanStack Query ile yenilenir; destek oturumu presence'ı Hocuspocus odasından gelir; ops sitesi `frappe.realtime` kanalı ticket güncellemeleri için kullanılır (doğrulanacak).
 
@@ -156,7 +156,7 @@ Proje sahibi şu sırayı seçti:
 | rc | Prod'un aynısında son kabul denemesi | Jenkins'te biri "Move to rc" düğmesine basar |
 | prod | Gerçek müşteri | Jenkins'te biri "Move to prod" düğmesine basar |
 
-Colima yalnız geliştirme içindir. Colima, bu Mac'teki konteyner ortamıdır.
+Colima yalnız geliştirme içindir. Colima, geliştiricinin yerel bilgisayarındaki konteyner ortamıdır.
 
 ### Ad haritası
 
@@ -185,7 +185,7 @@ Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dos
 | No | Engel | Sahibi |
 | --- | --- | --- |
 | E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. MVP'de ilk kiracı sitesini DevOps sorumlusu elle açar | press-tr işi ve DevOps sorumlusu |
-| E-2 | Press üretim imajı yazıldı ve Colima'da denendi. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor. Press bu yüzden bütün ortamlarda kapalıdır | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor. Press anahtarı bugün bütün ortamlarda kapalıdır. rc ve prod'da bu betikler bitmeden açılamaz. alpha'da DevOps sorumlusu Press'i elle açar | press-tr işi ve DevOps sorumlusu |
 | E-3 | `/panel` sayfası arka uçta hazır. Arayüz paketi bu adrese göre henüz ayarlanmadı | atonota-web işi |
 | E-4 | Çözüldü. Ayar listeleri yazıldı. Gerçek değerleri DevOps sorumlusu sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok | DevOps sorumlusu |

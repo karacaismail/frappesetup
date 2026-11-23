@@ -27,15 +27,19 @@ Her iki Social Login Key'de `user_id_property='sub'` yazılır; Frappe v16 varsa
 
 Tek Keycloak SSO oturumu her siteye etkileşimsiz OIDC dönüşüyle ayrı bir site oturumu açtırır; ortak parent-domain `sid` yoktur. Bu tablo tasarım sözleşmesidir; uygulanmadı ve test edilmedi.
 
+Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha, beta ve rc ortamlarında ortam adı araya girer. Örneğin beta'da giriş adresi `api.login.beta.atonota.net` olur. Tam harita [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır. Ad haritasında olmayan adlar "MVP sonrası hedef" diye ayrıldı.
+
+İki panel birbirine karışmasın: `panel.` adı Press'in müşteri panelidir, kiracının paneli ise kiracı adresinin `/panel` yoludur (örneğin `demo.app.atonota.net/panel`).
+
 | Host | Sunan | Oturum | CSRF kaynağı | CORS | Realtime / WS kimliği |
 | --- | --- | --- | --- | --- | --- |
-| `panel.<marka>.com.tr` | Press sitesi (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
-| `operator.<marka>.com.tr` | Aynı SPA'nın operatör modu ve operatör BFF'i (`ops-bff`), ters vekil arkasında aynı origin; yalnız Tailscale/özel ağ (`press.` ile aynı sınır, Press Desk'ten ayrı origin); satıcı betiği yok (G-134) | BFF'in host'a bağlı HttpOnly sunucu oturumu; Keycloak belirteçleri yalnız bu oturumda (G-148); dönüş ve back-channel logout adresi bu origin'de (G-58) | BFF oturumuna bağlı CSRF belirteci | Yok (aynı origin); tarayıcı `ops.` host'una istek atmaz (K-16) | Operatör bileti: `ops-bff` kiracı sitesinden alır; Hocuspocus yalnız bu origin'den kabul eder |
-| `press.<marka>.com.tr` | Press Desk (operatör; yalnız Tailscale) | Ayrı `sid` | Desk | Yok | Desk |
-| `<kiracı>.app.<marka>.com.tr` | Kiracı sitesi (platform\_core www, SPA) | Host'a bağlı `sid` | `www/<panel>.py` | Yok | Kiracı socket.io, aynı origin |
+| `panel.atonota.net` (MVP sonrası hedef. Backend MVP'de bu adı açmaz, `ortamlar.md` madde 4) | Press müşteri paneli (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
+| `operator.atonota.net` (MVP sonrası hedef) | Aynı SPA'nın operatör modu ve operatör BFF'i (`ops-bff`), ters vekil arkasında aynı origin; yalnız Tailscale/özel ağ (`press.` ile aynı sınır, Press Desk'ten ayrı origin); satıcı betiği yok (G-134) | BFF'in host'a bağlı HttpOnly sunucu oturumu; Keycloak belirteçleri yalnız bu oturumda (G-148); dönüş ve back-channel logout adresi bu origin'de (G-58) | BFF oturumuna bağlı CSRF belirteci | Yok (aynı origin); tarayıcı `ops.` host'una istek atmaz (K-16) | Operatör bileti: `ops-bff` kiracı sitesinden alır; Hocuspocus yalnız bu origin'den kabul eder |
+| `press.atonota.net` | Press Desk (operatör; yalnız Tailscale) | Ayrı `sid` | Desk | Yok | Desk |
+| `<kiracı>.app.atonota.net` (ilk kiracı `demo.app.atonota.net`) | Kiracı sitesi (platform\_core www, SPA). Kiracının paneli bu adresin `/panel` yoludur | Host'a bağlı `sid` | `www/<panel>.py` | Yok | Kiracı socket.io, aynı origin |
 | Doğrulanmış özel alan adı | Aynı kiracı sitesi; kiracının kayıtlı origin'i (G-119) | O host'a bağlı `sid` | Aynı | Yok | Aynı origin; redirect URI tam adres (G-124) |
-| `ops.<marka>.com.tr` | Operasyon sitesi (personel Desk); operatör modu buraya yalnız `ops-bff` üzerinden erişir | Host'a bağlı `sid` | Desk / www | Yok | — |
-| `agent.` ve Hocuspocus | Agent servisi, Hocuspocus | Çerez yok; aracı belirteci / tek kullanımlık bilet (G-148) | Gerekmez | Aracı belirteci ve müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden (kiracı host'u ve doğrulanmış özel alan adları, G-119), operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok); kimlik bilgisiz | Bilet + aktif Support Session |
+| `ops.atonota.net` (MVP sonrası hedef) | Operasyon sitesi (personel Desk); operatör modu buraya yalnız `ops-bff` üzerinden erişir | Host'a bağlı `sid` | Desk / www | Yok | — |
+| `agent.` ve Hocuspocus (MVP sonrası hedef) | Agent servisi, Hocuspocus | Çerez yok; aracı belirteci / tek kullanımlık bilet (G-148) | Gerekmez | Aracı belirteci ve müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden (kiracı host'u ve doğrulanmış özel alan adları, G-119), operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok); kimlik bilgisiz | Bilet + aktif Support Session |
 | `api.login.atonota.net` (AtonotA Login, K-61) | Keycloak | Yalnız Keycloak SSO oturumu | Keycloak | Yok | — |
 
 ## 2. Akışlar
@@ -48,7 +52,7 @@ Tek Keycloak SSO oturumu her siteye etkileşimsiz OIDC dönüşüyle ayrı bir s
 sequenceDiagram
   autonumber
   participant U as Kullanıcı
-  participant P as Panel SPA (panel.)
+  participant P as Press paneli (panel.)
   participant PR as Press
   participant K as Keycloak
   participant T as Kiracı SPA (kiracı host'u)
@@ -68,7 +72,7 @@ sequenceDiagram
   S-->>U: 302 Keycloak authorize (client site-kiraci)
   K-->>U: SSO oturumu var, etkileşimsiz 302 code
   S->>K: token + userinfo
-  S->>S: (iss, sub) ile System User eşle (sign_ups=Deny, G-120), host'a bağlı sid + csrf_token (G-45)
+  S->>S: (iss, sub) ile Website User eşle (sign_ups=Deny, G-120), host'a bağlı sid + csrf_token (G-45)
   S-->>T: get_bootstrap (G-63, aynı origin)
 ```
 
@@ -136,12 +140,12 @@ sequenceDiagram
 
 Servis JWT'leri için JWKS 10 dakika önbelleklenir ve bilinmeyen `kid` görülünce yenilenir; saat toleransı 30 sn; tüm servis belirteçleri kısa ömürlü ve audience kısıtlıdır (G-82).
 
-**Audience daraltma (doğrulandı: Keycloak 26.8.0, 2026-10-08).** Kiracının ve operasyon sitesinin audience'ı, Audience mapper'lı varsayılan olmayan kapsam `scope` ile istenmedikçe belirtece girmez; bu istemcilerde istemci rolü tanımlanmadığı için Audience Resolve da eklemez ([audience](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_audience_hardcoded)); client credentials isteği de `scope`'u uygular ([kod](https://github.com/keycloak/keycloak/blob/4246609cf2024c85016d3fb1254c3d2533367c31/services/src/main/java/org/keycloak/protocol/oidc/grants/ClientCredentialsGrantType.java#L105-L132)). Standart token exchange V2 yalnız confidential ve bu özelliği açık istemciye açıktır; istekte bulunan istemci subject token'ın `aud` değerinde olmalıdır, kendi belirtecini değiştiren istemci bundan muaftır; `audience` parametresi yalnız süzer, ekleme `scope` ile yapılır; değiştirilen erişim belirteci subject token iptal edilince iptal olmaz ([token exchange](https://www.keycloak.org/securing-apps/token-exchange#_standard-token-exchange-details)). `ops-bff` operatörün kendi belirtecini değiştirir; `scope` (hedefin kapsamı) ve `audience` (hedefin istemcisi) birlikte verilir, sonuçta `aud` tek değerdir. Servis belirteci tek `aud` taşır: servis hesabına kendi işi dışında istemci rolü atanmaz, `identity-sync`'in Admin API rolleri yalnız Admin API için istenen ayrı kapsamdadır ve kiracıya giden belirtece girmez; varsayılan kapsamlarda audience eşleyicisi yoktur; `identity-sync`'in Press'e giden belirtecindeki `press` audience'ı da `scope` ile istenen varsayılan olmayan kapsamdandır. Başka audience taşıyan belirteci site reddeder (G-59); rc kabulünde her servis belirtecinde `aud` tek değerdir (G-82, SA-40). Kiracı sayısıyla büyüyen kapsam listesinin belirteç üretim süresine etkisi staging'de ölçülür (doğrulanacak).
+**Audience daraltma (doğrulandı: Keycloak 26.8.0, 2026-10-08).** Kiracının ve operasyon sitesinin audience'ı, Audience mapper'lı varsayılan olmayan kapsam `scope` ile istenmedikçe belirtece girmez; bu istemcilerde istemci rolü tanımlanmadığı için Audience Resolve da eklemez ([audience](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_audience_hardcoded)); client credentials isteği de `scope`'u uygular ([kod](https://github.com/keycloak/keycloak/blob/4246609cf2024c85016d3fb1254c3d2533367c31/services/src/main/java/org/keycloak/protocol/oidc/grants/ClientCredentialsGrantType.java#L105-L132)). Standart token exchange V2 yalnız confidential ve bu özelliği açık istemciye açıktır; istekte bulunan istemci subject token'ın `aud` değerinde olmalıdır, kendi belirtecini değiştiren istemci bundan muaftır; `audience` parametresi yalnız süzer, ekleme `scope` ile yapılır; değiştirilen erişim belirteci subject token iptal edilince iptal olmaz ([token exchange](https://www.keycloak.org/securing-apps/token-exchange#_standard-token-exchange-details)). `ops-bff` operatörün kendi belirtecini değiştirir; `scope` (hedefin kapsamı) ve `audience` (hedefin istemcisi) birlikte verilir, sonuçta `aud` tek değerdir. Servis belirteci tek `aud` taşır: servis hesabına kendi işi dışında istemci rolü atanmaz, `identity-sync`'in Admin API rolleri yalnız Admin API için istenen ayrı kapsamdadır ve kiracıya giden belirtece girmez; varsayılan kapsamlarda audience eşleyicisi yoktur; `identity-sync`'in Press'e giden belirtecindeki `press` audience'ı da `scope` ile istenen varsayılan olmayan kapsamdandır. Başka audience taşıyan belirteci site reddeder (G-59); rc kabulünde her servis belirtecinde `aud` tek değerdir (G-82, SA-40). Kiracı sayısıyla büyüyen kapsam listesinin belirteç üretim süresine etkisi rc ortamında ölçülür (doğrulanacak).
 
 ## 4. Provizyon — identity-sync (G-81)
 
 - Kaynak: Keycloak Event Listener SPI (webhook eklentisi; eklenti seçimi doğrulanacak) + elle başlatılan admin event okuma yedeği (zamanlanmış iş yok, backend D-6 ve O-11); olaylar REGISTER, VERIFY\_EMAIL, UPDATE\_EMAIL, DELETE\_ACCOUNT, admin USER create/update/delete, `ORGANIZATION_MEMBERSHIP` (doğrulanacak).
-- Hedefler: `press_tr.api.identity.*` (Team/üyelik, `remove_team_member`), `platform_core.api.identity.provision` (System User, `role_profiles`, `enabled`), Admin API ile `site-<kiracı>` client yaşam döngüsü ve secret'ın Site Config'e Password olarak yazımı (G-39, G-112).
+- Hedefler: `press_tr.api.identity.*` (Team/üyelik, `remove_team_member`), `platform_core.api.identity.provision` (Website User, `role_profiles`, `enabled`), Admin API ile `site-<kiracı>` client yaşam döngüsü ve secret'ın Site Config'e Password olarak yazımı (G-39, G-112).
 - E-posta değişikliği yalnızca identity-sync üzerinden `rename_doc('User')` ile uygulanır; Keycloak self-service e-posta alanı kapalıdır (G-57). Silme/devre dışı → tüm sitelerde `User.enabled=0` + Press üyeliği kaldırma (X-11).
 - Idempotent, yeniden denemeli, ölü-mektup kuyruğu, elle başlatılan mutabakat (Keycloak ↔ Press ↔ kiracı kullanıcı farkı raporu. Zamanlanmış iş yok, backend D-6).
 - Davet: `press_tr.api.team.invite` → Admin API kullanıcı/Organization üyeliği + `execute-actions-email` (UPDATE\_PASSWORD, CONFIGURE\_TOTP) + Press Team üyeliği + kiracı provizyonu (G-16, G-79).
@@ -165,7 +169,7 @@ Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://ap
 
 ## 7. Realm politikaları (G-43, G-78, G-80)
 
-Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse proxy'de kapalı (ayrı `hostname-admin` tek başına yetmez; doğrulandı: Keycloak hostname rehberi), anonim dinamik istemci kaydı kapalı, redirect URI'leri tam adres, kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapalı, her minor sürüm Upgrading Guide ile rc ortamında. Politikalar: Login with email, Verify email Required, brute force detection (5 deneme / 300 sn), parola ≥12 + geçmiş + yaygın parola listesi, TOTP + WebAuthn/passkey, SSO Session Idle 30 dk / Max 12 saat (Frappe `session_expiry` ile hizalı), access token 5 dk, refresh token rotation, Remember me kapalı. Tema: Keycloakify ile `@platform/design-tokens`'tan türetilir, Türkçe birinci dil, 320 px kabul, Playwright E2E (X-16).
+Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse proxy'de kapalı (ayrı `hostname-admin` tek başına yetmez; doğrulandı: Keycloak hostname rehberi), anonim dinamik istemci kaydı kapalı, redirect URI'leri tam adres, kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapalı, her minor sürüm Upgrading Guide ile rc ortamında. Politikalar: Login with email, Verify email Required, brute force detection (5 deneme / 300 sn), parola ≥12 + geçmiş + yaygın parola listesi, TOTP + WebAuthn/passkey, SSO Session Idle 30 dk / Max 12 saat (Frappe `session_expiry` ile hizalı), access token 5 dk, refresh token rotation, Remember me kapalı. Tema: Keycloak'ın kendi tema yapısıyla kurulur. Tema `keycloak.v2` temasından türer. Renk ve yazılar CSS değişkeniyle verilir (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Giriş sayfası ve panel tasarım tokenlarını bugün iki ayrı dosyada tutar. Bu bir backend borcudur: bir dosyadaki değer değişince öteki eski kalabilir. Türkçe birinci dil, 320 px kabul, Playwright E2E (X-16).
 
 ## 8. HA kurulum ve sahipler (G-76)
 

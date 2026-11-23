@@ -14,7 +14,7 @@ Bu sayfa değerlendirme raporundaki her maddenin sonucunu ve bu sürümdeki doğ
 | Y-01 | P2'nin P6 çıktısına bağımlılığı | Kapatıldı: operasyon sitesi finans çekirdeği P2'ye alındı (SA-17, SA-18, SA-19, SA-21, SA-22, SA-23, SA-34, SA-35); P6 P2 tamamlanınca başlar; faz sırası tutarlılık testinde | [Yol haritası](/frappesetup/yol-haritasi/) |
 | Y-02 | P1 dilimi ve P0 kabulünün sonraki faz kalemlerine bağımlılığı | Kapatıldı: AI ve destek adımları ayrı kabullü prototip (G-129, SA-40); P0 çıkışı yalnız P0 kalemlerine dayanır | [Yol haritası](/frappesetup/yol-haritasi/) |
 | Y-03 | SSO ile site oturumunun karışması, origin | Kapatıldı: host'a bağlı oturum ve origin tablosu, CORS yok (G-119); tarayıcı belirteç modeli önerisi | [Rail 4](/frappesetup/rail-4-keycloak/); karar bekliyor K-25 |
-| Y-04 | DNS delegasyonu ile kiracı adresi | Kapatıldı: kiracılar `<kiracı>.app.<marka>.com.tr` | [Raylar](/frappesetup/raylar/), K-2 |
+| Y-04 | DNS delegasyonu ile kiracı adresi | Kapatıldı: kiracılar `<kiracı>.app.atonota.net` adresindedir (backend ad haritası). MVP'de NS devri yoktur, kayıtlar GoDaddy'dedir | [Raylar](/frappesetup/raylar/), K-2 |
 | Y-05 | Fatura senkronu için birden fazla olay modeli | Matris kapatıldı (SA-41); vergi ve belge zamanlaması karar bekliyor | [Rail 6](/frappesetup/rail-6-operasyon/), K-13 |
 | Y-06 | AI yazma onayı | Kapatıldı: her yazma önizle + onayla; risk sınıfı manifest ve sunucuda (G-86) | [Rail 5](/frappesetup/rail-5-ai/) |
 | Y-07 | "Veri Hetzner'de" ile AI aktarımı, maskeleme sırası | Kapatıldı: saklama, işleme, aktarım ayrı; ilk dış çağrıdan önce yerel maskeleme (G-90); aktarım mekanizması hukuk kararı | [Rail 5](/frappesetup/rail-5-ai/), G-116 |

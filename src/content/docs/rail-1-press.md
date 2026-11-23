@@ -28,8 +28,8 @@ sequenceDiagram
         IY-->>PT: callback → ThreedsPayment, Iyzico Stored Card
         PT->>PR: Team.payment_mode='Card', default_payment_provider='iyzico'
     end
-    P->>PT: install_app(confirm=false) → önizleme (fiyat, KDV, site)
-    K->>P: Onayla
+    P->>PT: install_app → öneri ve önizleme (fiyat, KDV, site)
+    K->>P: Ayrı insan onayı (onay ucu)
     P->>PR: press.api.site.install_app(site, app, plan)
     PR->>PR: Site Active kontrolü, status=Pending
     PR->>AG: Agent Job "Install App on Site"
@@ -42,7 +42,7 @@ sequenceDiagram
     S->>PR: get_subscription_info(sk_hrms_tr) → özellik kapıları
 ```
 
-Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; yinelenen callback, kayıp iş sonucu ve ödeme alınıp kurulumun başarısız olduğu durumların telafisi G-125'tedir. Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden `confirm` bayrağıyla çağırır (G-27).
+Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; yinelenen callback, kayıp iş sonucu ve ödeme alınıp kurulumun başarısız olduğu durumların telafisi G-125'tedir. Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden çağırır. Yazan araç işi yapmaz, yalnız öneri açar. İnsan öneriyi ayrı bir onay ucundan onaylar. Modelde onay aracı ve `confirm` alanı yoktur (G-27, [Rail 5](/frappesetup/rail-5-ai/)).
 
 ## 2. Plan ve tier modeli (G-9, G-10, G-25)
 
@@ -97,20 +97,24 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 
 ## 6. Press altyapı envanteri — Hetzner (G-2..G-6, G-36, G-37)
 
+Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha, beta ve rc ortamlarında ortam adı araya girer. Örneğin rc'de Press `press.rc.atonota.net` adresindedir. Tam harita [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır. Ad haritasında olmayan adlar "MVP sonrası hedef" diye ayrıldı.
+
+İki panel birbirine karışmasın: `panel.` adı Press'in müşteri panelidir, kiracının paneli ise kiracı adresinin `/panel` yoludur (örneğin `demo.app.atonota.net/panel`).
+
 | Bileşen | Press doctype / ayar | Sahip |
 | --- | --- | --- |
-| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); `panel.` Press'in kendi alan adı, `allow_cors` yok (G-119) | DevOps sorumlusu |
+| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); MVP'de Press `press.atonota.net` adresindedir. Press müşteri paneli için `panel.atonota.net` adı MVP sonrası hedeftir, backend ad haritasında yoktur. Backend MVP'de bu adı açmaz (`ortamlar.md` madde 4). `allow_cors` yok (G-119) | DevOps sorumlusu |
 | n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | DevOps sorumlusu |
 | f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | DevOps sorumlusu |
 | m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | DevOps sorumlusu |
 | r1 registry | Registry Server + Press Settings docker\_registry\_\* | DevOps sorumlusu |
-| İzleme / log | Monitor Server (Prometheus/Grafana/Alertmanager), Log Server (ES/Kibana), Incident Settings, Telegram + e-posta | DevOps sorumlusu |
-| Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test | DevOps sorumlusu |
+| İzleme / log | Monitor Server (Prometheus/Grafana/Alertmanager), Log Server (ES/Kibana), Incident Settings, Telegram + e-posta. MVP'de yalnız e-posta vardır: Telegram paketi Press üretim imajında yoktur (7. bölüm) | DevOps sorumlusu |
+| Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test. MVP'de düzenli yedek yoktur, çünkü zamanlanmış iş yasaktır. Yedek yalnız dağıtımda ve elle alınır. Düzenli yedek için proje sahibinin kararı gerekir (E-7). RPO ve aylık test bu karardan sonra geçerli olur | DevOps sorumlusu |
 | Cluster | 'hetzner-fsn1' cloud\_provider='Generic' (bare metal); Hetzner Cloud VM'ler 'Hetzner' | DevOps sorumlusu |
 | DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53`. MVP'de Route 53 yoktur: DNS GoDaddy'de kalır, sertifika her ad için ayrı alınır. Route 53 kararı Press sunucu kurma akışı çalışınca yeniden açılır (7. bölüm) | DevOps sorumlusu (Route 53/IAM, sonuç doğrulama) |
-| NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e; kiracılar `<kiracı>.app.<marka>.com.tr`, sabit host'lar GoDaddy'de (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
-| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr`; P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | DevOps sorumlusu; DNS alan adı sorumlusu |
-| Operatör modu ve `ops-bff` (Rail 6) | `operator.<marka>.com.tr`: aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS); DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
+| Kiracı adları ve NS delegasyonu | MVP: kiracılar `<kiracı>.app.atonota.net` adresindedir, ilk kiracı `demo.app.atonota.net` olur. Kayıtlar GoDaddy'dedir, NS devri yoktur. GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı (E-11). MVP sonrası hedef: `app.atonota.net` NS kayıtları GoDaddy'den Route 53'e devredilir, sabit host'lar GoDaddy'de kalır (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
+| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.atonota.net` (MVP sonrası hedef, backend ad haritasında yok); P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | DevOps sorumlusu; DNS alan adı sorumlusu |
+| Operatör modu ve `ops-bff` (Rail 6) | `operator.atonota.net` (MVP sonrası hedef, backend ad haritasında yok): aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS); DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
 | Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | DevOps sorumlusu |
 | Sürüm takibi | v0.155.x+ rc ortamındaki Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | DevOps sorumlusu |
 | Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | DevOps sorumlusu |
@@ -130,7 +134,7 @@ Bu bölüm backend'in 23 Kasım 2026 Pazartesi günkü durumunu anlatır. Kaynak
 - **Kapanma koşulu.** Press bir düzeltmeyi kabul edip yayımlarsa o yama silinir. Bütün yamalar kalkınca bu istisna kapanır.
 - **Çalışmayan özellikler.** Telegram paketi imajda yoktur, bu yüzden Telegram uyarıları çalışmaz. Stripe ödeme akışı ve Marketplace uygulama denetimi sınanmadı.
 
-İmaj yalnız bu Mac'teki Colima ortamında denendi. İmaj sunucuda ve amd64 mimarisinde denenmedi. Canlıya çıkışın önünde şu iki engel durur:
+İmaj yalnız geliştiricinin yerel bilgisayarındaki Colima ortamında denendi. İmaj sunucuda ve amd64 mimarisinde denenmedi. Canlıya çıkışın önünde şu iki engel durur:
 
 1. Press'in sunucu kurma akışı Frappe 16'da çalışmıyor (E-1). MVP'de Press sunucu kurmaz. DevOps sorumlusu ilk kiracı sitesini elle açar.
 2. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor (E-2). Bu yüzden Press, rc ve prod ortamlarında kapalı kalır.

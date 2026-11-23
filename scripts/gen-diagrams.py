@@ -186,7 +186,7 @@ def rails() -> str:
               "Superadmin operatör modu (Rail 6'nın kullanıcı yüzü)"])
     # Satır 2: AI (120..460), Keycloak (600..940), y 300..470
     o += box(120, 300, 340, 170, "Rail 5 — AI", "Ajan servisi · model geçidi",
-             ["Model yönlendirme · önizle+onayla", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
+             ["Önizle+onayla · PostgreSQL/Redis", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
     o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "api.login.&lt;marka&gt; · realm platform · HA",
              ["Client'lar: press · site-&lt;kiracı&gt;", "agent-service · identity-sync", "Organizations · MFA · passkey"])
     # Satır 3: Press (40..320), Kiracı (360..680), Ops (720..1000), y 570..740
