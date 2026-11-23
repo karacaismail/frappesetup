@@ -17,6 +17,8 @@ from atonota_login import keycloak_apply, platforms
 from atonota_login.keycloak_apply import ApplyError
 
 MASK = "**********"
+# The apply step never reads this value; tests only need the variable to exist.
+UNUSED_BOOTSTRAP_VALUE = "not-used"
 
 
 def record(alias):
@@ -212,7 +214,7 @@ class CommandTest(unittest.TestCase):
                     code, _ = self.run_command("--platforms-dir", folder, "--allow-local-http", *arguments)
                     self.assertNotEqual(code, 0)
             remote = {"KC_PUBLIC_URL": "https://api.login.atonota.net", "KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
-                      "KC_BOOTSTRAP_ADMIN_PASSWORD": "not-used"}
+                      "KC_BOOTSTRAP_ADMIN_PASSWORD": UNUSED_BOOTSTRAP_VALUE}
             with mock.patch.dict("os.environ", remote), \
                     mock.patch.object(keycloak_apply, "admin_caller") as caller:
                 code, _ = self.run_command("--platforms-dir", folder, "--allow-local-http", "apply", "--from-env",
@@ -224,7 +226,7 @@ class CommandTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             self.write_local_http_registry(folder)
             local = {"KC_PUBLIC_URL": "http://identity.localhost:5280", "KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
-                     "KC_BOOTSTRAP_ADMIN_PASSWORD": "not-used"}
+                     "KC_BOOTSTRAP_ADMIN_PASSWORD": UNUSED_BOOTSTRAP_VALUE}
             loopback = [(2, 1, 6, "", ("127.0.0.1", 0))]
             with mock.patch.dict("os.environ", local), mock.patch("socket.getaddrinfo", return_value=loopback), \
                     mock.patch.object(keycloak_apply, "admin_caller", return_value=FakeKeycloak([])):
