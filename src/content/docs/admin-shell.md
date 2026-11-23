@@ -78,7 +78,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
-| `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | agent servisi (Claude Agent SDK) | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
+| `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | sağlayıcıdan bağımsız agent servisi ve `platform_core` model geçidi | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
 | Sayfa bağlamı ve uygulamanın tek tık Prompts manifesti | `AppModule` AI sözleşmesi, `ai_tools` hook | develop | G-88, G-105 |
 | Yetki eşitliği: sitenin kullanıcı adına bastığı kısa ömürlü aracı belirteci (G-148) ve kullanıcıya bağlı Press bearer'ı | `auth_hooks` adaptörü, Press OAuth Client | develop + configure | G-59, G-82, G-85 |
 | Önizle+onayla, yıkıcı/ücretli sınıflandırma | confirm bayrağı + önizleme hash'i | develop (agent, press\_tr MCP) | G-27, G-86 |

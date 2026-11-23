@@ -16,7 +16,7 @@ Satılan her uygulama (HRMS TR, CRM, Webshop ve sonrakiler) aynı çerçeveden g
 | 4 | AI sözleşmesi | `ai_tools` hook'u: araç adı, TR/EN açıklama, şema, gereken rol, `destructive`/`billable` bayrağı, önizleme üretici, birim kredi maliyeti; tek tık akışları Prompts olarak; golden test + yetki negatif testi | G-105, G-84, G-86, SA-15 |
 | 5 | Abonelik kapıları | `platform_core.subscription.has_feature(app, feature)` hem whitelisted metot/doc\_events'te hem UI feature flag'inde; deneme/düşürme/askı durumunda salt okunur mod | G-106, G-35 |
 | 6 | Fixture ve sidebar | Workspace + Workspace Sidebar `standard=1, app=<uygulama>` modül dosyası; Role/Custom Field/Property Setter/Workflow/Email Template yalnızca ön ek filtreli `hooks.fixtures`; Notification kanalları Email + System Notification | G-107, G-94 |
-| 7 | Press kaydı | App + App Source (branch, `versions` = Version 16, `required_apps`), staging/prod Release Group üyeliği, Marketplace App, en az bir enabled App Plan (ücretsiz plan `price_usd=0`), `run_after_install_script=1` | G-29, G-32, G-14 |
+| 7 | Press kaydı | App + App Source (branch, `versions` = Version 16, `required_apps`), `erpnext-v16-tr-staging` ve `erpnext-v16-tr-prod` Release Group üyeliği, Marketplace App, en az bir enabled App Plan (ücretsiz plan `price_usd=0`), `run_after_install_script=1` | G-29, G-32, G-14 |
 | 8 | Shell entegrasyonu | Aktivasyon sonrası sidebar yeniden türetilir; tur ve görev listesi (G-139) + demo veri seçeneği; `user_data_fields` ile KVKK indirme/silme talepleri | G-95, G-97, G-52 |
 | 9 | Operasyon kaydı | Helpdesk ürün etiketi + SLA kademesi, `APP-<ad>` Item eşlemesi, Müşteri 360 özet sağlayıcısı, `support_mask_fields`, yaşam döngüsü sinyalleri (aşağıda) | SA-15, SA-19, SA-24, SA-31, SA-36, SA-38 |
 | 10 | Kabul | Playwright 320→masaüstü, Chromium/Firefox/WebKit; E2E: trial → Etkinleştir → Agent Job Success → sidebar başlığı; Lighthouse bütçesi | G-74, G-111, G-30 |
@@ -24,7 +24,7 @@ Satılan her uygulama (HRMS TR, CRM, Webshop ve sonrakiler) aynı çerçeveden g
 ## Press'e kayıt zinciri (tüm uygulamalar için ortak)
 
 1. **App + App Source**: GitHub App entegrasyonuyla depo bağlanır; `branch` ve `versions` tablosunda `Version 16`; `required_apps` ile bağımlılık (örn. hrms_tr → hrms) bildirilir (doğrulandı: App Source alanları).
-2. **Release Group**: `erpnext-v16-tr-staging` (auto deploy) ve `erpnext-v16-tr-prod` (Scheduled Deploy Settings) gruplarına eklenir; bench düzeyinde uygulama kümesi ortaktır, kiracı yalnızca `install_app` ile kurduğunu görür (G-32).
+2. **Release Group**: `erpnext-v16-tr-staging` (auto deploy) ve `erpnext-v16-tr-prod` (Scheduled Deploy Settings) gruplarına eklenir; bench düzeyinde uygulama kümesi ortaktır, kiracı yalnızca `install_app` ile kurduğunu görür (G-32). Grup adındaki `staging` sözcüğü bir ortam adı değildir. Backend'de staging ortamı yoktur. Canlı ortamlar alpha, beta, rc ve prod'dur ([Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı)).
 3. **Marketplace App**: `team` = yayıncı takımımız, `status` Published, `frappe_approved=1`, `subscription_type` (Free/Paid/Freemium), `sources` → App Source, `site_config` varsayılanları, `after_install_script` + `run_after_install_script=1`, `after_uninstall_script` karşılığı, `collect_feedback=1`; Türkiye yerelleştirmesi için `localisation_apps` satırı `country='Türkiye'` → `tr_localization` (G-65).
 4. **Marketplace App Plan**: `enabled=1`, `interval` Monthly, `price_try` Custom Field + USD karşılığı (`price_usd` kapılar için &gt;0, ücretsiz planda 0), `available_on_versions` Version 16, `features` (AI kotası, e-posta kotası, modül bayrakları), `roles` görünürlük (G-9, G-10, G-92).
 5. **Product Trial** (deneme sunan uygulamalar): `apps` listesi, `trial_days=14`, `trial_plan`, `redirect_to_after_login` panel URL'si; TR setup payload'ı press\_tr override'ından gelir (G-31).
@@ -58,9 +58,9 @@ Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmu
 ## Yayın kabul ölçütü
 
 - Manifestin on kalemi X-09 `docs/app-conformance.md` listesinde işaretli; otomatikleştirilebilen kalemler (pyproject sınırı, fixture filtresi, `AppModule` tip denetimi, `ai_tools` şema doğrulaması, permlevel şablonu varlığı, `support_mask_fields` varlığı) CI'da yeşil.
-- Staging Release Group'ta Deploy Candidate Success, ardından test kiracısında `bench --site X install-app <app>` idempotent ikinci çalışma hatasız (G-102).
+- `erpnext-v16-tr-staging` Release Group'unda Deploy Candidate Success, ardından test kiracısında `bench --site X install-app <app>` idempotent ikinci çalışma hatasız (G-102).
 - Aktivasyon E2E'si 320 px ve masaüstünde geçer; Marketplace App Subscription Active, `site_config` içinde `sk_<app>`, sidebar'da uygulama başlığı ve Workspace çocukları görünür (G-29, G-94, SA-16).
-- Yetki matrisi ve AI negatif testleri (yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, confirm'siz yıkıcı aksiyon) reddedilir ve AI Action Log'a `denied` düşer (G-85, G-64).
+- Yetki matrisi ve AI negatif testleri (yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, onaysız yıkıcı aksiyon) reddedilir ve AI Action Log'a `denied` düşer (G-85, G-64).
 - `user_data_fields` ile Personal Data Download/Deletion talebi uygulamanın tüm kişisel veri doctype'larını kapsar (G-52).
 - Backend metinleri `_()` ile bağlamla sarılır. Türkçe çeviri `translations/tr.csv` dosyasında tamdır. Panel metinleri dil kataloğundadır (G-73).
 - İlk Paid Invoice operasyon sitesinde `APP-<ad>` satırıyla Sales Invoice olarak görünür (SA-19).

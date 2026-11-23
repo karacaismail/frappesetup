@@ -11,11 +11,11 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | # | Karar | Tür | Seçenekler | Öneri | Faz |
 | --- | --- | --- | --- | --- | --- |
 | K-1 | Platform uygulamalarının lisansı (G-118) | Ürün sahibi + hukuk | AGPL-3.0 / GPL-3.0 / MIT, uygulama bazında | Öneri yok: bağımlılık lisansları girdidir (Frappe Framework MIT, ERPNext/HRMS GPL-3.0, Press/Agent/CRM/Helpdesk AGPL-3.0); kod ilişkisi ve dağıtım biçimiyle hukuk değerlendirir, ürün sahibi onaylar | P0 |
-| K-2 | DNS yetkisi (G-2) | Teknik varsayım | Apex bölgenin tamamı Route 53 / yalnız `app.<marka>.com.tr` alt bölgesi | Alt bölge: kiracılar `<kiracı>.app.<marka>.com.tr`; `panel.`, `press.`, `operator.`, `ops.`, `agent.` GoDaddy'de kalır. Keycloak ayrı `atonota.net` alanındadır (K-61). DevOps sorumlusu kayıt değerlerini hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını yazar, DevOps sorumlusu wildcard sertifikayı doğrular | P0 |
+| K-2 | DNS yetkisi (G-2) | Teknik varsayım | Apex bölgenin tamamı Route 53 / yalnız `app.<marka>.com.tr` alt bölgesi | Alt bölge: kiracılar `<kiracı>.app.<marka>.com.tr`; `panel.`, `press.`, `operator.`, `ops.`, `agent.` GoDaddy'de kalır. Keycloak ayrı `atonota.net` alanındadır (K-61). DevOps sorumlusu kayıt değerlerini hazırlar, alan adı sorumlusu GoDaddy'de NS kayıtlarını yazar, DevOps sorumlusu wildcard sertifikayı doğrular. MVP'de NS devri yoktur: kayıtlar GoDaddy'dedir ve marka alanı `atonota.net` olur (backend Ç-2, Ç-3). Alan adının kayıt yeri doğrulanmadı (backend O-1). Proje sahibi DNS'in GoDaddy'de olduğunu söyledi (backend Ç-7) | P0 |
 | K-3 | Güvenlik ajanları ve nöbet (G-36, G-115, X-08) | Ürün sahibi | Wazuh/YARA/Malware Scan kapsamı; yedek nöbetçi | Wazuh + auditd P0'da; birincil nöbet DevOps sorumlusu, yedek kişiyi ürün sahibi atar | P0 |
 | K-4 | Yinelenen tahsilat modeli (G-19, G-20) | Ürün sahibi | Press Usage Record + iyzico saklı karttan tahsilat / iyzico Subscription ürünü | Press defteri + saklı kart: ay içi plan değişimi, kredi ve Havale/EFT tek defterde kalır | P1 |
 | K-5 | App Release onay kapısı (G-14) | Ürün sahibi | `bypass_automated_audit` + otomatik Approved / App Release Approval Request | alpha ve beta'da otomatik, rc ve prod Release Group'ta Approval Request zorunlu | P1 |
-| K-6 | Keycloak teması (G-80) | Teknik varsayım | Keycloakify / FTL | Kapandı: tema Keycloak'ın kendi tema yapısıyla (FTL) kurulur (backend O-4). Tema Java kodu içermez (G-152). Giriş sayfası ve panelin tokenları bugün iki ayrı dosyadadır. Tek kaynağa geçiş backend borcudur | P1 |
+| K-6 | Keycloak teması (G-80) | Teknik varsayım | Keycloakify / FTL | MVP'de kapandı: tema Keycloak'ın kendi tema yapısıyla (FTL) kurulur (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Tema Java kodu içermez (G-152). Giriş sayfası ve panelin tokenları bugün iki ayrı dosyadadır. Tek kaynağa geçiş backend borcudur | P1 |
 | K-7 | SMTP relay (G-47) | Ürün sahibi | Hetzner'de Postfix / AB bölgeli sağlayıcı | AB bölgeli sağlayıcı (teslimat itibarı), KVKK envanterine eklenir; kurulum DevOps sorumlusu, DNS değerlerini alan adı sorumlusu uygular | P1 |
 | K-8 | Ürün parametreleri | Ürün sahibi | `rounding_method` (G-41), `session_expiry` 8–24 saat (G-43), `track_views` (G-64), `apply_strict_user_permissions` (G-52) | Banker's Rounding, 12 saat, track\_views yalnızca hassas doctype'larda, strict açık | P1 |
 | K-9 | GİB özel entegratörü ve e-belge kodu (G-22, G-65) | Mali müşavir + ürün sahibi | Hazır Frappe e-belge uygulaması / `tr_edocs` geliştirme; Sovos, Logo, Uyumsoft, eLogo | Entegratör mali müşavirle seçilir; UBL-TR katmanı tek kez yazılır, operasyon sitesi (`press_tr_finance`) ve kiracılar paylaşır | P2 |
@@ -76,7 +76,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-51 | Depo düzeni (KM-08) | Teknik | Dört depo / repo: `press_tr`, `platform_core`, pnpm monorepo | Onay bekliyor | — |
 | K-52 | Lisans kapısı (KM-09) | Ürün sahibi + hukuk | AGPL yasak, SBOM her PR / repo: AGPL bileşenleri kullanılır (K-1 açık), SEC-09 her sürümde SBOM | Onay bekliyor | — |
 | K-53 | AI yazma yetkisi (AI-04) | Ürün sahibi + hukuk | Seviye 3–4 yalnız taslak / repo: önizle + onayla ile `submit` ve `delete` (rail-5-ai) | Onay bekliyor | — |
-| K-54 | Dış LLM'e veri (AI-11) | Hukuk | Yerel modelle sınırlı / repo: maskelenmiş alanlar Anthropic API'ye (G-90) | Onay bekliyor | — |
+| K-54 | Dış LLM'e veri (AI-11) | Hukuk | Yerel modelle sınırlı / repo: maskelenmiş alanlar model geçidinin seçtiği dış sağlayıcıya (G-90) | Onay bekliyor | — |
 | K-55 | Kaizen hook ve global talimat (KZ-10, KZ-11) | Ürün sahibi | Uygula / kullanıcının kalıcı politikası: kural değişikliği yalnız açık talimatla, genel hook otomatik kurulmaz | Uygulanmadı; bu depoya hook veya global dosya eklenmedi | — |
 | K-56 | Kanıt sonuç değerleri (KZ-12) | Teknik | pass, fail, blocked, unknown / repo: pass, fail, not_run, not_applicable | Onay bekliyor | — |
 | K-57 | Bütçe kümeleri (AU-17) | Ürün sahibi + teknik | Not: 20/8 KB kritik CSS, 150/250 ya da 120 KB JS / repo: G-66 ilk yük JS ≤ 300 KB, docs kabuğu ≤ 100 KB | Onay bekliyor | — |
@@ -113,7 +113,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | frappe/agent | master | offsite endpoint PR; Agent Update | rc sunucusunda `auto_rollback` |
 | frappe/frappe, erpnext | frappe v16.51.0, erpnext v16.50.0 (doğrulandı); destek: ERPNext v15 2027 sonu, v16 2029 sonu (planlı) | /api/v2, Social Login Key, Workspace Sidebar meta, `user.impersonate` | Çekirdek meta codegen diff CI |
 | frappe/crm, frappe/helpdesk | `main` (frappe &gt;=15,&lt;17) | develop dalının v17/Python 3.14 geçişi, telephony/whatsapp bağımlılıkları | Operasyon sitesi rc Deploy Candidate |
-| frappe/mcp | main, "experimental" | v16 uyumu (doğrulanacak) | P3 kurulum testi |
+| frappe/mcp | Arşivlendi, kullanılmaz (backend karar notu 0002) | Yerine `platform_core.ai` katmanı | MCP el sıkışma testi (gerçek HTTP) |
 | ueberdosis/hocuspocus | v4.7.0 (MIT, doğrulandı) | extension-redis/webhook API'si, Yjs sürümü | Destek oturumu E2E |
 | Keycloak | 26.x (26.8.0, 2026-10-01, doğrulandı) | Upgrading Guide'daki minor/patch kırıcı değişiklikleri, güvenlik danışmanlıkları (G-142), Account Console v3 | Realm regresyon + tema E2E |
 | Ant Design / `@ant-design/x` | antd 6 + X 2 (X 2.9.0 eş bağımlılığı `antd ^6.1.1`, doğrulandı) | breaking changes, X bileşen API'si | Playwright görsel regresyon |
@@ -121,4 +121,4 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | Node / Python | 24.x / 3.14 (G-54) | Bench Dependency Version | İlk Deploy Candidate (DevOps sorumlusu) |
 | iyzico iyzipay-python | güncel | 3DS v2, webhook imzası (`X-IYZ-SIGNATURE-V3`), Card Storage, hak ediş SFTP | Sandbox regresyon |
 | Hetzner Object Storage | fsn1/nbg1 | zaman aşımı raporları (doğrulanacak) | 5 GB yükleme + indirme testi |
-| Anthropic modelleri | claude-sonnet-5-5 / opus-5-5 / haiku-4-5 (doğrulandı) | model kimliği, fiyat | `claude-api` referansı + golden set |
+| Model sağlayıcıları | Sağlayıcıdan bağımsız. Model adı ve fiyatı `AI Model` kaydındadır, sitede yazılmaz (O-10, O-13) | bağdaştırıcı biçimi, model kimliği, fiyat | Golden set + bağlantı denetimi |

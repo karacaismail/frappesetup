@@ -2,7 +2,7 @@
  {
   "id": "G-1",
   "title": "Press kontrol düzlemi sürüm sabitlemesi",
-  "detail": "Press v0.154.x etiketi Frappe v15 + Python 3.11 üzerinde çalışır; v0.155.x ve sonrası yalnızca staging Press'te `bench migrate` ve aktivasyon E2E testi geçtikten sonra alınır (doğrulandı: ansible/bench pinleri v16/py3.14'te çalışmaz).",
+  "detail": "Press v0.154.1 Frappe 16 ve Python 3.14 üzerinde yalnız açık bir yama dizisiyle açılır (backend O-9, O-52). Üretim imajı her yamadan önce `git apply --check` çalıştırır; yama tutmazsa derleme durur. Press'in sunucu kurma akışı Frappe 16'da çalışmadan üretime çıkılmaz (E-1). v0.155.x ve sonrası yalnızca rc ortamındaki Press'te `bench migrate` ve aktivasyon E2E testi geçtikten sonra alınır (doğrulandı: ansible/bench pinleri v16/py3.14'te yamasız çalışmaz).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P0",
@@ -561,8 +561,8 @@
  },
  {
   "id": "G-57",
-  "title": "Kullanıcı provizyonu: System User, Role Profile ve e-posta değişmezliği",
-  "detail": "OAuth otomatik oluşturma 'Website User' üretir (doğrulandı), bu yüzden kullanıcılar Keycloak admin `event/identity-sync` ile `platform_core` `api.identity.provision` üzerinden önceden 'System User' tipinde, Role Profile'lı ve `User.role_profiles` (Table MultiSelect) ile çoklu uygulama profilli açılır; Frappe v16 'User Invitation' doctype'ı davet için değerlendirilir. Kalıcı anahtar `(iss, sub)` çiftidir (G-120); Frappe'nin yerel eşlemesi e-posta ile yapıldığından (`login_oauth_user` get_email, doğrulandı) Keycloak'ta e-posta değişikliği self-service'te kapalıdır ve değişim yalnızca provisioning akışıyla `rename_doc('User')` olarak işlenir; Keycloak kullanıcı silme/devre dışı → User.enabled=0 ve Press `remove_team_member`.",
+  "title": "Kullanıcı provizyonu: Website User, Role Profile ve e-posta değişmezliği",
+  "detail": "Kiracıda son kullanıcı 'Website User' olur ve yalnız ayrı arayüzü görür (backend D-5, O-3). Kullanıcılar Keycloak admin `event/identity-sync` ile `platform_core` `api.identity.provision` üzerinden açılır; Role Profile ve `User.role_profiles` (Table MultiSelect) çoklu uygulama profilini taşır; Frappe v16 'User Invitation' doctype'ı davet için değerlendirilir. Kalıcı anahtar `(iss, sub)` çiftidir (G-120); Frappe'nin yerel eşlemesi e-posta ile yapıldığından (`login_oauth_user` get_email, doğrulandı) Keycloak'ta e-posta değişikliği self-service'te kapalıdır ve değişim yalnızca provisioning akışıyla `rename_doc('User')` olarak işlenir; Keycloak kullanıcı silme/devre dışı → User.enabled=0 ve Press `remove_team_member`.",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -632,7 +632,7 @@
  {
   "id": "G-64",
   "title": "Denetim izi: Version, Activity Log ve AI Action Log",
-  "detail": "Satılan tüm doctype'larda track_changes=1 (Version), track_views ürün kararıyla; `platform_core` 'AI Action Log' doctype'ı (session_id, user, model, tool, args hash, hedef doctype/name, önizleme/onay durumu, sonuç, token/maliyet, ip) her AI aksiyonunu ilgili Version kaydına bağlar; Permission Log, Access Log ve Activity Log saklama süreleri G-52 ile uyumlu; admin denetim görüntüleyici Shell'de sunulur.",
+  "detail": "Satılan tüm doctype'larda track_changes=1 (Version), track_views ürün kararıyla; `platform_core` 'AI Action Log' doctype'ı (session_id, user, tool, args hash, hedef doctype/name, önizleme/onay durumu, sonuç, ip) her AI aksiyonunu ve her reddi kaydeder ve ilgili Version kaydına bağlar. Model, token ve maliyet bu kayıtta değil, model geçidinin 'AI Usage Log' kaydındadır (backend karar notu 0002). Permission Log, Access Log ve Activity Log saklama süreleri G-52 ile uyumlu; admin denetim görüntüleyici Shell'de sunulur.",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -792,7 +792,7 @@
  {
   "id": "G-80",
   "title": "Keycloak giriş teması Türkçe ve markalı",
-  "detail": "Login/registration/forgot-password/OTP/consent ekranları Keycloakify (React, aynı tasarım tokenları) veya FTL temasıyla marka kimliğinde; Türkçe birinci dil; 320 px'ten başlayan mobil kabul; tek odak göstergesi, ≥1rem metin; Playwright E2E Keycloak akışlarını da kapsar; tema sürümü Keycloak sürüm yükseltmelerinde regresyon testinden geçer.",
+  "detail": "Login/registration/forgot-password/OTP/consent ekranları Keycloak'ın kendi tema yapısıyla marka kimliğinde yapılır: tema `keycloak.v2` temasından türer, renk ve yazılar CSS değişkeniyle verilir (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Türkçe birinci dil; 320 px'ten başlayan mobil kabul; tek odak göstergesi, ≥1rem metin; Playwright E2E Keycloak akışlarını da kapsar; tema sürümü Keycloak sürüm yükseltmelerinde regresyon testinden geçer.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -822,7 +822,7 @@
  {
   "id": "G-83",
   "title": "Agent servisi mimarisi ve dağıtımı",
-  "detail": "Claude Agent SDK ile TypeScript servis; modeller: claude-sonnet-5-5 / claude-opus-5-5 aksiyonlar, claude-haiku-4-5 sınıflandırma (model kimlikleri uygulama öncesi `claude-api` referansıyla doğrulanır); Hetzner'de Docker Engine ile konteyner, PostgreSQL (oturum/konuşma/log), Redis (kuyruk), SSE akış uç noktası, public HTTPS webhook alıcısı (G-15), yatay ölçeklenebilir stateless işçi; sırlar ortam değişkeni/age ile; KVKK gereği konuşma verisi Hetzner'de kalır.",
+  "detail": "Sağlayıcıdan bağımsız ajan servisi (backend D-9, D-11, O-10): model ve sağlayıcı ayardan gelir; servis modele `platform_core.ai` katmanı ve `platform_core` model geçidi üzerinden ulaşır (O-13), geçit sağlayıcılara düz HTTP ile bağlanır ve sağlayıcı kitaplığı kullanmaz; model adları yalnız `AI Model` ve `AI Route` kayıtlarında durur, kodda ve sitede yazılmaz. Hetzner'de Docker Engine ile konteyner, PostgreSQL (oturum/konuşma/log), Redis (kuyruk), SSE akış uç noktası, public HTTPS webhook alıcısı (G-15), yatay ölçeklenebilir stateless işçi; sırlar ortam değişkeni/age ile; KVKK gereği konuşma verisi Hetzner'de kalır. Ajan servisi backend'de henüz yoktur (MVP sonrası).",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -832,7 +832,7 @@
  {
   "id": "G-84",
   "title": "MCP kaynakları: Press MCP, press_tr MCP ve kiracı MCP",
-  "detail": "Agent üç MCP sunucusuna bağlanır: Press `press.mcp.handler` (ops, System User, yalnızca iç ekip ajanı), `press_tr.mcp.handler` (ticari araçlar, kullanıcı bearer'ı), kiracı sitede frappe/mcp uygulaması (`frappe_mcp`, Press'in bağımlı olduğu paket; v16 uyumu kurulumda doğrulanır: olası) + `platform_core` ve uygulamaların kayıt ettiği araçlar (tipli domain adaptörü üzerinden kapsamlı belge, rapor, workflow ve uygulama araçları; ham REST/RPC modele açılmaz). Araç tanımları yetki gereksinimi ve yıkıcı/ücretli bayrağı taşır; agent araç listesini kullanıcının kurulu uygulamaları ve rollerine göre daraltır.",
+  "detail": "Agent üç MCP kaynağına bağlanır: Press `press.mcp.handler` (ops, System User, yalnızca iç ekip ajanı), `press_tr.mcp.handler` (ticari araçlar, kullanıcı bearer'ı) ve kiracı sitedeki `platform_core.ai` katmanı. `frappe/mcp` deposu (`frappe_mcp`) arşivlendi ve kullanılmaz; Frappe 16'nın hazır `/api/v2/mcp` ucu önizleme, onay ve günlük taşımadığı için kiracıda kapatılır (backend karar notu 0002). Kiracı katmanı `platform_core` ve uygulamaların `ai_tools` ile kayıt ettiği araçları sunar (tipli domain adaptörü üzerinden kapsamlı belge, rapor, workflow ve uygulama araçları; ham REST/RPC modele açılmaz). Araç tanımları yetki gereksinimi ve yıkıcı/ücretli bayrağı taşır; araç listesi kullanıcının kurulu uygulamaları ve rollerine göre daralır.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -852,7 +852,7 @@
  {
   "id": "G-86",
   "title": "Önizle + onayla: her yazma, sunucuda bağlanan onay",
-  "detail": "Insert ve update dahil her yazma, silme, iptal, onaylama (submit), toplu güncelleme, ödeme/plan/kurulum ve dış sisteme gönderim aracı aynı sunucu tarafı sözleşmeden geçer: `confirm=false` etkilenecek kayıtların diff/özetini ve maliyet etkisini döner, UI @ant-design/x Actions ile onay ister. Risk sınıfı modelin sınıflandırmasıyla değil, araç manifesti ve sunucu tarafından belirlenir; haiku sınıflandırıcı yalnız yönlendirme ipucudur. Onay belirteci kullanıcı, site, araç, hedef belge ve sürümü (`modified`), fiyat sürümü ve önizleme özetine bağlıdır, tek kullanımlıktır ve TTL'lidir; uygulama anında yetki yeniden denetlenir; belge veya fiyat değiştiyse yeniden önizleme istenir; yeniden oynatma ve çift uygulama reddedilir; otomatik zincirleme yazma yapılmaz. Kabul: replay, süresi dolmuş onay, değişmiş belge ve başka kullanıcının onayı negatif testleri.",
+  "detail": "Insert ve update dahil her yazma, silme, iptal, onaylama (submit), toplu güncelleme, ödeme/plan/kurulum ve dış sisteme gönderim aracı aynı sunucu tarafı sözleşmeden geçer: araç kaydı yazmaz, yalnız öneri açar ve etkilenecek kayıtların diff/özetini ve maliyet etkisini döner; UI @ant-design/x Actions ile onay ister ve onay insan oturumundaki ayrı uçtan gelir. Modelde onay aracı ve `confirm` alanı yoktur (backend sözleşmesi 10. bölüm). Risk sınıfı modelin sınıflandırmasıyla değil, araç manifesti ve sunucu tarafından belirlenir; sınıflandırma yolu yalnız yönlendirme ipucudur. Onay kullanıcı, site, araç, hedef belge ve sürümü (`modified`), fiyat sürümü ve önizleme özetine bağlıdır, tek kullanımlıktır ve TTL'lidir; uygulama anında yetki yeniden denetlenir; belge veya fiyat değiştiyse yeniden önizleme istenir; yeniden oynatma ve çift uygulama reddedilir; otomatik zincirleme yazma yapılmaz. Kabul: replay, süresi dolmuş onay, değişmiş belge ve başka kullanıcının onayı negatif testleri.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -872,7 +872,7 @@
  {
   "id": "G-88",
   "title": "Sağ AI paneli @ant-design/x ile, bağlam farkındalığı ve tek tık akışları",
-  "detail": "Shell sağ paneli (yardım paneliyle aynı sağ yuva, G-137; içerik ile panel yan yana sığmadığında tam ekran çekmece) @ant-design/x Bubble, Sender, Conversations, Prompts, Suggestion, ThoughtChain, Actions, Attachments bileşenleriyle; SSE akışı; açık sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir; her uygulama 'tek tık' akışlarını (örn. 'bu çalışanın izin bakiyesini güncelle ve yöneticiye bildir') Prompts olarak bildirir; haiku ile niyet yönlendirme; panelden Press ticari aksiyonları (plan yükselt, uygulama etkinleştir) aynı önizle+onayla ile; klavye erişilebilirliği ve tek odak göstergesi.",
+  "detail": "Shell sağ paneli (yardım paneliyle aynı sağ yuva, G-137; içerik ile panel yan yana sığmadığında tam ekran çekmece) @ant-design/x Bubble, Sender, Conversations, Prompts, Suggestion, ThoughtChain, Actions, Attachments bileşenleriyle; SSE akışı; açık sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir; her uygulama 'tek tık' akışlarını (örn. 'bu çalışanın izin bakiyesini güncelle ve yöneticiye bildir') Prompts olarak bildirir; model geçidinin sınıflandırma yoluyla niyet yönlendirme; panelden Press ticari aksiyonları (plan yükselt, uygulama etkinleştir) aynı önizle+onayla ile; klavye erişilebilirliği ve tek odak göstergesi.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -892,7 +892,7 @@
  {
   "id": "G-90",
   "title": "KVKK: AI aktarımı, ilk dış çağrıdan önce yerel maskeleme ve saklama",
-  "detail": "Saklama, işleme ve aktarım ayrı tanımlanır: konuşma kayıtları Hetzner'deki agent veritabanında saklanır; model çağrısı Anthropic API'de işlenir ve yurt dışına aktarımdır. İlk dış model çağrısından (haiku sınıflandırıcı dahil) önce yerel ve deterministik veri seçimi ve maskeleme uygulanır: araç yalnız gereken alanları döner, permlevel ile gizli alanlar gönderilmez, TCKN/VKN/IBAN/kart ve ortak sözlükteki kişisel veri sınıfları regex + alan sınıfıyla maskelenir; ham kişisel veri hiçbir dış modele maskelenmeden gitmez. Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; Türkiye dışındaki saklama ve işleme için uygun aktarım mekanizması hukukça belirlenir (G-116). Anthropic veri saklama/eğitim dışı tutma koşulları sözleşmede teyit edilir (koşul: teyit gerekli); kiracı admin AI özelliğini takım düzeyinde kapatabilir. Kabul: maskeleme golden testleri ve ağ kaydında ham değer olmadığının kanıtı.",
+  "detail": "Saklama, işleme ve aktarım ayrı tanımlanır: konuşma kayıtları Hetzner'deki agent veritabanında saklanır; model çağrısı model geçidinin seçtiği sağlayıcıda işlenir; dış sağlayıcı seçilirse bu yurt dışına aktarımdır. İlk dış model çağrısından (sınıflandırma dahil) önce yerel ve deterministik veri seçimi ve maskeleme uygulanır: araç yalnız gereken alanları döner, permlevel ile gizli alanlar gönderilmez, TCKN/VKN/IBAN/kart ve ortak sözlükteki kişisel veri sınıfları regex + alan sınıfıyla maskelenir; ham kişisel veri hiçbir dış modele maskelenmeden gitmez. Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; Türkiye dışındaki saklama ve işleme için uygun aktarım mekanizması hukukça belirlenir (G-116). Her dış sağlayıcının veri saklama/eğitim dışı tutma koşulları sözleşmede teyit edilir (koşul: teyit gerekli); kiracı admin AI özelliğini takım düzeyinde kapatabilir. Kabul: maskeleme golden testleri ve ağ kaydında ham değer olmadığının kanıtı.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
