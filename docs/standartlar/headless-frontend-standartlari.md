@@ -173,7 +173,7 @@ Sözleşme, arayüz ile sunucunun anlaştığı istek ve yanıt biçimidir.
 
 **AD-10 (ZORUNLU).** Form doğrulamasını sunucu sözleşmesine bağlayın. Gönderim sürerken yinelenen isteği önleyin.
 
-**AD-11 (ZORUNLU).** Simgeyi açık adıyla içe aktarın. Dili `ConfigProvider` ile verin. Türkçe Day.js tarih seçicisinde `dayjs/locale/tr` dosyasını yükleyin.
+**AD-11 (ZORUNLU).** Simgeyi açık adıyla içe aktarın. Dili `ConfigProvider` ile verin. Dili uygulamanın dil bağlamından alın. Ant Design ve Day.js dilini bu dille yükleyin.
 
 ## 9. Ant Design X ve yapay zekâ yüzeyi
 
@@ -193,7 +193,7 @@ Sözleşme, arayüz ile sunucunun anlaştığı istek ve yanıt biçimidir.
 
 **AX-8 (ZORUNLU).** Sohbet günlüğünü saran öğeye `role="log"` verin. Yeni mesajı ekran okuyucuyla sınayın. Yüklenme durumunu metinle bildirin.
 
-**AX-9 (ZORUNLU).** X dil alanlarını Ant Design Türkçe dil nesnesiyle birleştirin.
+**AX-9 (ZORUNLU).** X dil alanlarını aynı dildeki antd nesnesiyle birleştirin.
 
 ## 10. Stil: CSS, SCSS ve Sass
 
@@ -213,7 +213,7 @@ Sözleşme, arayüz ile sunucunun anlaştığı istek ve yanıt biçimidir.
 
 ## 11. İçerik ve çeviri dosyaları
 
-**IC-1 (ZORUNLU).** Görünen metni koda gömmeyin. Metni çeviri veya içerik dosyasından alın. Çevirinin kaynak metni İngilizcedir. Cümleyi parçalardan birleştirmeyin. Değer için yer tutucu kullanın.
+**IC-1 (ZORUNLU).** Görünen metni koda gömmeyin. Metni çeviri veya içerik dosyasından alın. Çevirinin kaynak metni İngilizcedir. Geçiş dönemi için IC-9 kuralına bakın. Cümleyi parçalardan birleştirmeyin. Değer için yer tutucu kullanın.
 
 **IC-2 (ZORUNLU).** Türkçeyi yalın yazın ve yazım denetimini çalıştırın.
 
@@ -228,6 +228,26 @@ Sözleşme, arayüz ile sunucunun anlaştığı istek ve yanıt biçimidir.
 **IC-7 (ZORUNLU).** İçerik dosyasına gizli bilgi, kişisel veri ve iç adres koymayın. İçerikteki HTML'i temizlemeden basmayın.
 
 **IC-8 (ZORUNLU).** Üretilen JSON dosyasını elle düzenlemeyin.
+
+### GILT: dil, biçim ve çeviri
+
+GILT dört işin ortak adıdır: küreselleştirme, i18n, yerelleştirme ve çeviri. Bu kurallar ürünü başka dile hazır tutar. Çeviri yapılmasa da kurallar geçerlidir.
+
+**IC-9 (ZORUNLU).** Katalog anahtarını İngilizce ve ASCII yazın. Örneğin `collection.search.placeholder` yazın. Var olan Türkçe metni `tr` kataloğuna harfi harfine koyun. İngilizce metni çeviri işinde ekleyin. İngilizce metin uydurmayın.
+
+**IC-10 (ZORUNLU).** Görünen her metni dil kataloğundan alın. Bileşene metin gömmeyin. Gömülü metin denetimini derlemede çalıştırın. Var olan dosyaları izin listesine alın. Yeni kodun gömülü metin eklemesine izin vermeyin. Dosyayı kataloğa taşıyınca izin listesinden çıkarın.
+
+**IC-11 (ZORUNLU).** Mesajı ICU MessageFormat alt kümesiyle yazın. Değeri `{ad}` yer tutucusuyla ekleyin. Çoğul biçimini `Intl.PluralRules` ile seçin. Sayı 1 için ayrı koşul yazmayın. Projenin seçtiği kataloğu kullanın. Yeni çeviri kütüphanesi için proje kararı alın.
+
+**IC-12 (ZORUNLU).** Dili açılış verisindeki kullanıcı dilinden alın. Dil boşsa tek bir yedek dil sabitini kullanın. Dili bileşende sabit yazmayın. Arayüzün yedek dili sunucununkinden farklıysa farkı proje kaydına yazın.
+
+**IC-13 (ZORUNLU).** Tarih, saat, sayı, para ve listeyi `Intl` ile dile göre biçimleyin. `tr-TR` gibi sabit dil yazmayın. Saat dilimini ve para birimini açılış verisinden alın. Frappe tarih-saat değerini sitenin saat dilimiyle okuyun.
+
+**IC-14 (ZORUNLU).** `<html>` öğesinin `lang` ve `dir` değerini dile göre güncelleyin. Yeni CSS'te mantıksal yön özelliği kullanın. Örneğin `margin-left` yerine `margin-inline-start` yazın.
+
+**IC-15 (ZORUNLU).** Ekranı sözde dilde deneyin. Sözde dil, metni uzatan ve harfleri değiştiren deneme dilidir. Sözde dili yalnız deneme derlemesinde açın. Gömülü metin bu dilde değişmeden kalır ve göze çarpar. Metin uzayınca kesilmesin ve taşmasın.
+
+**IC-16 (ÖNERİLİR).** Eksik çeviriyi listeleyin. Liste kapıyı düşürmesin. Liste çeviri işinin girdisi olsun.
 
 ## 12. Güvenlik
 

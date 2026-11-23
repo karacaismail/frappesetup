@@ -19,6 +19,8 @@ PROJECTION_COMPONENTS = (
 	"DocType",
 	"Meta",
 	"Error",
+	"Formatting",
+	"Language",
 )
 
 

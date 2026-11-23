@@ -16,4 +16,6 @@ sitemap = 0
 def get_context(context):
 	if not hasattr(frappe.local, "message"):
 		raise frappe.PageDoesNotExistError
+	# The page follows the request language like the sign-in page (GILT step 2b).
+	context.lang = frappe.local.lang or "en"
 	return context

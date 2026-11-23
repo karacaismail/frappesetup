@@ -7,9 +7,10 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
-from platform_core.identity import provider_setup, sign_in, sign_out
+from platform_core.identity import csrf_token, provider_setup, sign_in, sign_out
 from platform_core.identity.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
 from platform_core.identity.safe_errors import safe_errors
+from platform_core.shell.http import require_session
 
 
 def _render_browser_rate_limit(function: Callable[..., None]) -> Callable[..., None]:
@@ -113,6 +114,18 @@ def keycloak_callback(
 def logout() -> dict:
 	"""Closes the Frappe session and returns the Keycloak logout address."""
 	return sign_out.logout_current_session()
+
+
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
+@rate_limit(limit=30, seconds=60, user_based=True)
+def get_csrf_token() -> dict:
+	"""Returns the CSRF token of the current session. The separate frontend is served as static files, so it
+	reads the token here instead of from the page. A session without a token gets one; only one request per
+	session creates it (`identity/csrf_token.py`). An expired session gets 401 `SessionExpired` from Frappe.
+	`require_session` sets `Cache-Control: private, no-store`; there is no `ETag` and no conditional reply."""
+	require_session()
+	return {"csrf_token": csrf_token.session_csrf_token()}
 
 
 # The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.

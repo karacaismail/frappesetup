@@ -104,7 +104,7 @@ Her bölüm yukarıdaki ekranları aynı katmandan üretir; bu katman olmadan sh
 - Liste: TanStack Table, sunucu taraflı filtre/sıralama, kayıtlı görünümler, toplu aksiyon, kanban/takvim (G-70).
 - Form: Section/Column/Tab Break yerleşimi, docstatus ve Workflow aksiyonları, child table, belge yan paneli (G-71).
 - Rapor/dashboard/yazdırma: `query_report.run`, Dashboard Chart, `download_pdf` (G-72).
-- i18n: `trTR`, dayjs 'tr', System Settings biçimleri, Frappe çevirileri (G-73).
+- GILT altyapısı tek bir metin kataloğu kullanır. Dil açılış verisinden gelir. Tarih ve sayı `Intl` ile biçimlenir. Frappe etiketleri meta ucundan çevrilmiş gelir (G-73).
 
 ## 10. Rail 6 eklemeleri: destek, kredi, faturalama ve operatör modu
 

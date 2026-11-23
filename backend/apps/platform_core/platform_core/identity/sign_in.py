@@ -19,6 +19,7 @@ import time
 import frappe
 import frappe.sessions
 from frappe import _
+from frappe.translate import get_all_languages
 from frappe.utils import get_url
 
 from platform_core.identity import helpers, jwks, session_policy, site_settings
@@ -226,6 +227,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 		frappe.db.rollback()
 		_close_new_session()
 		raise
+	adopt_token_locale(user, claims)
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
 	frappe.local.session.data["session_expiry"] = session_policy.IDLE_TIMEOUT
 	remember_keycloak_session(claims.get("sid"), frappe.session.sid)
@@ -238,6 +240,20 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	session_policy.mark_activity(frappe.session.sid, user)
 	frappe.local.cookie_manager.delete_cookie(_cookie_name())
 	return record.get("redirect_to") or settings.panel_url
+
+
+def adopt_token_locale(user: str, claims: dict) -> None:
+	"""GILT step 5d: an empty Frappe language takes the verified ID token `locale` claim.
+
+	Only an enabled Language record code is written. A language the user already has never changes.
+	"""
+	locale = claims.get("locale")
+	if not isinstance(locale, str) or locale not in get_all_languages():
+		return
+	if frappe.db.get_value("User", user, "language"):
+		return
+	# `set_value` also clears the cached User document that sessions read the language from.
+	frappe.db.set_value("User", user, "language", locale, update_modified=False)
 
 
 def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str) -> None:

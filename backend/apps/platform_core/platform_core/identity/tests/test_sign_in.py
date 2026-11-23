@@ -289,9 +289,12 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertEqual(h.logged_user(self.client), h.MEHMET)
 
 	def test_unknown_email_cannot_sign_up(self):
-		response = h.login_with_keycloak(self.client, h.userinfo("sub-new", "yeni.kisi@example.test"))
+		response = h.login_with_keycloak(
+			self.client, h.userinfo("sub-new", "yeni.kisi@example.test"), headers={"Accept-Language": "tr"}
+		)
 		self.assertEqual(response.status_code, 403)
 		html = response.data.decode()
+		self.assertIn('<html lang="tr" dir="ltr">', html)
 		self.assertIn("Başka hesapla oturum aç", html)
 		self.assertNotIn("yeni.kisi@example.test", html)
 		action = re.search(r'href="([^"]+)">Başka hesapla oturum aç</a>', html)
@@ -310,6 +313,60 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertEqual(h.logged_user(self.client), "Guest")
 		h.refresh()
 		self.assertFalse(frappe.db.exists("User", "yeni.kisi@example.test"))
+
+	def test_tenant_account_missing_page_uses_the_request_language(self):
+		# GILT step 2b: the page takes its language from the request, not a fixed "tr".
+		response = h.login_with_keycloak(
+			self.client, h.userinfo("sub-new", "yeni.kisi@example.test"), headers={"Accept-Language": "en"}
+		)
+		self.assertEqual(response.status_code, 403)
+		html = response.data.decode()
+		self.assertIn('<html lang="en" dir="ltr">', html)
+		self.assertIn(">Sign in with another account</a>", html)
+		self.assertNotIn("Başka hesapla oturum aç", html)
+
+	def _language_after_sign_in(self, locale, language=None):
+		frappe.db.set_value("User", h.AYSE, "language", language)
+		frappe.db.commit()
+		self.addCleanup(lambda: (frappe.db.set_value("User", h.AYSE, "language", None), frappe.db.commit()))
+		h.reset_rate_limits()
+		self.client = h.new_client()
+		claims = h.userinfo("sub-ayse", h.AYSE)
+		if locale is not None:
+			claims["locale"] = locale
+		response = h.login_with_keycloak(self.client, claims)
+		self.assertEqual(response.status_code, 302, response.data[:300])
+		h.refresh()
+		return frappe.db.get_value("User", h.AYSE, "language")
+
+	def test_empty_user_language_takes_the_token_locale(self):
+		# GILT step 5d: an empty Frappe language is filled from the verified ID token locale.
+		self.assertEqual(self._language_after_sign_in("tr"), "tr")
+		self.assertEqual(frappe.get_cached_value("User", h.AYSE, "language"), "tr")
+
+	def test_token_locale_does_not_replace_a_chosen_language(self):
+		self.assertEqual(self._language_after_sign_in("tr", language="en"), "en")
+
+	def test_token_locale_outside_enabled_languages_is_not_written(self):
+		self.assertIsNone(self._language_after_sign_in("zz"))
+		self.assertIsNone(self._language_after_sign_in(["tr"]))
+		disabled = "de"
+		previous = frappe.db.get_value("Language", disabled, "enabled")
+		self.assertIsNotNone(previous, "The sample language record must exist.")
+		frappe.db.set_value("Language", disabled, "enabled", 0)
+		frappe.client_cache.delete_value("languages")
+		frappe.db.commit()
+
+		def restore():
+			frappe.db.set_value("Language", disabled, "enabled", previous)
+			frappe.client_cache.delete_value("languages")
+			frappe.db.commit()
+
+		self.addCleanup(restore)
+		self.assertIsNone(self._language_after_sign_in(disabled))
+
+	def test_sign_in_without_locale_keeps_the_language_empty(self):
+		self.assertIsNone(self._language_after_sign_in(None))
 
 	def test_tenant_account_missing_page_has_no_standalone_address(self):
 		# The callback renders the page itself (test above). A direct request gets Frappe's 404 page (K-1).
