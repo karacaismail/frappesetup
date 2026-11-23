@@ -2,6 +2,7 @@
 
 import json
 import runpy
+import secrets
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,9 +20,10 @@ def environment():
     values.update(
         {
             "KC_PUBLIC_URL": "http://identity.localhost:43820",
-            "KC_BOOTSTRAP_ADMIN_USERNAME": "synthetic-admin",
-            "KC_BOOTSTRAP_ADMIN_PASSWORD": "synthetic-admin-password",
-            "UNRELATED_SECRET": "synthetic-unrelated",
+            # Values are made at run time so no credential-like literal sits in the source.
+            "KC_BOOTSTRAP_ADMIN_USERNAME": secrets.token_hex(8),
+            "KC_BOOTSTRAP_ADMIN_PASSWORD": secrets.token_urlsafe(16),
+            "UNRELATED_SECRET": secrets.token_urlsafe(16),
         }
     )
     return values
