@@ -69,6 +69,44 @@ class EnvironmentTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
         self.assertFalse(self.env_path.exists())
 
+    def run_test_command(self, app, allow_tests_status):
+        """Run bin/test with a fake Compose. The allow_tests check exits with the given status."""
+        dev = Path(self.temp.name) / "dev"
+        (dev / "bin").mkdir(parents=True, exist_ok=True)
+        (dev / "bin/test").write_bytes((DEV / "bin/test").read_bytes())
+        (dev / "init_env.py").write_text("")
+        log = Path(self.temp.name) / "compose.log"
+        log.write_text("")
+        compose = dev / "bin/compose"
+        compose.write_text(
+            "#!/bin/bash\n"
+            f"printf '%s\\n' \"$*\" >> '{log}'\n"
+            f'if [[ "$*" == *allow_tests* ]]; then exit {allow_tests_status}; fi\n'
+        )
+        for script in (dev / "bin/test", compose):
+            script.chmod(0o755)
+        result = subprocess.run([str(dev / "bin/test"), app], env=self.env, capture_output=True, text=True)
+        return result, log.read_text()
+
+    def test_test_command_fails_when_the_site_disables_tests(self):
+        """Frappe's run-tests prints "Testing is disabled" and exits 0 (MVP test 3, T-18)."""
+        result, log = self.run_test_command("platform_core", 3)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("allow_tests", result.stderr)
+        self.assertNotIn("run-tests", log)
+
+    def test_test_command_passes_other_check_failures_through(self):
+        result, log = self.run_test_command("platform_core", 1)
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("allow_tests is not true", result.stderr)
+        self.assertNotIn("run-tests", log)
+
+    def test_test_command_runs_the_tests_when_the_site_allows_them(self):
+        for app in ("platform_core", "hrms_tr"):
+            with self.subTest(app=app):
+                result, log = self.run_test_command(app, 0)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"bench --site test-{app.replace('_', '-')}.localhost run-tests --app {app}", log)
 
 if __name__ == "__main__":
     unittest.main()

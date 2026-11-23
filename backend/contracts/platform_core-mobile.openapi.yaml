@@ -215,6 +215,14 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/CleanupResultSuccess' }
         '401': { $ref: '#/components/responses/MobileAuthenticationError' }
+        '403':
+          description: |
+            The account is not a site administrator. The endpoint checks the System Manager role and answers with code `cleanup_forbidden`.
+            The body can also be Frappe's generic permission error. That body carries `exc_type` and no `code`.
+            Clients treat both bodies as the same refusal.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }

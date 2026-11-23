@@ -182,25 +182,76 @@ def main():
     issuer = f"http://identity.localhost:{port}/realms/platform"
     fixture = seed_lifecycle_identities(lifecycle, issuer, tenant)
     if tenant:
-        from platform_core.identity.anonymization import identity_hash
-
         fixture.update(seed_tenant(provider_urls))
-        for prefix, account in deletion_accounts(lifecycle):
-            doctype = fixture["E2E_DOCTYPE"]
-            digest = identity_hash(issuer, account["subject"])
-            anonymous = f"deleted-user-{digest[:16]}@deleted.invalid"
-            fixture.update({
-                prefix + "DELETE_RECORD_DOCTYPE": doctype,
-                prefix + "DELETE_RECORD_NAME": insert(
-                    doctype, title="Retained lifecycle request", request_user=account["email"],
-                ),
-                prefix + "DELETE_RECORD_PERSON_FIELD": "request_user",
-                prefix + "DELETE_RECORD_ANONYMOUS_VALUE": json.dumps(anonymous),
-                prefix + "DELETE_TENANT_ANONYMOUS_USER": anonymous,
-            })
+        fixture.update(deletion_records(fixture["E2E_DOCTYPE"], lifecycle, issuer))
+    frappe.db.commit()
+    print(json.dumps(fixture))
+
+
+def deletion_records(doctype, lifecycle, issuer):
+    """Keep one record per deletion account. The lifecycle tests check its anonymised owner."""
+    from platform_core.identity.anonymization import identity_hash
+
+    fixture = {}
+    for prefix, account in deletion_accounts(lifecycle):
+        digest = identity_hash(issuer, account["subject"])
+        anonymous = f"deleted-user-{digest[:16]}@deleted.invalid"
+        fixture.update({
+            prefix + "DELETE_RECORD_DOCTYPE": doctype,
+            prefix + "DELETE_RECORD_NAME": insert(
+                doctype, title="Retained lifecycle request", request_user=account["email"],
+            ),
+            prefix + "DELETE_RECORD_PERSON_FIELD": "request_user",
+            prefix + "DELETE_RECORD_ANONYMOUS_VALUE": json.dumps(anonymous),
+            prefix + "DELETE_TENANT_ANONYMOUS_USER": anonymous,
+        })
+    return fixture
+
+
+def stack_tenant():
+    """Seed the shared development stack's tenant (`backend/e2e/stack seed-preview`).
+
+    The stack already wrote the Keycloak client settings, so this mode changes only the test
+    settings. Settings arrive on stdin. No secret is read or written here.
+    """
+    settings = json.loads(sys.stdin.read())
+    os.environ.update(
+        E2E_PREVIEW_LOGIN_EMAIL=settings["E2E_PREVIEW_LOGIN_EMAIL"], E2E_FULL_BROWSER_FIXTURES="1",
+    )
+    port = int(settings["PANE_PORT"])
+    config_file = Path("sites") / "tenant1.localhost" / "site_config.json"
+    config = json.loads(config_file.read_text())
+    provider_urls = {part: f"http://e2e-provider:{port + 7}/{part}" for part in ("limited", "fallback")}
+    config.update(
+        allow_cors=[f"http://127.0.0.1:{port + 8}"],
+        mobile_identity_sync_url=settings["E2E_PREVIEW_SYNC_ORIGIN"],
+        mobile_allow_development_http=1,
+        kimlik_mobil_azp=["mobile-app", "e2e-expired-mobile"],
+        mobile_cursor_key=config.get("mobile_cursor_key") or token_urlsafe(32),
+        model_gateway_endpoints={
+            url: {"kind": "local", "addresses": [settings["E2E_PROVIDER_IP"]]} for url in provider_urls.values()
+        },
+    )
+    # Replace the live site's settings in one step, so a reader never sees half a file.
+    staged = config_file.with_name("site_config.json.e2e-seed")
+    staged.write_text(json.dumps(config, indent=2) + "\n")
+    staged.chmod(0o600)
+    staged.replace(config_file)
+    os.chdir("sites")
+    frappe.init(site="tenant1.localhost", sites_path=".")
+    frappe.connect()
+    frappe.set_user("Administrator")
+    issuer = f"http://identity.localhost:{port}/realms/platform"
+    lifecycle = json.loads(settings["E2E_LIFECYCLE_IDENTITIES"])
+    seed_lifecycle_identities(lifecycle, issuer, True)
+    fixture = seed_tenant(provider_urls)
+    fixture.update(deletion_records(fixture["E2E_DOCTYPE"], lifecycle, issuer))
     frappe.db.commit()
     print(json.dumps(fixture))
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["stack-tenant"]:
+        stack_tenant()
+    else:
+        main()
