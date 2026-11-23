@@ -199,7 +199,9 @@ Bakımcılar uzun vadede bakımı süren bir Telegram istemcisine geçmelidir.
 
 [Yama kaydı](../dev/press/patch-registry.json) geliştirme ve üretim yamalarını listeler.
 Her kayıtta yamanın sahibi, testi ve kaldırma koşulu bulunur.
-Kayıt sahibi, yamayı çıkarıp koşulu sabitlenen Press sürümünde doğrular.
+`upstream` alanı Press'in asıl geliştirici deposundaki ilgili kaydı gösterir.
+Ekip öneriyi göndermediyse alan bu belgenin ilgili bölümünü gösterir.
+Ekip her Press yükseltmesinde ilgili testi yamasız imajda çalıştırır. Test geçerse ekip yamayı kaldırır.
 
 Geliştirme betiğinde her yama için bir `patch-id` satırı açın.
 Aynı komut birden çok yamayı uygulayabilir. Her yama ayrı kayıt alır.
