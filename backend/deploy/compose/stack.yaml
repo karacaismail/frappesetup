@@ -3,8 +3,9 @@
 #   release.env  image references pinned by digest (from release.json, written by remote/apply)
 #   host.env     the non-secret environment file of deploy/environments/<env>.env
 # Secrets live only on the server in /etc/atonota/<env>/<service>.env (mode 0600). Nothing here
-# publishes a host port. The edge proxy (edge.yaml) reaches tenant-frontend, keycloak and press over
-# the network "atonota-edge-<env>" by the aliases <env>-tenant, <env>-keycloak and <env>-press.
+# publishes a host port. The edge proxy (edge.yaml) reaches tenant-frontend, keycloak and
+# press-frontend over the network "atonota-edge-<env>" by the aliases <env>-tenant, <env>-keycloak
+# and <env>-press.
 # Each environment has its own edge network, so alpha containers cannot reach beta services.
 
 x-tenant: &tenant
@@ -15,6 +16,22 @@ x-tenant: &tenant
     - tenant-sites:/home/frappe/frappe-bench/sites
     - tenant-logs:/home/frappe/frappe-bench/logs
     - /srv/atonota/web/${ATONOTA_ENV:?}:/srv/panel:ro
+  environment:
+    # The /panel page reads the current web bundle's Vite manifest (E-3). "current" is a relative
+    # link inside the mount, so a web release switches the panel without restarting Frappe.
+    ATONOTA_PANEL_MANIFEST: /srv/panel/current/.vite/manifest.json
+  networks: [internal]
+
+# Press runs on the same MariaDB server as the tenants (its own database and user, created by
+# "bench new-site" in the first install steps). It has its own Redis, because both benches live in
+# /home/frappe/frappe-bench: with a shared queue the tenant worker would take Press jobs.
+x-press: &press
+  image: ${ATONOTA_IMAGE_PRESS:-unset}
+  restart: unless-stopped
+  env_file: ["/etc/atonota/${ATONOTA_ENV:?}/press.env"]
+  volumes:
+    - press-sites:/home/frappe/frappe-bench/sites
+    - press-logs:/home/frappe/frappe-bench/logs
   networks: [internal]
 
 services:
@@ -156,14 +173,79 @@ services:
       keycloak: {condition: service_healthy}
     networks: [internal]
 
-  # Press has no production image yet (blocker E-2 in docs/dagitim/ortamlar.md).
-  # remote/apply turns this profile on only when the release carries a press image.
-  press:
-    image: ${ATONOTA_IMAGE_PRESS:-unset}
+  # Press image: deploy/images/press.Dockerfile. remote/apply turns this profile on only when the
+  # release carries a press image. Every Press service has the profile.
+  press-redis-cache:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     profiles: [press]
     restart: unless-stopped
-    env_file: ["/etc/atonota/${ATONOTA_ENV:?}/press.env"]
-    volumes: [press-sites:/home/frappe/frappe-bench/sites]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 20}
+    networks: [internal]
+
+  press-redis-queue:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    profiles: [press]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 20}
+    volumes: [press-redis-queue:/data]
+    networks: [internal]
+
+  press-web:
+    <<: *press
+    profiles: [press]
+    command:
+      - env/bin/gunicorn
+      - --chdir=/home/frappe/frappe-bench/sites
+      - --bind=0.0.0.0:8000
+      - --threads=4
+      - --workers=${ATONOTA_PRESS_GUNICORN_WORKERS:-2}
+      - --worker-class=gthread
+      - --worker-tmp-dir=/dev/shm
+      - --timeout=120
+      - --preload
+      - frappe.app:application
+    healthcheck:
+      test:
+        - CMD
+        - env/bin/python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/method/ping', headers={'Host': '${ATONOTA_PRESS_HOST:?}'}), timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      tenant-db: {condition: service_healthy}
+      press-redis-cache: {condition: service_healthy}
+      press-redis-queue: {condition: service_healthy}
+
+  press-worker:
+    <<: *press
+    profiles: [press]
+    command: ["bench", "worker", "--queue", "short,default,long"]
+    depends_on: [press-web]
+
+  press-socket:
+    <<: *press
+    profiles: [press]
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    depends_on: [press-web]
+
+  # Serves the built Press assets (desk and dashboard) and forwards to gunicorn and socket.io.
+  press-frontend:
+    <<: *press
+    profiles: [press]
+    command: ["nginx-entrypoint.sh"]
+    environment:
+      BACKEND: press-web:8000
+      SOCKETIO: press-socket:9000
+      FRAPPE_SITE_NAME_HEADER: $$host
+      UPSTREAM_REAL_IP_ADDRESS: 0.0.0.0/0
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      PROXY_READ_TIMEOUT: "120"
+      CLIENT_MAX_BODY_SIZE: 50m
+    depends_on: [press-web, press-socket]
     networks:
       internal: {}
       edge: {aliases: ["${ATONOTA_ENV:?}-press"]}
@@ -176,6 +258,8 @@ volumes:
   keycloak-db:
   identity-sync:
   press-sites:
+  press-logs:
+  press-redis-queue:
 
 networks:
   internal: {}

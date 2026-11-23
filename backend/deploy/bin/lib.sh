@@ -63,3 +63,9 @@ server_bin() {
 check_release_id() {
     [[ "$1" =~ ^(backend|web)-[0-9a-f]{12}-b[1-9][0-9]*$ ]] || fail "bad release id: $1"
 }
+
+# Press runs only when the environment switch is 1 and the release carries the Press image.
+# remote/common.sh has the same rule for remote/apply. Usage: press_on <switch> <release.json>
+press_on() {
+    [[ "$1" == 1 ]] && release_py images "$2" | grep -q '^press='
+}

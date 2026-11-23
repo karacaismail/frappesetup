@@ -33,7 +33,7 @@ PRESS_ENVIRONMENT.update(
     ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:7151",
     ATONOTA_SITE_TENANT1_SECRET=secrets.token_urlsafe(16),
     ATONOTA_SITE_TENANT1_SERVICE_SECRET=secrets.token_urlsafe(16),
-    IDENTITY_BRAND_NAME="Atonota",
+    IDENTITY_BRAND_NAME="AtonotA Login",
 )
 STACK_ENVIRONMENT = dict(
     PRESS_ENVIRONMENT,

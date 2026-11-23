@@ -27,7 +27,8 @@ if [[ "$kind" == web ]]; then
     files+=("$folder/$bundle")
 else
     files+=("$packed/compose/stack.yaml" "$packed/compose/edge.yaml"
-        "$packed/compose/Caddyfile" "$packed/compose/site.caddy.template")
+        "$packed/compose/Caddyfile" "$packed/compose/site.caddy.template"
+        "$packed"/settings/*.production.env.example)
 fi
 files+=("$packed"/remote/*)
 

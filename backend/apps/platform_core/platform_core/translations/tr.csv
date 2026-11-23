@@ -169,6 +169,8 @@ A valid DocType name is required.,Kayıt türü için geçerli bir ad girin.,she
 You cannot read this DocType.,Bu kayıt türünü okuma izniniz yok.,shell.metadata
 Skip to main content,Ana içeriğe geçin,shell.panel
 Go to site home,Sitenin ana sayfasına gidin,shell.panel
+The panel files are not installed on this site.,Panelin dosyaları bu siteye kurulmamış.,shell.panel
+Turn on JavaScript to use the panel.,Paneli kullanmak için JavaScript'i açın.,shell.panel
 A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.,shell.metadata
 {0} must be an array of DocType names.,{0} ayarı kayıt türü adlarından oluşan bir liste olmalıdır.,shell.metadata
 {0} contains an unknown DocType: {1},{0} ayarı tanınmayan {1} kayıt türünü içeriyor.,shell.metadata

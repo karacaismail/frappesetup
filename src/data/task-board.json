@@ -1,0 +1,1339 @@
+{
+ "audit": {
+  "date": "2026-11-23",
+  "commit": "36afb874",
+  "note": "MVP durum denetimi. Denetim P0 ile P4 arasındaki MUST kalemlerini okudu. Bitti kalemleri yalnız yerel yığında testle geçti. G-155 ile G-167 arasındaki kalemler denetimden sonra eklendi.",
+  "addedAfter": [
+   "G-155",
+   "G-156",
+   "G-157",
+   "G-158",
+   "G-159",
+   "G-160",
+   "G-161",
+   "G-162",
+   "G-163",
+   "G-164",
+   "G-165",
+   "G-166",
+   "G-167"
+  ]
+ },
+ "statuses": [
+  {
+   "id": "done",
+   "label": "Bitti",
+   "rule": "Denetim kodu ve testi buldu. Test yerel yığında geçti. Kanıt commit ve test dosyasıdır."
+  },
+  {
+   "id": "in-progress",
+   "label": "Sürüyor",
+   "rule": "Denetim işin bir kısmını buldu. Denetimdeki durum \"kısmen\" idi."
+  },
+  {
+   "id": "not-started",
+   "label": "Başlamadı",
+   "rule": "Denetim depoda bu işin kodunu bulamadı."
+  },
+  {
+   "id": "unverified",
+   "label": "Doğrulanmadı",
+   "rule": "Denetim bu kalemi okumadı. Bunun üç nedeni olabilir. Kalem SHOULD ya da MAY olabilir. Kalem P5 ya da sonraki bir fazda olabilir. Kalem denetimden sonra eklenmiş olabilir."
+  }
+ ],
+ "levels": [
+  {
+   "id": "poc",
+   "label": "PoC",
+   "rule": "Başlığında \"prototip\" geçen P1 kalemleri PoC olur. Bu kalemler staging denemesidir.",
+   "ids": [
+    "G-129",
+    "SA-40"
+   ]
+  },
+  {
+   "id": "mvp",
+   "label": "MVP",
+   "rule": "P0, P1, P3 ve P4 kalemleri MVP olur. MVP ilk kullanılabilir sürümdür.",
+   "phases": [
+    "P0",
+    "P1",
+    "P3",
+    "P4"
+   ]
+  },
+  {
+   "id": "post-mvp",
+   "label": "MVP sonrası",
+   "rule": "P2 ve P7 kalemleri MVP sonrası olur. MVP kararına göre ödeme katmanı MVP'ye girmez. K-61 kararına göre AtonotA Login MVP sonrasıdır. P4'teki kendi kendine deneme ve etkinleştirme kalemleri de MVP sonrasıdır.",
+   "phases": [
+    "P2",
+    "P7"
+   ],
+   "ids": [
+    "G-29",
+    "G-30",
+    "G-31",
+    "G-95",
+    "SA-16"
+   ]
+  },
+  {
+   "id": "scale",
+   "label": "Ölçek",
+   "rule": "P5 ve P6 kalemleri ölçek düzeyidir. Bu kalemler yeni uygulamaları ve operasyon düzlemini kurar.",
+   "phases": [
+    "P5",
+    "P6"
+   ]
+  },
+  {
+   "id": "enterprise",
+   "label": "Kurumsal",
+   "rule": "Kurumsal müşteriye özgü kalemler kurumsal düzeyidir. Örnekler izolasyon kademeleri, zorunlu kurumsal giriş, iki katmanlı operatör yetkisi ve çift onaydır.",
+   "ids": [
+    "G-147",
+    "G-160",
+    "SA-25",
+    "SA-26"
+   ]
+  }
+ ],
+ "epics": [
+  {
+   "id": "infra",
+   "title": "Altyapı ve sürüm sabitleme",
+   "goal": "Sunucular, ortamlar, veritabanı ve sürüm kuralları kurulur."
+  },
+  {
+   "id": "resilience",
+   "title": "Yedek, izleme ve geri dönüş",
+   "goal": "Veri yedeklenir, sistem izlenir ve hata anında geri dönülür."
+  },
+  {
+   "id": "security",
+   "title": "Güvenlik ve sırlar",
+   "goal": "Saldırı yüzeyi daralır, sırlar korunur ve güvenlik yamaları izlenir."
+  },
+  {
+   "id": "delivery",
+   "title": "Yayın hattı ve kaynak kaydı",
+   "goal": "Kod test edilip yayına çıkar ve her iddianın kaynağı kayıtlı olur."
+  },
+  {
+   "id": "identity",
+   "title": "Kimlik ve oturum",
+   "goal": "Kullanıcı Keycloak ile girer ve oturum her yüzeyde aynı kişiye bağlanır."
+  },
+  {
+   "id": "press-ext",
+   "title": "Press uzantısı",
+   "goal": "press_tr uygulaması Press'i Türkiye ve platform kurallarına uyarlar."
+  },
+  {
+   "id": "tenant-config",
+   "title": "Kiracı site yapılandırması",
+   "goal": "Her kiracı site aynı güvenli ve Türkçe ayarlarla açılır."
+  },
+  {
+   "id": "access",
+   "title": "Yetki ve denetim izi",
+   "goal": "Kayıt, alan ve rol yetkisi her yüzeyde aynı sonucu verir ve iz bırakır."
+  },
+  {
+   "id": "panel-core",
+   "title": "Panel temeli ve meta arayüz",
+   "goal": "Panel liste ve formları sunucu meta verisinden üretir."
+  },
+  {
+   "id": "shell",
+   "title": "Kabuk ekranları ve paylaşım",
+   "goal": "Menü, arama, ayarlar, kullanıcı ekranları ve paylaşım bağlantıları çalışır."
+  },
+  {
+   "id": "help",
+   "title": "Yardım, tur ve keşif",
+   "goal": "Kullanıcı ekrandan çıkmadan yardım alır ve ilk ziyarette yol gösterilir."
+  },
+  {
+   "id": "ai",
+   "title": "AI ajan katmanı",
+   "goal": "AI kullanıcının yetkisiyle çalışır, her yazmada onay ister ve iz bırakır."
+  },
+  {
+   "id": "billing",
+   "title": "Ödeme ve abonelik",
+   "goal": "Müşteri TRY ile öder, abonelik ve tahsilat durumu tek akışta izlenir."
+  },
+  {
+   "id": "finance-ops",
+   "title": "Finans çekirdeği ve e-belge",
+   "goal": "Operasyon sitesi faturayı, e-belgeyi ve mutabakatı yürütür."
+  },
+  {
+   "id": "compliance",
+   "title": "KVKK ve hukuk",
+   "goal": "Rıza, saklama, silme ve yasal yükümlülükler kayda bağlanır."
+  },
+  {
+   "id": "measurement",
+   "title": "Ölçüm ve kampanya",
+   "goal": "Pazarlama ölçümü yalnız rıza varsa çalışır."
+  },
+  {
+   "id": "app-framework",
+   "title": "Uygulama çerçevesi ve HRMS TR",
+   "goal": "İlk uygulama ortak sözleşmelerle kurulur ve etkinleştirilir."
+  },
+  {
+   "id": "more-apps",
+   "title": "CRM, Webshop ve ölçek",
+   "goal": "Yeni uygulamalar aynı kontrol listesiyle yayına çıkar."
+  },
+  {
+   "id": "operator",
+   "title": "Operatör yetkisi ve iş zekâsı",
+   "goal": "Operatör işleri ayrı yetkiyle, çift onayla ve denetimle yapılır."
+  },
+  {
+   "id": "support",
+   "title": "Destek oturumu ve Helpdesk",
+   "goal": "Destek ekibi müşterinin rızasıyla ve sınırlı kapsamla yardım eder."
+  },
+  {
+   "id": "login-product",
+   "title": "AtonotA Login ürünü",
+   "goal": "Giriş ekranı ayrı ve ücretli bir ürün olarak yayına çıkar."
+  }
+ ],
+ "items": {
+  "G-1": {
+   "epic": "infra",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-2": {
+   "epic": "infra",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-3": {
+   "epic": "infra",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-4": {
+   "epic": "infra",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-5": {
+   "epic": "resilience",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-6": {
+   "epic": "infra",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-7": {
+   "epic": "press-ext",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-8": {
+   "epic": "press-ext",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-9": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-10": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-11": {
+   "epic": "press-ext",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-12": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/press_tr/tests/test_auth_http.py",
+     "backend/apps/press_tr/tests/test_authorization_code.py"
+    ]
+   }
+  },
+  "G-13": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-14": {
+   "epic": "delivery",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-15": {
+   "epic": "press-ext",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-16": {
+   "epic": "press-ext",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-17": {
+   "epic": "press-ext",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-18": {
+   "epic": "operator",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-19": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-20": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-21": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-22": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-23": {
+   "epic": "compliance",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-24": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-25": {
+   "epic": "billing",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-26": {
+   "epic": "press-ext",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-27": {
+   "epic": "ai",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-28": {
+   "epic": "ai",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-29": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-30": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-31": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-32": {
+   "epic": "more-apps",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-33": {
+   "epic": "more-apps",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-34": {
+   "epic": "billing",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-35": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-36": {
+   "epic": "resilience",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-37": {
+   "epic": "resilience",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-38": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-39": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-40": {
+   "epic": "security",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-41": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-42": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-43": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-44": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/identity/tests/test_login_policy.py",
+     "backend/apps/platform_core/platform_core/identity/tests/test_provider_setup.py",
+     "backend/apps/platform_core/platform_core/identity/tests/test_sign_in.py"
+    ]
+   }
+  },
+  "G-45": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/shell/test_panel_template.py",
+     "backend/apps/platform_core/platform_core/access/tests/test_http_contract.py"
+    ]
+   }
+  },
+  "G-46": {
+   "epic": "security",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-47": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-48": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-49": {
+   "epic": "resilience",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-50": {
+   "epic": "infra",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-51": {
+   "epic": "tenant-config",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-52": {
+   "epic": "compliance",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-53": {
+   "epic": "tenant-config",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-54": {
+   "epic": "infra",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-55": {
+   "epic": "infra",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-56": {
+   "epic": "tenant-config",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-57": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/identity/tests/test_provisioning.py",
+     "backend/identity/identity_sync/tests/test_mapping.py"
+    ]
+   }
+  },
+  "G-58": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/identity/tests/test_sign_out.py"
+    ]
+   }
+  },
+  "G-59": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-60": {
+   "epic": "access",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/access/tests/test_record_rule.py",
+     "backend/apps/platform_core/platform_core/access/tests/test_hierarchy.py"
+    ]
+   }
+  },
+  "G-61": {
+   "epic": "access",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/access/tests/test_field_level.py"
+    ]
+   }
+  },
+  "G-62": {
+   "epic": "access",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-63": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-64": {
+   "epic": "access",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-65": {
+   "epic": "tenant-config",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-66": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-67": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-68": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-69": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-70": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-71": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-72": {
+   "epic": "panel-core",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-73": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-74": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-75": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-76": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-77": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-78": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/identity/keycloak/tests/test_second_factor.py",
+     "backend/identity/keycloak/tests/test_session_lifetimes.py"
+    ]
+   }
+  },
+  "G-79": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-80": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-81": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-82": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-83": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-84": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-85": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-86": {
+   "epic": "ai",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/ai/tests/test_approval.py"
+    ]
+   }
+  },
+  "G-87": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-88": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-89": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-90": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-91": {
+   "epic": "ai",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-92": {
+   "epic": "ai",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-93": {
+   "epic": "shell",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-94": {
+   "epic": "shell",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-95": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-96": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-97": {
+   "epic": "shell",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-98": {
+   "epic": "shell",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-99": {
+   "epic": "shell",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-100": {
+   "epic": "shell",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-101": {
+   "epic": "shell",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-102": {
+   "epic": "app-framework",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-103": {
+   "epic": "app-framework",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-104": {
+   "epic": "app-framework",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-105": {
+   "epic": "app-framework",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-106": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-107": {
+   "epic": "app-framework",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-108": {
+   "epic": "app-framework",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-109": {
+   "epic": "more-apps",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-110": {
+   "epic": "infra",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-111": {
+   "epic": "delivery",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-112": {
+   "epic": "security",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-113": {
+   "epic": "resilience",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-114": {
+   "epic": "resilience",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-115": {
+   "epic": "security",
+   "status": "in-progress",
+   "level": "post-mvp"
+  },
+  "G-116": {
+   "epic": "compliance",
+   "status": "in-progress",
+   "level": "post-mvp"
+  },
+  "G-117": {
+   "epic": "compliance",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-118": {
+   "epic": "delivery",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-119": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-120": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/identity/tests/test_sign_in.py"
+    ]
+   }
+  },
+  "G-121": {
+   "epic": "access",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-122": {
+   "epic": "access",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-123": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-124": {
+   "epic": "identity",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-125": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-126": {
+   "epic": "delivery",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-127": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-128": {
+   "epic": "delivery",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-129": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "poc"
+  },
+  "G-130": {
+   "epic": "shell",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-131": {
+   "epic": "shell",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-132": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-133": {
+   "epic": "measurement",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-134": {
+   "epic": "measurement",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-135": {
+   "epic": "measurement",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "G-136": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-137": {
+   "epic": "help",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-138": {
+   "epic": "help",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-139": {
+   "epic": "help",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-140": {
+   "epic": "help",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-141": {
+   "epic": "help",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-142": {
+   "epic": "security",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-143": {
+   "epic": "security",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-144": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-145": {
+   "epic": "security",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-146": {
+   "epic": "security",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-147": {
+   "epic": "more-apps",
+   "status": "unverified",
+   "level": "enterprise"
+  },
+  "G-148": {
+   "epic": "identity",
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "36afb874",
+    "tests": [
+     "backend/apps/platform_core/platform_core/ai/tests/test_identity.py"
+    ]
+   }
+  },
+  "G-149": {
+   "epic": "resilience",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-150": {
+   "epic": "panel-core",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-151": {
+   "epic": "infra",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "G-152": {
+   "epic": "identity",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "G-153": {
+   "epic": "tenant-config",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-154": {
+   "epic": "compliance",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-1": {
+   "epic": "operator",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "SA-2": {
+   "epic": "operator",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "SA-3": {
+   "epic": "identity",
+   "status": "not-started",
+   "level": "mvp"
+  },
+  "SA-4": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-5": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-6": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-7": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-8": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-9": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-10": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-11": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-12": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-13": {
+   "epic": "billing",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-14": {
+   "epic": "press-ext",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "SA-15": {
+   "epic": "ai",
+   "status": "in-progress",
+   "level": "mvp"
+  },
+  "SA-16": {
+   "epic": "app-framework",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-17": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-18": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-19": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-20": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-21": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-22": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-23": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-24": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-25": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "enterprise"
+  },
+  "SA-26": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "enterprise"
+  },
+  "SA-27": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-28": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-29": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-30": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-31": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-32": {
+   "epic": "more-apps",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-33": {
+   "epic": "finance-ops",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-34": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-35": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-36": {
+   "epic": "compliance",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-37": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-38": {
+   "epic": "operator",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-39": {
+   "epic": "ai",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "SA-40": {
+   "epic": "support",
+   "status": "not-started",
+   "level": "poc"
+  },
+  "SA-41": {
+   "epic": "finance-ops",
+   "status": "not-started",
+   "level": "post-mvp"
+  },
+  "SA-42": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-43": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "SA-44": {
+   "epic": "support",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-155": {
+   "epic": "ai",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-156": {
+   "epic": "ai",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-157": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-158": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-159": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-160": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "enterprise"
+  },
+  "G-161": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-162": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-163": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-164": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-165": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-166": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  },
+  "G-167": {
+   "epic": "login-product",
+   "status": "unverified",
+   "level": "post-mvp"
+  }
+ }
+}

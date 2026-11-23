@@ -1901,6 +1901,15 @@
   },
   {
     "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
     "file": "backend/identity/keycloak/tests/test_event_listener.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
@@ -2714,6 +2723,15 @@
     "ignoreUntil": "2027-02-22"
   },
   {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "5d3bafac377137b4a63e1da199131a0621a62fa4274accea27f29e7706490e92",
+    "owner": "kimlik-realm",
+    "reason": "The test starts its fixture command with an argument list and no implicit host shell.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
     "rule": "B607",
     "file": "backend/dev/ai_readiness/test_gate.py",
     "code": "subprocess.run([\"git\", \"-C\", str(self.repository), \"add\", \"backend\"], check=True)",
@@ -3198,5 +3216,41 @@
     "reason": "The keys name field kinds and the values are length limits; none is a credential.",
     "owner": "platform-core-gecit",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_settings.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_settings.py",
+    "code": "return subprocess.run([sys.executable, \"-I\", *map(str, arguments)], input=input_text,",
+    "statementSha256": "df1ad51817c28c6e876c4240a17fb5b5e00fbe35a05e82e778a889b0c6226fe5",
+    "reason": "Test runs the repository's own deploy scripts with this Python, fixed arguments and no shell.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_press_image.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the deploy scripts it checks.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_press_image.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "debd4cad75ac37a9391a52fb01cfd9e650e577dab7f0975e00a5491bb8514b2a",
+    "reason": "Test runs the repository's own build-release script with a fake docker, fixed arguments and no shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-23"
   }
 ]

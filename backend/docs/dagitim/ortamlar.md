@@ -16,7 +16,7 @@ Proje sahibi şu kararları 23 Kasım 2026 Pazartesi günü verdi:
 4. Ana dal güncellenince alpha ortamı kendiliğinden güncellenir.
 5. Sonraki ortamlara geçiş Jenkins'te elle basılan düğmeyle olur. Sıra alpha, beta, rc ve prod şeklindedir.
 6. alpha, beta ve rc birer alt alan adıdır. Prod ana alan adındadır: `atonota.net`.
-7. Keycloak'ın prod adresi `id.atonota.net` olarak kalır. Bu adres proje kaydındaki O-1 kararıdır.
+7. AtonotA Login giriş adresi prod'da `api.login.atonota.net` olur. AtonotA Login, Keycloak üzerinde çalışan giriş ürünüdür. Bu adres proje kaydındaki O-51 kararıdır.
 
 ## Sözlük
 
@@ -43,7 +43,7 @@ Her ortamın kuralları `backend/deploy/environments/` klasöründedir. Bu dosya
 
 rc ve prod ortamları daha sıkıdır:
 
-- Sürüm paketinde her parça bulunmalıdır. Örneğin Press imajı eksikse rc dağıtımı reddeder.
+- Sürüm paketinde her parça bulunmalıdır. Örneğin Press imajı eksikse rc dağıtımı reddeder. Press imajı pakette olsa da rc ve prod'da Press açılmaz (E-2).
 - Yedeğin sunucu dışına kopyası başarılı olmalıdır. Kopya başarısızsa dağıtım başlamaz.
 - Hata olursa veritabanı kendiliğinden geri yüklenmez. Bu kararı DevOps sorumlusu verir.
 
@@ -56,7 +56,7 @@ Kararım şudur: her ortamın bir temel adı vardır. Öteki adlar bu temel adı
 | Ad | alpha | beta | rc | prod |
 | --- | --- | --- | --- | --- |
 | Temel ad | `alpha.atonota.net` | `beta.atonota.net` | `rc.atonota.net` | `atonota.net` |
-| Keycloak | `id.alpha.atonota.net` | `id.beta.atonota.net` | `id.rc.atonota.net` | `id.atonota.net` |
+| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.beta.atonota.net` | `api.login.rc.atonota.net` | `api.login.atonota.net` |
 | Press | `press.alpha.atonota.net` | `press.beta.atonota.net` | `press.rc.atonota.net` | `press.atonota.net` |
 | Kiracı bölgesi | `*.app.alpha.atonota.net` | `*.app.beta.atonota.net` | `*.app.rc.atonota.net` | `*.app.atonota.net` |
 | İlk kiracı | `demo.app.alpha.atonota.net` | `demo.app.beta.atonota.net` | `demo.app.rc.atonota.net` | `demo.app.atonota.net` |
@@ -67,7 +67,7 @@ Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bild
 ### Gerekçe
 
 1. Her ortamda adların biçimi aynıdır. Ortam dosyası yalnız temel adı değiştirir.
-2. Keycloak'ın prod adı `id.atonota.net` olarak kalır. O-1 kararı bozulmaz.
+2. Giriş adresi `api.login.<ortam tabanı>` biçimindedir. Bu biçim öteki adların kuralını korur. Eski `id.` adları kalkar. Ürün canlıda olmadığı için yönlendirme gerekmez (O-51).
 3. Kiracı adları karar sitesindeki K-2 biçimini korur. K-2'de kiracılar `<kiracı>.app.<marka>` biçimindedir.
 4. Panel her kiracının kendi adresinde `/panel` yolundadır. Ayrı bir `panel.` adı açılmaz. Nedeni şudur: panel Frappe çerezini ve CSRF belirtecini aynı kökten okur (SZ-7). CSRF belirteci, sahte istekleri engelleyen tek kullanımlık koddur.
 5. Prod temel adı `atonota.net` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
@@ -95,7 +95,7 @@ Her ortamın kendi veritabanı, kendi birimleri ve kendi iç ağı vardır. Orta
 
 Her sunucuda tek bir ön vekil vardır. Ön vekil 80 ve 443 portlarını açar. Öteki hiçbir servis port açmaz.
 
-Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press. Veritabanları bu ağda değildir.
+Ön vekil her ortamın servislerine o ortamın kendi ağından ulaşır. Ağın adı `atonota-edge-<ortam>` olur. Örneğin `atonota-edge-alpha` bir ağdır. Bu ağda yalnız üç servis vardır: kiracı ön yüzü, Keycloak ve Press ön yüzü. Veritabanları bu ağda değildir.
 
 Ortamlar aynı ağı paylaşmaz. Bu yüzden alpha'daki bir konteyner beta'nın Keycloak'ına doğrudan ulaşamaz. `remote/apply` betiği ağı açar. Betik ön vekilin ağ listesini de `networks.yaml` dosyasına yazar.
 
@@ -120,13 +120,14 @@ Kural şudur: kod bir kez derlenir. Her ortam aynı paketi çalıştırır.
 
 ### Arka uç paketi
 
-Arka uç paketinde üç imaj vardır:
+Arka uç paketinde dört imaj vardır:
 
 - `atonota-tenant` imajı kiracı sitesini taşır. İçinde ERPNext, HRMS, `platform_core` ve `hrms_tr` vardır. İmajı `backend/deploy/images/tenant.Dockerfile` dosyası derler.
 - `atonota-keycloak` imajı Keycloak'ı taşır. İmajı `backend/identity/keycloak/Dockerfile` dosyasının `prod` hedefi derler.
 - `atonota-identity-sync` imajı kullanıcı eşitleme servisini taşır. İmajı `backend/identity/identity_sync/Dockerfile` dosyası derler.
+- `atonota-press` imajı Press'i taşır. İçinde Press v0.154.1, `press_tr` ve `oidc_verify` vardır. İmajı `backend/deploy/images/press.Dockerfile` dosyası derler. Ayrıntı [Press imajı belgesindedir](press-imaji.md).
 
-Press imajı henüz yok. Bu bir engeldir (E-2). Press imajı eklenince pakete dördüncü parça olarak girer.
+Press'in sunucu tarafı işleri henüz tam değildir. Kalan iş E-2 satırındadır.
 
 İmajlar GitHub Container Registry'ye yüklenir. Adres `ghcr.io/karacaismail/atonota-<parça>` olur. Depo açık kaynaktır. İmajlarda sır yoktur.
 
@@ -183,9 +184,40 @@ Kararım şudur:
 
 1. Panelin HTML sayfası Frappe'nin `/panel` sayfasıdır. Bu sayfa oturumu denetler. Sayfaya CSRF belirtecini ve güvenlik başlıklarını koyar.
 2. Arayüzün betik ve stil dosyaları `/panel/assets/` yolundan sunulur. Bu dosyaları ön vekil sunucudaki arayüz paketinden verir.
-3. Arayüz `--base=/panel/` ile derlenir.
+3. Arayüz `--base=/panel/ --manifest` ile derlenir. Vite, derleme aracının adıdır. `--manifest` seçeneği `dist/.vite/manifest.json` dosyasını yazar. Bu dosya Vite listesidir. Liste, giriş betiğini ve onun stil dosyalarını adlarıyla verir.
 
-Bugün `/panel` sayfası arayüz dosyalarını yüklemiyor. Bu bir engeldir (E-3).
+Paketin sunucudaki yolları şunlardır:
+
+| Ne | Yol |
+| --- | --- |
+| Paket klasörü | `/srv/atonota/web/<ortam>/releases/<paket kimliği>/` |
+| Şu anki paket | `/srv/atonota/web/<ortam>/current` bağı |
+| Ön vekilin gördüğü yol | `/srv/web/<ortam>/current/assets/` |
+| Kiracı container'ının gördüğü Vite listesi | `/srv/panel/current/.vite/manifest.json` |
+
+Sayfa şöyle çalışır:
+
+1. Kiracı container'ı `ATONOTA_PANEL_MANIFEST` değişkenini taşır. Değişken Vite listesinin yolunu verir. Değer `stack.yaml` dosyasındadır.
+2. Bir site başka bir liste kullanabilir. Bunun için site ayarına `panel_manifest_path` yazılır. Site ayarı değişkenden önce gelir.
+3. `/panel` sayfası listeyi her istekte okur. Sayfa giriş betiğini, stil dosyalarını ve önceden yükleme bağlantılarını listeden yazar. Bütün dosyalar `/panel/assets/` yolundan gelir.
+4. Liste yoksa ya da bozuksa sayfa yer tutucuyu gösterir. Yer tutucu "Panelin dosyaları bu siteye kurulmamış." der. Frappe günlüğüne nedeni de yazılır.
+5. Ön vekil `/panel/assets/` dosyalarını `/srv/web/<ortam>/current/assets/` klasöründen verir. Dosya yoksa ön vekil 404 döner. İstek Frappe'ye gitmez.
+6. `/panel/<yol>` biçimindeki adresler de aynı sayfayı açar. Böylece arayüzün kendi sayfaları doğrudan açılabilir.
+7. Oturumsuz istek giriş sayfasına yönlenir. Giriş sonrası kullanıcı aynı adrese döner.
+
+Geliştirme ortamında ön vekil yoktur. Bu yüzden `/panel/assets/` istekleri de Frappe'ye gider. Frappe bu isteklere dosya yerine panel sayfasının HTML'ini verir. Bu davranış beklenir. Yerelde arayüz dosyalarını Vite'ın kendi sunucusu verir. Canlıda ön vekil bu yolu Frappe'den önce karşılar.
+
+İçerik güvenlik politikası şudur. Bu politika tarayıcıya hangi kaynakların yüklenebileceğini söyler.
+
+- Betik ve stil yalnız sitenin kendi kökeninden gelir.
+- Sayfa her yanıtta yeni bir nonce üretir. Nonce, yalnız o yanıtta geçerli rastgele bir koddur.
+- Arayüz kütüphanesi kendi `style` öğelerini bu nonce ile işaretler. Politika yalnız bu öğelere izin verir.
+- Nonce `<meta property="csp-nonce">` öğesinde durur. Satır içi betik yoktur.
+- Sayfa başka sitede çerçeve içinde açılmaz.
+
+Taşıma betiği paketi kurmadan önce Vite listesini denetler. Kural `/panel` sayfasının kuralıyla aynıdır. Giriş betiği, stil dosyaları ve bütün içe aktarmalar `assets/` klasörünün hemen altında olmalıdır. Bu dosyalar pakette de bulunmalıdır. Kurala uymayan paket kurulmaz ve şu anki paket değişmez. Böylece sayfa taşımadan sonra yer tutucuya düşmez.
+
+Arka uç tarafı hazırdır. Arayüz tarafındaki ayar ayrı bir iştir (E-3).
 
 ## Jenkins hattı
 
@@ -395,9 +427,9 @@ Depoda sır yoktur. Sırlar iki yerde durur:
 Sunucudaki sır dosyaları şunlardır:
 
 - `tenant.env` ve `tenant-db.env` dosyaları kiracı sitesinin ve MariaDB'nin sırlarını tutar.
-- `keycloak.env` ve `keycloak-db.env` dosyaları Keycloak'ın ve PostgreSQL'in sırlarını tutar. Anahtar adları `backend/identity/keycloak/production.env.example` dosyasındadır.
+- `keycloak.env` ve `keycloak-db.env` dosyaları Keycloak'ın ve PostgreSQL'in sırlarını tutar.
 - `identity-sync.env` dosyası eşitleme servisinin sırlarını tutar.
-- `press.env` dosyası Press'in sırlarını tutar. Bu dosya Press imajı gelince gerekir.
+- `press.env` dosyası Press'in sırlarını tutar. Press servisleri bu dosyayı okur.
 - `offsite.env` dosyası sunucu dışı yedeğin `rclone` adresini tutar.
 - `/etc/atonota/edge.env` dosyası sertifika uyarısının gideceği e-posta adresini tutar.
 
@@ -421,6 +453,109 @@ Frappe'nin geri yükleme komutu veritabanı kök parolasını komut satırında 
 
 Her ortamın sırları ayrıdır. alpha'nın parolası prod'da kullanılmaz.
 
+## Üretim ayarları
+
+Bu bölüm E-4 engelinin çözümüdür. Her sır dosyasının bir anahtar listesi vardır.
+
+### Listeler nerede
+
+Listeler `backend/deploy/settings/` klasöründedir. Her listenin adı `<servis>.production.env.example` biçimindedir.
+
+Listede gerçek değer yoktur. Her satırda anahtar adı ve değerin biçimi vardır. Örnek:
+
+```text
+ATONOTA_SITE_TENANT1_SECRET=<kiracı tarayıcı istemcisi sırrı, en az 32 karakter>
+```
+
+`<` ile `>` arasındaki metin yer tutucudur. Yer tutucu, gerçek değerin yerine yazılan açıklamadır.
+
+Bir değerin tamamı `<` ile `>` arasındaysa denetim onu yer tutucu sayar. Örneğin `<noreply@alan-adi.example>` reddedilir. Bu değeri `noreply@alan-adi.example` biçiminde yazın.
+
+| Liste | Sunucudaki yeri | Ne zaman gerekir |
+| --- | --- | --- |
+| `tenant` | `/etc/atonota/<ortam>/tenant.env` | Her arka uç dağıtımında |
+| `tenant-db` | `/etc/atonota/<ortam>/tenant-db.env` | Her arka uç dağıtımında |
+| `tenant-site` | Her kiracı sitesinin `site_config.json` dosyası | Her arka uç dağıtımında |
+| `keycloak` | `/etc/atonota/<ortam>/keycloak.env` | Her arka uç dağıtımında |
+| `keycloak-db` | `/etc/atonota/<ortam>/keycloak-db.env` | Her arka uç dağıtımında |
+| `identity-sync` | `/etc/atonota/<ortam>/identity-sync.env` | Her arka uç dağıtımında |
+| `press` | `/etc/atonota/<ortam>/press.env` | Pakette Press imajı varsa ve `ATONOTA_PRESS_ENABLED=1` ise |
+| `press-site` | Press sitesinin `site_config.json` dosyası | Bugün denetlenmez. Press sitesi açılınca denetime girer (E-2) |
+| `offsite` | `/etc/atonota/<ortam>/offsite.env` | rc ve prod'da her zaman. Öteki ortamlarda dosya varsa |
+| `edge` | `/etc/atonota/edge.env` | Her arka uç dağıtımında |
+
+Keycloak listesinin asıl dosyası `backend/identity/keycloak/production.env.example` dosyasıdır. `settings/` klasöründeki Keycloak listesi bu dosyaya bağdır. Böylece tek liste vardır.
+
+Bir yorum satırı listedeki anahtarın kuralını söyleyebilir:
+
+- `[isteğe bağlı]` etiketli anahtar boş kalabilir.
+- `[sabit]` etiketli anahtarın değeri listedeki değerle aynı olur. Örneğin `ATONOTA_SSL_REQUIRED=all` böyledir.
+- Etiketsiz anahtar zorunludur.
+
+### Sırlar nereye konur
+
+Sırlar yalnız sunucuda durur. Depoya, Jenkins'e ve sohbet kayıtlarına yazılmaz.
+
+DevOps sorumlusu her ortam için şu adımları uygular:
+
+1. Sunucuda `/etc/atonota/<ortam>/` klasörünü açar.
+2. Her liste için listedeki adla bir dosya yazar. Örneğin `keycloak.env` yazar.
+3. Her yer tutucunun yerine gerçek değeri yazar. Değerde `$` işareti varsa değeri tek tırnağa alır. Örnek: `KC_DB_PASSWORD='ab$cd'`. Docker Compose tırnaksız değerdeki `$` işaretini değişken sayar.
+4. Dosyanın iznini `0600` yapar. Dosyanın sahibi `deploy-<ortam>` kullanıcısı olur.
+5. Kiracı sitesinin ayarlarını sitenin içinde yazar. Örnek komut: `bench --site <site> set-config keycloak_client_id site-tenant1`.
+
+Aynı değerin iki yerde durduğu anahtarlar vardır. Örneğin `KC_DB_PASSWORD` ile `POSTGRES_PASSWORD` aynıdır. Listedeki yorum bu eşleri söyler.
+
+### Dağıtım eksik ayarı nasıl yakalar
+
+Jenkins sırları görmez. Bu yüzden denetimi sunucudaki `remote/apply` betiği yapar.
+
+1. Betik önce sır dosyalarını paketteki listelerle karşılaştırır. Bunu `remote/settings.py` yapar.
+2. Bir dosya yoksa ya da bir anahtar eksikse betik durur. Sunucuda hiçbir şey değişmez.
+3. Betik yeni imajları indirir. Eski sürüm bu sırada çalışmaya devam eder.
+4. Betik yeni kiracı imajıyla her sitenin `site_config.json` dosyasını okur. Bunu `remote/site-probe.py` yapar.
+5. Bir site ayarı eksikse ya da `[sabit]` değerden farklıysa betik durur. Eski sürüm durdurulmaz ve çalışmaya devam eder.
+
+Site ayarlarında iki `[sabit]` değer vardır: `developer_mode` ve `mobile_allow_development_http`. İkisi de üretimde yazılmaz ya da 0 olur. Değer 1 olursa bazı yollar HTTP adresi kabul eder.
+
+Site denetimi imajın giriş betiğini çalıştırmaz. Giriş betiği ortak birimdeki `assets` bağını yeniden kurar. Eski sürüm o birimi kullanır.
+
+Betik eksik anahtarın adını ve dosyanın yolunu yazar. Değeri hiçbir zaman yazmaz. Örnek çıktı:
+
+```text
+settings: /etc/atonota/prod/keycloak.env: KC_DB_PASSWORD (missing)
+remote: settings of prod are incomplete; nothing changed; fill the settings, then deploy again
+```
+
+Betik şu durumları da reddeder:
+
+- Değer yer tutucu olarak kalmışsa.
+- `[sabit]` etiketli değer farklıysa.
+- Değerde tırnaksız ya da çift tırnaklı `$` işareti varsa.
+- Ortamın sır dosyasının izni `0600` değilse.
+
+Site denetimi kapsayıcıdan yalnız anahtar adlarını alır. `[sabit]` değerleri kapsayıcının içinde karşılaştırılır. Sitenin değerleri kapsayıcıdan çıkmaz.
+
+Press sitesinin ayarları bugün denetlenmez. Press imajı vardır, ama Press sitesi hiçbir ortamda açılmadı (E-2). Site açılınca `press-site` listesi denetime eklenir.
+
+Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan listeyle denetlenir.
+
+### Listenin eksiksiz kalması
+
+`backend/deploy/tests/test_settings.py` dosyası kodu tarar. Kodda okunan bir ayar listede yoksa test düşer. Tarananlar şunlardır:
+
+- Keycloak realm dosyasındaki `${...}` yer tutucuları,
+- Keycloak eklentilerinin ayarları,
+- identity-sync servisinin `config.py` dosyası,
+- `platform_core`, `hrms_tr` ve `press_tr` uygulamalarının site ayarı okumaları,
+- `stack.yaml`, `edge.yaml` ve sunucu betiklerindeki değişkenler.
+
+Kod ayarları başka bir adla da okuyabilir. Örneğin `from frappe import conf as c` satırı `c` adını verir. `cfg = frappe.get_site_config()` satırı da `cfg` adını verir. Tarama bu adları da izler.
+
+Kod bir ayarı değişken adıyla okuyabilir. Tarama bu adı kaynak koddan çözer. Örneğin modül sabitini, döngüdeki listeyi ve işlevin çağrılarını okur. Tarama bir adı çözemezse test düşer.
+
+Test, sır taşıyan her anahtarın değerinin yer tutucu olduğunu da denetler.
+
 ## Kabul ölçütleri
 
 Jenkins her dağıtımdan sonra `backend/deploy/bin/health` betiğini koşar. Betik ortama dışarıdan, HTTPS ile bakar.
@@ -432,7 +567,7 @@ Arka uç için şu denetimler geçmelidir:
 3. `https://<Keycloak>/admin/` adresi 404 döner.
 4. Her kiracıda `/api/method/ping` adresi `pong` döner.
 5. Her kiracıda oturumsuz `/panel` isteği `/login` sayfasına yönlenir.
-6. Press imajı paketteyse `https://<Press>/api/method/ping` adresi `pong` döner. İmaj yoksa denetim `not_run` yazar.
+6. Pakette Press imajı varsa ve `ATONOTA_PRESS_ENABLED=1` ise `https://<Press>/api/method/ping` adresi `pong` döner. Öteki durumda denetim `not_run` yazar.
 7. Sertifika geçerlidir. `curl` geçersiz sertifikada hata verir.
 
 Arayüz için şu denetim geçmelidir:
@@ -465,10 +600,10 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 
 | No | Engel | Önerilen çözüm | Sahibi |
 | --- | --- | --- | --- |
-| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
-| E-2 | Press'in üretim imajı yok. Press bugün açılışta kurulur. Python 3.14 yaması da açık (O-18) | press-tr işi `backend/deploy/images/press.Dockerfile` dosyasını yazar. Dosya gelince `build-release` Press'i pakete ekler | press-tr işi |
-| E-3 | `/panel` sayfası arayüz dosyalarını yüklemiyor. Sayfa yer tutucu metin gösteriyor | `panel.html`, arayüz paketinin Vite listesini okur. Sonra `/panel/assets/` dosyalarını yükler. İçerik güvenlik politikası bu yola izin verir | platform-core-kabuk işi |
-| E-4 | Üretim ayarlarının listesi yok. Örneğin Keycloak istemci sırları, sitenin kimlik ayarları ve eşitleme servisinin kiracı listesi | Her servis için üretim anahtar listesi yazılır. Liste `production.env.example` biçiminde olur | kimlik-realm işi ve DevOps sorumlusu |
+| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. 23 Kasım 2026 Pazartesi günü üretim imajında ansible-core 2.21.6 yerel bir oyunu çalıştırdı. Gerçek sunucu kurma denenmedi | MVP'de Press sunucu kurmaz. Kiracı sitesini DevOps sorumlusu ilk kurulumda elle açar. Kurma akışı hazırlık sunucusunda ayrıca sınanır | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi ([Press imajı belgesi](press-imaji.md)). Press yalnız `ATONOTA_PRESS_ENABLED=1` olan ortamda açılır. Anahtar bütün ortamlarda bugün 0'dır. Kalan iş şudur: `remote/backup`, `remote/restore` ve `remote/apply` Press sitesini yedeklemez, geri yüklemez ve Press sitesinde `migrate` çalıştırmaz. `remote/site-probe.py` Press sitesinin ayarlarını denetlemez. Press'in migrate adımı Press'in kendi denetimi için internetten chromedriver indirmeye çalışır. İmaj sunucuda ve amd64'te denenmedi | press-tr işi betiklere Press sitesini ekler. Ekleme bitmeden `release.py` rc ve prod'da anahtarı reddeder. DevOps sorumlusu Press sitesini alpha'da elle açar | press-tr işi ve DevOps sorumlusu |
+| E-3 | Arka uç tarafı hazır. `/panel` sayfası Vite listesini okur ve `/panel/assets/` dosyalarını yükler. Arayüz henüz bu adrese göre ayarlanmadı | atonota-web işi altı ayar yapar. (1) Yönlendiricinin kök yolu `/panel` olur. (2) Ant Design `ConfigProvider` nonce'u `csp-nonce` öğesinin `.nonce` özelliğinden alır. (3) Küçük dosyalar `data:` adresine çevrilmez. Gerekirse `build.assetsInlineLimit: 0` verilir. (4) Kök öğenin kimliği `root` olur. (5) `public/` klasörü kullanılmaz. Ön vekil `/panel/<ad>` adresini sunmaz. (6) Yerel derleme de `--base=/panel/ --manifest` kullanır. Jenkins bu seçenekleri zaten verir. Ayrıca atonota-web işi tarayıcıda politika ihlali olup olmadığını denetler. Örneğin `setAttribute('style', ...)` ile yazılan stil engellenir | atonota-web işi |
+| E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-7 | Zamanlanmış iş yasağı var. Bu yüzden Frappe zamanlayıcısı kapalıdır. Düzenli yedek de yoktur | Proje sahibi karar verir. Zamanlayıcı `COMPOSE_PROFILES=scheduler` ile açılır | Proje sahibi |
@@ -480,6 +615,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-13 | Arayüz ve arka uç ayrı taşınır. Bir ortamda uyumsuz ikili oluşabilir | Bir ortamda önce arka uç taşınır. Arayüz arka ucun sözleşmesini aşmaz | Orkestratör |
 | E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | prod'a gerçek veri girmeden önce hukuk onayı alınır | Hukuk ve ürün sahibi |
 | E-15 | Üretim imajları Mac'te arm64 ile denendi. Hetzner sunucuları amd64 olabilir | Derleme ajanı sunucularla aynı mimaride olur | DevOps sorumlusu |
+| E-16 | identity-sync üretimde yalnız iç ağda HTTP ile açılır. Üç bağlantı ise HTTPS ister. Bunlar Keycloak olayları, telefonun oturum kapatma isteği ve Press'in silme isteğidir. Bu yüzden `KC_SPI_EVENTS_LISTENER__WEBHOOK__URL`, `mobile_identity_sync_url` ve `identity_sync_url` için geçerli değer yok | identity-sync için iç ağda TLS tasarlanır. Başka bir yol da ön vekilde yalnız iç ağa açık bir addır | identity-sync işi ve DevOps sorumlusu |
 
 ## Neler sınandı
 
@@ -491,6 +627,9 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 - Sunucuya giden her dosyanın paketten geldiği sınanır. Değişmiş, eksik ya da başka commit'ten gelen dağıtım dosyası iş bağlanmadan reddedilir.
 - Üretim kiracı imajı yerelde derlendi. İçinde `panel.bundle.css` ve `panel-focus.bundle.js` dosyaları var.
 - Jenkins dosyaları Jenkins'in kendi denetleyicisinden geçti.
+- `backend/deploy/tests/test_settings.py` dosyası listelerin eksiksiz olduğunu ve sunucu denetimini sınar.
+- Sunucu betiği testleri eksik sır dosyasını, eksik anahtarı ve eksik site ayarını sınar. Eksik sırda hiçbir `docker` komutu çalışmaz. Eksik site ayarında eski sürüm durmaz.
+- `/panel` sayfası yerel Frappe web sürecinde denendi. Sayfa Vite listesindeki dosyaları yükledi. Liste yokken yer tutucu göründü.
 
 Şunlar sınanmadı:
 

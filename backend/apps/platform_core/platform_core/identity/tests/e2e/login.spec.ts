@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const START = "/api/method/platform_core.api.auth.start_login";
-const LABEL = "Atonota ile oturum aç";
+const LABEL = "AtonotA Login ile oturum aç";
 
 // Safari and WebKit move focus to links only with Option+Tab by default. Chromium uses Tab.
 function tabKey(browserName: string) {

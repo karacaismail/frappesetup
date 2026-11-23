@@ -245,6 +245,9 @@ doc_events = {
 
 after_request = ["platform_core.shell.headers.add_security_headers"]
 
+# Panel client routes (platform-core-kabuk): every /panel/<path> renders the /panel page.
+website_route_rules = [{"from_route": "/panel/<path:app_path>", "to_route": "panel"}]
+
 after_build = ["platform_core.shell.assets.remove_panel_source_maps"]
 
 # Access rule engine (erisim-kurali task). Decision note: docs/decisions/0006-access-rule.md

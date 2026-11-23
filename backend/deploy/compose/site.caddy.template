@@ -14,9 +14,10 @@ __ID_HOST__ {
 	reverse_proxy __ENV__-keycloak:8080
 }
 
+# Press desk and dashboard. press-frontend serves the built assets and forwards to gunicorn.
 __PRESS_HOST__ {
 	import security_headers
-	reverse_proxy __ENV__-press:8000
+	reverse_proxy __ENV__-press:8080
 }
 
 # Tenant sites. The panel HTML is Frappe's /panel page (session check, CSRF meta, CSP).

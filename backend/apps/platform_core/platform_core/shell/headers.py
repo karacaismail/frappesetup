@@ -13,6 +13,14 @@ SECURITY_HEADERS = {
 }
 
 
+def panel_csp(nonce: str) -> str:
+	"""The /panel policy with the web bundle: the UI library creates nonce-marked style elements."""
+	return (
+		f"default-src 'self'; script-src 'self'; style-src 'self' 'nonce-{nonce}'; "
+		f"frame-ancestors 'none'; {CSP_RESTRICTIONS}"
+	)
+
+
 def add_security_headers(response: Response | None, request: Request | None = None) -> None:
 	if response is None:
 		return

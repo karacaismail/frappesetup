@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
@@ -16,11 +17,100 @@ const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
   .map((f) => ({ slug: f.replace(/\.md$/, ''), text: readFileSync(new URL(f, docsDir), 'utf8') }));
 const ids = new Set(reqs.map((r) => r.id));
+type TaskItem = { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[] } };
+type TaskBoard = {
+  audit: { date: string; commit: string; note: string; addedAfter: string[] };
+  epics: { id: string; title: string; goal: string }[];
+  statuses: { id: string; label: string; rule: string }[];
+  levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
+  items: Record<string, TaskItem>;
+};
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
 
 test.describe('content consistency', () => {
   test.beforeEach(({ browserName }) => {
     test.skip(browserName !== 'chromium', 'Dosya düzeyi denetim; tek motorda koşar.');
+  });
+
+  test('task board covers every requirement with a valid epic, status and level', () => {
+    // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
+    expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const itemIds = Object.keys(board.items);
+    expect(itemIds.filter((id) => !ids.has(id)), 'gereksinimde olmayan kimlik').toEqual([]);
+    expect(reqs.map((r) => r.id).filter((id) => !(id in board.items)), 'kaydı olmayan gereksinim').toEqual([]);
+    const epicIds = board.epics.map((e) => e.id);
+    expect(new Set(epicIds).size, 'epic kimliği tekil').toBe(epicIds.length);
+    expect(board.statuses.map((s) => s.id)).toEqual(['done', 'in-progress', 'not-started', 'unverified']);
+    expect(board.levels.map((l) => l.id)).toEqual(['poc', 'mvp', 'post-mvp', 'scale', 'enterprise']);
+    for (const e of board.epics) {
+      expect(e.title.trim(), e.id).not.toBe('');
+      expect(e.goal.trim(), `${e.id} amacı`).not.toBe('');
+      expect(itemIds.some((id) => board.items[id].epic === e.id), `${e.id} boş epic`).toBe(true);
+    }
+    for (const l of [...board.levels, ...board.statuses]) expect(l.rule.trim(), `${l.id} kuralı`).not.toBe('');
+    for (const [id, it] of Object.entries(board.items)) {
+      expect(epicIds, `${id} epic`).toContain(it.epic);
+      expect(board.statuses.map((s) => s.id), `${id} durum`).toContain(it.status);
+      expect(board.levels.map((l) => l.id), `${id} düzey`).toContain(it.level);
+      const allowed = ['epic', 'status', 'level', ...(it.status === 'done' ? ['evidence'] : [])];
+      expect(Object.keys(it).filter((k) => !allowed.includes(k)), `${id} fazla alan`).toEqual([]);
+    }
+  });
+
+  test('task board levels follow the written mapping rules', () => {
+    // Düzey elle seçilmez: sayfadaki kural (faz eşlemesi + adı yazılı istisna listesi) her kalemi tek düzeye bağlar.
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const byId = new Map<string, string>();
+    const byPhase = new Map<string, string>();
+    for (const l of board.levels) {
+      for (const id of l.ids ?? []) {
+        expect(byId.has(id), `${id} iki istisna listesinde`).toBe(false);
+        expect(ids.has(id), `${l.id} istisnasında bilinmeyen ${id}`).toBe(true);
+        byId.set(id, l.id);
+      }
+      for (const p of l.phases ?? []) {
+        expect(byPhase.has(p), `${p} iki düzeyde`).toBe(false);
+        byPhase.set(p, l.id);
+      }
+    }
+    expect([...byPhase.keys()].sort(), 'her faz bir düzeye bağlı').toEqual(phases.map((p) => p.id).sort());
+    const wrong = reqs
+      .map((r) => ({ id: r.id, want: byId.get(r.id) ?? byPhase.get(r.phase), got: board.items[r.id].level }))
+      .filter((x) => x.want !== x.got)
+      .map((x) => `${x.id}: ${x.got} (kural ${x.want})`);
+    expect(wrong).toEqual([]);
+    // MVP kapsam kararı: P2 ödeme katmanı ve P4 kendi kendine deneme ve etkinleştirme MVP dışındadır.
+    for (const r of reqs.filter((x) => x.phase === 'P2')) expect(board.items[r.id].level, r.id).not.toBe('mvp');
+    for (const id of ['G-31', 'G-95']) expect(board.items[id].level, id).toBe('post-mvp');
+  });
+
+  test('every done task carries evidence that exists in the repository', () => {
+    // "Bitti" yalnız kanıtla yazılır: denetim commit'i depoda olmalı, test dosyası yolu gerçek olmalı.
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const done = Object.entries(board.items).filter(([, it]) => it.status === 'done');
+    expect(done.length, 'en az bir bitti kaydı').toBeGreaterThan(0);
+    for (const [id, it] of done) {
+      expect(it.evidence, `${id} kanıt`).toBeTruthy();
+      const ev = it.evidence!;
+      expect(ev.commit, `${id} commit`).toMatch(/^[0-9a-f]{7,40}$/);
+      expect(ev.tests.length, `${id} test listesi boş`).toBeGreaterThan(0);
+      for (const t of ev.tests) expect(existsSync(new URL(t, root)), `${id} test dosyası ${t}`).toBe(true);
+    }
+    const commits = new Set(done.map(([, it]) => it.evidence!.commit));
+    for (const c of commits) {
+      expect(() => execFileSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: fileURLToPath(root), stdio: 'ignore' }), `commit ${c}`).not.toThrow();
+    }
+    // Denetlenmemiş kalem bitti ya da sürüyor sayılmaz: denetim yalnız P0..P4 MUST kalemlerini okudu.
+    // Denetimden sonra eklenen kalemler (audit.addedAfter) ayrıca adlandırılır; bunlar da denetim dışıdır.
+    const addedAfter = new Set(board.audit.addedAfter);
+    expect([...addedAfter].filter((id) => !ids.has(id)), 'addedAfter bilinmeyen kimlik').toEqual([]);
+    expect(addedAfter.size, 'addedAfter tekrarsız').toBe(board.audit.addedAfter.length);
+    expect(board.statuses.find((s) => s.id === 'unverified')!.rule).toContain('denetimden sonra eklen');
+    const audited = (r: Req) =>
+      !addedAfter.has(r.id) && r.priority === 'MUST' && ['P0', 'P1', 'P2', 'P3', 'P4'].includes(r.phase);
+    const claimed = reqs.filter((r) => !audited(r) && board.items[r.id].status !== 'unverified').map((r) => r.id);
+    expect(claimed, 'denetim dışı kalemde durum iddiası').toEqual([]);
   });
 
   test('requirement ids are unique, contiguous and well formed', () => {
@@ -126,6 +216,7 @@ test.describe('content consistency', () => {
       P4: ['P1'],
       P6: ['P2'],
       P5: ['P2', 'P4'],
+      P7: ['P1', 'P2'],
     });
     expect(ph.P2.entryGate).toMatch(/Keycloak/);
     expect(ph.P2.entryGate).toMatch(/G-12.*G-16.*G-79.*G-81/);
@@ -135,6 +226,58 @@ test.describe('content consistency', () => {
     for (const p of phases) for (const pre of p.after) expect(diagram).toContain(`data-edge='${pre}-${p.id}'`);
     expect(diagram).toContain('Keycloak adımı');
     expect(diagram).toContain('Yol haritası faz sırası');
+  });
+
+  test('phase diagram arrows read exactly as the after lists in phases.json', () => {
+    // Okur, birbirine değen çizgileri tek bir bağlantı gibi okur. Bu yüzden değen oklar bir grup oluşturur.
+    // Bir grupta her çıkış fazı her hedef faza bağlı görünür. Grubun okunan bağımlılıkları veriyle birebir aynı olmalı.
+    // Aynı fazdan çıkan oklar (P0 → P1, P2) ve aynı faza giren oklar bu yüzden çizgi paylaşabilir.
+    // Uçları değmeyen dik kesişme bağlantı sayılmaz. Çizimde kesişme noktası zemin renginde bir boşlukla ayrılır.
+    const svg = read('src/components/Timeline.astro');
+    type Pt = [number, number];
+    const boxes = [...svg.matchAll(/<rect x='(\d+)' y='(\d+)' width='(\d+)' height='(\d+)'[^>]*\/>\s*<text[^>]*>(P\d)</g)].map((m) => ({
+      id: m[5],
+      x: +m[1],
+      y: +m[2],
+      w: +m[3],
+      h: +m[4],
+    }));
+    expect(boxes.map((b) => b.id).sort()).toEqual(phases.map((p) => p.id).sort());
+    const edges = [...svg.matchAll(/<path data-edge='([^']+)' d='([^']+)'/g)].map((m) => {
+      const pts: Pt[] = [...m[2].matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)].map((c) => [+c[1], +c[2]]);
+      expect(m[2].replace(/[ML]\s*-?[\d.]+\s+-?[\d.]+/g, '').trim(), `${m[1]} yalnız M/L komutu kullanır`).toBe('');
+      return { label: m[1], pts };
+    });
+    const onBoundary = ([x, y]: Pt, b: (typeof boxes)[number]) =>
+      x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h && (x === b.x || x === b.x + b.w || y === b.y || y === b.y + b.h);
+    const boxAt = (p: Pt) => boxes.filter((b) => onBoundary(p, b)).map((b) => b.id);
+    const ends = edges.map((e) => {
+      const from = boxAt(e.pts[0]);
+      const to = boxAt(e.pts[e.pts.length - 1]);
+      expect(from, `${e.label} tek bir fazdan çıkar`).toHaveLength(1);
+      expect(to, `${e.label} tek bir faza girer`).toHaveLength(1);
+      const expected = e.label.replace(/-gate$/, '');
+      expect(`${from[0]}-${to[0]}`, `${e.label} çizilen uçlar`).toBe(expected);
+      return { ...e, from: from[0], to: to[0] };
+    });
+    const deps = ends.filter((e) => !e.label.endsWith('-gate')).map((e) => e.label).sort();
+    expect(deps, 'oklar phases.json after listesiyle birebir').toEqual(phases.flatMap((p) => p.after.map((a) => `${a}-${p.id}`)).sort());
+    const onSeg = ([x, y]: Pt, [a, b]: [Pt, Pt]) =>
+      (a[0] === b[0] && x === a[0] && y >= Math.min(a[1], b[1]) && y <= Math.max(a[1], b[1])) ||
+      (a[1] === b[1] && y === a[1] && x >= Math.min(a[0], b[0]) && x <= Math.max(a[0], b[0]));
+    const segs = (pts: Pt[]) => pts.slice(1).map((p, i) => [pts[i], p] as [Pt, Pt]);
+    for (const e of ends) for (const [a, b] of segs(e.pts)) expect(a[0] === b[0] || a[1] === b[1], `${e.label} dik parçalı`).toBe(true);
+    const touch = (a: Pt[], b: Pt[]) => a.some((p) => segs(b).some((s) => onSeg(p, s))) || b.some((p) => segs(a).some((s) => onSeg(p, s)));
+    const parent = ends.map((_, i) => i);
+    const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+    for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) if (touch(ends[i].pts, ends[j].pts)) parent[find(i)] = find(j);
+    const groups = new Map<number, typeof ends>();
+    for (const [i, e] of ends.entries()) groups.set(find(i), [...(groups.get(find(i)) ?? []), e]);
+    for (const g of groups.values()) {
+      const drawn = g.map((e) => `${e.from}-${e.to}`).sort();
+      const seen = [...new Set(g.map((e) => e.from))].flatMap((f) => [...new Set(g.map((e) => e.to))].map((t) => `${f}-${t}`)).sort();
+      expect(seen, `değen oklar (${g.map((e) => e.label).join(', ')}) yalnız çizilen bağımlılıkları göstermeli`).toEqual(drawn);
+    }
   });
 
   test('phases and tasks carry no duration, week, story point or effort estimate', () => {

@@ -454,8 +454,8 @@
     "/panel": {
       "get": {
         "operationId": "getPanel",
-        "summary": "Open the authenticated placeholder shell",
-        "description": "Serves no frontend application yet. Injects the session-bound CSRF token in an escaped HTML meta element. Server and shared caching are disabled. The token must be sent as X-Frappe-CSRF-Token for writes.",
+        "summary": "Open the authenticated panel shell",
+        "description": "Serves the HTML shell of the web panel. The page reads the web bundle's Vite manifest from the path in the site config key panel_manifest_path or the environment variable ATONOTA_PANEL_MANIFEST. It then loads the entry script, its stylesheets and its static imports from /panel/assets/ (modulepreload). If the manifest is missing or invalid, the page shows a placeholder that says the panel files are not installed. Injects the session-bound CSRF token in an escaped HTML meta element named csrf-token. With the bundle, the page also carries a per-response CSP nonce in <meta property=\"csp-nonce\" nonce=\"...\">; the panel uses it for the style elements it creates. Server and shared caching are disabled. The token must be sent as X-Frappe-CSRF-Token for writes. Client routes under /panel/{app_path} return the same page.",
         "responses": {
           "200": {
             "description": "Authenticated shell. Cache-Control is private, no-store.",
@@ -474,7 +474,7 @@
                 }
               },
               "Content-Security-Policy": {
-                "description": "Restricts sources to this origin and prevents framing.",
+                "description": "Restricts sources to this origin and prevents framing. With the bundle, style-src also allows the per-response nonce: default-src 'self'; script-src 'self'; style-src 'self' 'nonce-<nonce>'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'.",
                 "schema": {
                   "type": "string"
                 }
@@ -488,7 +488,7 @@
             }
           },
           "302": {
-            "description": "Guest redirect to /login?redirect-to=/panel. No CSRF token is returned.",
+            "description": "Guest redirect to /login?redirect-to=<requested panel path>, for example /login?redirect-to=/panel. No CSRF token is returned.",
             "headers": {
               "Location": {
                 "description": "Same-origin login route.",
