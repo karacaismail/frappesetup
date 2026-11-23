@@ -311,6 +311,12 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		h.refresh()
 		self.assertFalse(frappe.db.exists("User", "yeni.kisi@example.test"))
 
+	def test_tenant_account_missing_page_has_no_standalone_address(self):
+		# The callback renders the page itself (test above). A direct request gets Frappe's 404 page (K-1).
+		response = h.request(self.client.get, "/tenant_account_missing")
+		self.assertEqual(response.status_code, 404, response.data[:300])
+		self.assertNotIn("Başka hesapla oturum aç", response.data.decode())
+
 	def test_disabled_user_cannot_sign_in(self):
 		h.make_link("sub-mehmet", h.MEHMET)
 		frappe.db.set_value("User", h.MEHMET, "enabled", 0)

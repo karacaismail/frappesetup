@@ -493,6 +493,19 @@ def configure_press(compose, environment):
 
 VITE_ORIGIN = "http://localhost:5180"
 TENANT_CALLBACK = "/api/method/platform_core.api.auth.keycloak_callback"
+TENANT_LOGIN_SETTINGS = ("ATONOTA_SITE_TENANT1_URL", "ATONOTA_SITE_TENANT1_SECRET")
+
+
+def require_tenant_login_settings(environment):
+    """Name missing tenant sign-in settings without printing any value (review item K-3)."""
+    missing = [key for key in TENANT_LOGIN_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Tenant sign-in needs these settings: "
+            + ", ".join(missing)
+            + ". setup() derives the tenant URL from PANE_PORT. Copy the missing secret from"
+            " backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
 
 
 def tenant_browser_origin(environment):
@@ -648,8 +661,7 @@ def up(engine, compose, environment):
     require_press_settings(environment)
     require_tenant_settings(environment)
     require_realm_sync_settings(environment)
-    if not environment.get("ATONOTA_SITE_TENANT1_SECRET"):
-        raise ValueError("Tenant sign-in requires ATONOTA_SITE_TENANT1_SECRET in E2E_ENV_FILE.")
+    require_tenant_login_settings(environment)
     check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
@@ -947,6 +959,8 @@ def main():
         elif args.action == "up":
             # Check local settings before the ownership probe or any other Docker call.
             require_press_settings(environment)
+            require_realm_sync_settings(environment)
+            require_tenant_login_settings(environment)
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)
         elif args.action == "down":
