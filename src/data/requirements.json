@@ -752,7 +752,7 @@
  {
   "id": "G-76",
   "title": "Keycloak kurulumu: HA, PostgreSQL, yedek ve olay günlüğü",
-  "detail": "Keycloak 26.x (sürüm: olası, kurulumda doğrulanır) Hetzner'de en az iki düğüm + PostgreSQL (streaming replika), Press proxy veya ayrı nginx arkasında `https://api.login.atonota.net` (AtonotA Login; alpha, beta ve rc için `api.login.<ortam>.atonota.net`), Infinispan küme, günlük şifreli DB yedeği ikinci lokasyona, admin konsolu ve Admin REST API yalnızca Tailscale/özel ağdan, public host'ta reverse proxy düzeyinde kapalı (ayrı `hostname-admin` tek başına yetmez; G-144); kullanıcı ve admin olayları (login, logout, login_error, update_email, admin events) etkin ve Log Server'a aktarılır, saklama KVKK/5651 ile hizalı.",
+  "detail": "Keycloak 26.x (sürüm: olası, kurulumda doğrulanır) Hetzner'de en az iki düğüm + PostgreSQL (streaming replika), Press proxy veya ayrı nginx arkasında HTTPS ile `api.login.atonota.net` (AtonotA Login; alpha, beta ve rc için ortam adı `api.login.` ile `atonota.net` arasına girer, G-158), Infinispan küme, günlük şifreli DB yedeği ikinci lokasyona, admin konsolu ve Admin REST API yalnızca Tailscale/özel ağdan, public host'ta reverse proxy düzeyinde kapalı (ayrı `hostname-admin` tek başına yetmez; G-144); kullanıcı ve admin olayları (login, logout, login_error, update_email, admin events) etkin ve Log Server'a aktarılır, saklama KVKK/5651 ile hizalı.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P0",
