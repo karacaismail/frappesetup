@@ -281,3 +281,24 @@ doc_events = {"User": {"on_update": "press_tr.press_identity.accounts.revoke_dis
 extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
 
 ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session"]
+
+fixtures = [
+	{
+		"dt": "Site Config Key",
+		"filters": [
+			[
+				"key",
+				"in",
+				[
+					"backup_encryption_key",
+					"encryption_key",
+					"host_name",
+					"keycloak_client_secret",
+					"mail_password",
+					"plan_limit",
+					"server_script_enabled",
+				],
+			],
+		],
+	},
+]

@@ -1,0 +1,51 @@
+[
+  {
+    "doctype": "Site Config Key",
+    "name": "backup_encryption_key",
+    "key": "backup_encryption_key",
+    "type": "Password",
+    "internal": 0
+  },
+  {
+    "doctype": "Site Config Key",
+    "name": "encryption_key",
+    "key": "encryption_key",
+    "type": "Password",
+    "internal": 0
+  },
+  {
+    "doctype": "Site Config Key",
+    "name": "host_name",
+    "key": "host_name",
+    "type": "String",
+    "internal": 1
+  },
+  {
+    "doctype": "Site Config Key",
+    "name": "keycloak_client_secret",
+    "key": "keycloak_client_secret",
+    "type": "Password",
+    "internal": 0
+  },
+  {
+    "doctype": "Site Config Key",
+    "name": "mail_password",
+    "key": "mail_password",
+    "type": "Password",
+    "internal": 0
+  },
+  {
+    "doctype": "Site Config Key",
+    "name": "plan_limit",
+    "key": "plan_limit",
+    "type": "Number",
+    "internal": 1
+  },
+  {
+    "doctype": "Site Config Key",
+    "name": "server_script_enabled",
+    "key": "server_script_enabled",
+    "type": "Boolean",
+    "internal": 1
+  }
+]
