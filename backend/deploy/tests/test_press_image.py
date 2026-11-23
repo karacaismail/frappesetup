@@ -329,11 +329,36 @@ class StackServesPress(unittest.TestCase):
                 self.assertNotIn("internal", networks[name])
                 self.assertIn("press-internal", networks[name])
         self.assertEqual(networks["press-frontend"], {"press-internal", "edge"})
+        self.assertEqual(networks["press-web"], {"press-internal", "press-identity"})
         self.assertEqual(networks["tenant-db"], {"internal", "press-internal"})
         for name in set(networks) - press - {"tenant-db"}:
             with self.subTest(service=name):
                 self.assertNotIn("press-internal", networks[name])
                 self.assertTrue(networks[name])
+
+    def test_press_reaches_identity_sync_only_on_a_closed_network(self):
+        # Review 2, finding 1: Press left the network "internal", so the only way left to reach
+        # identity-sync was a public address. The deletion and session revocation endpoints must
+        # not reach the edge. press-web and identity-sync share a network without a gateway.
+        text = self.stack()
+        networks = service_networks(text)
+        top = text.split("\nnetworks:\n")[-1]
+        self.assertRegex(top, r"(?m)^  press-identity: \{internal: true\}$")
+        members = {name for name, nets in networks.items() if "press-identity" in nets}
+        self.assertEqual(members, {"press-web", "identity-sync"})
+        self.assertEqual(networks["identity-sync"], {"internal", "press-identity"})
+        self.assertNotIn("press-internal", networks["identity-sync"])
+        edge = {name for name, nets in networks.items() if "edge" in nets}
+        self.assertEqual(edge, {"tenant-frontend", "keycloak", "press-frontend"})
+        for name in ("site.caddy.template", "Caddyfile", "edge.yaml"):
+            with self.subTest(edge_file=name):
+                edge_text = (DEPLOY / "compose" / name).read_text()
+                self.assertNotIn("identity-sync", edge_text)
+                self.assertNotIn("6115", edge_text)
+                self.assertNotIn("/v1/", edge_text)
+        self.assertNotIn("identity-sync by their public HTTPS addresses", text)
+        settings = (DEPLOY / "settings" / "press-site.production.env.example").read_text()
+        self.assertRegex(settings, r"(?m)^identity_sync_url=http://identity-sync:6115$")
 
     def test_edge_sends_the_press_host_to_the_press_frontend(self):
         template = (DEPLOY / "compose" / "site.caddy.template").read_text()

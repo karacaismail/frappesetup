@@ -8,6 +8,7 @@ import http.client
 import io
 import json
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -28,6 +29,8 @@ SECURITY = Path("backend/dev/security")
 FIXTURES = SECURITY / "fixtures"
 CONTRACT_FIXTURE = SECURITY / "contract-fixtures" / "contract.yaml"
 OSV_CONFIG = SECURITY / "osv-exceptions.toml"
+# Exceptions that hold only for the Press image lock (review 2, small finding 2).
+PRESS_OSV_CONFIG = SECURITY / "osv-exceptions-press.toml"
 # The Press production image installs this lock (backend/deploy/images/press.Dockerfile).
 PRESS_LOCK = Path("backend/deploy/images/press-requirements.lock.txt")
 # backend/dev/security/osv-setup puts the pinned scanner and the open vulnerability database here.
@@ -286,13 +289,30 @@ def osv_lockfile(lock):
     return f"requirements.txt:{lock}" if Path(lock).name.endswith(".lock.txt") else str(lock)
 
 
+OSV_PLATFORMS = {"Darwin-arm64": "DARWIN_ARM64", "Linux-x86_64": "LINUX_AMD64", "Linux-aarch64": "LINUX_ARM64"}
+
+
+def osv_pinned_sum():
+    """SHA-256 of the pinned OSV-Scanner for this machine (tool-versions.env), or None."""
+    name = OSV_PLATFORMS.get(f"{platform.system()}-{platform.machine()}")
+    return VERSIONS.get(f"OSV_SHA256_{name}") if name else None
+
+
 def osv_scanner():
-    """The scanner on PATH, else the copy that osv-setup downloaded, else None."""
-    found = shutil.which("osv-scanner")
-    if found:
-        return found
-    local = OSV_HOME / "bin" / "osv-scanner"
-    return str(local) if local.is_file() and os.access(local, os.X_OK) else None
+    """The scanner on PATH, else the copy that osv-setup downloaded, else None.
+
+    Both must match the checksum that osv-setup checks (review 2, small finding 1).
+    """
+    pinned = osv_pinned_sum()
+    if not pinned:
+        return None
+    for candidate in (shutil.which("osv-scanner"), OSV_HOME / "bin" / "osv-scanner"):
+        if not candidate:
+            continue
+        path = Path(candidate)
+        if path.is_file() and os.access(path, os.X_OK) and hashlib.sha256(path.read_bytes()).hexdigest() == pinned:
+            return str(path)
+    return None
 
 
 def osv_version(scanner):
@@ -365,12 +385,13 @@ def validate_osv_inputs(locks):
     import tomllib
 
     today = datetime.now(timezone.utc).date()
-    config = tomllib.loads((ROOT / OSV_CONFIG).read_text())
-    if set(config) - {"IgnoredVulns"}:
-        raise ValueError("OSV may only ignore individual vulnerability IDs.")
-    for item in config.get("IgnoredVulns", []):
-        if not osv_exception_valid(item, today):
-            raise ValueError("OSV exceptions require id, an owner and a reason, and matching expiry dates.")
+    for path in (OSV_CONFIG, PRESS_OSV_CONFIG):
+        config = tomllib.loads((ROOT / path).read_text())
+        if set(config) - {"IgnoredVulns"}:
+            raise ValueError("OSV may only ignore individual vulnerability IDs.")
+        for item in config.get("IgnoredVulns", []):
+            if not osv_exception_valid(item, today):
+                raise ValueError("OSV exceptions require id, an owner and a reason, and matching expiry dates.")
     cache = Path(os.environ["OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY"]) / "osv-scalibr"
     ecosystems = {"PyPI"}
     if any(Path(path).name in {"package-lock.json", "pnpm-lock.yaml", "yarn.lock"} for path in locks):
@@ -414,10 +435,10 @@ def scan_press_lock():
     """
     scanner = osv_scanner()
     command = [scanner or "osv-scanner", "scan", "source", "--offline", "--format", "json",
-               "--config", str(OSV_CONFIG), "--lockfile", osv_lockfile(PRESS_LOCK)]
+               "--config", str(PRESS_OSV_CONFIG), "--lockfile", osv_lockfile(PRESS_LOCK)]
     result = Result("OSV-Scanner (Press lock)", OSV, shlex.join(command), "fail")
     if scanner is None:
-        print("OSV-Scanner is missing. Run backend/dev/security/osv-setup (needs the network).")
+        print("The pinned OSV-Scanner is missing. Run backend/dev/security/osv-setup (needs the network).")
         return result
     try:
         osv_database()
@@ -448,7 +469,7 @@ def scan_dependencies(requirements=None, *, reproduce=False):
     result = Result("OSV-Scanner", OSV, shlex.join(command) + " LOCKFILES", "fail")
     try:
         if scanner is None:
-            print("OSV-Scanner is not available on PATH.")
+            print("The pinned OSV-Scanner is not available. Run backend/dev/security/osv-setup.")
             return replace(result, status="not_run")
         osv_database()
         output = osv_version(scanner)
@@ -461,13 +482,22 @@ def scan_dependencies(requirements=None, *, reproduce=False):
             raise ValueError(f"OSV-Scanner {OSV} is required.")
         validate_osv_inputs(locks)
         osv_fixture_check(scanner)
-        actual = [*command, *(arg for lock in locks for arg in ("--lockfile", osv_lockfile(lock)))]
-        code, report = run_json(actual)
-        if code not in (0, 1):
-            raise ValueError(f"OSV exited with code {code}.")
-        findings = osv_report_findings(report)
-        if code == 1 and not findings:
-            raise ValueError("OSV returned no findings for a failed scan.")
+        # The Press lock has its own exceptions, so it is scanned with its own config.
+        groups = ((OSV_CONFIG, [lock for lock in locks if lock != str(PRESS_LOCK)]),
+                  (PRESS_OSV_CONFIG, [lock for lock in locks if lock == str(PRESS_LOCK)]))
+        findings = set()
+        for config, group in groups:
+            if not group:
+                continue
+            actual = [*command[:command.index("--config")], "--config", str(config),
+                      *(arg for lock in group for arg in ("--lockfile", osv_lockfile(lock)))]
+            code, report = run_json(actual)
+            if code not in (0, 1):
+                raise ValueError(f"OSV exited with code {code}.")
+            group_findings = osv_report_findings(report)
+            if code == 1 and not group_findings:
+                raise ValueError("OSV returned no findings for a failed scan.")
+            findings |= group_findings
         unchecked = []
         for lock in locks:
             path = Path(lock)

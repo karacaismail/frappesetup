@@ -3,8 +3,18 @@
 # This is the only step that needs the network. The security gate (backend/dev/bin/security-audit,
 # "scans.py press-lock") and security-full then scan without it. The database must be at most
 # seven days old, so run this again at least once a week.
+# --if-stale downloads a database file only when it is missing or at least six days old. Jenkins
+# runs it before the gates (backend.Jenkinsfile, review 2), because scheduled jobs are not allowed.
+# The day of margin keeps a database that is almost seven days old from failing the scan.
+# The database files have no published checksum. They come over HTTPS from OSV's own bucket.
 # Files: ${XDG_CACHE_HOME:-~/.cache}/frappesetup-osv/bin/osv-scanner and .../db/osv-scalibr/<ecosystem>/all.zip
 set -euo pipefail
+if_stale=0
+case "${1-}" in
+"") ;;
+--if-stale) if_stale=1 ;;
+*) printf 'usage: osv-setup [--if-stale]\n' >&2; exit 2 ;;
+esac
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tool-versions.env
 source "$here/tool-versions.env"
@@ -12,11 +22,12 @@ source "$here/tool-versions.env"
 home="${XDG_CACHE_HOME:-$HOME/.cache}/frappesetup-osv"
 db="${OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY:-$home/db}"
 
-# SHA-256 of the release files of OSV-Scanner 2.7.1 (osv-scanner_SHA256SUMS of the release).
+# SHA-256 of the release files (osv-scanner_SHA256SUMS of the release) live in tool-versions.env,
+# so scans.py checks a scanner on PATH against the same values.
 case "$(uname -s)-$(uname -m)" in
-Darwin-arm64) asset=darwin_arm64 sum=b22c02877a811c8f78956e8643efa554932b7378f590d13f8e97d4e9448a29f3 ;;
-Linux-x86_64) asset=linux_amd64 sum=fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8 ;;
-Linux-aarch64) asset=linux_arm64 sum=983d22fbad9724514e3fcc6acc83b5fa64c5ffa6b0d9f510028f22c1b223ff81 ;;
+Darwin-arm64) asset=darwin_arm64 sum=$OSV_SHA256_DARWIN_ARM64 ;;
+Linux-x86_64) asset=linux_amd64 sum=$OSV_SHA256_LINUX_AMD64 ;;
+Linux-aarch64) asset=linux_arm64 sum=$OSV_SHA256_LINUX_ARM64 ;;
 *) printf 'osv-setup: no pinned OSV-Scanner for %s\n' "$(uname -sm)" >&2; exit 1 ;;
 esac
 [[ "$OSV_VERSION" == 2.7.1 ]] || { printf 'osv-setup: update the checksums for OSV %s\n' "$OSV_VERSION" >&2; exit 1; }
@@ -37,6 +48,11 @@ fi
 for ecosystem in PyPI npm; do
     folder="$db/osv-scalibr/$ecosystem"
     mkdir -p "$folder"
+    # find -mmin +N: modified more than N minutes ago (GNU and BSD find).
+    if [[ "$if_stale" == 1 && -f "$folder/all.zip" && -z "$(find "$folder/all.zip" -mmin +$((6 * 24 * 60)))" ]]; then
+        printf 'osv-setup: %s database is less than six days old; kept\n' "$ecosystem"
+        continue
+    fi
     curl -fsSLo "$folder/all.zip.new" "https://osv-vulnerabilities.storage.googleapis.com/$ecosystem/all.zip"
     mv "$folder/all.zip.new" "$folder/all.zip"
 done

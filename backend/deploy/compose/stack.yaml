@@ -27,8 +27,11 @@ x-tenant: &tenant
 # /home/frappe/frappe-bench: with a shared queue the tenant worker would take Press jobs.
 # Press services join only the network press-internal (review 1, finding 1). A tenant container
 # cannot reach the Press Redis (it has no password) or press-web:8000 past the front proxy. Only
-# tenant-db joins both networks. Press reaches Keycloak and identity-sync by their public HTTPS
-# addresses, so keycloak_internal_url stays empty in production.
+# tenant-db joins both networks. Press reaches Keycloak by its public HTTPS address, so
+# keycloak_internal_url stays empty in production. Keycloak is public anyway; identity-sync is not.
+# press-web reaches identity-sync over press-identity (review 2, finding 1), a network with only
+# these two services and no gateway, at http://identity-sync:6115. The deletion and session
+# revocation endpoints never reach the edge, and press-identity gives no path to the tenants.
 x-press: &press
   image: ${ATONOTA_IMAGE_PRESS:-unset}
   restart: unless-stopped
@@ -176,7 +179,9 @@ services:
     volumes: [identity-sync:/data]
     depends_on:
       keycloak: {condition: service_healthy}
-    networks: [internal]
+    # press-identity: press-web sends account deletion requests here. identity-sync does not join
+    # press-internal, so it cannot reach the Press Redis.
+    networks: [internal, press-identity]
 
   # Press image: deploy/images/press.Dockerfile. remote/apply turns this profile on only when the
   # release carries a press image. Every Press service has the profile.
@@ -224,6 +229,9 @@ services:
       tenant-db: {condition: service_healthy}
       press-redis-cache: {condition: service_healthy}
       press-redis-queue: {condition: service_healthy}
+    # Only press-web sends account deletion requests (press_tr api/account.py), so only it joins
+    # press-identity. The worker, socket and front proxy stay on press-internal.
+    networks: [press-internal, press-identity]
 
   press-worker:
     <<: *press
@@ -269,6 +277,8 @@ volumes:
 networks:
   internal: {}
   press-internal: {}
+  # press-web and identity-sync only. "internal: true" gives the network no gateway.
+  press-identity: {internal: true}
   # One edge network per environment (remote/apply creates it); the edge proxy joins each one.
   edge:
     name: atonota-edge-${ATONOTA_ENV:?}

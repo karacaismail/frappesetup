@@ -43,7 +43,7 @@ Yetkili hesap 200, yetkisiz hesap 403 almalıdır.
 
 DevOps sorumlusu araç sürümlerini ve açık veritabanını günceller.
 Her yanlış alarm için sorumlu rolü ve gerekçeyi yazın.
-OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin.
+OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin. Press imajının kilidine ait istisnayı `osv-exceptions-press.toml` dosyasına girin.
 Bandit istisnaları `backend/dev/security/bandit-exceptions.json` dosyasındadır.
 Semgrep istisnaları `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
 Gitleaks istisnaları `backend/dev/security/.gitleaksignore` dosyasındadır.
