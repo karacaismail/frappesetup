@@ -69,7 +69,7 @@ Tarama ağsız çalışır. Yalnız yerel dosyaları okur. Aracı ve veritabanı
 | `dnspython` 1.16.0 | CVE-2023-29483 ve iki yeni hizmet engelleme açığı | 2.9.2 sürümüne yükseldi. Press `Resolver.query` işlevini kullanır. Bu işlev 2.9.2'de de vardır. |
 | `paramiko` 3.3.1 | Terrapin (CVE-2023-48795) ve SHA-1 RSA imzası (CVE-2026-44405) | 5.1.0 sürümüne yükseldi. Press kodu `paramiko` kullanmaz. Ansible eklentileri ve `docker` paketi kullanır. Yeni sürüm `invoke` paketini de getirdi. |
 | `setuptools` 80.9.0 | CVE-2026-59890 ve GHSA-xmj3-9gf7-h52w | 84.2.1 sürümüne yükseldi. Bu sürümde `pkg_resources` yoktur. İmajda bu modülü açan her satır `try` bloğu içindedir. |
-| `wcmatch` 8.5.2 | GHSA-53pm-wgxf-c6qf | İstisna kaydına yazıldı. Semgrep 1.79.0, `wcmatch~=8.3` ister. Semgrep yalnız kapalı Marketplace denetiminde çalışır. Kayıt `backend/dev/security/osv-exceptions.toml` dosyasındadır. Bitiş tarihi 23 Şubat 2027 Salı günüdür. |
+| `wcmatch` 8.5.2 | GHSA-53pm-wgxf-c6qf | İstisna kaydına yazıldı. Semgrep 1.79.0, `wcmatch~=8.3` ister. Semgrep yalnız kapalı Marketplace denetiminde çalışır. Kayıt `backend/dev/security/osv-exceptions-press.toml` dosyasındadır. Bu dosya yalnız Press kilidinde kullanılır. Bitiş tarihi 23 Şubat 2027 Salı günüdür. |
 
 Yükseltmeler `0005` yamasıyla Press'in `pyproject.toml` dosyasına da yazıldı. Böylece `uv pip check` yine yalnız izinli iki satırı bildirir.
 

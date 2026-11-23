@@ -139,7 +139,7 @@ Bazı DocType'lar kod ya da kimlik bilgisi taşır. Genel yazma araçları bunla
 
 Frappe çatısının kendi DocType'ları da genel yazma araçlarına kapalıdır. Bunlar ayar, kod ya da sistem kaydıdır. Çatıdan yalnız beş DocType açıktır: “ToDo”, “Note”, “Event”, “Contact” ve “Address”. Uygulamaların ve kullanıcıların kendi DocType'ları açıktır. Bu kural listeden güvenlidir. Çatıya yeni bir sistem DocType'ı gelirse kendiliğinden kapalı kalır.
 
-Tam liste kodda tek yerde durur. Dosya `yapay_zeka/policy.py` dosyasıdır. Testler listeyi sınar.
+Tam liste kodda tek yerde durur. Dosya `ai/policy.py` dosyasıdır. Testler listeyi sınar.
 
 ### Uygulama araçları (`ai_tools`, G-105)
 
