@@ -68,8 +68,29 @@ def timeline() -> str:
         o.append(f"<rect x='{x}' y='{y}' width='{BOX_W}' height='{BOX_H}' rx='10' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>")
         o.append(f"<text x='{x + 16}' y='{y + 26}' font-size='18' font-weight='650' fill='var(--fs-ink)'>{pid}</text>")
         o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
+    # P7'ye giden iki ok kendi yolundan gider. Hiçbiri başka fazın okuyla çizgi ya da çıkış noktası paylaşmaz.
+    # P1 → P7: P1'in sağından ayrı bir noktadan (y=148) çıkar. x=510 şeridinden iner, P7'ye üst yarıdan girer.
+    #   x=510, P1 → P4 şeridinin (x=524) solundadır. Böylece P1 → P4'ün y=222 parçasını kesmez.
+    #   P2 → P6 çizgisini (y=312) kesmek zorunludur. Kesişme noktasında zemin renginde bir boşluk bırakılır.
+    # P2 → P7: P2'nin altından (x=456) çıkar. P2 → P6 sağdan, P2 → P5 x=396'dan çıkar. P7'ye alt yarıdan girer.
+    P7_Y1, P7_Y2 = ROW_Y["P7"] + 16, ROW_Y["P7"] + BOX_H - 16
+    P1P7_X, P1P7_OUT_Y, P2P7_X = col_x["P7"] - 42, ROW_Y["P1"] + 48, col_x["P2"] + 160
+    routes = {
+        "P1-P7": f"M{col_x['P1'] + BOX_W} {P1P7_OUT_Y} L{P1P7_X} {P1P7_OUT_Y} L{P1P7_X} {P7_Y1} L{col_x['P7']} {P7_Y1}",
+        "P2-P7": f"M{P2P7_X} {ROW_Y['P2'] + BOX_H} L{P2P7_X} {P7_Y2} L{col_x['P7']} {P7_Y2}",
+    }
+    halo_y = ROW_Y["P2"] + BOX_H // 2  # P1 → P7'nin P2 → P6 çizgisini kestiği yer
     for p in phases:
         for pre in p["after"]:
+            edge = f"{pre}-{p['id']}"
+            if edge in routes:
+                if edge == "P1-P7":
+                    o.append(
+                        f"<path data-halo='{edge}' d='M{P1P7_X} {halo_y - 7} L{P1P7_X} {halo_y + 7}' fill='none' "
+                        "stroke='var(--fs-surface-2)' stroke-width='7'/>"
+                    )
+                o.append(f"<path data-edge='{edge}' d='{routes[edge]}' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>")
+                continue
             x1, y1 = col_x[pre] + BOX_W, ROW_Y[pre] + BOX_H / 2
             x2, y2 = col_x[p["id"]], ROW_Y[p["id"]] + BOX_H / 2
             if level[p["id"]] - level[pre] > 1:  # sütun atlayan ok kutuların altından dolaşır, hedefe alttan girer

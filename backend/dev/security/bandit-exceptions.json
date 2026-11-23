@@ -1901,6 +1901,15 @@
   },
   {
     "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
     "file": "backend/identity/keycloak/tests/test_event_listener.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
@@ -2709,6 +2718,15 @@
     "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
     "code": "subprocess.run(",
     "statementSha256": "609969b3142cf9da75a397f7e1974b7d64c8813f0dbfec191e509842a434348d",
+    "owner": "kimlik-realm",
+    "reason": "The test starts its fixture command with an argument list and no implicit host shell.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "5d3bafac377137b4a63e1da199131a0621a62fa4274accea27f29e7706490e92",
     "owner": "kimlik-realm",
     "reason": "The test starts its fixture command with an argument list and no implicit host shell.",
     "ignoreUntil": "2027-02-22"
