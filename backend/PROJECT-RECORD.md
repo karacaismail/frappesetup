@@ -85,7 +85,7 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - `platform_core` içinde giriş, çıkış ve ekran verisi uçları,
   - kullanıcı eşitleme servisi,
   - `press_tr` içinde Keycloak ile giriş.
-- **D-4. Kimlik markası Atonota'dır.** Proje sahibi alan adı olarak atonota.net yazdı.
+- **D-4. Kimlik markası Atonota'dır.** Proje sahibi alan adı olarak atonota.net yazdı. Ürünün adı O-51 ile “AtonotA Login” oldu.
   - Keycloak bu alan adında, platformdan ayrı durur.
   - Düğme metni “Atonota ile oturum aç” olur.
   - Marka adı ve alan adı ayardan gelir. Kodda sabit yazılmaz.
@@ -137,7 +137,7 @@ Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçt
 
 Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma”. Bu söz D-10 kararıdır. Orkestratör açık kararları bu yetkiyle kapattı. Proje sahibi her kararı değiştirebilir.
 
-- **O-1. Keycloak'ın sunucu adı `id.atonota.net` olur.** Kök alan adı markanın tanıtım sayfasına kalır. DNS değerini DevOps sorumlusu hazırlar. Kaydı alan adı sorumlusu uygular. Ajan DNS'e dokunmaz. Alan adının kayıt yeri doğrulanmadı.
+- **O-1. Keycloak'ın sunucu adı `id.atonota.net` olur.** Bu adres O-51 ile değişti. Yeni adres `api.login.atonota.net` olur. Kök alan adı markanın tanıtım sayfasına kalır. DNS değerini DevOps sorumlusu hazırlar. Kaydı alan adı sorumlusu uygular. Ajan DNS'e dokunmaz. Alan adının kayıt yeri doğrulanmadı.
 - **O-2. Platformun alan adı ayardan gelir.** Karar sitesi `<marka>.com.tr` yazar. Marka belli olunca yalnız ayar değişir.
 - **O-3. Kiracıda son kullanıcı “Website User” olur.** Bu, Karar 10'dur. Frappe 16 bu yolu engellerse işçi engeli kaynakla raporlar.
 - **O-4. Giriş teması Keycloak'ın kendi tema yapısıyla kurulur.** Tema `keycloak.v2` temasından türer. Renkler ve yazılar CSS değişkeniyle verilir. Bu yol yeni teknoloji eklemez (T-1). Keycloakify (G-80), panelin tasarım tokenları hazır olunca yeniden değerlendirilir.
@@ -331,6 +331,17 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Testler MVP son test 3 raporundaki üç yaşam döngüsü testidir.
   - alpha ortamı için bu testler zorunlu değildir.
   - Testler TLS aracısı olan hazırlık ortamında koşar. TLS aracısı, şifreli bağlantıyı karşılayan ara sunucudur.
+- **O-51. Giriş ürününün adı “AtonotA Login” olur. Giriş adresi `api.login.atonota.net` olur.** Proje sahibi bu kararı 23 Kasım 2026 Pazartesi günü verdi. Orkestratör ortam adlarına aynı gün karar verdi. Karar O-1'deki adresin yerine geçer.
+  - Ad tam olarak “AtonotA Login” yazılır. İlk ve son A büyük harftir.
+  - Giriş adresi prod'da `api.login.atonota.net` olur. alpha, beta ve rc ortamlarında adres `api.login.<ortam>.atonota.net` olur. Örneğin `api.login.alpha.atonota.net`.
+  - Eski `id.atonota.net` ve `id.<ortam>.atonota.net` adları kalkar. Ürün canlıda değildir. Bu yüzden yönlendirme ve takma ad gerekmez.
+  - Ortam değişkenlerinin adları değişmez. Örneğin `ATONOTA_ID_HOST` adı kalır. Yalnız değeri değişir.
+  - Keycloak'ta yalnız görünen ad değişir. Realm adı `platform` kalır. İstemci kimlikleri ve tema klasörünün adı da kalır. Realm adı değişirse bütün dönüş adresleri ve testler bozulur. Bu değişikliğin bir kazancı yoktur.
+  - Kullanıcı birçok platformla giriş yapabilir. Örneğin Google, Facebook, LinkedIn ve X kullanılabilir. Platform sayısı sınırlı değildir. Platform listesi realm verisinden gelir. Kodda sabit bir platform listesi olmaz. Testler de her platform kaydına aynı kuralı uygular.
+  - Platform kendi giriş sayfasını kendi adresinde açar. Örneğin Google `accounts.google.com` adresini kullanır. Sonra tarayıcı `https://api.login.atonota.net/realms/<realm>/broker/<platform>/endpoint` adresine döner.
+  - Ürün kodu MIT lisanslıdır (D-2). Keycloak'ın kendisi Apache-2.0 lisanslıdır. `identity/keycloak/event-listener/` klasörü Apache-2.0 lisanslı bir çataldır. Bu klasör kendi lisansını korur. Temadaki şablonlar da Keycloak şablonlarından türer. Bu yüzden şablonların başında kaynak notu kalır.
+  - Yeni platform eklemek ve ürünü paketlemek MVP sonrasıdır. MVP'de yalnız bu kararla çelişen yerler düzeltildi.
+  - DNS kayıtlarının yeni listesini DevOps sorumlusu hazırlar. Alan adı sorumlusu kayıtları girer. Ajan DNS'e dokunmaz.
 
 ## Karar sitesine işlenecek farklar
 
@@ -346,6 +357,7 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 | G-57: Kiracıda kullanıcı “System User” olur. | Son kullanıcı “Website User” olur. | D-5, O-3 |
 | G-80: Tema Keycloakify ile yapılır. | Tema Keycloak'ın kendi tema yapısıyla yapılır. | O-4 |
 | Rail 4: Saatlik yoklama ve gece mutabakatı | Zamanlanmış iş yok. Mutabakat elle başlar. | D-6, O-11 |
+| Keycloak'ın sunucu adı `id.atonota.net` | Giriş ürününün adı “AtonotA Login”, adresi `api.login.atonota.net` | O-51 |
 
 ## Değişmeyen sınırlar
 

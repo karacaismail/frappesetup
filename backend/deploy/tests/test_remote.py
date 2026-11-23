@@ -186,7 +186,7 @@ class RemoteScripts(unittest.TestCase):
         self.assertEqual(self.link("alpha", "backend-current"), f"releases/backend-{commit(1)[:12]}-b1")
         self.assertFalse((self.root / "alpha" / "backend-pending").is_symlink())
         site = (self.root / "edge" / "sites" / "alpha.caddy").read_text()
-        self.assertIn("id.alpha.atonota.net {", site)
+        self.assertIn("api.login.alpha.atonota.net {", site)
         self.assertIn("demo.app.alpha.atonota.net {", site)
         self.assertIn("reverse_proxy alpha-keycloak:8080", site)
         self.assertNotIn("__", site)

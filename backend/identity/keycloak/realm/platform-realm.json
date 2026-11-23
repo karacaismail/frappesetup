@@ -63,7 +63,7 @@
   "otpPolicyLookAheadWindow": 1,
   "otpPolicyPeriod": 30,
   "otpPolicyCodeReusable": false,
-  "webAuthnPolicyPasswordlessRpEntityName": "Atonota",
+  "webAuthnPolicyPasswordlessRpEntityName": "${IDENTITY_BRAND_NAME}",
   "webAuthnPolicyPasswordlessSignatureAlgorithms": [
     "ES256",
     "RS256"

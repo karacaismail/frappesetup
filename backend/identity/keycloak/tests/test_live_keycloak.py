@@ -131,7 +131,7 @@ class RealmSettingsTest(unittest.TestCase):
 
     def test_marka_dil_tema(self):
         r = self.realm
-        self.assertEqual(r["displayName"], "Atonota")
+        self.assertEqual(r["displayName"], get_environment_value("IDENTITY_BRAND_NAME"))
         self.assertEqual(r["defaultLocale"], "tr")
         self.assertEqual(set(r["supportedLocales"]), {"tr", "en"})
         self.assertEqual(r["loginTheme"], "atonota")

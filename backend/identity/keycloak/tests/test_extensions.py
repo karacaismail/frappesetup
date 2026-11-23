@@ -46,10 +46,11 @@ class ExtensionFileTest(unittest.TestCase):
 
     def test_social_providers_have_post_broker_second_factor(self):
         # O6: after a social login the second factor must be asked when the user has one.
+        # O-51: the platform list is data. The rule covers every provider in the realm, not a fixed list.
         akislar = {a["alias"]: a for a in self.realm["authenticationFlows"]}
-        for alias in ("google", "apple"):
-            idp = [s for s in self.realm["identityProviders"] if s["alias"] == alias][0]
-            self.assertEqual(idp.get("postBrokerLoginFlowAlias"), POST_BROKER, alias)
+        self.assertTrue(self.realm["identityProviders"])
+        for idp in self.realm["identityProviders"]:
+            self.assertEqual(idp.get("postBrokerLoginFlowAlias"), POST_BROKER, idp["alias"])
         self.assertIn(POST_BROKER, akislar)
         alt = [y.get("flowAlias") for y in akislar[POST_BROKER]["authenticationExecutions"] if y.get("authenticatorFlow")]
         yurutmeler = [y for a in [akislar[POST_BROKER]] + [akislar[x] for x in alt] for y in a["authenticationExecutions"]]
@@ -156,9 +157,11 @@ class LiveExtensionTest(unittest.TestCase):
         self.assertNotIn(MAGIC_LINK_AUTHENTICATOR, bilgi["authenticator"]["providers"])
 
     def test_post_broker_flow_is_bound_to_social_providers(self):
-        for alias in ("google", "apple"):
-            idp = admin(f"/identity-provider/instances/{alias}", self.admin_token).json()
-            self.assertEqual(idp.get("postBrokerLoginFlowAlias"), POST_BROKER, alias)
+        # O-51: every provider on the server, whatever the list holds.
+        providers = admin("/identity-provider/instances", self.admin_token).json()
+        self.assertTrue(providers)
+        for idp in providers:
+            self.assertEqual(idp.get("postBrokerLoginFlowAlias"), POST_BROKER, idp["alias"])
         yurutmeler = admin(f"/authentication/flows/{POST_BROKER}/executions", self.admin_token).json()
         saglayicilar = {y.get("providerId"): y for y in yurutmeler}
         self.assertIn("conditional-user-configured", saglayicilar)
