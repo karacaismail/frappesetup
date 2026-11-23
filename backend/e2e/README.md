@@ -66,6 +66,8 @@ Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
 `e2e/stack up` Keycloak hazır olunca realm eşitleme adımını çalıştırır. Bu adım realm dosyasındaki istemci ve kapsamları korunan veritabanına uygular. Adım kullanıcı ve oturum silmez. Ayrıntı `identity/keycloak/README.md` dosyasının "Korunan veritabanında realm eşitleme" bölümündedir.
 
+`e2e/stack` eski bir `.env` dosyasını da açar. Gizli olmayan eksik anahtarları `.env.example` dosyalarındaki yerel örnek değerle doldurur. Örneğin `ATONOTA_MCP_REDIRECT_URI` ve `ATONOTA_MCP_RESOURCE_URL` böyledir. Betik `.env` dosyasını değiştirmez. Gizli bir anahtar eksikse betik Docker'a dokunmadan durur. Betik eksik anahtarın yalnız adını yazar, değer yazmaz. Örneğin `ATONOTA_MCP_INTROSPECTION_SECRET` böyledir. Eksik anahtarı `.env.example` dosyasından `.env` dosyanıza kopyalayın ve kendi değerinizi yazın.
+
 ### Colima profilleri
 
 - **Mevcut Factory ortamı.** Betik yalnız mevcut imajı ve siteyi yeniden kullanır. Factory diskinde en az 5 GiB boş alan gerekir.
@@ -121,7 +123,7 @@ Okuyucu yalnız kendi kaydını görebilir. İşlev okuyucu için geçici parola
 Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenlerine koyun.
 
 - **Tarayıcı.** Keycloak'a doğrulanmış `e2e-user@example.test` hesabını ekleyin. Kiracıya aynı e-postayla bir “Website User” ekleyin. Parolasını `E2E_KEYCLOAK_PASSWORD` değişkenine verin. Kiracı ile Keycloak'ı kendi yerel adreslerinde bağlayın.
-- **Kullanıcı eşitleme.** Her koşu için Keycloak'a yeni bir örnek hesap ekleyin. Örneğin `e2e-sync-02@example.test` kullanın. Hesabı Keycloak'ta doğrulanmış olarak işaretleyin. Hesabı `E2E_SYNC_EMAIL` değişkenine verin. Kullanıcı kimliğini `E2E_SYNC_SUBJECT` değişkenine verin. Servis ile teste aynı `IDENTITY_SYNC_WEBHOOK_SECRET` değerini verin. Bu hesap deneme öncesinde kiracıda bulunmamalı.
+- **Kullanıcı eşitleme.** Keycloak'ta kullanıcı ve kuruluş yazabilen bir servis istemcisi açın. İstemci kimliğini `E2E_SYNC_KEYCLOAK_CLIENT`, sırrını `E2E_SYNC_KEYCLOAK_SECRET` değişkenine verin. Test her koşuda `e2e-sync-<kimlik>@example.test` biçiminde yeni bir örnek hesap üretir ve `tenant1` kuruluşuna ekler. Servis ile teste aynı `IDENTITY_SYNC_WEBHOOK_SECRET` değerini verin.
 - **Yetki ve onay.** Örnek kayıt türünü `E2E_DOCTYPE` değişkenine verin. Örnek kayıt adlarını `E2E_VISIBLE_RECORD` ve `E2E_HIDDEN_RECORD` değişkenlerine verin. Okuyucu yalnız ilk kayda erişebilmeli. Yetkili test hesabı iki kaydı da okuyabilmeli. Bu hesap ilk kaydı değiştirebilmeli. Yazılabilir metin alanının adını `E2E_UPDATE_FIELD` değişkenine verin.
 - **Oturumlar.** Okuyucu için `E2E_READER_COOKIE` ve `E2E_READER_CSRF` kullanın. Yetkili hesap için `E2E_OPERATOR_COOKIE` ve `E2E_OPERATOR_CSRF` kullanın. CSRF değeri, sitenin yazma isteğini doğruladığı oturum anahtarıdır.
 - **Model geçidi.** `backend/e2e/environment.sh provider` komutuyla sahte sağlayıcıyı açın. `e2e-local-only` yoluna iki kimliksiz Ollama uyumlu adres ekleyin. Yol kaydının adını `E2E_MODEL_ROUTE` değişkenine verin. İlk adres `http://e2e-provider:<PANE_PORT+7>/limited` olur. İkinci adres `http://e2e-provider:<PANE_PORT+7>/fallback` olur. İkinci API kaydının adını `E2E_FALLBACK_API` değişkenine verin. Bu yola gerçek sağlayıcı eklemeyin. Tekrar öncesi ilk adresin bekleme süresi dolmalı.
@@ -130,8 +132,8 @@ Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenl
 
 Bu iki test grubu, örnek ortam hazır olunca açılır.
 
-- **Sihirli bağlantı.** `E2E_MAGIC_LINK=1` kullanın. Mailpit, `PANE_PORT + 6` adresinde çalışmalı. Doğrulanmış test e-postasını `E2E_MAGIC_EMAIL` değişkenine verin. İkinci doğrulaması açık hesabı `E2E_MAGIC_OTP_EMAIL` değişkenine verin. Bu hesabın Base32 anahtarını `E2E_MAGIC_OTP_SEED` değişkenine verin. Etkin bağlantı süresini saniye olarak `E2E_MAGIC_TTL_SECONDS` değişkenine verin. Üst sınır 300 saniyedir.
-- **Telefon paketi.** `E2E_MOBILE_PKCE=1` kullanın. Keycloak'ta herkese açık test istemcisine PKCE S256 şartı koyun. İstemciyi ve dönüş adresini `E2E_MOBILE_CLIENT_ID` ve `E2E_MOBILE_REDIRECT_URI` ile verin. Dönüş adresi yerel olmalı. İzin kapsamını ve hedefi `E2E_MOBILE_SCOPE` ve `E2E_MOBILE_AUDIENCE` ile verin. CORS için izinli kökeni `E2E_MOBILE_ORIGIN` ile verin. Örnek hesabı ve parolasını `E2E_MOBILE_EMAIL` ve `E2E_MOBILE_PASSWORD` ile verin. Ret denemeleri için `E2E_MOBILE_EXPIRED_TOKEN`, `E2E_MOBILE_WRONG_AUDIENCE_TOKEN` ve `E2E_MOBILE_SESSION_COOKIE` hazırlayın.
+- **Sihirli bağlantı.** `E2E_MAGIC_LINK=1` kullanın. Mailpit, `PANE_PORT + 6` adresinde çalışmalı. Doğrulanmış test e-postasını `E2E_MAGIC_EMAIL` değişkenine verin. İkinci doğrulaması açık hesabı `E2E_MAGIC_OTP_EMAIL` değişkenine verin. Keycloak kaydındaki ham UTF-8 gizli metnin Base32 karşılığını `E2E_MAGIC_OTP_SEED` değişkenine verin. Etkin bağlantı süresini saniye olarak `E2E_MAGIC_TTL_SECONDS` değişkenine verin. Üst sınır 300 saniyedir.
+- **Telefon paketi.** `E2E_MOBILE_PKCE=1` kullanın. Keycloak'ta herkese açık test istemcisine PKCE S256 şartı koyun. İstemciyi ve dönüş adresini `E2E_MOBILE_CLIENT_ID` ve `E2E_MOBILE_REDIRECT_URI` ile verin. Dönüş adresi yerel olmalı. İzin kapsamını ve hedefi `E2E_MOBILE_SCOPE` ve `E2E_MOBILE_AUDIENCE` ile verin. CORS için izinli kökeni `E2E_MOBILE_ORIGIN` ile verin. Örnek hesabı ve parolasını `E2E_MOBILE_EMAIL` ve `E2E_MOBILE_PASSWORD` ile verin. Ret denemeleri için `E2E_MOBILE_EXPIRED_TOKEN` ve `E2E_MOBILE_SESSION_COOKIE` hazırlayın. Test, yanlış hedefli belirteci kullanmadan hemen önce kendisi üretir.
 
 Sihirli bağlantı için `magic-link.spec.ts` dosyasını seçin.
 Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.

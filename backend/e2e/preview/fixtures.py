@@ -18,7 +18,8 @@ else:
     import browser_keycloak
 
 LOGIN_EMAIL = "e2e-user@example.test"
-SYNC_EMAIL = "e2e-sync@example.test"
+SYNC_CLIENT = "e2e-sync-fixture"
+SYNC_ROLES = ("view-users", "query-users", "manage-users", "view-organizations", "manage-organizations")
 BENCH = "/home/frappe/frappe-bench"
 PRESS_BENCH = "/home/frappe/benches/frappe-bench"
 DOCKER_PATH = shutil.which("docker")
@@ -129,8 +130,8 @@ def created_identifier(location, fixture_kind):
     return identifier
 
 
-def seed_keycloak(port, password, *, browser_fixtures=None):
-    token = keycloak_request(
+def admin_access_token(port):
+    return keycloak_request(
         port,
         "/realms/master/protocol/openid-connect/token",
         form=True,
@@ -141,6 +142,35 @@ def seed_keycloak(port, password, *, browser_fixtures=None):
             "password": os.environ["E2E_KEYCLOAK_ADMIN_PASSWORD"],
         },
     )["access_token"]
+
+
+def configure_sync_fixture_client(port, auth_header=None):
+    realm = "/admin/realms/platform"
+    bearer = auth_header or admin_access_token(port)
+
+    def call(path, **kwargs):
+        return keycloak_request(port, realm + path, token=bearer, **kwargs)
+
+    generated = secrets.token_urlsafe(32)
+    call("/clients", data={
+        "clientId": SYNC_CLIENT, "protocol": "openid-connect", "enabled": True,
+        "publicClient": False, "secret": generated, "serviceAccountsEnabled": True,
+        "standardFlowEnabled": False, "directAccessGrantsEnabled": False, "fullScopeAllowed": False,
+        "defaultClientScopes": ["roles"],
+    })
+    scopes = {scope["name"]: scope for scope in call("/client-scopes")}
+    client, = call(f"/clients?clientId={SYNC_CLIENT}")
+    for scope in ("basic", "service_account", "admin-api", "kc-admin-api"):
+        call(f"/clients/{client['id']}/default-client-scopes/{scopes[scope]['id']}", method="PUT", data={})
+    management, = call("/clients?clientId=realm-management")
+    service_user = call(f"/clients/{client['id']}/service-account-user")
+    roles = [call(f"/clients/{management['id']}/roles/{name}") for name in SYNC_ROLES]
+    call(f"/users/{service_user['id']}/role-mappings/clients/{management['id']}", data=roles)
+    return {"client_id": SYNC_CLIENT, "client_value": generated}
+
+
+def seed_keycloak(port, password, *, browser_fixtures=None):
+    token = admin_access_token(port)
     realm = "/admin/realms/platform"
     lifecycle = {
         scenario: {
@@ -168,7 +198,7 @@ def seed_keycloak(port, password, *, browser_fixtures=None):
             E2E_LIFECYCLE_READER_SECRET=secret,
         )
     otp_seeds = {item["email"]: item["otp_seed"] for item in lifecycle.values() if "otp_seed" in item}
-    accounts = {email: password for email in (LOGIN_EMAIL, SYNC_EMAIL)}
+    accounts = {LOGIN_EMAIL: password}
     accounts.update({item["email"]: item["password"] for item in lifecycle.values()})
     subjects = {}
     for email, credential in accounts.items():
@@ -187,19 +217,18 @@ def seed_keycloak(port, password, *, browser_fixtures=None):
             subjects[email] = created_identifier(location, "user")
     for item in lifecycle.values():
         item["subject"] = subjects[item["email"]]
-    subject = subjects[SYNC_EMAIL]
     location = keycloak_request(
         port, realm + "/organizations", token=token,
         data={"name": "Preview Integration Tenant", "alias": "tenant1", "enabled": True},
     )
     organization = created_identifier(location, "organization")
     members = (item["subject"] for key, item in lifecycle.items() if key.split("_")[-1] in {"delete", "revoke"})
-    for member in (subject, *members):
+    for member in members:
         keycloak_request(
             port, realm + "/organizations/" + quote(organization, safe="") + "/members",
             token=token, data=member,
         )
-    return subject, lifecycle
+    return None, lifecycle
 
 
 def seed_site(project, service, bench, environment):
@@ -237,7 +266,8 @@ def main():
     print("Tenant browser and service client checks passed.", flush=True)
     password = "Aa9!" + secrets.token_urlsafe(24)
     browser_fixtures = {} if os.environ.get("E2E_FULL_BROWSER_FIXTURES") == "1" else None
-    subject, lifecycle = seed_keycloak(port, password, browser_fixtures=browser_fixtures)
+    _, lifecycle = seed_keycloak(port, password, browser_fixtures=browser_fixtures)
+    sync_client = configure_sync_fixture_client(port)
     common = {
         "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
         "PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL,
@@ -286,8 +316,8 @@ def main():
     fixture.update(
         E2E_MOBILE_CLIENT_ID=browser_keycloak.MOBILE_CLIENT,
         E2E_KEYCLOAK_PASSWORD=password,
-        E2E_SYNC_EMAIL=SYNC_EMAIL,
-        E2E_SYNC_SUBJECT=subject,
+        E2E_SYNC_KEYCLOAK_CLIENT=sync_client["client_id"],
+        E2E_SYNC_KEYCLOAK_SECRET=sync_client["client_value"],
     )
     path = Path(os.environ["PREVIEW_DIR"]) / "fixtures.json"
     with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as stream:

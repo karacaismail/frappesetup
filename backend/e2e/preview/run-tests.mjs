@@ -164,7 +164,9 @@ async function runFullPreview(projects) {
   }
 
   const shared = Object.fromEntries(Object.entries(env)
-    .filter(([name]) => !/^E2E_(CHROMIUM|WEBKIT)_/.test(name) && name !== 'E2E_LIFECYCLE_READER_SECRET'));
+    .filter(([name]) => !/^E2E_(CHROMIUM|WEBKIT)_/.test(name)
+      && name !== 'E2E_LIFECYCLE_READER_SECRET'
+      && name !== 'E2E_SYNC_KEYCLOAK_SECRET'));
   const runs = projects.flatMap((project) => {
     const engine = project.slice('--project='.length);
     const settings = {
