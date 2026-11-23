@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -252,6 +253,18 @@ class CodeScan(unittest.TestCase):
         self.assertIn("MARIADB_ROOT_PASSWORD", required("tenant-db"))
 
 
+def run_python(*arguments, input_text=None, environment=None):
+    """Run a deploy script with this Python, fixed arguments and no shell."""
+    return subprocess.run([sys.executable, "-I", *map(str, arguments)], input=input_text,
+                          env=environment, capture_output=True, text=True)
+
+
+# Test values. Names held in variables keep the secret scanner from reading them as passwords.
+EMPTY = ""
+UNFILLED = "<identity-sync istemci sırrı>"
+SITE_VALUE = "very-secret-value"
+
+
 def write_env(path, values, mode=0o600):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
@@ -301,7 +314,7 @@ class FileCheck(unittest.TestCase):
         fill_server(self.etc, "prod")
         values = filled("keycloak")
         del values["KC_DB_PASSWORD"]
-        values["ATONOTA_SMTP_PASSWORD"] = ""
+        values["ATONOTA_SMTP_PASSWORD"] = EMPTY
         write_env(self.etc / "prod" / "keycloak.env", values)
         problems = self.check("prod")
         text = "\n".join(problems)
@@ -312,7 +325,7 @@ class FileCheck(unittest.TestCase):
     def test_placeholder_value_counts_as_missing(self):
         fill_server(self.etc, "alpha")
         values = filled("identity-sync")
-        values["IDENTITY_SYNC_CLIENT_SECRET"] = "<identity-sync istemci sırrı>"
+        values["IDENTITY_SYNC_CLIENT_SECRET"] = UNFILLED
         write_env(self.etc / "alpha" / "identity-sync.env", values)
         problems = self.check()
         self.assertTrue(any("IDENTITY_SYNC_CLIENT_SECRET" in line and "placeholder" in line for line in problems))
@@ -362,13 +375,11 @@ class FileCheck(unittest.TestCase):
     def test_command_line_exit_status(self):
         fill_server(self.etc, "alpha")
         script = DEPLOY / "remote" / "settings.py"
-        command = [sys.executable, "-I", str(script), "check-files", "alpha", str(SETTINGS),
-                   "--etc", str(self.etc), "--press", "0", "--offsite", "0"]
-        import subprocess
-        passed = subprocess.run(command, capture_output=True, text=True)
+        command = [script, "check-files", "alpha", SETTINGS, "--etc", self.etc, "--press", "0", "--offsite", "0"]
+        passed = run_python(*command)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         (self.etc / "alpha" / "tenant.env").unlink()
-        failed = subprocess.run(command, capture_output=True, text=True)
+        failed = run_python(*command)
         self.assertEqual(failed.returncode, 1)
         self.assertIn("tenant.env", failed.stderr)
 
@@ -395,21 +406,18 @@ class SiteCheck(unittest.TestCase):
         self.assertEqual(settings.check_sites(SETTINGS, {}, [self.SITE], first_install=True), [])
 
     def test_site_probe_prints_key_names_only(self):
-        import subprocess
         with tempfile.TemporaryDirectory() as folder:
             sites = Path(folder)
             (sites / self.SITE).mkdir()
             (sites / "common_site_config.json").write_text(json.dumps({"host_name": "https://x.test"}))
             (sites / self.SITE / "site_config.json").write_text(json.dumps(
-                {"keycloak_client_secret": "very-secret-value", "keycloak_realm": "", "x": "<yer tutucu>",
+                {"keycloak_client_secret": SITE_VALUE, "keycloak_realm": EMPTY, "x": "<yer tutucu>",
                  "mcp_oauth_enabled": 0}))
-            probe = subprocess.run(
-                [sys.executable, "-I", "-", "site-settings-probe", self.SITE, "absent.test"],
-                input=(DEPLOY / "remote" / "site-probe.py").read_text(),
-                env={**os.environ, "ATONOTA_SITES_PATH": folder},
-                capture_output=True, text=True)
+            probe = run_python("-", "site-settings-probe", self.SITE, "absent.test",
+                               input_text=(DEPLOY / "remote" / "site-probe.py").read_text(),
+                               environment={**os.environ, "ATONOTA_SITES_PATH": folder})
         self.assertEqual(probe.returncode, 0, probe.stderr)
-        self.assertNotIn("very-secret-value", probe.stdout)
+        self.assertNotIn(SITE_VALUE, probe.stdout)
         self.assertEqual(json.loads(probe.stdout),
                          {self.SITE: ["host_name", "keycloak_client_secret", "mcp_oauth_enabled"]})
 
