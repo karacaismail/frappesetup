@@ -14,7 +14,19 @@ DECISIONS = ("Approved", "Rejected")
 MAX_EMAIL_LENGTH = 254
 
 
+def request_review(email: str) -> None:
+	# The request does the same work for every address. The account lookup and the new
+	# record run later in a background job, so the answer time does not show who has an account.
+	# The queued address is cut one character past the limit. open_review still rejects it.
+	frappe.enqueue(
+		"press_tr.press_identity.recovery.open_review",
+		queue="short",
+		email=(email or "").strip()[: MAX_EMAIL_LENGTH + 1],
+	)
+
+
 def open_review(email: str) -> None:
+	# Runs in a background job. The request never waits for this lookup.
 	address = (email or "").strip().lower()
 	if not address or len(address) > MAX_EMAIL_LENGTH or "@" not in address:
 		return

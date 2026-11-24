@@ -1241,7 +1241,21 @@ class IdentityHttpTest(
 		status, _headers, body = self.exchange(
 			"POST", RECOVERY_ROUTE, {"Content-Type": "application/json"}, json.dumps({"email": email})
 		)
+		self.run_short_jobs()
 		return status, body
+
+	def run_short_jobs(self):
+		# AJA-505: a background job opens the review record after the answer.
+		# The test runs the queued jobs here, so it does not wait for a worker.
+		from frappe.utils.background_jobs import get_queue
+		from rq import SimpleWorker
+
+		frappe.init("press.localhost")
+		try:
+			queue = get_queue("short")
+		finally:
+			frappe.destroy()
+		SimpleWorker([queue], connection=queue.connection).work(burst=True, with_scheduler=False)
 
 	def open_recovery_reviews(self, email):
 		frappe.init("press.localhost")

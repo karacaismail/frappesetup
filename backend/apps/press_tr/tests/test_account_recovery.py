@@ -143,7 +143,9 @@ class RecoveryRequestQueueTest(unittest.TestCase):
 			if isinstance(node, ast.FunctionDef) and node.name == "request_recovery"
 		)
 		called = {
-			node.func.id for node in ast.walk(route) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+			node.func.id
+			for node in ast.walk(route)
+			if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
 		}
 		self.assertIn("request_review", called)
 		self.assertNotIn("open_review", called)
@@ -359,7 +361,7 @@ class RecoveryRouteTest(unittest.TestCase):
 		returns = [ast.unparse(node.value) for node in ast.walk(route) if isinstance(node, ast.Return)]
 		self.assertEqual(returns, ["{'received': True}"])
 		calls = {ast.unparse(node.func) for node in ast.walk(route) if isinstance(node, ast.Call)}
-		self.assertIn("open_review", calls)
+		self.assertIn("request_review", calls)
 
 	def test_review_doctype_is_desk_only_with_final_states(self):
 		doc = json.loads(DOCTYPE.read_text(encoding="utf-8"))

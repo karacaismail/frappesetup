@@ -314,7 +314,7 @@ paths:
     post:
       operationId: requestAccountRecovery
       summary: Ask for account recovery after losing a strong key.
-      description: Opens a recovery review record when the address belongs to a linked account. Email access alone never recovers an account. The request does not change credentials, send a sign-in link or open a session. A reviewer who is not the account owner approves or rejects the record. The answer is the same for every address.
+      description: Opens a recovery review record when the address belongs to a linked account. Email access alone never recovers an account. The request does not change credentials, send a sign-in link or open a session. A reviewer who is not the account owner approves or rejects the record. The answer is the same for every address. A background job looks up the account after the answer, so the answer time does not show whether an account exists.
       requestBody:
         required: true
         content:
