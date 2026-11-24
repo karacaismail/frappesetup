@@ -71,7 +71,25 @@ Parolası olmayan kullanıcı bu yolla bağ kuramaz. Örneğin yalnız sihirli b
 
 Kuruluş kurumsal girişi zorunlu kılabilir. Bu durumda üyelik katmanı kullanıcıya `enterprise-sso-required` rolünü verir. Rolü olan kullanıcı sosyal platformla giremez.
 
-Kurumsal sağlayıcılar kayıtta yoktur. `apply` komutu onları değiştirmez. `email_verified` kuralı olmayan kurumsal sağlayıcıyı komut uyarıyla adlandırır. Bu sağlayıcı da önceden ele geçirmeye açıktır. Borç satırı proje kaydındadır.
+Kurumsal sağlayıcılar kayıtta yoktur. `apply` komutu onları değiştirmez. Komut her kurumsal sağlayıcıyı şu sırayla denetler (G-160):
+
+1. `trustEmail` açıksa komut hata verir.
+2. Sağlayıcıda `email_verified` kuralı varsa sağlayıcı geçer.
+3. Kural yoksa sağlayıcının onaylı bir istisna kaydı olmalıdır. Kayıt yoksa komut hata verir.
+4. Sosyal platform istisna alamaz.
+5. Kayıt bütün kurallara uymalıdır. Kurallar `platform_core/identity/enterprise_rules.py` dosyasındadır.
+6. Kayıttaki `issuer` adresi sağlayıcının adresiyle aynı olmalıdır.
+7. Kaydın bitiş tarihi geçmemiş olmalıdır.
+8. İki giriş akışının adı sabit kalmalıdır.
+
+Komut ilk hatada durur. Komut sağlayıcıyı kapatmaz. Sağlayıcıyı kapatma kararı DevOps sorumlusundadır.
+
+İstisna kaydı Frappe'de `PLT Enterprise IdP Exception` DocType'ında durur. Kayıt onaydan sonra değişmez ve silinmez. Kayıtları DevOps sorumlusu şu iki adımla taşır:
+
+1. `bench --site <site> execute platform_core.identity.enterprise_sync.export_exceptions --kwargs '{"path": "<dosya>"}'` komutu geçerli kayıtları dosyaya yazar.
+2. `bin/atonota-login apply --from-env --enterprise-exceptions <dosya>` komutu sağlayıcıları bu dosyayla denetler.
+
+Dosya sır taşımaz. Dosya Git'e girmez. Kalan işler proje kaydının borç satırındadır.
 
 Bağ, ikinci adımdan ve kurumsal giriş denetiminden önce kaydedilir. Bu sıra Keycloak'ın kendi sırasıdır. İkinci adım başarısız olursa bağ yine de kalır. Bağ yine de giriş açmaz, çünkü her girişte iki denetim yeniden çalışır.
 

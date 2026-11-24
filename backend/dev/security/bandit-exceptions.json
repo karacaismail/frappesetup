@@ -3279,5 +3279,32 @@
     "reason": "Test runs git from its absolute path with no shell. Arguments are fixed subcommands, the repository patch file and temporary folders. It runs only when AGENT_SOURCE is set.",
     "owner": "canli-dagitim",
     "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_enterprise_rules.py",
+    "code": "record[\"allowed_domains\"][0][\"client_secret\"] = \"x\"",
+    "statementSha256": "cc14f84ca59919e8254aea5976a40dab05a32f18b4ddbe5d8d2dc7617be8be84",
+    "reason": "The test puts a secret-like field name with the fake value x into a domain row. It checks that the record rules refuse the row. No real secret exists.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/atonota_login/tests/test_enterprise_apply.py",
+    "code": "self.environment = {\"ATONOTA_OPEN_ONE_CLIENT_ID\": \"client-1\", \"ATONOTA_OPEN_ONE_CLIENT_SECRET\": \"s3\"}",
+    "statementSha256": "9e4e4f4abf830858bc5be26c73239909f8bc7c57f191e12dca11b3d0927cd361",
+    "reason": "The apply command test feeds a fake client secret s3 to an in-memory environment. Keycloak is mocked. No real secret exists.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/atonota_login/tests/test_enterprise_apply.py",
+    "code": "\"KC_BOOTSTRAP_ADMIN_PASSWORD\": \"not-used\"}",
+    "statementSha256": "5de2a112b124c9a972d4327b8e4fc868f3f80e154c284262cad41884d9daf5c4",
+    "reason": "The apply command test sets the fake admin password not-used. The test never reaches Keycloak. No real secret exists.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-23"
   }
 ]
