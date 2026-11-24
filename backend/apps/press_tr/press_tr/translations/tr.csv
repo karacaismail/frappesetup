@@ -113,3 +113,27 @@ An identity page and a flag that indicates whether another page exists.,Yanıt k
 The page start or length is invalid.,İlk sıra veya kayıt sayısı geçersiz.,press_tr.openapi
 The service token or request parameters were rejected.,Press servis belirtecini veya istek alanlarını reddetti.,press_tr.openapi
 The {0} value is not a valid key. A valid key is 44 characters of URL-safe base64 and ends with one = sign. Copy the key again exactly.,{0} değeri geçerli bir anahtar değil. Geçerli anahtar 44 karakterdir ve tek bir = işaretiyle biter. Anahtarı yeniden ve eksiksiz kopyalayın.,press_tr
+Records an account recovery request. Email access alone never recovers an account; a reviewer decides each request.,Hesap kurtarma isteğini kaydeder. E-posta erişimi tek başına hesabı kurtarmaz. Her isteğe bir inceleyici karar verir.,PTR Recovery Review
+Identity Link,Kimlik bağı,PTR Recovery Review
+Verified identity whose account recovery was requested.,Kurtarma isteği bu doğrulanmış kimliğe aittir.,PTR Recovery Review
+Status,Durum,PTR Recovery Review
+Open until a reviewer approves or rejects the request. Approved and Rejected are final.,İnceleyici karar verene kadar istek açık kalır. Onaylandı ve Reddedildi kesin kararlardır.,PTR Recovery Review
+Requested At,İstek zamanı,PTR Recovery Review
+Time the recovery request was received.,Kurtarma isteğinin geldiği zaman.,PTR Recovery Review
+Review Note,İnceleme notu,PTR Recovery Review
+Required for a decision. Write how the reviewer confirmed or refused the identity.,Karar için not zorunludur. İnceleyici kimliği nasıl doğruladığını ya da neden reddettiğini yazar.,PTR Recovery Review
+Reviewed By,İnceleyen,PTR Recovery Review
+Reviewer who made the decision. The account owner cannot review their own request.,Kararı veren inceleyici. Hesap sahibi kendi isteğini inceleyemez.,PTR Recovery Review
+Reviewed At,İnceleme zamanı,PTR Recovery Review
+Time of the decision.,Kararın verildiği zaman.,PTR Recovery Review
+A recovery review starts open.,Kurtarma incelemesi açık durumda başlar.,press_tr
+A recovery review decision is final.,Kurtarma incelemesindeki karar kesindir.,press_tr
+Choose Approved or Rejected.,Onaylandı ya da Reddedildi seçin.,press_tr
+The account owner cannot review their own recovery request.,Hesap sahibi kendi kurtarma isteğini inceleyemez.,press_tr
+Write a review note before you decide.,Karar vermeden önce inceleme notunu yazın.,press_tr
+Ask for account recovery after losing a strong key.,Güçlü anahtarınızı kaybettiyseniz hesap kurtarma isteyin.,press_tr.openapi
+"Opens a recovery review record when the address belongs to a linked account. Email access alone never recovers an account. The request does not change credentials, send a sign-in link or open a session. A reviewer who is not the account owner approves or rejects the record. The answer is the same for every address.","Adres bağlı bir hesaba aitse sistem bir kurtarma inceleme kaydı açar. E-posta erişimi tek başına hesabı kurtarmaz. İstek giriş bilgilerini değiştirmez. İstek giriş bağlantısı göndermez ve oturum açmaz. Hesap sahibi olmayan bir inceleyici kaydı onaylar ya da reddeder. Yanıt her adres için aynıdır.",press_tr.openapi
+Email address of the account to recover.,Kurtarılacak hesabın e-posta adresi.,press_tr.openapi
+The request was received. The answer does not show whether an account exists.,İstek alındı. Yanıt hesabın var olup olmadığını göstermez.,press_tr.openapi
+The request had extra fields.,İstekte fazladan alan vardı.,press_tr.openapi
+Recovery request limit reached.,Kurtarma isteği sınırına ulaşıldı.,press_tr.openapi

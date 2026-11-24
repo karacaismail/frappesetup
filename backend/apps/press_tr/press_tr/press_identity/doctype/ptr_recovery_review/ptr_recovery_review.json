@@ -1,0 +1,78 @@
+{
+  "doctype": "DocType",
+  "description": "Records an account recovery request. Email access alone never recovers an account; a reviewer decides each request.",
+  "name": "PTR Recovery Review",
+  "module": "Press Identity",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "track_changes": 1,
+  "field_order": [
+    "identity_link",
+    "status",
+    "requested_at",
+    "review_note",
+    "reviewed_by",
+    "reviewed_at"
+  ],
+  "fields": [
+    {
+      "fieldname": "identity_link",
+      "label": "Identity Link",
+      "fieldtype": "Link",
+      "description": "Verified identity whose account recovery was requested.",
+      "reqd": 1,
+      "read_only": 1,
+      "options": "PTR Identity Link",
+      "search_index": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "description": "Open until a reviewer approves or rejects the request. Approved and Rejected are final.",
+      "reqd": 1,
+      "options": "Open\nApproved\nRejected",
+      "default": "Open",
+      "in_list_view": 1,
+      "search_index": 1
+    },
+    {
+      "fieldname": "requested_at",
+      "label": "Requested At",
+      "fieldtype": "Datetime",
+      "description": "Time the recovery request was received.",
+      "read_only": 1
+    },
+    {
+      "fieldname": "review_note",
+      "label": "Review Note",
+      "fieldtype": "Small Text",
+      "description": "Required for a decision. Write how the reviewer confirmed or refused the identity."
+    },
+    {
+      "fieldname": "reviewed_by",
+      "label": "Reviewed By",
+      "fieldtype": "Link",
+      "description": "Reviewer who made the decision. The account owner cannot review their own request.",
+      "options": "User",
+      "read_only": 1
+    },
+    {
+      "fieldname": "reviewed_at",
+      "label": "Reviewed At",
+      "fieldtype": "Datetime",
+      "description": "Time of the decision.",
+      "read_only": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 0,
+      "delete": 0,
+      "report": 1
+    }
+  ]
+}
