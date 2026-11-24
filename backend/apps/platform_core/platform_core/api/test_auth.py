@@ -131,10 +131,16 @@ class TestAuthEndpointAccess(FrappeAPITestCase):
 		return calls
 
 	def test_list_login_providers_guest_denied(self):
+		"""Guests may read the platform list (AJA-516). A guest POST or a guest parameter is refused."""
 		calls = self._refusing_identity_sync()
-		response = h.request(h.new_client().get, PREFIX + "list_login_providers")
+		response = h.request(h.new_client().post, PREFIX + "list_login_providers")
 		self.assertEqual(response.status_code, 403)
 		self.assertEqual(response.json["exc_type"], "PermissionError")
+		response = h.request(
+			h.new_client().get, PREFIX + "list_login_providers", query_string={"subject": "fixture-second"}
+		)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json["exc_type"], "InvalidInput")
 		self.assertEqual(calls, [])
 
 	def test_list_login_providers_foreign_data_denied(self):

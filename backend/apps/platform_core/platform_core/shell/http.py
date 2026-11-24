@@ -26,13 +26,18 @@ def has_session_cookie() -> bool:
 	)
 
 
-def require_session() -> str:
+def no_store() -> None:
+	"""The reply is never stored by the browser or by a cache on the way."""
 	frappe.local.response_headers.update(
 		{
 			"Cache-Control": "private, no-store",
 			"Vary": "Cookie, Authorization",
 		}
 	)
+
+
+def require_session() -> str:
+	no_store()
 	user = frappe.session.user
 	if not has_session_cookie():
 		frappe.throw(

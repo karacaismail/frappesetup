@@ -10,7 +10,7 @@ from frappe.rate_limiter import rate_limit
 from platform_core.identity import csrf_token, login_accounts, provider_setup, sign_in, sign_out
 from platform_core.identity.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
 from platform_core.identity.safe_errors import safe_errors
-from platform_core.shell.http import require_session
+from platform_core.shell.http import no_store, require_session
 
 
 def _render_browser_rate_limit(function: Callable[..., None]) -> Callable[..., None]:
@@ -138,14 +138,17 @@ def setup_keycloak_login() -> dict:
 
 
 # The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
-@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
-@rate_limit(limit=login_accounts.RATE_LIMIT, seconds=60, user_based=True)
+# The sign-in screen calls this before sign-in, so guests may call it (AJA-516, panel contract G-159).
+# A guest limit counts per IP address. A per-user limit would put every guest into one bucket.
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
+@rate_limit(limit=login_accounts.RATE_LIMIT, seconds=60)
 @safe_errors
 def list_login_providers() -> dict:
-	"""The sign-in platforms this site may show (G-159, AJA-459). The list comes from identity-sync.
+	"""The sign-in platforms this site may show (G-159, AJA-459, AJA-516). The list comes from identity-sync.
 
-	Guests get 403. The method takes no parameters. The reply is never stored (`no-store`)."""
-	require_session()
+	No session is needed. The reply names no person: each row has only `alias` and `display_name`.
+	The method takes no parameters and only GET. The reply is never stored (`no-store`)."""
+	no_store()
 	login_accounts.reject_parameters()
 	return login_accounts.list_login_providers()
 
