@@ -25,12 +25,12 @@
  },
  "update": {
   "date": "2026-11-24",
-  "commit": "18a9fff8",
+  "commit": "065bf90c",
   "release": {
-   "pr": 23,
-   "commit": "22e70ad7"
+   "pr": 27,
+   "commit": "ec669626"
   },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23 ile yayımlanan ürün birleşmesidir. İşlem kararının Frappe ucu backend dalındaki e7130aaa birleşmesindedir. Bu uç henüz yayımlanmadı ve canlıda denenmedi. Bu kalemlerin hiçbiri bitti sayılmadı. Kurumsal sağlayıcı ve gerçek platform hesapları henüz yoktur.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı.",
   "reviewed": [
    "G-155",
    "G-156",
@@ -1354,8 +1354,19 @@
   },
   "G-157": {
    "epic": "login-product",
-   "status": "in-progress",
-   "level": "post-mvp"
+   "status": "done",
+   "level": "post-mvp",
+   "evidence": {
+    "commit": "18a9fff8",
+    "release": {
+     "pr": 23,
+     "commit": "22e70ad7"
+    },
+    "tests": [
+     "backend/identity/atonota_login/tests/test_product_boundary.py",
+     "backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts"
+    ]
+   }
   },
   "G-158": {
    "epic": "login-product",
@@ -1394,7 +1405,7 @@
   },
   "G-165": {
    "epic": "login-product",
-   "status": "not-started",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-166": {

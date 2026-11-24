@@ -1720,7 +1720,9 @@
     {
       "alias": "atonota-magic-link",
       "config": {
-        "magickey.validity.duration": "300"
+        "magickey.validity.duration": "300",
+        "magiclink.send.limit": "3",
+        "magiclink.send.window.seconds": "900"
       }
     },
     {

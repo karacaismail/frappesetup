@@ -1499,6 +1499,117 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
 
+  /platform_core.identity.enterprise_membership.approve_exception:
+    post:
+      tags: [atonota-login]
+      operationId: approveEnterpriseIdpException
+      summary: Approves a waiting corporate provider exception record (G-160).
+      description: |
+        A corporate provider must require the `email_verified` claim. A provider that never sends the claim
+        needs an approved `PLT Enterprise IdP Exception` record. This endpoint approves one waiting grant record.
+
+        The caller needs three things. Without any of them the endpoint returns 403 and `PermissionError`:
+
+        - the `System Manager` role,
+        - read permission on the named record,
+        - a human session: a cookie session with a checked CSRF token. A request with an `Authorization` header is refused.
+          Agent tokens and MCP OAuth tokens are refused this way.
+
+        The approver must be another user than the requester. The endpoint writes only three fields:
+        `approved_by`, `approved_on` and `approval_principal`. No role has write permission on the record.
+        The record never changes after approval and is never deleted.
+        A rule break returns 417 and `ValidationError`. The endpoint does not write Keycloak.
+        The `atonota-login apply` command reads the approved records later.
+      x-yikici: false
+      security:
+        - frappeSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 140, description: Name of the waiting grant record.}
+      responses:
+        "200":
+          description: The name of the approved record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: string, description: Name of the approved record.}
+        "403":
+          description: Guest, no `System Manager` role, no read permission or no human session. The `exc_type` value is `PermissionError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "417":
+          description: The record is not a waiting grant or breaks a rule. The `exc_type` value is `ValidationError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.identity.enterprise_membership.revoke_exception:
+    post:
+      tags: [atonota-login]
+      operationId: revokeEnterpriseIdpException
+      summary: Opens a revocation record that ends a corporate provider exception (G-160).
+      description: |
+        The endpoint opens a new revocation record. The new record supersedes the named current grant.
+        The old record stays unchanged. A revocation record means the provider has no exception.
+
+        The caller needs the same three things as `approve_exception`. Without any of them the endpoint
+        returns 403 and `PermissionError`: the `System Manager` role, read permission on the named record and
+        a human session with a checked CSRF token.
+
+        Only a current grant can be revoked. Otherwise the endpoint returns 417 and `ValidationError`.
+        The endpoint does not write Keycloak. The `atonota-login apply` command reads the records later.
+      x-yikici: false
+      security:
+        - frappeSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, reason]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 140, description: Name of the current grant record.}
+                reason: {type: string, minLength: 1, description: Why the exception ends.}
+      responses:
+        "200":
+          description: The name of the new revocation record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: string, description: Name of the revocation record.}
+        "403":
+          description: Guest, no `System Manager` role, no read permission or no human session. The `exc_type` value is `PermissionError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "417":
+          description: The named record is not the current grant. The `exc_type` value is `ValidationError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+
   /platform_core.identity.login_policy.reset_password:
     post:
       tags: [yerel-giris-kapisi]
