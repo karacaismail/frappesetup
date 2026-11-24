@@ -14,6 +14,7 @@ import json
 import frappe
 from frappe.query_builder import Table
 
+from platform_core.access import files
 from platform_core.access.tests.base import (
 	DOCTYPE,
 	EMPLOYEE_1,
@@ -251,6 +252,19 @@ class TestFiles(SurfaceMatrixTestCase):
 			- self.names_of(EXPECTED_VISIBLE[EMPLOYEE_1]),
 			set(),
 		)
+
+	def test_file_list_condition_keeps_only_attachments_of_visible_records(self):
+		"""The condition the engine adds to the file list, run in the database for every user."""
+		table = frappe.qb.DocType("File")
+		for user, owners in EXPECTED_VISIBLE.items():
+			with self.subTest(user=user):
+				query = (
+					frappe.qb.from_(table)
+					.select(table.attached_to_name)
+					.where(table.attached_to_doctype == DOCTYPE)
+					.where(files.list_criterion(user))
+				)
+				self.assertEqual({row[0] for row in query.run()}, self.names_of(owners))
 
 	def test_attachments_of_a_record_outside_the_rule_are_not_loaded(self):
 		client = self.login(EMPLOYEE_1)
