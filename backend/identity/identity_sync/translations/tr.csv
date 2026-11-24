@@ -351,14 +351,14 @@ This token is the token of the requests that come to the service.
 The token the service uses when it goes to the Keycloak Admin API is a separate one.
 That token is requested with `scope=admin-api kc-admin-api` (the shared contract, `docs/sozlesmeler.md`, section 2).
 The Keycloak roles of the service account go only into that token.
-The roles are `view-users`, `query-users`, `manage-users` and the minimum role needed for organizations.
+The roles are `view-users`, `query-users`, `manage-users`, `view-identity-providers` and the minimum role needed for organizations.
 The token that goes to the tenant and to Press does not carry these roles.
 The service verifies the token with the shared `oidc_verify` library.
 The `aud` value of the token must be only `identity-sync`.
 The `azp` value of the token must be in one of five lists.
 The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to preview invitations.
 The `IDENTITY_SYNC_EXECUTE_AZP` list gives permission to execute within the caller tenant organization.
-The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
+The `IDENTITY_SYNC_SESSION_AZP` list opens only `/v1/sessions/revoke`, `/v1/login-providers` and `/v1/linked-accounts`.
 The OPERATOR list alone opens platform reconciliation, replay and queue lists.
 The DELETION list opens only global account deletion for Press.
 EXECUTE and SESSION contain the same tenant clients. All other lists are disjoint.
@@ -370,14 +370,14 @@ Bu belirteç servise gelen isteklerin belirtecidir.
 Servisin Keycloak Admin API'ye giderken kullandığı belirteç ayrıdır.
 O belirteç `scope=admin-api kc-admin-api` ile istenir (ortak sözleşme, 2. bölüm).
 Servis hesabının Keycloak rolleri yalnız o belirtece girer.
-Roller `view-users`, `query-users`, `manage-users` ve kuruluş için gereken en az roldür.
+Roller `view-users`, `query-users`, `manage-users`, `view-identity-providers` ve kuruluş için gereken en az roldür.
 Kiracıya ve Press'e giden belirteç bu rolleri taşımaz.
 Servis belirteci ortak `oidc_verify` kitaplığıyla doğrular.
 Belirtecin `aud` değeri yalnız `identity-sync` olmalıdır.
 Belirtecin `azp` değeri beş listeden birinde olmalıdır.
 `IDENTITY_SYNC_PREVIEW_AZP` listesi davet önizleme izni verir.
 `IDENTITY_SYNC_EXECUTE_AZP` listesi yalnız çağıran kiracının kuruluşunda yürütme izni verir.
-`IDENTITY_SYNC_SESSION_AZP` listesi yalnız `/v1/sessions/revoke` ucunu açar.
+`IDENTITY_SYNC_SESSION_AZP` listesi yalnız `/v1/sessions/revoke`, `/v1/login-providers` ve `/v1/linked-accounts` uçlarını açar.
 OPERATOR listesi platform mutabakatını, yeniden işletmeyi ve kuyruk listelerini açar.
 DELETION listesi Press için genel hesap silmeyi açar.
 EXECUTE ve SESSION aynı kiracı istemcilerini taşır. Diğer listeler birbirinden ayrıdır.
@@ -1288,3 +1288,105 @@ Hata kodu `forbidden` olur.
 ",identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.403.description
 Ends one Keycloak session.,Bir Keycloak oturumunu kapatır.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.summary
 Development environment. The port is the `PANE_PORT` value plus 5.,"Geliştirme ortamı. Port, `PANE_PORT` değerinin 5 fazlasıdır.",identity_sync.openapi.yaml: servers[0].description
+Lists the sign-in platforms that the calling tenant may show.,Çağıran kiracının gösterebileceği giriş platformlarını listeler.,identity_sync.openapi.yaml: paths./v1/login-providers.get.summary
+"The source is the AtonotA Login security review (AJA-458) and the panel contract, G-159.
+The login page of a `platform_core` site shows one button for each platform in this list.
+The request names no person and has no body.
+
+The service finds the tenant from the `azp` value of the token and the tenant list. The request cannot choose the tenant.
+The list has two kinds of platforms. The first kind is a general platform that is enabled and not hidden on the login page.
+The second kind is a platform that belongs to the Organization of the calling tenant.
+A platform of another tenant is never in the list. A platform without a stored secret is never in the list.
+A disabled platform and a platform that only links accounts are not in the list either.
+
+The reply is built from an allow list. It carries only `alias` and `display_name`.
+It never carries `config`, a secret, or a Keycloak id.
+The service may keep the platform list of the realm for 30 seconds. The list holds no personal data.
+
+Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint. These are the service clients of the tenant sites.
+Operator, preview and deletion clients get 403. The service needs the `view-identity-providers` role in Keycloak.
+The endpoint only reads. It writes nothing in Keycloak or on a target.
+","Kaynak AtonotA Login güvenlik incelemesi (AJA-458) ve panel sözleşmesinin G-159 maddesidir.
+`platform_core` sitesinin giriş sayfası bu listedeki her platform için bir düğme gösterir.
+İstek hiçbir kişiyi adlandırmaz ve gövde taşımaz.
+
+Servis kiracıyı belirtecin `azp` değerinden ve kiracı listesinden bulur. İstek kiracıyı seçemez.
+Listede iki tür platform vardır. Birinci tür açık ve giriş sayfasında gizli olmayan genel platformdur.
+İkinci tür çağıran kiracının kuruluşuna bağlı platformdur.
+Başka kiracının platformu listede hiç yer almaz. Sırrı kayıtlı olmayan platform da listede yer almaz.
+Kapalı platform ve yalnız hesap bağlayan platform da listede yoktur.
+
+Yanıt izin listesiyle kurulur. Yanıt yalnız `alias` ve `display_name` taşır.
+Yanıt `config`, sır ya da Keycloak kimlik numarası taşımaz.
+Servis realm'in platform listesini 30 saniye tutabilir. Liste kişisel veri taşımaz.
+
+Bu ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir. Bunlar kiracı sitelerinin servis istemcileridir.
+Operatör, önizleme ve silme istemcileri 403 alır. Servisin Keycloak'ta `view-identity-providers` rolüne ihtiyacı vardır.
+Uç yalnız okur. Keycloak'a ve hedeflere bir şey yazmaz.
+",identity_sync.openapi.yaml: paths./v1/login-providers.get.description
+"The platforms the calling tenant may show, in the order of the realm.",Çağıran kiracının gösterebileceği platformlar. Sıra realm'deki sıradır.,identity_sync.openapi.yaml: paths./v1/login-providers.get.responses.200.description
+The request has a body. This endpoint takes no body.,İstek gövde taşıyor. Bu uç gövde almaz.,identity_sync.openapi.yaml: paths./v1/login-providers.get.responses.400.description
+"The client is not in the session list, or no tenant in the tenant list belongs to the client.
+The error code is `forbidden`.
+","İstemci oturum listesinde değildir ya da kiracı listesinde istemciye ait kiracı yoktur.
+Hata kodu `forbidden` olur.
+",identity_sync.openapi.yaml: paths./v1/login-providers.get.responses.403.description
+Lists the linked platforms and the local sign-in ways of one member.,Bir üyenin bağlı platformlarını ve yerel giriş yollarını listeler.,identity_sync.openapi.yaml: paths./v1/linked-accounts.post.summary
+"The source is the AtonotA Login security review (AJA-458) and the panel contract, G-160.
+The account page of a `platform_core` site shows which platforms the signed-in user has linked.
+The site takes the id of the user from its own session and identity link. The body carries this id.
+The method is POST so that the id of the user is not in the address. The endpoint still only reads.
+
+The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
+The user must be a member of the Organization of the calling tenant. If not, the service returns 403.
+An unknown user gets the same 403. So the reply does not tell whether a person exists.
+
+The platform list is the same list as in `GET /v1/login-providers`. Each platform carries a `linked` flag.
+A link to a platform outside this list is left out of the reply.
+`local_sign_in_methods` is the number of sign-in ways without a platform. Examples are a password and a passkey.
+A second factor, such as a one-time code, is not counted.
+
+The reply is built from an allow list. It never carries the outside user name, credential data, or a Keycloak id.
+The reply is never kept. The log names the endpoint, the caller and the result. It never names the person.
+
+Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
+Operator, preview and deletion clients get 403.
+Remaining risk: a taken-over tenant site can read the linked platforms of its own members.
+It cannot read the members of another tenant. The decision record is `docs/decisions/0003-keycloak-extensions.md`.
+","Kaynak AtonotA Login güvenlik incelemesi (AJA-458) ve panel sözleşmesinin G-160 maddesidir.
+`platform_core` sitesinin hesap sayfası, oturumu açık kullanıcının bağladığı platformları gösterir.
+Site kullanıcının kimliğini kendi oturumundan ve kimlik bağından alır. Gövde bu kimliği taşır.
+Yöntem POST'tur. Böylece kullanıcının kimliği adrese girmez. Uç yine de yalnız okur.
+
+Servis kiracıyı belirtecin `azp` değerinden bulur. Gövde kiracıyı seçemez.
+Kullanıcı çağıran kiracının kuruluşunun üyesi olmalıdır. Üye değilse servis 403 döner.
+Bilinmeyen kullanıcı da aynı 403 yanıtını alır. Böylece yanıt kişinin var olup olmadığını söylemez.
+
+Platform listesi `GET /v1/login-providers` ucundaki listeyle aynıdır. Her platform bir `linked` bayrağı taşır.
+Bu listenin dışındaki platforma kurulan bağ yanıttan çıkarılır.
+`local_sign_in_methods` platform dışındaki giriş yollarının sayısıdır. Örnekler parola ve geçiş anahtarıdır.
+Tek kullanımlık kod gibi ikinci adım sayılmaz.
+
+Yanıt izin listesiyle kurulur. Yanıt dış hesap adını, kimlik bilgisi verisini ve Keycloak kimlik numarasını taşımaz.
+Yanıt hiç saklanmaz. Kayıt uç adını, çağıranı ve sonucu yazar. Kayıt kişiyi hiç adlandırmaz.
+
+Bu ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir.
+Operatör, önizleme ve silme istemcileri 403 alır.
+Kalan risk şudur: ele geçirilmiş bir kiracı sitesi kendi üyelerinin bağlı platformlarını okuyabilir.
+Site başka kiracının üyelerini okuyamaz. Karar kaydı `docs/decisions/0003-keycloak-extensions.md` dosyasıdır.
+",identity_sync.openapi.yaml: paths./v1/linked-accounts.post.description
+The linked platforms of the member and the number of local sign-in ways.,Üyenin bağlı platformları ve yerel giriş yollarının sayısı.,identity_sync.openapi.yaml: paths./v1/linked-accounts.post.responses.200.description
+"The body is invalid. For example, `subject` is missing or invalid, or the body has another field.",Gövde geçersizdir. Örneğin `subject` eksik ya da geçersizdir veya gövdede başka bir alan vardır.,identity_sync.openapi.yaml: paths./v1/linked-accounts.post.responses.400.description
+"The client is not in the session list, or no tenant in the tenant list belongs to the client.
+The response is the same when the user is unknown or is not a member of the Organization of the calling tenant.
+The error code is `forbidden`.
+","İstemci oturum listesinde değildir ya da kiracı listesinde istemciye ait kiracı yoktur.
+Kullanıcı bilinmiyorsa ya da çağıran kiracının kuruluşunun üyesi değilse yanıt aynıdır.
+Hata kodu `forbidden` olur.
+",identity_sync.openapi.yaml: paths./v1/linked-accounts.post.responses.403.description
+The alias of the platform in Keycloak. An example is `google`.,Platformun Keycloak'taki takma adı. Örnek: `google`.,identity_sync.openapi.yaml: components.schemas.LoginProvider.properties.alias.description
+"The name of the platform on the button. If Keycloak has no display name, it is the alias.",Düğmedeki platform adı. Keycloak'ta görünen ad yoksa takma ad kullanılır.,identity_sync.openapi.yaml: components.schemas.LoginProvider.properties.display_name.description
+The alias of the platform in Keycloak.,Platformun Keycloak'taki takma adı.,identity_sync.openapi.yaml: components.schemas.LinkedProvider.properties.alias.description
+The name of the platform on the account page.,Hesap sayfasındaki platform adı.,identity_sync.openapi.yaml: components.schemas.LinkedProvider.properties.display_name.description
+True when the member has linked an account of this platform.,Üye bu platformun bir hesabını bağladıysa değer doğrudur.,identity_sync.openapi.yaml: components.schemas.LinkedProvider.properties.linked.description
+The number of sign-in ways without a platform. Only a password and a passkey count.,Platform dışındaki giriş yollarının sayısı. Yalnız parola ve geçiş anahtarı sayılır.,identity_sync.openapi.yaml: components.schemas.LinkedAccounts.properties.local_sign_in_methods.description
