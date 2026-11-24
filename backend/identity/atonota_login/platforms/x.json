@@ -1,0 +1,14 @@
+{
+  "alias": "x",
+  "providerId": "twitter",
+  "displayName": "X",
+  "authorizationHost": "api.twitter.com",
+  "secrets": {
+    "clientId": "ATONOTA_X_CLIENT_ID",
+    "clientSecret": "ATONOTA_X_CLIENT_SECRET"
+  },
+  "config": {
+    "syncMode": "IMPORT"
+  },
+  "active": false
+}

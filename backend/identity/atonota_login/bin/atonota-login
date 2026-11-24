@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""AtonotA Login command line.
+
+  atonota-login render --check          exit 1 when the realm file differs from the registry
+  atonota-login render --write          rewrite only the realm file's identityProviders array
+  atonota-login apply --from-env        open or close platforms on a running Keycloak
+  atonota-login --allow-local-http apply --from-env
+                                        development only: records may use http to a local name
+  atonota-login redirects --env alpha   print each platform's return address for an environment
+  atonota-login redirects --public-url http://identity.localhost:5280
+
+The apply step reads KC_PUBLIC_URL, KC_BOOTSTRAP_ADMIN_USERNAME, KC_BOOTSTRAP_ADMIN_PASSWORD and the
+platform secret variables from the environment. It prints aliases and states, never a secret.
+"""
+
+import argparse
+import json
+import os
+import sys
+import urllib.parse
+from pathlib import Path
+
+PRODUCT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PRODUCT))
+
+from atonota_login import keycloak_apply, platforms  # noqa: E402
+
+BACKEND = PRODUCT.parents[1]
+REALM_FILE = BACKEND / "identity" / "keycloak" / "realm" / "platform-realm.json"
+ENVIRONMENTS = BACKEND / "deploy" / "environments"
+ENVIRONMENT_CHOICES = ("alpha", "beta", "rc", "prod", "all")
+
+
+def render(arguments, registry):
+    text = REALM_FILE.read_text(encoding="utf-8")
+    rendered = platforms.replace_identity_providers(text, registry)
+    if arguments.write:
+        if rendered != text:
+            REALM_FILE.write_text(rendered, encoding="utf-8")
+            print("The realm file's identityProviders array was rewritten.")
+        return 0
+    if rendered != text:
+        print("The realm file differs from the platform registry. Run: atonota-login render --write", file=sys.stderr)
+        return 1
+    print("The realm file matches the platform registry.")
+    return 0
+
+
+def apply(arguments, registry):
+    environment = os.environ
+    for name in ("KC_PUBLIC_URL", "KC_BOOTSTRAP_ADMIN_USERNAME", "KC_BOOTSTRAP_ADMIN_PASSWORD"):
+        if not environment.get(name):
+            print(f"Set {name}.", file=sys.stderr)
+            return 2
+    url = keycloak_apply.checked_keycloak_url(environment["KC_PUBLIC_URL"], arguments.remote_host)
+    if arguments.allow_local_http and not platforms.LOCAL_HOST.fullmatch(urllib.parse.urlsplit(url).hostname or ""):
+        print("--allow-local-http works only with a local development Keycloak.", file=sys.stderr)
+        return 2
+    call = keycloak_apply.admin_caller(
+        url, environment["KC_BOOTSTRAP_ADMIN_USERNAME"], environment["KC_BOOTSTRAP_ADMIN_PASSWORD"]
+    )
+    for line in keycloak_apply.apply_registry(call, registry, environment):
+        state = "open" if line["enabled"] else "closed"
+        print(f"{line['alias']}: {line['action']}, {state}")
+        if line["action"] == "not-in-registry-unverified-email":
+            print(f"WARNING: {line['alias']} does not require email_verified. It can claim another person's e-mail.",
+                  file=sys.stderr)
+    return 0
+
+
+def redirects(arguments, registry):
+    if arguments.public_url:
+        host = urllib.parse.urlsplit(arguments.public_url).hostname or ""
+        if not platforms.LOCAL_HOST.fullmatch(host):
+            print("--public-url takes only a local development address.", file=sys.stderr)
+            return 2
+        table = {
+            p.alias: platforms.broker_redirect_uri(arguments.public_url, p.alias, allow_local_http=True)
+            for p in registry
+        }
+    else:
+        names = sorted(f.stem for f in ENVIRONMENTS.glob("*.env")) if arguments.env == "all" else [arguments.env]
+        table = {}
+        for name in names:
+            path = ENVIRONMENTS / f"{name}.env"
+            if not path.is_file():
+                print(f"There is no environment file for {name}.", file=sys.stderr)
+                return 2
+            for alias, uri in platforms.environment_redirects(platforms.read_env_file(path), registry).items():
+                table[f"{name} {alias}"] = uri
+    print(json.dumps(table, indent=2) if arguments.json else "\n".join(f"{k}: {v}" for k, v in table.items()))
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="atonota-login", description="AtonotA Login platform tools.")
+    parser.add_argument("--platforms-dir", type=Path, default=platforms.REGISTRY_DIR,
+                        help="Folder of platform records. Default: the product's platforms folder.")
+    parser.add_argument("--allow-local-http", action="store_true",
+                        help="Development only, with apply to a local Keycloak: records may use http to a local name.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    render_parser = commands.add_parser("render", help="Compare or rewrite the realm file's platforms.")
+    group = render_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--check", action="store_true")
+    group.add_argument("--write", action="store_true")
+    apply_parser = commands.add_parser("apply", help="Open or close platforms on a running Keycloak.")
+    apply_parser.add_argument("--from-env", action="store_true", required=True)
+    apply_parser.add_argument("--remote-host", help="Exact host of an approved remote Keycloak.")
+    redirect_parser = commands.add_parser("redirects", help="Print the return address of each platform.")
+    target = redirect_parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--env", choices=ENVIRONMENT_CHOICES, help="alpha, beta, rc, prod or all")
+    target.add_argument("--public-url", help="A local development Keycloak address.")
+    redirect_parser.add_argument("--json", action="store_true")
+    arguments = parser.parse_args(argv)
+    if arguments.allow_local_http and arguments.command != "apply":
+        # The realm file and the return addresses reach every environment (review 2, finding 2).
+        print("--allow-local-http works only with apply.", file=sys.stderr)
+        return 2
+    try:
+        registry = platforms.load_platforms(arguments.platforms_dir, allow_local_http=arguments.allow_local_http)
+        handler = {"render": render, "apply": apply, "redirects": redirects}[arguments.command]
+        return handler(arguments, registry)
+    except (platforms.RegistryError, keycloak_apply.ApplyError) as error:
+        print(str(error), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

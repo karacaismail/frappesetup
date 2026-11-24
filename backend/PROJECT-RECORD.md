@@ -356,10 +356,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-54. Her geçici Press yaması kayıt altına alınır.**
   - [Yama kaydı](dev/press/patch-registry.json) geliştirme ve üretim yamalarını kapsar.
   - Press Türkiye uygulamasının ekibi her yamanın sahibidir. Kayıtta ekibin adı `press-tr` olur.
-  - Ekip, kaldırma koşulu sağlanınca ilgili testi yamasız imajda çalıştırır.
-  - Depo testi eksik kayıtları ve boş alanları yakalar.
+  - Ekip her Press yükseltmesinde ilgili testi yamasız imajda çalıştırır. Test geçerse ekip yamayı kaldırır.
+  - `upstream` alanı Press'in asıl geliştirici deposundaki hata kaydını veya değişiklik önerisini gösterir.
+  - Ekip öneriyi Press'e göndermediyse alan [yerel öneri belgesinin](docs/press-python314-upstream.md) ilgili bölümünü gösterir.
+  - Depo testi eksik kayıtları ve boş alanları yakalar. Test dosyasını, sınıfını ve yöntemini de doğrular.
   - Geçici geliştirme betiği değişirse dosya özeti de değişir. Test kayıt incelemesini ister.
-  - Bu karar G-7 kapsamındaki takibi sağlar. O-18 borcu açık kalır.
+  - Ekip yerel önerileri Press'e gönderip bağlantıları ekleyince G-7 takibi tamamlanır. O-18 borcu açık kalır.
 
 - **O-55. Press'in `press.` adı yalnız özel ağa açıktır. Müşteriye yalnız hesap silme akışı açılır.** Karar 23 Kasım 2026 Pazartesi günü alındı.
   - G-6, G-13 ve G-119 aynı kuralı yazar. Desk ve operatör adı yalnız Tailscale ya da özel ağdan açılır. Bu karar o kuralı kenar vekile işler.
@@ -381,6 +383,27 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Müşteriye yeni bir yol gerekirse yol bu listeye tek tek eklenir. Gerekçe bu karara yazılır. Joker yol eklenmez. `/assets/*` yalnız durağan dosyaları sunar.
   - DevOps sorumlusu sunucunun genel ağ arayüzünde `100.64.0.0/10` kaynaklı paketleri düşürür. Bu kural G-6 güvenlik duvarının parçasıdır.
   - Kural `deploy/compose/site.caddy.template` dosyasındadır. `deploy/tests/test_press_image.py` kuralı denetler. Test bütün şablonu da tarar. Press kabına giden satır yalnız Press bloğunda olabilir.
+
+- **O-56. AtonotA Login ürününün geliştirmesi başladı.** Proje sahibi bu kararı 23 Kasım 2026 Pazartesi günü verdi. Proje sahibinin sözü şudur: "AtonotA Login geliştirmeleri bitsin."
+  - Bu karar O-51'in son iki hükmünü değiştirir. O-51 geçerli kalır. Değişen hükümler "yeni platform eklemek MVP sonrasıdır" ve "MVP'de yalnız çelişen yerler düzeltildi" hükümleridir.
+  - Realm adı, istemci kimlikleri ve tema klasörünün adı değişmez. Bu kural O-51'den gelir.
+  - Ürünün kodu `identity/atonota_login/` klasöründedir. Klasör MIT lisans dosyası taşır. Keycloak ve eklentileri Apache-2.0 lisanslıdır. Liste `identity/atonota_login/THIRD-PARTY-NOTICES.md` dosyasındadır.
+  - Giriş platformları veridir. Her platform `identity/atonota_login/platforms/` klasöründe bir dosyadır. Google, Facebook, LinkedIn, X ve Apple kayıtları hazırdır.
+  - Realm dosyasının platform bölümü bu kayıtlardan üretilir. Komut `bin/atonota-login render --write` komutudur. Bir test iki kaynağın aynı kaldığını denetler.
+  - Platformun sırları depoya girmez. Kayıt yalnız ortam değişkeninin adını yazar. Bütün değişkenleri dolu olan platform açılır. Bir değişken boşsa platform kapalı kalır ve giriş sayfasında görünmez. Açma işini `bin/atonota-login apply` komutu yapar.
+  - Platformdan dönüş adresi `https://api.login.<ortam tabanı>/realms/platform/broker/<platform>/endpoint` olur. Ortam tabanı `docs/dagitim/ortamlar.md` kuralından gelir.
+  - Hesap bağlama kuralı `atonota-first-broker-login` akışındadır (G-160). E-posta eşleşmesi tek başına bağ kurmaz. E-posta bağlantısı da bağ kurmaz. Kullanıcı bağlamayı onaylar ve var olan hesabın parolasıyla yeniden oturum açar.
+  - Parolası olmayan kullanıcı bu yolla bağ kuramaz. Bu kısıtlama bilinçlidir. Güvenli olmayan yol açılmaz.
+  - Açık platform e-postanın doğrulandığını bildirmelidir. Kayıt `email_verified` iddiasını zorunlu kılar. Kullanıcı ilk girişte e-postasını kendisi yazamaz. Bu iki kural önceden ele geçirmeyi önler. Önceden ele geçirme, başkasının e-postasıyla kişiden önce hesap açmaktır. Bağımsız inceleme bu açığı buldu.
+  - Facebook ve X bu iddiayı göndermez. İki kayıt hazırdır ama `"active": false` ile kapalıdır.
+  - Kayıt güvenliği zayıflatan ayarları reddeder. Örnekler imza doğrulamasını kapatmak ve PKCE'yi kapatmaktır. Platform adresleri https kullanır.
+  - Kuruluşların kurumsal sağlayıcıları kayıtta yoktur. `apply` komutu onları değiştirmez. `email_verified` kuralı olmayan sağlayıcıyı uyarıyla adlandırır.
+  - İşlem kararı varsayılan olarak reddeder. Her işlemde en az bir zorunlu kontrol çalışır. Bitiş zamanı olmayan kanıt geçerli sayılmaz.
+  - `enterprise-sso-required` rolü olan kullanıcı sosyal platformla giremez. Rolü üyelik katmanı verir.
+  - Canlı deneme bir hata buldu. Keycloak 26.8.2, bağlantı sonrası akışta hiçbir adım çalışmazsa girişi reddediyordu. İkinci adımı olmayan kullanıcı hiçbir platformla giriş yapamıyordu. Akışın sonuna "allow access" adımı eklendi.
+  - Üç parça ürün klasöründe Frappe kullanmadan yazıldı. Bunlar işlem kararı (G-161), değer bekleyen kurallar (G-167) ve dış doğrulama gelen kutusudur (G-164). Frappe bağlantısı ilgili klasörlerin sahiplerine devredildi. Borç tablosunda yazılıdır.
+  - Tanıtım sayfası (G-165) site işidir. Bu iş site dosyalarına dokunmadı.
+  - Bu karar önce O-54 numarasını taşıyordu. O-54 ve O-55 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-56 oldu.
 
 ## Karar sitesine işlenecek farklar
 
@@ -443,6 +466,12 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Sihirli bağlantı eklentisi Keycloak 26.1.4 için yazıldı | Eklenti Keycloak'ın iç arayüzlerini kullanır. Keycloak yükseltmesi eklentiyi bozabilir. İşaret `identity/keycloak/Dockerfile` dosyasındadır | kimlik-realm | Eklentinin çalışan Keycloak sürümü için yayımı çıkar. Yayım yoksa her Keycloak yükseltmesinde `identity/keycloak/tests/test_magic_link.py` yeniden koşar |
 | `BORC(mvp)`: `list_identities` satırı e-posta ve takım taşımaz | Mutabakat, var olan kaydın e-posta farkını göremez. Fazla takım üyeliğini de göremez. İşaret `identity/identity_sync/README.md` dosyasındadır | Orkestratör | İki farkın nasıl bulunacağı sözleşmeye yazılır. Ya da iki fark kapsam dışı sayılır |
 | `BORC(mvp)`: identity-sync'in bazı veritabanı okumaları son ana bağlı değildir | Son an, isteğin en geç bitmesi gereken zamandır. Başka bir süreç yazarken okuma en çok 5 saniye bekleyebilir. Örnekler `is_processed`, `dead_letter_state` ve `progress` okumalarıdır. İşaret `docs/gap-backlog.md` dosyasının identity-sync bölümündedir | identity-sync işi | İki bağlantılı bir test, okuma beklerken de olay yanıtının 5 saniyelik sınırı aşmadığını gösterir |
+| `BORC(mvp)`: AtonotA Login Frappe bağlantısı yarım (O-56) | İşlem kararı ucu (AJA-230) ve doğrulama bildirimi ucu (AJA-231) var. Bildirim ucu `platform_core.api.atonota_login.verification_notice` adını taşır. Doğrulama sağlayıcısı seçilmedi. Bu yüzden `atonota_verification_secret` ayarı yoktur ve uç 503 döner. Doğrulamayı başlatan kod da yoktur. Bu kod `verification_api.open_attempt` işlevini çağıracak. `enterprise-sso-required` rolünü veren üyelik kodu yoktur. Canlı deneme `not_run` | platform-core-kimlik ve erisim-kurali | Sağlayıcı seçilir ve kendi imza bağdaştırıcısı yazılır. Doğrulamayı başlatan akış `open_attempt` çağırır. Kuruluş kurumsal girişi zorunlu kılınca üyelik kodu rolü verir. Deneme ortamında bir bildirim baştan sona işlenir |
+| `BORC(mvp)`: AtonotA Login üyelik kanıtı rollere bağlı (G-160) | `decision_api.collect_evidence` üyeliği `User.user_type` alanından okur. Frappe bu alanı kayıt sırasında masaüstü rollerinden türetir. Sunucu kaydında masaüstü rolü olan her kullanıcı üyelik kanıtı alır. Tokendaki rol okunmaz | platform-core-kimlik ve erisim-kurali | Kuruluş üyelik kaydı gelince üyelik kanıtı o kayda bağlanır (G-160). `test_desk_role_on_the_server_record_makes_membership_evidence` testi yeni davranışa göre değişir |
+| `BORC(mvp)`: Facebook ve X girişi kapalı (O-56) | İki platform e-postanın doğrulandığını Keycloak'a bildirmez. Açılırsa önceden ele geçirme mümkün olur | kimlik-realm | Bağlanmadan önce e-postayı doğrulayan bir Keycloak adımı yazılır. Canlı test bu saldırıyı iki platform için de reddeder |
+| `BORC(mvp)`: Kurumsal sağlayıcıda e-posta denetimi zorunlu değil (O-56) | Kurumsal sağlayıcılar da `atonota-first-broker-login` akışını kullanır. `email_verified` kuralı olmayan bir sağlayıcı başkasının e-postasıyla önceden hesap açabilir. `apply` komutu bu sağlayıcıyı yalnız uyarıyla adlandırır. Kurumsal sağlayıcıyı açan kod henüz yoktur | platform-core-kimlik ve kimlik-realm | Kurumsal sağlayıcıyı açan kod `email_verified` kuralını zorunlu kılar. Ya da e-postanın alan adı kuruluşun doğrulanmış alan adıyla eşleşir. Canlı test bu saldırıyı reddeder |
+| `BORC(mvp)`: Apple, Google ve LinkedIn sağlayıcılarında e-posta süzgeci canlı denenmedi (O-56) | Süzgeci sağlayıcının kendi kodu uygular. Canlı test yalnız Keycloak'ın genel OIDC sağlayıcısını denedi | DevOps sorumlusu | Her platform açılmadan önce deneme ortamında doğrulanmamış e-postalı giriş reddedilir |
+| `BORC(mvp)`: X girişi OAuth 1.0a ister (O-56) | Keycloak 26.8.2'nin X sağlayıcısı OAuth 1.0a kullanır. X bu yolu kapatırsa giriş durur | kimlik-realm | Kayıt genel OIDC ya da OAuth 2.0 sağlayıcısına geçer ve canlı deneme geçer |
 | `BORC(mvp)`: identity-sync gerçek TLS sunucusuyla süre denemesinden geçmedi | TLS kurulumu bağlantının kalan süresiyle bekler. Bu davranış gerçek sunucuyla sınanmadı. İşaret `docs/gap-backlog.md` dosyasının identity-sync bölümündedir | identity-sync işi | Yavaş el sıkışan bir test sunucusuyla istek son anda biter |
 
 ### Kapanan teknik borç
