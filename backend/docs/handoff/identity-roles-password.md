@@ -19,7 +19,8 @@ Bu testler gerçek Keycloak sunucusuyla giriş yapıldığını kanıtlamaz.
 
 1. Parolayla giriş kapalıyken sunucu geçerli bilgileri de reddetmelidir.
    Test `/api/method/login` ve `cmd=login` yollarını kapsar.
-   Yanıt 401 ve `AuthenticationError` olmalıdır.
+   Yanıt 401 olmalıdır. API yolunda hata türü `AuthenticationError` olmalıdır.
+   Kök yol genel bir HTML hata sayfası döner. Bu sayfada hata türü yazmaz.
    Kullanıcı misafir kalmalıdır. Sunucu yeni oturum kaydı oluşturmamalıdır.
 2. Yetkisiz uygulama kullanıcısı `/desk` ve `/app` sayfalarını açamamalıdır.
    Yanıt 403 olmalıdır. Kullanıcının mevcut oturumu açık kalmalıdır.
@@ -32,7 +33,7 @@ Dosya `apps/platform_core/platform_core/identity/tests/` klasöründedir.
 - Kullanıcı tam 3600 saniye boşta kalınca oturum silinir.
 - Ek yetki başlığı, süresi dolan oturumu uzatamaz.
 
-Bu üç test AJA-72 tesliminde geçti. AJA-167 bunları henüz yeniden çalıştırmadı.
+Bu üç test AJA-167 doğrulamasında yeniden çalıştı ve geçti.
 Önceki sonuçların ayrıntıları [önceki devir belgesindedir](identity-role-test-gaps.md).
 
 ## G-43: Parola ve başarısız giriş ayarları
@@ -119,13 +120,35 @@ QA, işletmeci hesabına yetki yükseltme girişimini de sınamalıdır.
 
 ## Doğrulama ve sonraki adım
 
-Yeni testlerin durumu `not_run` değerindedir. Bu değer, testlerin çalıştırılmadığını belirtir.
-Ortak test sırası AJA-167 görevine henüz gelmedi.
-Kod ve biçim kontrolleri de sıra bekler.
-Önceki AJA-72 sonuçları yeni testlerin geçtiği anlamına gelmez.
-Türkçe metin elle denetlendi. Otomatik yazım kontrolü henüz çalıştırılmadı.
+Doğrulama 24 Kasım 2026 Salı günü yapıldı. Yeni testler yerel test sitesinde geçti.
+Ortam `fs-dev-ortam-7167` adlı ayrı Colima projesidir. Çalışan başka ortama dokunulmadı.
+Test verileri uydurmadır. Zamanlanmış iş kurulmadı.
 
-Sıra gelince geliştirici şu modülleri ayrı yerel test sitesinde çalıştırmalıdır:
+| Kontrol | Sonuç |
+| --- | --- |
+| `platform_core.identity.tests.test_login_policy` | `pass`. 12 test çalıştı. |
+| `platform_core.identity.tests.test_session_boundary_contract` | `pass`. Üç test çalıştı. |
+| `platform_core.access.tests.test_identity_role_denials` | `pass`. Yedi test çalıştı. |
+| Dalın değiştirdiği üç Python dosyasında Ruff | `pass`. Kod ve biçim denetimi geçti. |
+| Dal kapıları ve Playwright | `not_run`. Görev bu kapıları kapsam dışında bıraktı. |
+| Gerçek Keycloak girişi ve CI | `not_run`. |
+
+İlk koşuda bir test düştü. Kök yol yanıtı JSON değil, HTML idi.
+Test yalnız API yolunda hata türünü denetleyecek biçimde düzeltildi.
+Kök yolda 401 yanıtı, misafir kullanıcı ve sıfır oturum denetimi korunur.
+Ürün kodu değişmedi.
+
+Testler şu biçimde çalıştırıldı:
+
+```bash
+PANE_PORT=7167 backend/dev/bin/test platform_core --module <modül>
+```
+
+İlk komut siteyi kurdu. Sonraki modüller aynı sitede `bench run-tests` ile çalıştı.
+Ortamda Python 3.14.10, Frappe 16.56.0 ve ERPNext 16.55.0 gözlendi.
+Bu sürümler ürünün bütün ortamlarını kanıtlamaz.
+
+Çalıştırılan modüller şunlardır:
 
 ```text
 platform_core.identity.tests.test_login_policy
@@ -133,26 +156,6 @@ platform_core.identity.tests.test_session_boundary_contract
 platform_core.access.tests.test_identity_role_denials
 ```
 
-Çalıştırma biçimi şöyledir:
-
-```bash
-bench --site <yerel-test-sitesi> run-tests --module <modül>
-```
-
-Geliştirici dal kontrollerini de sırayla çalıştırmalıdır:
-
-```bash
-backend/dev/bin/module-boundaries
-UV_OFFLINE=1 backend/dev/bin/security-audit
-backend/dev/bin/ai-readiness
-```
-
-Paket Python `>=3.14,<3.15` ve Frappe `>=16.56.0,<17.0.0` ister.
-AJA-72 ortamında Python 3.14.10 ve Frappe 16.56.0 gözlendi.
-AJA-167 çalışır test ortamındaki sürümleri henüz doğrulamadı.
-Manifest aralığı, kurulu paketlerin kesin sürümlerini kanıtlamaz.
-
-Geliştirici gerçek komutları ve sonuçları AJA-167 yorumuna yazmalıdır.
 QA incelemesi AJA-75, dal incelemesi AJA-76 görevindedir.
 Bu görev canlı sunucuya ve canlı veriye dokunmaz.
 Gerçek okurla denenmedi.

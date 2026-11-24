@@ -57,7 +57,10 @@ class TestKeycloakOnly(FrappeAPITestCase):
 						data={"usr": self.admin_user, "pwd": self.admin_password, **extra},
 					)
 					self.assertEqual(response.status_code, 401, response.data[:200])
-					self.assertEqual(response.json.get("exc_type"), "AuthenticationError")
+					# The root path answers a rejected cmd=login with Frappe's generic HTML
+					# error page, which carries neither exc_type nor the message.
+					if path.startswith("/api/"):
+						self.assertEqual(response.json.get("exc_type"), "AuthenticationError")
 					self.assertEqual(h.logged_user(client), "Guest")
 					self.assertEqual(h.session_count(self.admin_user), 0)
 
