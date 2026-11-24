@@ -3333,5 +3333,32 @@
     "reason": "Test runs the repository's CI install script with bash, a fixed argument list and no shell string; PATH is fixed by the test.",
     "owner": "canli-dagitim",
     "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_magic_link.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-24"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_magic_link.py",
+    "code": "logs = subprocess.run([\"docker\", \"--context\", context, \"logs\", \"--since\", str(since), f\"{project}-keycloak-1\"],",
+    "statementSha256": "5768f4d6974885c560f7d7e0d8a7a1112260a50e063af0a8bfb2403698392df9",
+    "reason": "The test reads the local Keycloak container log with a fixed docker argument list and no shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-24"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_magic_link.py",
+    "code": "logs = subprocess.run([\"docker\", \"--context\", context, \"logs\", \"--since\", str(since), f\"{project}-keycloak-1\"],",
+    "statementSha256": "5768f4d6974885c560f7d7e0d8a7a1112260a50e063af0a8bfb2403698392df9",
+    "reason": "The developer test runner supplies the executable PATH for this docker command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-24"
   }
 ]

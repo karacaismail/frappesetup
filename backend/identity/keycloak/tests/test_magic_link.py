@@ -166,7 +166,8 @@ class MagicLinkLiveTest(unittest.TestCase):
         # Several tests ask for more than SEND_LIMIT links to one address. The limit test sets it back.
         cls.config_id, cls.file_config = _magic_link_config(cls.admin_token)
         status = _put_magic_link_config(cls.config_id, cls.file_config, **{SEND_LIMIT_KEY: str(RAISED_SEND_LIMIT)})
-        assert status == 204, f"HTTP {status}"
+        if status != 204:
+            raise AssertionError(f"raising the send limit failed: HTTP {status}")
         cls.addClassCleanup(lambda: admin(f"/authentication/config/{cls.config_id}", admin_token(), "PUT", cls.file_config))
 
     def _open_email_form(self):

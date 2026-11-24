@@ -3,6 +3,8 @@
  * Original: cloudflightio/keycloak-magic-link, commit 7b4ee949a39a7ee953987162479ae1da2c57c3cb,
  * keycloak-magic-link/src/main/java/io/cloudflight/keycloak/magiclink/authenticators/AbstractMagicLinkAuthenticatorFactory.java
  * Licensed under the Apache License, Version 2.0. The change notice is in magic-link-fork/NOTICE.
+ * The upstream @author tag kept its name. Its e-mail address was left out: this repository holds
+ * no personal e-mail addresses (backend/dev/tests/test_release_residue.py).
  *
  * Changes:
  * - getConfigProperties() also declares the send limit and the window (MagicLinkSendLimiter).
@@ -26,7 +28,7 @@ import io.cloudflight.keycloak.magiclink.sending.MagicLinkSendLimiter;
 /**
  * Common implementation for magic link authenticator factories.
  *
- * @author Ludwig Burtscher (ludwig.burtscher@cloudflight.io)
+ * @author Ludwig Burtscher (Cloudflight)
  */
 public abstract class AbstractMagicLinkAuthenticatorFactory implements AuthenticatorFactory {
 
