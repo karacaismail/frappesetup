@@ -25,12 +25,12 @@
  },
  "update": {
   "date": "2026-11-24",
-  "commit": "b9c07e62",
+  "commit": "4abc0cb3",
   "release": {
-   "pr": 44,
-   "commit": "1c326c33"
+   "pr": 45,
+   "commit": "e4bce744"
   },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-11 Press erişim izinleri 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 2c21c9f5 birleşmesi ve test_press_access.py dosyasıdır. Testleri 3a918f8b commit'i ekledi. Gerçek Frappe denemesinde 8 testin 8'i geçti. Birleşme PR 42 ile yayımlandı ama canlıda denenmedi. G-13 Sürüyor kalır. Kod kanıtı 9f128360 commit'i ve test_panel_session.py dosyasıdır. Bu kanıt fed71b33 birleşmesiyle PR 43 üzerinden main dalına yayımlandı. Canlı madde açıktır: panel alan adında oturum çerezi ve anlık olay denenmedi. Bu denemeyi Hüseyin Cengiz yapacak. G-81 kimlik eşitleme 24 Kasım 2026 Salı günü Bitti oldu. Kanıt b9c07e62 birleşmesi ve test_g81_closure.py dosyasıdır. Kanıt notunu 763dfab4 commit'i ekledi. Yerel ortamda kimlik eşitlemede 6 testin 6'sı geçti. Java eklentisinde 40 testin 40'ı geçti. Birleşme PR 44 ile yayımlandı ama canlıda denenmedi.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-11 Press erişim izinleri 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 2c21c9f5 birleşmesi ve test_press_access.py dosyasıdır. Testleri 3a918f8b commit'i ekledi. Gerçek Frappe denemesinde 8 testin 8'i geçti. Birleşme PR 42 ile yayımlandı ama canlıda denenmedi. G-13 Sürüyor kalır. Kod kanıtı 9f128360 commit'i ve test_panel_session.py dosyasıdır. Bu kanıt fed71b33 birleşmesiyle PR 43 üzerinden main dalına yayımlandı. Canlı madde açıktır: panel alan adında oturum çerezi ve anlık olay denenmedi. Bu denemeyi Hüseyin Cengiz yapacak. G-81 kimlik eşitleme 24 Kasım 2026 Salı günü Bitti oldu. Kanıt b9c07e62 birleşmesi ve test_g81_closure.py dosyasıdır. Kanıt notunu 763dfab4 commit'i ekledi. Yerel ortamda kimlik eşitlemede 6 testin 6'sı geçti. Java eklentisinde 40 testin 40'ı geçti. Birleşme PR 44 ile yayımlandı ama canlıda denenmedi. G-104 İK yetki sözleşmesi 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 4abc0cb3 birleşmesi ve test_permission_matrix.py dosyasıdır. Yetki tablosu notunu 96509586 commit'i ekledi. Gerçek Frappe denemesinde İK yetki testlerinde 8 testin 8'i geçti. Yetki tablosunda 7 testin 7'si geçti. Birleşme PR 45 ile yayımlandı ama canlıda denenmedi.",
   "reviewed": [
    "G-155",
    "G-156",
@@ -869,8 +869,18 @@
   },
   "G-104": {
    "epic": "app-framework",
-   "status": "in-progress",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "4abc0cb3",
+    "release": {
+     "pr": 45,
+     "commit": "e4bce744"
+    },
+    "tests": [
+     "backend/apps/hrms_tr/hrms_tr/tests/test_permission_matrix.py"
+    ]
+   }
   },
   "G-105": {
    "epic": "app-framework",
