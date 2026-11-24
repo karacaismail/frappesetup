@@ -53,9 +53,15 @@ def check_install():
 	preserve_employee_permissions()
 
 
+# Types that get HRMS TR custom permission rows next to their standard ones.
+# "Leave Type" gets "select" so a leave role can search the link field of a leave application.
+PRESERVED_PERMISSION_DOCTYPES = ("Employee", "Leave Type")
+
+
 def preserve_employee_permissions():
 	# Frappe uses custom rows instead of the standard permissions once any custom row exists.
-	setup_custom_perms("Employee")
+	for doctype in PRESERVED_PERMISSION_DOCTYPES:
+		setup_custom_perms(doctype)
 
 
 def before_migrate():
@@ -155,4 +161,5 @@ def remove_policy_fixtures(keys=None):
 	# The framework commits app removal before after_uninstall and does not commit again.
 	frappe.db.commit()
 	frappe.clear_cache(doctype=DOCTYPE)
-	frappe.clear_cache(doctype="Employee")
+	for doctype in PRESERVED_PERMISSION_DOCTYPES:
+		frappe.clear_cache(doctype=doctype)
