@@ -87,6 +87,9 @@ ai_write_closed_doctypes = [
 website_user_allowed_methods = [
 	"platform_core.api.auth.logout",
 	"platform_core.api.auth.get_csrf_token",
+	# AtonotA Login reads (AJA-459). The server takes the person from the session, never from the request.
+	"platform_core.api.auth.list_login_providers",
+	"platform_core.api.auth.list_linked_accounts",
 	"platform_core.api.shell.get_bootstrap",
 	"platform_core.api.collection.group_summary",
 	"platform_core.api.meta.get_doctype",

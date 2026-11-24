@@ -718,7 +718,8 @@
           "query-users",
           "manage-users",
           "view-organizations",
-          "manage-organizations"
+          "manage-organizations",
+          "view-identity-providers"
         ]
       }
     ]
@@ -1094,7 +1095,8 @@
           "query-users",
           "manage-users",
           "view-organizations",
-          "manage-organizations"
+          "manage-organizations",
+          "view-identity-providers"
         ]
       }
     }

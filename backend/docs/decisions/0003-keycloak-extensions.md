@@ -73,7 +73,7 @@ Proje sahibinin kararı açıktır: sihirli bağlantı ve Apple ile giriş MVP'y
 
 ### identity-sync rolleri (sözleşme 26a274c)
 
-identity-sync davet ve kuruluş hazırlama için Keycloak'a yazar. Servis hesabı şu rolleri taşır: `view-users`, `query-users`, `manage-users`, `view-organizations`, `manage-organizations`. `manage-clients`, `manage-realm` ve `impersonation` yoktur. Roller yalnız `scope=admin-api kc-admin-api` belirtecine girer. Kiracı hedefli belirteç bu rolleri taşımaz ve Admin API'de 401 ya da 403 alır.
+identity-sync davet ve kuruluş hazırlama için Keycloak'a yazar. Servis hesabı şu rolleri taşır: `view-users`, `query-users`, `manage-users`, `view-organizations`, `manage-organizations`, `view-identity-providers`. `manage-clients`, `manage-realm` ve `impersonation` yoktur. Roller yalnız `scope=admin-api kc-admin-api` belirtecine girer. Kiracı hedefli belirteç bu rolleri taşımaz ve Admin API'de 401 ya da 403 alır.
 
 En az rol kümesi Keycloak 26.8.2 kaynağından çıkarıldı:
 
@@ -85,10 +85,39 @@ En az rol kümesi Keycloak 26.8.2 kaynağından çıkarıldı:
 | Kuruluşa üye ekleme ve çıkarma | `OrganizationMemberResource.java`: `auth.orgs().requireManage(organization)` ve `auth.users().requireView(member)` | `manage-organizations` ve `view-users` |
 | Kuruluş daveti | `OrganizationInvitationResource.java`: `auth.orgs().requireManage(organization)` | `manage-organizations` |
 | Kuruluş okuma ve arama | `auth.orgs().requireView(organization)` ve `requireQuery()` | `view-organizations` (bileşik: `query-organizations`) |
+| Giriş platformlarını okuma (AJA-459) | `GET /admin/realms/<realm>/identity-provider/instances`. Kaynak satırı bu işte açılmadı. Canlı Keycloak denemesi gerekir. | `view-identity-providers` |
 
 Bileşik roller `services/src/main/java/org/keycloak/services/managers/RealmManager.java` 285 ile 289. satırlarında tanımlıdır. `manage-*` rolleri `view-*` rollerini içermez. Bu yüzden `view-users` ve `view-organizations` açıkça verilir. Rol adları `server-spi-private/src/main/java/org/keycloak/models/AdminRoles.java` dosyasındadır.
 
 Canlı test (`test_identity_sync_admin_scope_can_create_user_and_organization`) admin-api belirteciyle kullanıcı ve kuruluş açar (201). Aynı belirteçle istemci açma 403 alır. Kiracı hedefli belirteç Admin API'de 401 ya da 403 alır (`test_kiraci_belirtecinde_yonetim_yetkisi_yok`).
+
+### AtonotA Login okuma uçları (AJA-459)
+
+Bu bölüm 24 Kasım 2026 Salı günü eklendi. Kaynak güvenlik incelemesidir (AJA-458).
+
+1. Panel iki şeyi okur: giriş platformlarını ve kullanıcının bağlı hesaplarını.
+2. Okumayı `identity-sync` yapar. Kiracı sitesi Keycloak yönetim rolü taşımaz.
+3. `identity-sync` hesabına yalnız `view-identity-providers` rolü eklendi. Rol yalnız `admin-api kc-admin-api` kapsamlı belirtece girer.
+4. `manage-identity-providers` rolü verilmez. Site servis hesabının rolleri değişmez.
+5. Platform listesi kiracıya göre süzülür. Başka kiracının kurumsal platformu listeye girmez.
+6. Sırrı olmayan platform listeye girmez. Servis bunu `config.clientSecret` alanından anlar. Boş değer ve çözülmemiş `${...}` değeri sır sayılmaz.
+7. Keycloak yönetim yanıtı sırrı `**********` diye gizler. Keycloak boş sırrı da böyle gizleyebilir. Bu durumda asıl denetim platformun açık olmasıdır. Kapalı platform listeye hiç girmez. Bu davranış canlı Keycloak 26 denemesiyle doğrulanmalıdır.
+8. Servis platform listesini 30 saniye tutar. Kapatılan bir platform bu süre boyunca listede kalabilir.
+
+Kalan risk şudur: ele geçirilmiş bir kiracı sitesi kendi üyelerinin bağlı hesaplarını okuyabilir. Site başka kiracının üyelerini okuyamaz. `identity-sync` kişinin kiracı üyesi olup olmadığına bakar. Bu sınır `/v1/sessions/revoke` ucundaki sınırla aynıdır. Güvenlik incelemesi bu riski kabul etti.
+
+Panel hesabı Frappe'de “Website User” türündedir. Frappe bu hesaba yalnız izin listesindeki yöntemleri açar. İki okuma yöntemi `platform_core/hooks.py` içindeki `website_user_allowed_methods` listesine eklendi. Yöntemler kişiyi yalnız oturumdan alır. `subject` ve `user` parametrelerini reddeder.
+
+#### Yerel yığında servis belirteci
+
+Bu karar 24 Kasım 2026 Salı günü yazıldı.
+
+1. Kiracı sitesi servis belirtecini Keycloak'tan HTTPS ile alır. Kod HTTP adresini her ortamda reddeder. Geliştirme bayrakları açıkken de reddeder. `test_keycloak_requires_https_even_with_both_development_flags` testi bu kuralı korur.
+2. Bu kural gevşetilmedi. Üretimde HTTP kabul eden yeni bir ayar eklenmedi.
+3. Yerel yığında Keycloak HTTP kullanır. Bu yüzden iki okuma ucu yerel yığında 503 verir. Telefon oturumu kapatma ucu da aynı nedenle yerelde çalışmaz.
+4. Yerel çözüm, birleştirme önizlemesindeki HTTPS aktarıcısıdır: `e2e/preview/session-tls.sh`. Aktarıcı `identity-sync` kapsayıcısında çalışır. Keycloak belirteç ucunu 9444 portunda, `identity-sync` uçlarını 9443 portunda HTTPS ile sunar.
+5. Aktarıcı yalnız adı yazılı yolları geçirir. İki okuma ucu bu listeye eklendi.
+6. Gerekçe şudur: belirteç bir sırla alınır. Sırrın düz HTTP ile gitmesine kod izin vermemelidir. Yerel kolaylık için üretim kodunda istisna açılmaz.
 
 ### Olay dinleyici eklentisi (sözleşme 26a274c, Proje kaydı A-10)
 

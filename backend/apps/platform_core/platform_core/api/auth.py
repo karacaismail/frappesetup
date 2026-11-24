@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
-from platform_core.identity import csrf_token, provider_setup, sign_in, sign_out
+from platform_core.identity import csrf_token, login_accounts, provider_setup, sign_in, sign_out
 from platform_core.identity.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
 from platform_core.identity.safe_errors import safe_errors
 from platform_core.shell.http import require_session
@@ -135,3 +135,30 @@ def setup_keycloak_login() -> dict:
 	"""Creates or updates the Keycloak “Social Login Key” from site settings. System Manager only."""
 	frappe.only_for("System Manager")
 	return provider_setup.ensure_social_login_key()
+
+
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
+@rate_limit(limit=login_accounts.RATE_LIMIT, seconds=60, user_based=True)
+@safe_errors
+def list_login_providers() -> dict:
+	"""The sign-in platforms this site may show (G-159, AJA-459). The list comes from identity-sync.
+
+	Guests get 403. The method takes no parameters. The reply is never stored (`no-store`)."""
+	require_session()
+	login_accounts.reject_parameters()
+	return login_accounts.list_login_providers()
+
+
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
+@rate_limit(limit=login_accounts.RATE_LIMIT, seconds=60, user_based=True)
+@safe_errors
+def list_linked_accounts() -> dict:
+	"""The linked platforms of the signed-in user (G-160, AJA-459). The list comes from identity-sync.
+
+	The person comes only from the session and its identity link. A `subject` or `user` parameter
+	is refused. Guests get 403. The reply is never stored (`no-store`)."""
+	require_session()
+	login_accounts.reject_parameters()
+	return login_accounts.list_linked_accounts()
