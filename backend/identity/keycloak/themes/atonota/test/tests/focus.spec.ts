@@ -106,7 +106,7 @@ const minimumChecked: Record<string, number> = {
   'update-profile': 3,
   'recovery-codes-setup': 4,
   'delete-credential': 2,
-  'sign-out-confirm': 1,
+  'sign-out-confirm': 3,
   'page-expired': 2,
 };
 
