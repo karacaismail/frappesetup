@@ -1,0 +1,1286 @@
+#!/usr/bin/env python3.14
+"""Start and stop the isolated tenant, Keycloak and Press development stack."""
+
+import argparse
+import hashlib
+import hmac
+import ipaddress
+import json
+import os
+import re
+import secrets
+import shutil
+import stat
+import subprocess
+import sys
+import urllib.parse
+from pathlib import Path
+
+BACKEND = Path(__file__).resolve().parents[1]
+# Tests may move BACKEND. The trusted credential root stays this checkout.
+REPOSITORY = Path(__file__).resolve().parents[2]
+CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
+REQUIRED_SETTING = re.compile(r"\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}")
+INCLUDE_FILE = re.compile(r"^\s*-\s*(?:path:\s*)?([A-Za-z0-9_.-]+\.ya?ml)\s*$")
+SECRET_PREFIXES = ("degistir-", "example-only-")
+SECRET_KEY = re.compile(r"(?:^|_)(?:SECRET|PASSWORD|TOKEN|P8_KEY)(?:_|$)")
+REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+
+
+def template_entries():
+    root = BACKEND if (BACKEND / "dev/.env.example").is_file() else REPOSITORY / "backend"
+    for template in (
+        root / "dev/.env.example",
+        root / "identity/keycloak/.env.example",
+        root / "dev/press/.env.example",
+    ):
+        for line in template.read_text().splitlines():
+            key, separator, value = line.partition("=")
+            if not separator or not key or key.startswith("#"):
+                continue
+            yield key, value
+
+
+def default_settings():
+    """Return non-secret template defaults without touching E2E_ENV_FILE.
+
+    A key that names a credential is never filled, even when the template holds a fake value.
+    """
+    return {
+        key: value
+        for key, value in template_entries()
+        if not value.startswith(SECRET_PREFIXES) and not SECRET_KEY.search(key)
+    }
+
+
+def project_name(environment):
+    """Give each canonical worktree and port base a stable resource namespace."""
+    port = environment["PANE_PORT"]
+    digest = hashlib.sha256(f"{BACKEND.resolve()}\n{port}".encode()).hexdigest()[:20]
+    return f"fs-e2e-{port}-{digest}"
+
+
+def env_file(value):
+    """Return a canonical environment file path inside this checkout."""
+    value = str(value)
+    if any(character in value for character in "\0\r\n"):
+        raise ValueError("E2E_ENV_FILE contains a control character.")
+    path = Path(value)
+    if path.name in ("", ".", ".."):
+        raise ValueError("E2E_ENV_FILE must name a file.")
+    # Resolve only the parent: credentials() must still reject a symlinked file.
+    path = Path(os.path.abspath(path.parent)).resolve() / path.name
+    if not path.is_relative_to(REPOSITORY.resolve()):
+        raise ValueError(f"E2E_ENV_FILE must be inside {REPOSITORY}.")
+    return path
+
+
+def assert_ignored(path):
+    """Refuse a credential path that Git could add to the public repository."""
+    git = shutil.which("git")
+    if not git:
+        raise ValueError("Git is required to check that E2E_ENV_FILE is ignored by Git.")
+    # GIT_* variables could point the check at another repository.
+    clean = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    result = run(
+        [git, "-C", str(REPOSITORY), "check-ignore", "-q", "--", str(path)],
+        clean,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        raise ValueError("E2E_ENV_FILE must be a path that is ignored by Git.")
+
+
+def container_ids(output):
+    ids = output.split()
+    if not all(CONTAINER_ID.fullmatch(value) for value in ids):
+        raise ValueError("Docker returned an invalid container ID.")
+    return ids
+
+
+def run(command, environment, check=True, **kwargs):
+    """Run Docker without a shell after checking every argument."""
+    if not command or not all(isinstance(argument, str) and "\0" not in argument for argument in command):
+        raise ValueError("Commands must be non-empty text arguments without NUL bytes.")
+    if "--env-file" in command:
+        index = command.index("--env-file") + 1
+        if index >= len(command) or str(env_file(command[index])) != command[index]:
+            raise ValueError("The Compose environment file was not validated.")
+    return subprocess.run(command, env=environment, check=check, **kwargs)
+
+
+def credentials(path):
+    """Read plain dotenv values, never execute them as shell code."""
+    if not path.exists() and not path.is_symlink():
+        values = {
+            key: secrets.token_urlsafe(32) if value.startswith(SECRET_PREFIXES) else value
+            for key, value in template_entries()
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # The staging file holds secrets too, so Git must ignore its name before it exists.
+        # The name is independent of the target so one narrow .gitignore rule covers it.
+        staging = path.parent / f".fs-stack-env.{secrets.token_hex(8)}.tmp"
+        assert_ignored(staging)
+        descriptor = os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(descriptor, "w") as stream:
+                stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
+                stream.flush()
+                os.fsync(stream.fileno())
+                # Publish only complete credentials and never overwrite a competing writer.
+                try:
+                    os.link(staging, path)
+                except FileExistsError:
+                    pass
+        finally:
+            staging.unlink(missing_ok=True)
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
+        raise ValueError("The environment file must be a private regular file (0600).")
+    values = {}
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        if not separator or not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
+            raise ValueError("Invalid environment file syntax.")
+        values[key] = value
+    return values
+
+
+def setup():
+    port = os.environ.get("PANE_PORT", "")
+    if not re.fullmatch(r"[1-9][0-9]{3,4}", port) or int(port) > 65526:
+        raise ValueError("PANE_PORT must be an integer from 1000 to 65526.")
+    profile = os.environ.get("FS_COLIMA_PROFILE", "factory")
+    if profile not in ("factory", "default"):
+        raise ValueError("FS_COLIMA_PROFILE must be factory or default.")
+    port = int(port)
+    context = "colima-factory" if profile == "factory" else "colima"
+    path = env_file(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
+    assert_ignored(path)
+    environment = {**default_settings(), **os.environ, **credentials(path)}
+    environment.update(
+        {
+            "PANE_PORT": str(port),
+            "FS_COLIMA_PROFILE": profile,
+            "FS_TENANT_WEB_PORT": str(port + 1),
+            "FS_TENANT_SOCKET_PORT": str(port + 2),
+            "PTR_WEB_PORT": str(port + 3),
+            "PTR_SOCKET_PORT": str(port + 4),
+            "IDENTITY_SYNC_PORT": str(port + 5),
+            "IDENTITY_SYNC_EVENTS_URL": "http://identity-sync.localhost:6115/v1/events",
+            "KC_PORT": str(port),
+            "KC_PUBLIC_URL": f"http://identity.localhost:{port}",
+            "MAILPIT_UI_PORT": str(port + 6),
+            "ATONOTA_SITE_TENANT1_URL": f"http://tenant1.localhost:{port + 1}",
+            "ATONOTA_PRESS_URL": f"http://press.localhost:{port + 3}",
+        }
+    )
+    environment["FS_STACK_IMAGE_TAG"] = project_name(environment)
+    if environment.get("IDENTITY_SYNC_WEBHOOK_SECRET"):
+        # Domain separation keeps preview digests distinct from event signatures.
+        environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
+            environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),
+            b"frappesetup-e2e-preview-digest-v1",
+            hashlib.sha256,
+        ).hexdigest()
+    engine = ["docker", "--context", context]
+    compose = [
+        *engine,
+        "compose",
+        "--project-name",
+        project_name(environment),
+        "--env-file",
+        str(path),
+        "--file",
+        str(BACKEND / "dev/compose.yaml"),
+    ]
+    # Name missing local settings before any Docker call, whatever the action.
+    require_compose_settings(compose, environment)
+    return environment, engine, compose
+
+
+def assert_owner(engine, compose, environment, create=False):
+    """Reject foreign resources even inside the worktree's own namespace."""
+    project = project_name(environment)
+    env_path = str(Path(compose[compose.index("--env-file") + 1]).resolve())
+    owner = hashlib.sha256(
+        f"{BACKEND.resolve()}\n{environment['PANE_PORT']}\n{env_path}".encode()
+    ).hexdigest()
+    marker = project + "-owner"
+    label = "io.frappesetup.stack-owner"
+    ids = container_ids(
+        run(
+            [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
+            environment,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
+    if ids:
+        containers = json.loads(
+            run([*engine, "inspect", *ids], environment, capture_output=True, text=True).stdout
+        )
+        for container in containers:
+            labels = container["Config"].get("Labels") or {}
+            name = container.get("Name", "").lstrip("/") or container.get("Id", "")[:12]
+            working_dir = labels.get("com.docker.compose.project.working_dir")
+            if not working_dir:
+                # Compose writes its project label into every image it builds. A container that
+                # `docker run` starts from the stack's tenant image inherits that label (T-17).
+                raise ValueError(
+                    f"Container {name} carries this stack's Compose project label, but Compose did not "
+                    "start it. It was probably started with docker run from the stack's tenant image, "
+                    "which holds the label. Stop that container, or start it with "
+                    "--label com.docker.compose.project= so that it leaves the project."
+                )
+            if working_dir != str(BACKEND / "dev"):
+                raise ValueError(
+                    f"This Compose project belongs to another worktree: container {name} was started "
+                    f"from {working_dir}."
+                )
+            recorded_env = labels.get("com.docker.compose.project.environment_file")
+            if not recorded_env or str(Path(recorded_env).resolve()) != env_path:
+                raise ValueError("This Compose project uses another environment file.")
+            for item in container["Config"].get("Env", []):
+                key, _, value = item.partition("=")
+                if key in ("KC_HTTP_PORT", "FS_TENANT_WEB_PORT", "PTR_WEB_PORT"):
+                    expected = environment["KC_PORT" if key == "KC_HTTP_PORT" else key]
+                    if value != expected:
+                        raise ValueError("This Compose project uses another Pane port range.")
+    volumes = run(
+        [*engine, "volume", "ls", "--format", "{{.Name}}"], environment, capture_output=True, text=True
+    ).stdout.splitlines()
+    if marker not in volumes and any(name.startswith(project + "_") for name in volumes):
+        raise ValueError("Unclaimed stack volumes exist. Their ownership must be checked before reuse.")
+    if create and marker not in volumes:
+        run(
+            [*engine, "volume", "create", "--label", f"{label}={owner}", marker],
+            environment,
+            stdout=subprocess.DEVNULL,
+        )
+    if create or marker in volumes:
+        result = run([*engine, "volume", "inspect", marker], environment, capture_output=True, text=True)
+        actual = json.loads(result.stdout)[0].get("Labels", {}).get(label)
+        if actual != owner:
+            raise ValueError("This stack's saved volumes belong to another worktree or port range.")
+
+
+def compose_files(compose):
+    entry = (
+        Path(compose[compose.index("--file") + 1])
+        if "--file" in compose and compose.index("--file") + 1 < len(compose)
+        else BACKEND / "dev/compose.yaml"
+    )
+    pending = [entry]
+    seen = []
+    while pending:
+        current = pending.pop(0)
+        if current in seen or not current.is_file():
+            continue
+        seen.append(current)
+        for line in current.read_text().splitlines():
+            match = INCLUDE_FILE.match(line)
+            if match:
+                pending.append(current.parent / match.group(1))
+    return seen
+
+
+def required_compose_settings(compose):
+    required_keys = []
+    for manifest in compose_files(compose):
+        text = manifest.read_text()
+        # Exclude nested fallbacks like ${FS_STACK_IMAGE_TAG:-${KC_PORT:?}} when the outer variable is set.
+        for outer, inner in re.findall(r"\$\{([A-Z][A-Z0-9_]*):-\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}\}", text):
+            text = re.sub(
+                rf"\$\{{{outer}:-\$\{{{inner}:\?[^}}]*\}}\}}",
+                f"${{{outer}:-}}",
+                text,
+            )
+            required_keys.append((outer, inner))
+        for key in REQUIRED_SETTING.findall(text):
+            if key != "IDENTITY_SYNC_DIGEST_KEY" and key not in required_keys:
+                required_keys.append(key)
+    return required_keys
+
+
+def require_compose_settings(compose, environment):
+    """Name missing Compose settings without printing any value or starting Docker."""
+    missing = []
+    for item in required_compose_settings(compose):
+        if isinstance(item, tuple):
+            outer, inner = item
+            if not environment.get(outer) and not environment.get(inner) and inner not in missing:
+                missing.append(inner)
+        elif not environment.get(item) and item not in missing:
+            missing.append(item)
+    if missing:
+        raise ValueError(
+            "Stack setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from the .env.example files into E2E_ENV_FILE."
+        )
+
+
+def config(compose, environment):
+    require_compose_settings(compose, environment)
+    result = run(
+        [*compose, "config", "--format", "json"],
+        environment,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def resources(engine, environment):
+    # Read the VM filesystem and memory without SSH or a host bind mount.
+    result = run(
+        [
+            *engine,
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "--tmpfs",
+            "/data",
+            "--entrypoint",
+            "sh",
+            REDIS,
+            "-c",
+            "df -Pk /; free -m",
+        ],
+        environment,
+        capture_output=True,
+        text=True,
+    )
+    print(result.stdout, flush=True)
+    lines = result.stdout.splitlines()
+    disk = int(lines[1].split()[3])
+    memory = int(next(line for line in lines if line.startswith("Mem:")).split()[-1])
+    return disk, memory
+
+
+def ensure_images(engine, compose, environment, model):
+    for service in ("tenant-web", "keycloak", "event-sink", "web", "identity-sync"):
+        image = model["services"][service].get("image") or f"{project_name(environment)}-{service}"
+        found = subprocess.run(
+            [*engine, "image", "inspect", image],
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        # Refresh both halves of the event contract, including the dev HTTP allowlist.
+        if found.returncode or service in ("keycloak", "identity-sync"):
+            run([*compose, "build", service], environment)
+
+
+def check(compose, environment):
+    """Probe real service protocols, not only container process state."""
+    model = config(compose, environment)
+    result = run(
+        [*compose, "ps", "--all", "--format", "json"],
+        environment,
+        capture_output=True,
+        text=True,
+    )
+    records = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    states = {record["Service"]: record for record in records}
+    for service in model["services"]:
+        record = states.get(service, {})
+        if record.get("State") != "running" or record.get("Health", "") not in (
+            "",
+            "healthy",
+        ):
+            raise ValueError(f"Service is not ready: {service}")
+    probes = {
+        "tenant-web": [
+            "env/bin/python",
+            "-c",
+            "import urllib.request; "
+            "r=urllib.request.urlopen('http://tenant1.localhost:' + "
+            "__import__('os').environ['FS_TENANT_WEB_PORT'] + '/api/method/ping', timeout=10); "
+            "assert __import__('json').load(r)['message']=='pong'",
+        ],
+        "tenant-socket": [
+            "node",
+            "-e",
+            "const s=require('net').connect(Number(process.env.FS_TENANT_SOCKET_PORT),'127.0.0.1',"
+            "()=>s.end());s.on('error',()=>process.exit(1));s.setTimeout(5000,()=>process.exit(1));",
+        ],
+        "web": [
+            "bash",
+            "-lc",
+            "cd /home/frappe/benches/frappe-bench && env/bin/python -c "
+            '"import urllib.request,json,os; '
+            "r=urllib.request.urlopen('http://press.localhost:'+os.environ['PTR_WEB_PORT']+"
+            "'/api/method/ping', timeout=10); assert json.load(r)['message']=='pong'\"",
+        ],
+        "redis": ["redis-cli", "ping"],
+        "identity-sync": [
+            "python",
+            "-c",
+            "import urllib.request; urllib.request.urlopen('http://127.0.0.1:6115/healthz', timeout=5)",
+        ],
+        "event-sink": ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"],
+        "mailpit": ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8025/livez"],
+    }
+    for service, command in probes.items():
+        run([*compose, "exec", "-T", service, *command], environment)
+        print(f"{service}: pass", flush=True)
+    run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "web",
+            "bash",
+            "-lc",
+            "cd /home/frappe/benches/frappe-bench && env/bin/python -c "
+            "\"import os,socket; socket.create_connection(('127.0.0.1',"
+            "int(os.environ['PTR_SOCKET_PORT'])),10).close()\"",
+        ],
+        environment,
+    )
+    run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "tenant-web",
+            "env/bin/python",
+            "-c",
+            "import urllib.request,json; "
+            f"issuer={environment['KC_PUBLIC_URL']!r}+'/realms/platform'; "
+            "r=urllib.request.urlopen(issuer+'/.well-known/openid-configuration', timeout=10); "
+            "assert json.load(r)['issuer']==issuer",
+        ],
+        environment,
+    )
+    print("Tenant to Keycloak discovery: pass", flush=True)
+    run([*compose, "ps"], environment)
+
+
+def check_resources(engine, environment):
+    disk, memory = resources(engine, environment)
+    if disk < 10 * 1024 * 1024 or memory < 3 * 1024:
+        raise ValueError("Startup requires 10 GiB free disk and 3 GiB available memory.")
+
+
+PRESS_SETTINGS = ("ATONOTA_PRESS_URL", "KC_PUBLIC_URL", "ATONOTA_PRESS_SECRET", "ATONOTA_PRESS_SERVICE_SECRET")
+
+
+def require_press_settings(environment):
+    """Name missing Press settings without printing any value."""
+    missing = [key for key in PRESS_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Press setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
+def configure_press(compose, environment):
+    require_press_settings(environment)
+    settings = {
+        "host_name": environment["ATONOTA_PRESS_URL"],
+        "keycloak_public_url": environment["KC_PUBLIC_URL"],
+        "keycloak_internal_url": environment["KC_PUBLIC_URL"],
+        "keycloak_realm": "platform",
+        "keycloak_client_id": "press",
+        "keycloak_client_secret": environment["ATONOTA_PRESS_SECRET"],
+        "press_identity_sync_user": "identity-sync@example.test",
+        "press_service_client_secret": environment["ATONOTA_PRESS_SERVICE_SECRET"],
+        "identity_sync_url": "http://identity-sync.localhost:6115",
+    }
+    script = (BACKEND / "e2e/preview/configure-stack-press.py").read_text()
+    run(
+        [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench",
+         "web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(settings),
+        text=True,
+    )
+
+
+VITE_ORIGIN = "http://localhost:5180"
+TENANT_CALLBACK = "/api/method/platform_core.api.auth.keycloak_callback"
+TENANT_LOGIN_SETTINGS = ("ATONOTA_SITE_TENANT1_URL", "ATONOTA_SITE_TENANT1_SECRET")
+
+
+def require_tenant_login_settings(environment):
+    """Name missing tenant sign-in settings without printing any value (review item K-3)."""
+    missing = [key for key in TENANT_LOGIN_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Tenant sign-in needs these settings: "
+            + ", ".join(missing)
+            + ". setup() derives the tenant URL from PANE_PORT. Copy the missing secret from"
+            " backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
+def tenant_browser_origin(environment):
+    if environment.get("FS_STACK_VITE") == "1":
+        return VITE_ORIGIN
+    return environment["ATONOTA_SITE_TENANT1_URL"]
+
+
+def tenant_login_settings(environment):
+    origin = tenant_browser_origin(environment)
+    settings = {
+        "keycloak_public_url": environment["KC_PUBLIC_URL"],
+        "keycloak_internal_url": environment["KC_PUBLIC_URL"],
+        "keycloak_client_id": "site-tenant1",
+        "keycloak_client_secret": environment["ATONOTA_SITE_TENANT1_SECRET"],
+        "identity_brand_name": "AtonotA Login",
+        "platform_panel_url": origin + "/panel",
+    }
+    if environment.get("FS_STACK_VITE") == "1":
+        settings["host_name"] = origin
+    return settings
+
+
+def configure_tenant_login(compose, environment):
+    script = """import json, sys
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+path = Path("sites/tenant1.localhost/site_config.json")
+config = json.loads(path.read_text())
+config.update(json.load(sys.stdin))
+with NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
+    temporary = Path(stream.name)
+    try:
+        json.dump(config, stream, indent=2)
+        stream.write(chr(10))
+        stream.flush()
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+"""
+    run(
+        [*compose, "run", "--rm", "--no-deps", "-T", "tenant-web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(tenant_login_settings(environment)),
+        text=True,
+    )
+
+
+TENANT_SETTINGS = (
+    "KC_PUBLIC_URL",
+    "ATONOTA_SITE_TENANT1_URL",
+    "ATONOTA_SITE_TENANT1_SECRET",
+    "ATONOTA_SITE_TENANT1_SERVICE_SECRET",
+    "IDENTITY_BRAND_NAME",
+)
+# The apps of the tenant that Press is bound to. HRMS TR is part of the MVP (MVP test 2, row 5e).
+TENANT_APPS = ("erpnext", "platform_core", "hrms", "hrms_tr")
+
+
+def require_tenant_settings(environment):
+    """Name missing tenant settings without printing any value."""
+    missing = [key for key in TENANT_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Tenant setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
+def configure_tenant(compose, environment):
+    """Write the tenant's Keycloak settings (platform_core identity/README.md, site settings).
+
+    Builds on the sign-in settings of `configure_tenant_login`, so the Vite browser origin stays,
+    and adds the realm and the service client that identity-sync calls the tenant with.
+    """
+    require_tenant_settings(environment)
+    settings = {
+        **tenant_login_settings(environment),
+        "keycloak_realm": "platform",
+        "keycloak_service_client_id": "site-tenant1-service",
+        "keycloak_service_client_secret": environment["ATONOTA_SITE_TENANT1_SERVICE_SECRET"],
+        "identity_brand_name": environment["IDENTITY_BRAND_NAME"],
+    }
+    script = (BACKEND / "e2e/preview/configure-stack-tenant.py").read_text()
+    run(
+        [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(settings),
+        text=True,
+    )
+
+
+def stack_realm(realm, environment):
+    origin = tenant_browser_origin(environment)
+    if origin != environment["ATONOTA_SITE_TENANT1_URL"]:
+        tenant = next(client for client in realm["clients"] if client["clientId"] == "site-tenant1")
+        tenant["redirectUris"].append(origin + TENANT_CALLBACK)
+        logout_uris = tenant["attributes"]["post.logout.redirect.uris"]
+        recovery = "/api/method/platform_core.api.auth.start_login?switch_account=1"
+        tenant["attributes"]["post.logout.redirect.uris"] = "##".join(
+            (logout_uris, origin + "/panel", origin + recovery)
+        )
+    return realm
+
+
+REALM_SYNC = BACKEND / "identity/keycloak/bin/sync-dev-realm.py"
+REALM_FILE = BACKEND / "identity/keycloak/realm/platform-realm.json"
+
+
+REALM_SYNC_SETTINGS = ("KC_PUBLIC_URL", "KC_BOOTSTRAP_ADMIN_USERNAME", "KC_BOOTSTRAP_ADMIN_PASSWORD")
+
+
+def require_realm_sync_settings(environment):
+    """Name missing Keycloak admin settings without printing any value."""
+    missing = [key for key in REALM_SYNC_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Realm sync needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
+def sync_realm(compose, environment):
+    """Apply the realm file's clients and scopes to a kept Keycloak database (finding T-11).
+
+    --import-realm skips an existing realm. The sync runs in the stack network, so it reaches only
+    this stack's Keycloak. Secrets travel on stdin, never on the command line.
+    """
+    require_realm_sync_settings(environment)
+    realm_text = REALM_FILE.read_text()
+    names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)", realm_text))
+    payload = {
+        "keycloak_url": environment["KC_PUBLIC_URL"],
+        "realm": stack_realm(json.loads(realm_text), environment),
+        "values": {name: environment[name] for name in sorted(names) if name in environment},
+        "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+        "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+    }
+    run(
+        [*compose, "run", "--rm", "--no-deps", "-T", "identity-sync", "python", "-I", "-c",
+         REALM_SYNC.read_text(), "--stdin"],
+        environment,
+        input=json.dumps(payload),
+        text=True,
+    )
+
+
+def up(engine, compose, environment):
+    # Fail before any container work, not after a long startup.
+    require_press_settings(environment)
+    require_tenant_settings(environment)
+    require_realm_sync_settings(environment)
+    require_tenant_login_settings(environment)
+    check_resources(engine, environment)
+    model = config(compose, environment)
+    ensure_images(engine, compose, environment, model)
+    run(
+        [
+            *compose,
+            "up",
+            "-d",
+            "--wait",
+            "--wait-timeout",
+            "180",
+            "tenant-db",
+            "tenant-redis",
+            "mariadb",
+            "redis",
+            "keycloak",
+            "mailpit",
+            "event-sink",
+        ],
+        environment,
+    )
+    sync_realm(compose, environment)
+    realm_id = run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "keycloak-db",
+            "psql",
+            "-U",
+            "keycloak",
+            "-d",
+            "keycloak",
+            "-Atc",
+            "SELECT id FROM realm WHERE name = 'platform'",
+        ],
+        environment,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", realm_id):
+        raise ValueError("The platform realm must have one valid internal ID.")
+    environment["IDENTITY_SYNC_REALM_ID"] = realm_id
+    run([*compose, "up", "-d", "--no-build", "--wait", "identity-sync"], environment)
+    run(
+        [
+            *compose,
+            "run",
+            "--rm",
+            "--no-deps",
+            "tenant-web",
+            "env/bin/python",
+            "/workspace/dev/bootstrap.py",
+            "tenant1.localhost",
+            *(argument for app in TENANT_APPS for argument in ("--app", app)),
+        ],
+        environment,
+    )
+    configure_tenant_login(compose, environment)
+    run(
+        [*compose, "up", "-d", "--no-build", "tenant-web", "tenant-socket", "web"],
+        environment,
+    )
+    configure_tenant(compose, environment)
+    run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "--user",
+            "root",
+            "web",
+            "install",
+            "-d",
+            "-o",
+            "frappe",
+            "-g",
+            "frappe",
+            "/home/frappe/benches",
+            "/home/frappe/benches/source",
+        ],
+        environment,
+    )
+    run(
+        [
+            *compose,
+            "cp",
+            str(BACKEND / "apps/press_tr"),
+            "web:/home/frappe/benches/source/",
+        ],
+        environment,
+    )
+    ready = run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "web",
+            "test",
+            "-f",
+            "/home/frappe/benches/.stack-installed",
+        ],
+        environment,
+        check=False,
+    )
+    if ready.returncode:
+        with (BACKEND / "dev/press/install.sh").open() as stream:
+            run([*compose, "exec", "-T", "web", "bash", "-s"], environment, stdin=stream)
+        run(
+            [
+                *compose,
+                "exec",
+                "-T",
+                "web",
+                "touch",
+                "/home/frappe/benches/.stack-installed",
+            ],
+            environment,
+        )
+    else:
+        run(
+            [
+                *compose,
+                "exec",
+                "-T",
+                "web",
+                "bash",
+                "-lc",
+                "cd /home/frappe/benches/frappe-bench && bench --site press.localhost migrate",
+            ],
+            environment,
+        )
+    configure_press(compose, environment)
+    run(
+        [
+            *compose,
+            "exec",
+            "-d",
+            "web",
+            "bash",
+            "-lc",
+            "cd /home/frappe/benches/frappe-bench && "
+            'if ! curl -fsS -o /dev/null "http://press.localhost:$PTR_WEB_PORT/api/method/ping"; then '
+            "exec bench start > logs/bench-start.log 2>&1; fi",
+        ],
+        environment,
+    )
+    # This is a bounded startup check, not a scheduled job.
+    run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "web",
+            "bash",
+            "-lc",
+            "curl --retry 30 --retry-delay 2 --retry-connrefused --retry-all-errors "
+            '--max-time 5 -fsS -o /dev/null "http://press.localhost:$PTR_WEB_PORT/api/method/ping"',
+        ],
+        environment,
+    )
+    check(compose, environment)
+    resources(engine, environment)
+    ids = container_ids(run([*compose, "ps", "-q"], environment, capture_output=True, text=True).stdout)
+    run(
+        [*engine, "stats", "--no-stream", "--format", "{{.Name}}: {{.MemUsage}}", *ids],
+        environment,
+    )
+
+
+FIXTURE_NAME = re.compile(r"E2E_[A-Z0-9_]+")
+EXTRA_LABEL = "io.frappesetup.stack-extra"
+PROVIDER_ALIAS = "e2e-provider"
+
+
+def preview_fixtures():
+    """Load the merge preview's fixture helpers. The stack reuses them and does not copy them."""
+    preview = BACKEND / "e2e/preview"
+    if str(preview) not in sys.path:
+        sys.path.insert(0, str(preview))
+    import fixtures
+
+    return fixtures
+
+
+def stop_provider(engine, environment):
+    """Remove this stack's fake model provider. Compose does not own it, so down alone misses it."""
+    label = f"label={EXTRA_LABEL}={project_name(environment)}"
+    ids = container_ids(
+        run([*engine, "ps", "-aq", "--filter", label], environment, capture_output=True, text=True).stdout
+    )
+    if ids:
+        run([*engine, "rm", "-f", *ids], environment, stdout=subprocess.DEVNULL)
+
+
+def start_provider(engine, environment):
+    """Start the fake model provider on the stack network and return its private address.
+
+    The provider runs from the tenant image. The image holds Compose's project and service labels,
+    so the run clears them and adds the stack's own extra label instead (T-17).
+    """
+    project = project_name(environment)
+    name = f"{project}-provider"
+    port = int(environment["PANE_PORT"]) + 7
+    running = run(
+        [*engine, "ps", "-q", "--filter", f"name=^{name}$"], environment, capture_output=True, text=True
+    ).stdout.strip()
+    if not running:
+        image = run(
+            [*engine, "inspect", "--format", "{{.Config.Image}}", f"{project}-tenant-web-1"],
+            environment,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        run(
+            [
+                *engine, "run", "-d", "--rm", "--name", name,
+                "--label", "com.docker.compose.project=", "--label", "com.docker.compose.service=",
+                "--label", f"{EXTRA_LABEL}={project}",
+                "--network", f"{project}_default", "--network-alias", PROVIDER_ALIAS, "--memory", "96m",
+                "--publish", f"127.0.0.1:{port}:{port}",
+                "--env", f"PANE_PORT={environment['PANE_PORT']}", "--env", "E2E_PROVIDER_BIND=0.0.0.0",
+                "--entrypoint", "node", image,
+                "--input-type=module", "-e", (BACKEND / "e2e/fake-provider.mjs").read_text(),
+            ],
+            environment,
+            capture_output=True,
+            text=True,
+        )
+    address = run(
+        [*engine, "inspect", "--format",
+         "{{(index .NetworkSettings.Networks \"%s_default\").IPAddress}}" % project, name],
+        environment,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    try:
+        parsed = ipaddress.ip_address(address)
+    except ValueError:
+        parsed = None
+    if not parsed or not parsed.is_private or parsed.is_loopback or parsed.is_link_local:
+        raise ValueError("The fake model provider has no private address on the stack network.")
+    return address
+
+
+def seed_preview(engine, compose, environment):
+    """Prepare the API and browser test data on a running stack (MVP test 3, T-16).
+
+    The merge preview's helpers seed Keycloak from this computer and the tenant inside its
+    container. The tenant keeps the Keycloak settings that stack up wrote. Press is not seeded
+    here: seed-deletion prepares the Press deletion chain. Run it once on a new stack.
+    """
+    require_tenant_settings(environment)
+    require_realm_sync_settings(environment)
+    fixtures = preview_fixtures()
+    port = int(environment["KC_PORT"])
+    os.environ.pop("E2E_BROWSER_RUNTIME", None)
+    os.environ.update(
+        FS_COLIMA_PROFILE=environment["FS_COLIMA_PROFILE"],
+        E2E_FULL_BROWSER_FIXTURES="1",
+        E2E_KEYCLOAK_CLIENT_SECRET=environment["ATONOTA_SITE_TENANT1_SECRET"],
+        E2E_KEYCLOAK_SERVICE_CLIENT_SECRET=environment["ATONOTA_SITE_TENANT1_SERVICE_SECRET"],
+        E2E_KEYCLOAK_ADMIN_USER=environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+        E2E_KEYCLOAK_ADMIN_PASSWORD=environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+    )
+    existing = fixtures.keycloak_request(
+        port,
+        "/admin/realms/platform/users?exact=true&email=" + fixtures.LOGIN_EMAIL,
+        token=fixtures.admin_access_token(port),
+    )
+    if existing:
+        raise ValueError(
+            "This stack's Keycloak already holds the preview accounts. If the first seed-preview run "
+            "finished, use the fixture file it wrote. If that run failed, the stack holds part of the "
+            "fixtures and cannot be seeded again: open a new stack with another PANE_PORT."
+        )
+    address = start_provider(engine, environment)
+    password, browser_fixtures, lifecycle, sync_client = fixtures.seed_identities(port)
+    settings = {
+        "PANE_PORT": environment["PANE_PORT"],
+        "E2E_PROVIDER_IP": address,
+        "E2E_PREVIEW_SYNC_ORIGIN": environment["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
+        "E2E_PREVIEW_LOGIN_EMAIL": fixtures.LOGIN_EMAIL,
+        "E2E_LIFECYCLE_IDENTITIES": fixtures.lifecycle_identities(lifecycle),
+    }
+    tenant = _seed_output(
+        run(
+            [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c",
+             (BACKEND / "e2e/preview/site-seed.py").read_text(), "stack-tenant"],
+            environment,
+            input=json.dumps(settings),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    return fixtures.account_fixtures(tenant, lifecycle, browser_fixtures, password, sync_client)
+DELETION_SCRIPTS = {
+    name: BACKEND / "e2e/preview" / f"stack-deletion-{name}.py" for name in ("keycloak", "tenant", "press")
+}
+
+
+def seed_deletion(compose, environment):
+    """Prepare one synthetic account for the Press deletion chain test (MVP test 2, row 5e).
+
+    Keycloak gets the account and a read-only client. The tenant gets the identity link, a company
+    and an Employee with personal fields. Press gets the identity link. Every secret travels on
+    stdin and is returned only in the fixture mapping.
+    """
+    require_tenant_settings(environment)
+    require_realm_sync_settings(environment)
+    if not environment.get("ATONOTA_IDENTITY_SYNC_SECRET"):
+        raise ValueError("The deletion fixture needs ATONOTA_IDENTITY_SYNC_SECRET in E2E_ENV_FILE.")
+    email = f"e2e-delete-{secrets.token_hex(4)}@example.test"
+    password = "Aa9!" + secrets.token_urlsafe(24)
+    issuer = environment["KC_PUBLIC_URL"] + "/realms/platform"
+    account = _seed_output(
+        run(
+            [*compose, "run", "--rm", "--no-deps", "-T", "identity-sync", "python", "-I", "-c",
+             DELETION_SCRIPTS["keycloak"].read_text()],
+            environment,
+            input=json.dumps(
+                {
+                    "keycloak_url": environment["KC_PUBLIC_URL"],
+                    "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+                    "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+                    "identity_sync_secret": environment["ATONOTA_IDENTITY_SYNC_SECRET"],
+                    "email": email,
+                    "password": password,
+                }
+            ),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    identity = json.dumps({"issuer": issuer, "subject": account["subject"], "email": email})
+    tenant = _seed_output(
+        run(
+            [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c", DELETION_SCRIPTS["tenant"].read_text()],
+            environment,
+            input=identity,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    press = _seed_output(
+        run(
+            [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench", "web",
+             "env/bin/python", "-c", DELETION_SCRIPTS["press"].read_text()],
+            environment,
+            input=identity,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    return {
+        "E2E_PRESS_DELETION": "1",
+        "E2E_DELETE_EMAIL": email,
+        "E2E_DELETE_PASSWORD": password,
+        "E2E_DELETE_SUBJECT": account["subject"],
+        "E2E_LIFECYCLE_READER_CLIENT": account["reader_client"],
+        "E2E_LIFECYCLE_READER_SECRET": account["reader_secret"],
+        "E2E_DELETE_SERVICE_TOKEN": account["service_token"],
+        **tenant,
+        **press,
+    }
+
+
+REVIEW_ACCOUNTS = BACKEND / "e2e/review-accounts.json"
+REVIEW_SCRIPTS = {
+    name: BACKEND / "e2e/preview" / f"stack-review-{name}.py" for name in ("keycloak", "tenant", "press")
+}
+# The production rule stays 12 characters. Only the running local Keycloak uses this while
+# review-accounts sets the passwords.
+REVIEW_RELAXED_LENGTH = 8
+REVIEW_LOCAL_SETTINGS = ("KC_PUBLIC_URL", "ATONOTA_SITE_TENANT1_URL", "ATONOTA_PRESS_URL")
+LOCAL_HOST = re.compile(r"(?:localhost|127\.0\.0\.1|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.localhost)")
+REVIEW_EMAIL = re.compile(r"inceleme-[a-z-]+@example\.test")
+
+
+def load_review_accounts(path=REVIEW_ACCOUNTS):
+    """Read the local review accounts. Only synthetic example.test names and a local admin name pass."""
+    data = json.loads(path.read_text())
+    password = data.get("password")
+    accounts = data.get("accounts")
+    if not isinstance(password, str) or not password or not isinstance(accounts, list) or not accounts:
+        raise ValueError("review-accounts.json needs a password and a list of accounts.")
+    for account in accounts:
+        realm, username = account.get("realm"), account.get("username")
+        if realm == "platform" and isinstance(username, str) and REVIEW_EMAIL.fullmatch(username):
+            continue
+        if realm == "master" and isinstance(username, str) and re.fullmatch(r"inceleme-[a-z-]+", username):
+            continue
+        raise ValueError("A review account must be a synthetic inceleme-*@example.test platform user"
+                         " or a local inceleme-* master user.")
+    return data
+
+
+def require_local_stack(environment):
+    """Stop unless every address of the stack is a plain-HTTP localhost address."""
+    for key in REVIEW_LOCAL_SETTINGS:
+        parts = urllib.parse.urlsplit(environment.get(key, ""))
+        if (
+            parts.scheme != "http"
+            or not LOCAL_HOST.fullmatch(parts.hostname or "")
+            or parts.path not in ("", "/")
+            or parts.query
+            or parts.username
+        ):
+            raise ValueError(f"review-accounts runs only on a local stack. {key} is not a localhost address.")
+
+
+def review_accounts(compose, environment):
+    """Create or update the local review accounts (backend/e2e/review-accounts.json).
+
+    Keycloak gets the users and the shared review password, the tenant gets the roles and the
+    identity links, and Press gets the identity link. The password travels on stdin only.
+    """
+    require_local_stack(environment)
+    require_realm_sync_settings(environment)
+    data = load_review_accounts()
+    accounts = data["accounts"]
+    issuer = environment["KC_PUBLIC_URL"] + "/realms/platform"
+    keycloak = _seed_output(
+        run(
+            [*compose, "run", "--rm", "--no-deps", "-T", "identity-sync", "python", "-I", "-c",
+             REVIEW_SCRIPTS["keycloak"].read_text()],
+            environment,
+            input=json.dumps(
+                {
+                    "keycloak_url": environment["KC_PUBLIC_URL"],
+                    "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
+                    "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+                    "password": data["password"],
+                    "relaxed_length": REVIEW_RELAXED_LENGTH,
+                    # The rule of the realm file, not of the running Keycloak, so a killed
+                    # earlier run cannot leave the relaxed rule in place for good.
+                    "restore_policy": json.loads(REALM_FILE.read_text())["passwordPolicy"],
+                    "accounts": accounts,
+                }
+            ),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    subjects = keycloak.get("subjects")
+    if not isinstance(subjects, dict):
+        raise ValueError("The Keycloak review script returned no subjects.")
+
+    def linked(account):
+        return {"email": account["username"], "subject": subjects[account["username"]]}
+
+    tenant_accounts = [
+        {**linked(account), "first_name": account["first_name"], "last_name": account["last_name"],
+         "tenant_roles": account["tenant_roles"], "employee": bool(account.get("employee"))}
+        for account in accounts if account.get("tenant_roles")
+    ]
+    press_accounts = [linked(account) for account in accounts if account.get("press")]
+    tenant = _seed_output(
+        run(
+            [*compose, "exec", "-T", "tenant-web", "env/bin/python", "-c", REVIEW_SCRIPTS["tenant"].read_text()],
+            environment,
+            input=json.dumps({"issuer": issuer, "accounts": tenant_accounts}),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    press = _seed_output(
+        run(
+            [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench", "web",
+             "env/bin/python", "-c", REVIEW_SCRIPTS["press"].read_text()],
+            environment,
+            input=json.dumps({"issuer": issuer, "accounts": press_accounts}),
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    )
+    return {
+        "keycloak": sorted(account["username"] for account in accounts),
+        "tenant": tenant.get("users", []),
+        "press": press.get("users", []),
+    }
+
+
+def _seed_output(completed):
+    """The seed scripts print one JSON object as their last line. Earlier lines are Frappe output."""
+    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    if not lines:
+        raise ValueError("A seed script printed no result.")
+    result = json.loads(lines[-1])
+    if not isinstance(result, dict):
+        raise ValueError("A seed script printed an invalid result.")
+    return result
+
+
+def write_fixture(path, fixture):
+    """Write the test settings as a private dotenv file. Only E2E_ names, one line per value."""
+    for key, value in fixture.items():
+        if not FIXTURE_NAME.fullmatch(key) or not isinstance(value, str) or any(c in value for c in "\0\r\n"):
+            raise ValueError("The fixture holds a name or value that cannot be written.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.unlink(missing_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "w") as stream:
+        stream.write("".join(f"{key}={value}\n" for key, value in fixture.items()))
+
+
+ACTIONS = (
+    "config", "build", "up", "down", "check", "resources", "seed-deletion", "seed-preview", "review-accounts",
+)
+ACTION_HELP = """actions:
+  config           print the resolved service names, images, ports and networks (no secrets)
+  build            build the web image after the free disk and memory check
+  up               start the stack
+  down             stop the stack and its own test provider
+  check            probe the running services through their real protocols
+  resources        show free disk and memory in the container VM
+  seed-deletion    write the account deletion test fixture
+  seed-preview     load the API and browser test data into a running stack
+  review-accounts  create the local review accounts (local stack only; see backend/e2e/README.md)
+"""
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, epilog=ACTION_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "action", choices=ACTIONS, metavar="action",
+        help="one of: " + ", ".join(ACTIONS),
+    )
+    args = parser.parse_args()
+    try:
+        environment, engine, compose = setup()
+        if args.action == "config":
+            model = config(compose, environment)
+            # Deliberate allowlist: Compose's resolved environment contains secrets.
+            print(
+                json.dumps(
+                    {
+                        "name": model["name"],
+                        "services": {
+                            name: {
+                                key: service[key] for key in ("image", "ports", "networks") if key in service
+                            }
+                            for name, service in model["services"].items()
+                        },
+                    },
+                    indent=2,
+                )
+            )
+        elif args.action == "build":
+            assert_owner(engine, compose, environment)
+            check_resources(engine, environment)
+            run([*compose, "build", "web"], environment)
+        elif args.action == "up":
+            # Check local settings before the ownership probe or any other Docker call.
+            require_press_settings(environment)
+            require_realm_sync_settings(environment)
+            require_tenant_login_settings(environment)
+            assert_owner(engine, compose, environment, create=True)
+            up(engine, compose, environment)
+        elif args.action == "down":
+            assert_owner(engine, compose, environment)
+            stop_provider(engine, environment)
+            run([*compose, "down"], environment)
+        elif args.action == "check":
+            check(compose, environment)
+        elif args.action == "seed-deletion":
+            assert_owner(engine, compose, environment)
+            path = env_file(os.environ.get("E2E_FIXTURE_FILE", REPOSITORY / ".pane/scratch/e2e-deletion.env"))
+            assert_ignored(path)
+            write_fixture(path, seed_deletion(compose, environment))
+            print(f"Deletion fixture written to {path}")
+        elif args.action == "review-accounts":
+            # Refuse a non-local stack before the ownership probe or any other Docker call.
+            require_local_stack(environment)
+            assert_owner(engine, compose, environment)
+            summary = review_accounts(compose, environment)
+            print("Review accounts ready. See backend/e2e/README.md.")
+            print(json.dumps(summary, indent=2))
+        elif args.action == "seed-preview":
+            assert_owner(engine, compose, environment)
+            path = env_file(os.environ.get("E2E_FIXTURE_FILE", REPOSITORY / ".pane/scratch/e2e-preview.env"))
+            assert_ignored(path)
+            write_fixture(path, seed_preview(engine, compose, environment))
+            print(f"Preview fixture written to {path}")
+        else:
+            resources(engine, environment)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    except RuntimeError as error:
+        # The preview fixture helpers raise RuntimeError without tokens or response bodies.
+        print(str(error), file=sys.stderr)
+        return 1
+    except (OSError, subprocess.CalledProcessError):
+        print(
+            "Stack command failed. Run stack down to close this project's services.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -59,10 +59,10 @@ Kılavuzun 67 adımı, adımdaki en zayıf işlemin statüsüne göre: 36 uygula
 
 | İş | Sorumlu | Kabul ölçütü |
 | --- | --- | --- |
-| Disk ölçümü, onaylı build cache temizliği, servis yeniden başlatma, registry deposu, sunucu hazırlığı | Hüseyin Cengiz | Önce ve sonra ölçüm; ardından tek build ya da iş sonucu |
-| GoDaddy DNS kaydı | Hüseyin Cengiz kaydı hazırlar ve doğrular; Asistan Hüseyin uygular | Çözümleme ve TLS doğrulaması açık HTTPS sonucu |
+| Disk ölçümü, onaylı build cache temizliği, servis yeniden başlatma, registry deposu, sunucu hazırlığı | DevOps sorumlusu | Önce ve sonra ölçüm; ardından tek build ya da iş sonucu |
+| GoDaddy DNS kaydı | DevOps sorumlusu kaydı hazırlar ve doğrular; alan adı sorumlusu uygular | Çözümleme ve TLS doğrulaması açık HTTPS sonucu |
 | Bölgesel yasal kutu, ödeme, plan ve ücretli Marketplace planı, site oluşturma formu | Hesap sahibi | İnsanın kendi işlemi; ajan işaretlemez, uygulama kurarken plan seçmez |
-| Press kod düzeltmesi | Geliştirici yazar, bağımsız inceleme; kurulum Hüseyin Cengiz | Yedek ve SHA, önce kırmızı sonra yeşil test, yalnız gereken sürecin yeniden başlatılması |
+| Press kod düzeltmesi | Geliştirici yazar, bağımsız inceleme; kurulum DevOps sorumlusu | Yedek ve SHA, önce kırmızı sonra yeşil test, yalnız gereken sürecin yeniden başlatılması |
 | Geri yükleme | Site sahibi karar verir | Yedek durumu ve dosya erişilebilirliği önceden okunur |
 
 ## Hazır araçlarla fark

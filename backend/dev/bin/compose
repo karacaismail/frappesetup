@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); then
+    printf '%s\n' 'PANE_PORT must be an integer from 1000 to 65526.' >&2
+    exit 2
+fi
+case "${FS_COLIMA_PROFILE:-factory}" in
+    factory) DOCKER_CONTEXT_NAME=colima-factory ;;
+    default) DOCKER_CONTEXT_NAME=colima ;;
+    *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
+export FS_TENANT_WEB_PORT="$((PANE_PORT + 1))"
+export FS_TENANT_SOCKET_PORT="$((PANE_PORT + 2))"
+exec docker --context "$DOCKER_CONTEXT_NAME" compose \
+    --project-name "fs-dev-ortam-${PANE_PORT}" \
+    --env-file "${DEV_ENV_FILE:-$DEV_DIR/.env}" \
+    --file "$DEV_DIR/compose.tenant.yaml" "$@"

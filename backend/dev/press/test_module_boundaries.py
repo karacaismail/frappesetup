@@ -1,0 +1,70 @@
+"""Check module boundaries for the Press identity and Ansible packages."""
+
+import importlib.util
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+
+DEV = Path(__file__).resolve().parents[1]
+BACKEND = DEV.parent
+SPEC = importlib.util.spec_from_file_location("check_boundaries", DEV / "check_boundaries.py")
+CHECKER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(CHECKER)
+
+
+def press_policy():
+    policy = json.loads((DEV / "module-boundaries.json").read_text())
+    policy["path_owners"].update(
+        {
+            "press_tr.api": "press_tr.press_identity",
+            "press_tr.www": "press_tr.press_identity",
+        }
+    )
+    return policy
+
+
+class PressModuleBoundaryTest(unittest.TestCase):
+    def test_press_paths_reject_foreign_dependencies_and_writes(self):
+        scratch = Path(os.environ.get("PANE_SCRATCH_DIR", BACKEND.parent / ".pane/scratch"))
+        scratch.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as temp:
+            root = Path(temp)
+            foreign = root / "apps/platform_core/platform_core/access/doctype/foreign_rule/foreign_rule.json"
+            foreign.parent.mkdir(parents=True)
+            foreign.write_text(json.dumps({"name": "Foreign Rule", "module": "Access"}))
+
+            for entry in ("api", "www"):
+                target = root / "apps/press_tr/press_tr" / entry / "example.py"
+                target.parent.mkdir(parents=True)
+                target.write_text('import frappe\nfrappe.db.set_value("Foreign Rule", "rule", "state", 1)\n')
+
+            bridge = root / "apps/press_tr/press_tr/ansible_bridge/callback_plugins/example.py"
+            bridge.parent.mkdir(parents=True)
+            bridge.write_text(
+                "import platform_core.access.api\n"
+                "import frappe\n"
+                'frappe.db.set_value("Foreign Rule", "rule", "state", 1)\n'
+            )
+
+            errors = CHECKER.check(root, press_policy())
+            bridge_source = bridge.relative_to(root)
+            for line, code in ((1, "IMPORT"), (3, "WRITE")):
+                source = f"{bridge_source}:{line} {code} "
+                with self.subTest(source=source):
+                    self.assertTrue(any(error.startswith(source) for error in errors), errors)
+
+            for entry in ("api", "www"):
+                with self.subTest(entry=entry):
+                    source = f"apps/press_tr/press_tr/{entry}/example.py:2 WRITE "
+                    self.assertTrue(any(error.startswith(source) for error in errors), errors)
+
+    def test_current_press_tree_obeys_module_boundaries(self):
+        errors = CHECKER.check(BACKEND, press_policy())
+        press_errors = [
+            error
+            for error in errors
+            if error.startswith("apps/press_tr/") or ("CYCLE" in error and "press_tr." in error)
+        ]
+        self.assertEqual(press_errors, [])

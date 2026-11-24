@@ -1,0 +1,13 @@
+# shellcheck shell=bash
+source "$(dirname "${BASH_SOURCE[0]}")/tool-versions.env"
+
+case "${FS_COLIMA_PROFILE:-factory}" in
+    factory) docker_command=(docker --context colima-factory) ;;
+    default) docker_command=(docker --context colima) ;;
+    ci) docker_command=(docker) ;;
+    *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory, default or ci.' >&2; exit 2 ;;
+esac
+
+gitleaks_image="ghcr.io/gitleaks/gitleaks:v${GITLEAKS_VERSION}@${GITLEAKS_DIGEST}"
+container_flags=(--rm -i --pull never --network none --read-only --tmpfs /tmp \
+    --cap-drop ALL --security-opt no-new-privileges --entrypoint /bin/sh)

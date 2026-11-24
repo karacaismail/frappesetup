@@ -1,0 +1,869 @@
+openapi: 3.1.0
+info:
+  title: Mobile sync
+  version: 1.0.0
+  description: |
+    The phone sends pending operations and receives changes when connectivity returns.
+    Request bodies may be at most 256 KiB. Larger requests return 413.
+    The server accepts up to 60 requests per account per minute. Further requests return 429.
+    The server applies a one-hour idle limit per installation.
+    On 401 reauthentication_required, pause sync and ask the user to sign in again.
+    For mobile, use interactive Keycloak sign-in to obtain a newer auth_time, even when sid is unchanged.
+    For PWA, sign in again to obtain a new browser session.
+    Register the same installation again, then resume sync with its existing cursor and operation IDs.
+    This version starts with an empty allowlist. The server does not accept files.
+servers:
+  - url: /api/method
+security:
+  - mobileBearer: []
+paths:
+  /platform_core.api.mobile.v1_register:
+    post:
+      summary: Register a mobile installation
+      operationId: registerMobileInstallationV1
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Binds the installation to a verified Keycloak session.
+        The verified auth_time starts the idle clock. A newer auth_time resets it even when sid is unchanged.
+        Registering a new installation with an old auth_time does not restart the clock.
+        After reauthentication, older tokens for that session cannot resume sync.
+        A revoked installation cannot be reactivated. An active installation can be rebound to a new verified Keycloak session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/DeviceSuccess' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_revoke:
+    post:
+      summary: Revoke a mobile installation
+      operationId: revokeMobileInstallationV1
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Revokes one installation or all active installations for the account.
+        The returned count reflects local revocations. The server then requests session closure.
+        Revoking other installations requires a registered and recently active calling installation.
+        This also applies to revoking all installations. Self-revocation is available after the idle limit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              singleInstallation:
+                value: { installation_id: 20000000-0000-4000-8000-000000000001 }
+              allInstallations:
+                value: { all: true }
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/Device' }
+                - type: object
+                  additionalProperties: false
+                  required: [all]
+                  properties:
+                    all: { const: true }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_activity:
+    post:
+      summary: Record the user's last activity time
+      operationId: recordMobileActivityV1
+      description: |
+        The client calls this endpoint only when the user acts.
+        The server records its own time. Background sync does not change it.
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200':
+          description: The server returns the last activity time in Unix seconds.
+          content:
+            application/json:
+              example: { server_time: 1795340000, message: { last_user_activity_at: 1795340000 } }
+              schema:
+                type: object
+                required: [message, server_time]
+                properties:
+                  server_time: { $ref: '#/components/schemas/ServerTime' }
+                  message:
+                    type: object
+                    required: [last_user_activity_at]
+                    properties:
+                      last_user_activity_at: { type: integer }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_push:
+    post:
+      summary: Push mobile changes to the server
+      operationId: pushMobileChangesV1
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+        For an operation with the same ID and content, the server returns the original committed result.
+        After a change of sid, register the installation first. Until then, this endpoint responds with 403 installation_unavailable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              sampleUpdate:
+                summary: Illustrative command. The production command allowlist starts empty.
+                value:
+                  installation_id: 20000000-0000-4000-8000-000000000001
+                  operations:
+                    - operation_id: 40000000-0000-4000-8000-000000000001
+                      command: sample.leave.update
+                      record_id: 50000000-0000-4000-8000-000000000001
+                      version: "1"
+                      fields: { title: Sample leave request }
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id, operations]
+              properties:
+                installation_id: { $ref: '#/components/schemas/UUID' }
+                operations:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { $ref: '#/components/schemas/Operation' }
+      responses:
+        '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
+        '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '403': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_pull:
+    post:
+      summary: Pull records to the phone
+      operationId: pullMobileChangesV1
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.
+        After a change of sid, register the installation first. Until then, this endpoint responds with 403 installation_unavailable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001, limit: 20 }
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id]
+              properties:
+                installation_id: { $ref: '#/components/schemas/UUID' }
+                cursor: { type: string, maxLength: 2048 }
+                limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        '200': { $ref: '#/components/responses/Page' }
+        '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '403': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_cleanup:
+    post:
+      summary: Clean up expired sync records
+      operationId: cleanupMobileDataV1
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: A site administrator manually removes expired events and operation records. A dry run leaves records intact.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { dry_run: true }
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200': { $ref: '#/components/responses/CleanupResultSuccess' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
+        '403':
+          description: |
+            The account is not a site administrator. The endpoint checks the System Manager role and answers with code `cleanup_forbidden`.
+            The body can also be Frappe's generic permission error. That body carries `exc_type` and no `code`.
+            Clients treat both bodies as the same refusal.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.revoke_user_installations:
+    post:
+      summary: Revoke all mobile installations for a user
+      operationId: revokeUserMobileInstallations
+      security:
+        - identitySyncBearer: []
+      description: |
+        The identity service revokes all mobile installations for the user.
+        The server removes notification bindings. Repeating the request returns the same status and count.
+        The server finds the user by issuer and subject.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { issuer: 'https://identity.example.test/realms/sample', subject: sample-user }
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject]
+              properties:
+                issuer: { type: string, minLength: 1, maxLength: 512 }
+                subject: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        '200':
+          description: The number of revoked installations for the user.
+          content:
+            application/json:
+              example: { server_time: 1795340000, message: { revoked: 2 } }
+              schema:
+                type: object
+                required: [message, server_time]
+                properties:
+                  server_time: { $ref: '#/components/schemas/ServerTime' }
+                  message: { $ref: '#/components/schemas/Revoked' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/IdentitySyncAuthorizationError' }
+        '404':
+          description: The identity link was not found. The exc_type field is IdentityNotFound.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /platform_core.api.mobile_pwa.v1_register:
+    post:
+      summary: Register a mobile installation
+      operationId: registerMobilePwaInstallationV1
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Registers the mobile installation using a same-origin Frappe session.
+        An active installation can be reused after signing in again. A revoked installation cannot be reactivated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/DeviceSuccess' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_revoke:
+    post:
+      summary: Revoke a mobile installation
+      operationId: revokeMobilePwaInstallationV1
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Revoking an installation does not end the Frappe browser session.
+        Revokes one installation or all active installations for the account.
+        The count reflects local revocations. The browser session stays open.
+        Registering a new installation after revocation requires a new cookie session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              singleInstallation:
+                value: { installation_id: 20000000-0000-4000-8000-000000000001 }
+              allInstallations:
+                value: { all: true }
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/Device' }
+                - type: object
+                  additionalProperties: false
+                  required: [all]
+                  properties:
+                    all: { const: true }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_activity:
+    post:
+      summary: Record the user's last activity time
+      operationId: recordMobilePwaActivityV1
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      description: |
+        The client calls this endpoint only when the user acts.
+        The server records its own time. Background sync does not change it.
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200':
+          description: The server returns the last activity time in Unix seconds.
+          content:
+            application/json:
+              example: { server_time: 1795340000, message: { last_user_activity_at: 1795340000 } }
+              schema:
+                type: object
+                required: [message, server_time]
+                properties:
+                  server_time: { $ref: '#/components/schemas/ServerTime' }
+                  message:
+                    type: object
+                    required: [last_user_activity_at]
+                    properties:
+                      last_user_activity_at: { type: integer }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_push:
+    post:
+      summary: Push mobile changes to the server
+      operationId: pushMobilePwaChangesV1
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+        For an operation with the same ID and content, the server returns the original committed result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            examples:
+              sampleUpdate:
+                summary: Illustrative command. The production command allowlist starts empty.
+                value:
+                  installation_id: 20000000-0000-4000-8000-000000000001
+                  operations:
+                    - operation_id: 40000000-0000-4000-8000-000000000001
+                      command: sample.leave.update
+                      record_id: 50000000-0000-4000-8000-000000000001
+                      version: "1"
+                      fields: { title: Sample leave request }
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id, operations]
+              properties:
+                installation_id: { $ref: '#/components/schemas/UUID' }
+                operations:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { $ref: '#/components/schemas/Operation' }
+      responses:
+        '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
+        '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_pull:
+    post:
+      summary: Pull records to the phone
+      operationId: pullMobilePwaChangesV1
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001, limit: 20 }
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id]
+              properties:
+                installation_id: { $ref: '#/components/schemas/UUID' }
+                cursor: { type: string, maxLength: 2048 }
+                limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        '200': { $ref: '#/components/responses/Page' }
+        '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_list_installations:
+    post:
+      summary: List your mobile installations
+      operationId: listMobileInstallationsV1
+      description: |
+        Lists installations for the verified account, ordered by installation ID.
+        The calling phone installation must be active and within its idle limit.
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { after: 10000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/InstallationListRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/InstallationListSuccess' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_revoke_installation:
+    post:
+      summary: Revoke one of your mobile installations
+      operationId: revokeOwnedMobileInstallationV1
+      description: |
+        Revokes one owned installation and requests closure of its Keycloak session when present.
+        Before revoking another installation, the server checks the calling installation's idle limit.
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_list_installations:
+    post:
+      summary: List your mobile installations
+      operationId: listMobilePwaInstallationsV1
+      description: Lists installations for the signed-in account, ordered by installation ID.
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { after: 10000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/InstallationListRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/InstallationListSuccess' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_revoke_installation:
+    post:
+      summary: Revoke one of your mobile installations
+      operationId: revokeOwnedMobilePwaInstallationV1
+      description: |
+        Revokes one owned installation. The Frappe browser session stays open.
+        A browser with a valid session can register a replacement installation.
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    identitySyncBearer:
+      type: http
+      scheme: bearer
+      description: Service token verified by the identity hook with azp set to identity-sync.
+    mobileBearer: { type: http, scheme: bearer }
+    pwaSession: { type: apiKey, in: cookie, name: sid }
+    pwaCsrf: { type: apiKey, in: header, name: X-Frappe-CSRF-Token }
+  parameters:
+    PwaOrigin:
+      name: Origin
+      in: header
+      required: true
+      description: The PWA and tenant site are served from the same origin.
+      schema: { type: string }
+    AppVersion:
+      name: X-Mobile-App-Version
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}$' }
+    ContractVersion:
+      name: X-Mobile-Contract-Version
+      in: header
+      required: true
+      schema: { type: string, const: '1' }
+  schemas:
+    ServerTime:
+      type: integer
+      description: Server time at the start of the request, expressed in Unix seconds.
+    UUID:
+      type: string
+      format: uuid
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    InstallationListRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        after: { $ref: '#/components/schemas/UUID' }
+    Device:
+      type: object
+      additionalProperties: false
+      required: [installation_id]
+      properties:
+        installation_id: { $ref: '#/components/schemas/UUID' }
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [operation_id, command, record_id]
+      properties:
+        operation_id: { $ref: '#/components/schemas/UUID' }
+        command: { type: string, minLength: 1, maxLength: 80 }
+        record_id: { $ref: '#/components/schemas/UUID' }
+        version: { type: string, minLength: 1, maxLength: 128, description: Record version required for updates and deletions. }
+        fields: { type: object, description: Fields allowed by the command. }
+    Change:
+      type: object
+      additionalProperties: false
+      required: [record_type, record_id, kind]
+      properties:
+        record_type: { type: string }
+        record_id: { $ref: '#/components/schemas/UUID' }
+        kind: { enum: [upsert, remove] }
+        version: { type: string }
+        fields: { type: object }
+    Revoked:
+      type: object
+      required: [revoked]
+      properties:
+        revoked: { type: integer, minimum: 0 }
+    AppliedOperations:
+      type: object
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [operation_id, status]
+            properties:
+              operation_id: { $ref: '#/components/schemas/UUID' }
+              status: { const: applied }
+    CleanupResult:
+      type: object
+      required: [dry_run, removed, operations_removed, eligible_changes, eligible_operations, deliveries_removed, eligible_deliveries]
+      properties:
+        eligible_revoked_sessions: { type: integer, minimum: 0, maximum: 1000 }
+        revoked_sessions_removed: { type: integer, minimum: 0, maximum: 1000 }
+        dry_run: { type: boolean }
+        removed: { type: integer, minimum: 0, maximum: 2000 }
+        operations_removed: { type: integer, minimum: 0, maximum: 1000 }
+        eligible_changes: { type: integer, minimum: 0, maximum: 2000 }
+        eligible_operations: { type: integer, minimum: 0, maximum: 1000 }
+        deliveries_removed: { type: integer, minimum: 0, maximum: 1000 }
+        eligible_deliveries: { type: integer, minimum: 0, maximum: 1000 }
+    Error:
+      type: object
+      if:
+        required: [code]
+      then:
+        required: [server_time]
+      anyOf:
+        - required: [code]
+        - required: [exc_type]
+      properties:
+        server_time: { $ref: '#/components/schemas/ServerTime' }
+        code:
+          type: string
+          description: Error code returned by the mobile endpoint.
+          enum:
+            - IdentityNotFound
+            - body_too_large
+            - cleanup_forbidden
+            - command_disabled
+            - cursor_key_unavailable
+            - installation_limit
+            - installation_unavailable
+            - invalid_batch_size
+            - invalid_client_version
+            - invalid_command
+            - invalid_cursor
+            - invalid_fields
+            - invalid_json
+            - invalid_mobile_route
+            - invalid_mobile_settings
+            - invalid_operation
+            - invalid_page_size
+            - invalid_request
+            - invalid_retention_setting
+            - invalid_uuid
+            - json_required
+            - mixed_authentication
+            - mobile_busy
+            - mobile_schema_unavailable
+            - mobile_session_revoked
+            - mobile_sequence_exhausted
+            - mobile_token_required
+            - mobile_token_revoked
+            - operation_conflict
+            - service_token_required
+            - pwa_request_forbidden
+            - pwa_session_required
+            - reauthentication_required
+            - rate_limit
+            - record_not_found
+            - unexpected_version
+            - unknown_command
+            - unsupported_contract_version
+            - version_conflict
+            - version_required
+        exc_type: { type: string, description: Error type returned if Frappe rejects the request before it reaches the endpoint. }
+        current: { $ref: '#/components/schemas/Change', description: Current record visible to the user. }
+  responses:
+    InstallationListSuccess:
+      description: A page of installations for the authenticated account.
+      content:
+        application/json:
+          example:
+            server_time: 1795340000
+            message:
+              installations:
+                - { installation_id: 20000000-0000-4000-8000-000000000001, scope: mobile, revoked: false }
+                - { installation_id: 30000000-0000-4000-8000-000000000001, scope: pwa, revoked: false }
+              next_after: null
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message:
+                type: object
+                required: [installations, next_after]
+                properties:
+                  installations:
+                    type: array
+                    maxItems: 20
+                    items:
+                      type: object
+                      required: [installation_id, scope, revoked]
+                      properties:
+                        installation_id: { $ref: '#/components/schemas/UUID' }
+                        scope: { type: string, enum: [mobile, pwa] }
+                        revoked: { type: boolean }
+                  next_after:
+                    anyOf:
+                      - { $ref: '#/components/schemas/UUID' }
+                      - { type: 'null' }
+    DeviceSuccess:
+      description: The request completed.
+      content:
+        application/json:
+          example: { server_time: 1795340000, message: { installation_id: 20000000-0000-4000-8000-000000000001 } }
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message: { $ref: '#/components/schemas/Device' }
+    RevokedSuccess:
+      description: The request completed.
+      content:
+        application/json:
+          example: { server_time: 1795340000, message: { revoked: 1 } }
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message: { $ref: '#/components/schemas/Revoked' }
+    AppliedOperationsSuccess:
+      description: The request completed.
+      content:
+        application/json:
+          example:
+            server_time: 1795340000
+            message:
+              operations:
+                - { operation_id: 40000000-0000-4000-8000-000000000001, status: applied }
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message: { $ref: '#/components/schemas/AppliedOperations' }
+    CleanupResultSuccess:
+      description: The request completed.
+      content:
+        application/json:
+          example:
+            server_time: 1795340000
+            message:
+              dry_run: true
+              removed: 0
+              operations_removed: 0
+              eligible_changes: 12
+              eligible_operations: 3
+              deliveries_removed: 0
+              eligible_deliveries: 2
+              eligible_revoked_sessions: 1
+              revoked_sessions_removed: 0
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message: { $ref: '#/components/schemas/CleanupResult' }
+    Page:
+      description: A page of records and the cursor for the next request.
+      content:
+        application/json:
+          example:
+            server_time: 1795340000
+            message:
+              changes:
+                - kind: upsert
+                  record_type: sample_leave
+                  record_id: 50000000-0000-4000-8000-000000000001
+                  version: "2"
+                  fields: { title: Sample leave request }
+              cursor: e1.sample-page-cursor
+              has_more: false
+          schema:
+            type: object
+            required: [message, server_time]
+            properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
+              message:
+                type: object
+                required: [changes, cursor, has_more]
+                properties:
+                  changes: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/Change' } }
+                  cursor: { type: string, maxLength: 2048 }
+                  has_more: { type: boolean }
+    MobileAuthenticationError:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { server_time: 1795340000, code: mobile_token_required }
+    PwaAuthenticationError:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { server_time: 1795340000, code: pwa_session_required }
+    IdentitySyncAuthorizationError:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { server_time: 1795340000, code: service_token_required }
+    Error:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Throttled:
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+      description: The request rate limit was exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+    Unavailable:
+      description: The server could not complete the operation.
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

@@ -1,0 +1,84 @@
+Press patch 0005: dependency pins that install on Python 3.14 next to Frappe 16.
+wrapt ~=1.15.0 stays: 1.15.0 installs from its pure Python wheel (py3-none-any), so no C build; only slower (review 1, minor 4).
+Purpose: keep pyproject.toml truthful for the locked image, so "uv pip check" can pass.
+  ansible 3.4.0 -> 14.6.0      ansible-base 2.10 cannot import on Python 3.12+ (decision 0018)
+  oci 2.180.0 -> 2.192.0       2.180.0 needs cryptography<47; Frappe 16 pins cryptography 50
+  pexpect 4.8.0 -> 4.9.0       Frappe 16 pins 4.9.0
+  pyOpenSSL ~=23.2 -> ~=26.4   Frappe 16 pins 26.4
+  python-telegram-bot removed  cannot import on Python 3.12+ (patch 0004)
+  requests <2.32 -> ~=2.33     Frappe 16 pins 2.33
+  sql_metadata 2.10 -> ~=3.0.1 Frappe 16 pins 3.0.1
+  stripe ~=2.56 -> 3.1.0       2.56 vendors six 1.x, which cannot import on Python 3.12+ (decision 0019)
+  playwright 1.49.1 -> 1.65.2  1.49.1 pins greenlet 3.1.1, which has no Python 3.14 build
+  semgrep 1.159.0 -> 1.79.0    1.159.0 pins opentelemetry-api <1.38; Frappe 16 pins 1.45. 1.79.0 is
+                               the newest semgrep that resolves; the marketplace audit is not tested
+  frappe-mcp pinned to a commit  the unpinned Git URL was not reproducible
+  dnspython 1.16.0 -> 2.9.2    CVE-2023-29483 and two later DoS fixes; Resolver.query still exists
+  paramiko 3.3.1 -> 5.1.0      Terrapin (CVE-2023-48795) and SHA-1 RSA (CVE-2026-44405); Press
+                               code does not import paramiko (Ansible plugins and docker ssh do)
+  setuptools 80.9.0 -> 84.2.1  CVE-2026-59890 and GHSA-xmj3-9gf7-h52w; 84 has no pkg_resources,
+                               every import of it in the image is guarded by try/except
+  The three upgrades come from the OSV scan of the lock (review 1, finding 3).
+Upstream: proposal 4 in backend/docs/press-python314-upstream.md.
+Remove when Press ships Python 3.14 pins (decision O-52 in backend/PROJECT-RECORD.md).
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 73a5467..d2b1d02 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -22,29 +22,28 @@ classifiers = [
+     "Programming Language :: Python :: 3.12",
+ ]
+ dependencies = [
+-    "ansible==3.4.0",
++    "ansible==14.6.0",
+     "beautifulsoup4",
+     "boto3==1.39.14",
+     "Click",
+     "coverage",
+-    "dnspython==1.16.0",
++    "dnspython==2.9.2",
+     "docker==6.1.2",
+     "dockerfile==3.2.0",
+-    "oci==2.180.0",
+-    "paramiko==3.3.1",
+-    "pexpect==4.8.0",
++    "oci==2.192.0",
++    "paramiko==5.1.0",
++    "pexpect==4.9.0",
+     "posthog==3.0.1",
+     "prometheus-client==0.19.0",
+     "PyGithub==1.44.1",
+-    "pyOpenSSL~=23.2.0",
+-    "python-telegram-bot==13.15",
++    "pyOpenSSL~=26.4.0",
+     "razorpay>=1.3.0",
+-    "requests<2.32",
++    "requests~=2.33.0",
+     "responses==0.23.1",
+     "selenium==4.23.1",
+     "semantic-version==2.10.0",
+-    "sql_metadata==2.10.0",
+-    "stripe~=2.56.0",
++    "sql_metadata~=3.0.1",
++    "stripe==3.1.0",
+     "tldextract==3.4.4",
+     "tomli==2.0.1",
+     "tqdm==4.66.3",
+@@ -52,12 +51,12 @@ dependencies = [
+     "wrapt~=1.15.0",
+     "elasticsearch-dsl>=8.0.0,<9.0.0",
+     "hcloud==2.26.0",
+-    "playwright==1.49.1",
++    "playwright==1.65.2",
+     "prometheus-api-client==0.6.0",
+     "pydo==0.24.0",
+-    "semgrep==1.159.0",
+-    "frappe-mcp @ git+https://github.com/frappe/mcp",
+-    "setuptools==80.9.0",
++    "semgrep==1.79.0",
++    "frappe-mcp @ git+https://github.com/frappe/mcp@b5c9730d18401c85d4b3ea68d20e2ba6f2bb7e7c",
++    "setuptools==84.2.1",
+ ]
+ 
+ [project.optional-dependencies]

@@ -4,7 +4,7 @@ nav: "Karar kataloğu"
 order: 26
 ---
 
-Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez, bir satırda. Notlar karardır: repodaki aktif veriyle çelişenler **Çelişki** olarak işaretlendi ve repo verisi değişmedi. Repoda zaten yazılı kararlar (320-first, `issuer + sub`, ROPC yasağı, belirteç tarayıcıya inmez, hibrit giriş, gerçek cihaz ayrı rapor vb.) tekrar edilmedi. Açık ve çelişkili satırlar [Açık kararlar](/frappesetup/acik-kararlar/) sayfasındaki K-37..K-60'a bağlıdır.
+Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez, bir satırda. Notlar karardır: repodaki aktif veriyle çelişenler **Çelişki** olarak işaretlendi ve repo verisi değişmedi. Repoda zaten yazılı kararlar (320-first, `issuer + sub`, ROPC yasağı, belirteç tarayıcıya inmez, hibrit giriş, gerçek cihaz ayrı rapor vb.) tekrar edilmedi. Açık ve çelişkili satırlar [Açık kararlar](/frappesetup/acik-kararlar/) sayfasındaki K-37..K-60'a bağlıdır. AtonotA Login kararı K-61'dir.
 
 **Durum:** Kesin · Koşullu (koşul sağlanınca) · Açık (karar bekliyor) · Çelişki (repo verisiyle zıt, onay bekliyor).
 **Kaynak:** KC kimlik rehberi · AE AI ekosistemi · KS Kaizen şartnamesi · KP Kaizen paketi · AM, A1, A2 adaptif arayüz notları. Dosya adları: [İzlenebilirlik](/frappesetup/izlenebilirlik/) KD-38..KD-44.
@@ -47,10 +47,10 @@ Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez,
 | AI-02 | Sınıf üretim güvenliği ve olgunluktur (A, B, C), depo başına gerekçeli. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
 | AI-03 | Dört yetki seviyesi: yalnız okur, öneri verir, veriyi değiştirir, otomatik aksiyon alır. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-04 | Seviye 3 ve 4 yalnız taslak üretir, submit yetkisi olmaz; öğrenci, ücret ve muhasebe doctype'larında kapalıdır (EDU sitesi). | Çelişki | AE | K-53 |
-| AI-05 | MCP: yalnız okuma araçları, ayrı AI kullanıcısı, gerekli doctype'lar, staging verisi; kullanıcı başına OAuth, yazmada ayrı onay, her çağrı denetim kaydı, sağlayıcıyla DPA. Yasak: Administrator anahtarı, açık `run_python_code`, `run_database_query`, `delete_document`, lisanssız repo, ham REST/SQL aracı. | Kesin | AE | [MCP](/frappesetup/ai-mcp/) |
-| AI-06 | Frappe Assistant Core en olgun MCP (sınıf B, tek kişiye bağlı); yalnız staging'de Python, SQL ve silme araçları kapalı denenir. Lisans v2.0.0'da MIT'den AGPL'ye geçti. | Koşullu | AE | [MCP](/frappesetup/ai-mcp/) |
+| AI-05 | MCP: yalnız okuma araçları, ayrı AI kullanıcısı, gerekli doctype'lar, beta ortamının verisi; kullanıcı başına OAuth, yazmada ayrı onay, her çağrı denetim kaydı, sağlayıcıyla DPA. Yasak: Administrator anahtarı, açık `run_python_code`, `run_database_query`, `delete_document`, lisanssız repo, ham REST/SQL aracı. | Kesin | AE | [MCP](/frappesetup/ai-mcp/) |
+| AI-06 | Frappe Assistant Core en olgun MCP (sınıf B, tek kişiye bağlı); yalnız beta ortamında Python, SQL ve silme araçları kapalı denenir. Lisans v2.0.0'da MIT'den AGPL'ye geçti. | Koşullu | AE | [MCP](/frappesetup/ai-mcp/) |
 | AI-07 | Geliştirici skill paketleri geliştirme ortamında kurulur, siteye kurulmaz; üretilen kod yine incelenir. | Kesin | AE | [Skills](/frappesetup/ai-skills/) |
-| AI-08 | Staging'de denenecek: Jarvis (hazırla-onayla, Trigger kapalı), Huf (Ollama, LiteLLM sürümü sabit), Builder Bob (yalnız pazarlama sayfası, onay açık). | Koşullu | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
+| AI-08 | beta ortamında denenecek: Jarvis (hazırla-onayla, Trigger kapalı), Huf (Ollama, LiteLLM sürümü sabit), Builder Bob (yalnız pazarlama sayfası, onay açık). | Koşullu | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-09 | İzlenecek: Flow tam sürümü, Grove, Studio, frappectl, yerel OCR belge kuyruğu, Helpdesk AI, Raven V3 sağlayıcıları, `frappe/mcp` kararlı sürümü. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-10 | Kaçınılacak: otomatik ana veri üreten OCR ve submit yetkili ajan. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-11 | Öğrenci verisine dokunan yapay zekâ yerel modelle sınırlı; dış LLM yalnız anonim içerik ve kod geliştirme için. GPU'suz sunucuda yalnız 7–8B model, yalnız sınıflandırma ve özetleme. | Çelişki | AE | K-54 |

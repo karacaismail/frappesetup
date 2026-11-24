@@ -904,3 +904,90 @@ tr[id^="req-"][tabindex="-1"]:focus {
     line-height: var(--fs-leading-body);
   }
 }
+
+/* Görev panosu: durum etiketi görünür metindir; simge süstür ve ekran okuyucuya alternatif metinsiz gider. Biten görevin
+   başlığı üstü çizilir ama rengi değişmez (karşıtlık açık başlıkla aynı kalır). */
+.task-card-id {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+.task-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
+  font-weight: 600;
+  color: var(--fs-ink);
+  white-space: nowrap;
+}
+.task-status::before {
+  content: '○' / '';
+  color: var(--fs-quiet);
+}
+.task-status[data-status='done']::before {
+  content: '✓' / '';
+  color: var(--fs-accent-ink);
+}
+.task-status[data-status='in-progress']::before {
+  content: '◐' / '';
+}
+.task-status[data-status='unverified']::before {
+  content: '?' / '';
+}
+.is-done {
+  text-decoration-line: line-through;
+  text-decoration-thickness: 0.08em;
+}
+.task-evidence {
+  margin: 0;
+  color: var(--fs-quiet);
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
+}
+.task-groups,
+.task-phase,
+.task-epic,
+.task-list {
+  display: grid;
+  min-width: 0;
+}
+.task-groups {
+  gap: 1.75rem;
+}
+.task-phase {
+  gap: 1rem;
+}
+.task-epic {
+  gap: 0.5rem;
+}
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0.6rem;
+}
+.task-phase-title,
+.task-epic-title {
+  margin: 0;
+  line-height: var(--fs-leading-body);
+}
+.task-phase-title {
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 650;
+}
+.task-epic-title {
+  font-size: var(--fs-font-body);
+  font-weight: 600;
+}
+.task-count {
+  font-weight: 500;
+  color: var(--fs-quiet);
+  white-space: nowrap;
+}
+.task-row-status {
+  margin: 0 0 calc(0.25rem * var(--mantine-scale));
+}

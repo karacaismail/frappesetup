@@ -1,0 +1,470 @@
+"""Exercise the operator command without contacting Keycloak."""
+
+import json
+import runpy
+import unittest
+import uuid
+from io import BytesIO
+from secrets import token_hex
+from urllib.error import HTTPError
+from urllib.parse import parse_qs, urlsplit
+from unittest.mock import MagicMock, patch
+
+from helpers import DIRECTORY, admin, live_available, client_token, jwt_payload, get_environment_value, safe_detail, admin_token
+
+COMMAND = DIRECTORY / "bin" / "create-tenant-client.py"
+ARGS = ["acme", "https://tenant.example.test", "https://identity.example.test"]
+
+
+class FakeKeycloak:
+    def __init__(self):
+        self.clients = {"identity-sync": {"id": "sync"}, "press-service": {"id": "press-service"}}
+        self.scopes = {}
+        self.optional = {client["id"]: set() for client in self.clients.values()}
+        self.default = {client_id: set() for client_id in self.optional}
+        self.calls = []
+        self.deny = {}
+
+    def open(self, request, *, timeout):
+        parts = urlsplit(request.full_url)
+        path = parts.path.removeprefix("/admin/realms/platform")
+        method = request.get_method()
+        self.calls.append(request)
+        if code := self.deny.get((method, path)):
+            raise HTTPError(request.full_url, code, "Denied", {}, BytesIO(b"synthetic denial"))
+        body = json.loads(request.data) if request.data else None
+        if method == "GET" and path == "/clients":
+            query = parse_qs(parts.query)
+            if "clientId" in query:
+                name = query["clientId"][0]
+                status, data = 200, [{"clientId": name, **self.clients[name]}] if name in self.clients else []
+            else:
+                first = int(query["first"][0])
+                count = int(query["max"][0])
+                all_clients = [{"clientId": name, **client} for name, client in self.clients.items()]
+                status, data = 200, all_clients[first : first + count]
+        elif method == "POST" and path == "/clients":
+            client_id = body["clientId"]
+            if client_id in self.clients:
+                raise HTTPError(request.full_url, 409, "Conflict", {}, BytesIO())
+            self.clients[client_id] = {**body, "id": client_id, "secret": token_hex(16)}
+            status, data = 201, None
+        elif method == "GET" and path == "/client-scopes":
+            status, data = 200, list(self.scopes.values())
+        elif method == "POST" and path == "/client-scopes":
+            self.scopes[body["name"]] = {**body, "id": "scope"}
+            status, data = 201, None
+        elif method == "GET" and path.endswith("/protocol-mappers/models"):
+            status, data = 200, self.scopes["aud-site-acme"]["protocolMappers"]
+        elif method == "GET" and path.endswith("/scope-mappings"):
+            status, data = 200, {}
+        elif method == "GET" and path in ("/default-default-client-scopes", "/default-optional-client-scopes"):
+            status, data = 200, []
+        elif method == "PUT" and path.count("/") == 2 and path.startswith("/clients/"):
+            client = path.rsplit("/", 1)[1]
+            stored = self.clients[client]
+            self.clients[client] = {**stored, **body, "id": stored["id"], "secret": stored["secret"]}
+            status, data = 204, None
+        elif path.startswith("/clients/"):
+            _, _, client, kind, *rest = path.split("/")
+            if method == "GET":
+                bindings = {"optional-client-scopes": self.optional, "default-client-scopes": self.default}
+                status, data = 200, [{"id": scope} for scope in bindings[kind][client]]
+            elif method == "PUT" and kind == "optional-client-scopes":
+                self.optional[client].add(rest[0])
+                status, data = 204, None
+            else:
+                raise AssertionError(f"Unexpected request {method} {path}")
+        else:
+            raise AssertionError(f"Unexpected request {method} {path}")
+        response = MagicMock()
+        response.__enter__.return_value.status = status
+        response.__enter__.return_value.read.return_value = json.dumps(data).encode()
+        return response
+
+
+class CreateTenantClientTest(unittest.TestCase):
+    def run_command(self, args=ARGS, *, tty=True, reply=None, server=None):
+        if reply is None:
+            action = "UPDATE" if "--update-redirects" in args else "CREATE"
+            reply = f"{action} site-acme"
+        opener = MagicMock()
+        if server is not None:
+            opener.open.side_effect = server.open
+        with (
+            patch("sys.argv", [str(COMMAND), *args]),
+            patch("sys.stdin.isatty", return_value=tty),
+            patch("sys.stderr.isatty", return_value=tty),
+            patch("builtins.input", return_value=reply),
+            patch("builtins.print") as output,
+            patch("getpass.getpass", return_value="dummy-admin-token") as token_prompt,
+            patch("urllib.request.build_opener", return_value=opener),
+        ):
+            with self.assertRaises(SystemExit) as stopped:
+                runpy.run_path(str(COMMAND), run_name="__main__")
+        return stopped.exception.code, opener, output, token_prompt
+
+    def test_preview_is_available_without_terminal_or_credentials(self):
+        code, opener, output, prompt = self.run_command([*ARGS, "--preview"], tty=False)
+        self.assertEqual(code, 0)
+        preview = str(output.call_args_list)
+        for name in ("site-acme", "aud-site-acme", "identity-sync", "press-service", "optional"):
+            self.assertIn(name, preview)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_declined_creation_never_requests_token_or_calls_keycloak(self):
+        code, opener, _, prompt = self.run_command(reply="no")
+        self.assertEqual(code, 2)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_noninteractive_creation_is_refused(self):
+        code, opener, _, prompt = self.run_command(tty=False)
+        self.assertEqual(code, 2)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_confirmed_creation_posts_restricted_client_to_admin_api(self):
+        server = FakeKeycloak()
+        code, _, output, prompt = self.run_command(server=server)
+        self.assertEqual(code, 0)
+        prompt.assert_called_once()
+        request = next(
+            call for call in server.calls if call.get_method() == "POST" and call.full_url.endswith("/clients")
+        )
+        self.assertEqual(request.full_url, "https://identity.example.test/admin/realms/platform/clients")
+        self.assertEqual(request.get_method(), "POST")
+        self.assertEqual(request.get_header("Authorization"), "Bearer dummy-admin-token")
+        client = json.loads(request.data)
+        self.assertEqual(client["clientId"], "site-acme")
+        self.assertFalse(client["publicClient"])
+        self.assertFalse(client["fullScopeAllowed"])
+        self.assertFalse(client["directAccessGrantsEnabled"])
+        self.assertEqual(client["attributes"]["pkce.code.challenge.method"], "S256")
+        self.assertEqual(client["optionalClientScopes"], [])
+        self.assertFalse(client["serviceAccountsEnabled"])
+        service = server.clients["site-acme-service"]
+        self.assertTrue(service["serviceAccountsEnabled"])
+        self.assertFalse(service["standardFlowEnabled"])
+        self.assertEqual(service["optionalClientScopes"], ["aud-identity-sync"])
+        self.assertEqual(
+            client["redirectUris"],
+            [
+                "https://tenant.example.test/api/method/platform_core.api.auth.keycloak_callback",
+            ],
+        )
+        self.assertNotIn("secret", client)
+        self.assertNotIn("dummy-admin-token", str(output.call_args_list))
+
+    def test_confirmed_creation_installs_and_binds_only_an_optional_tenant_scope(self):
+        server = FakeKeycloak()
+        code, _, _, _ = self.run_command(server=server)
+        self.assertEqual(code, 0)
+        scope = server.scopes["aud-site-acme"]
+        self.assertEqual(scope["protocol"], "openid-connect")
+        self.assertEqual(scope["attributes"]["include.in.token.scope"], "false")
+        (mapper,) = scope["protocolMappers"]
+        self.assertEqual(mapper["protocolMapper"], "oidc-audience-mapper")
+        self.assertEqual(mapper["config"]["included.client.audience"], "site-acme")
+        self.assertEqual(mapper["config"]["access.token.claim"], "true")
+        self.assertEqual(mapper["config"]["id.token.claim"], "false")
+        self.assertEqual(server.optional, {"sync": {"scope"}, "press-service": {"scope"}})
+        self.assertEqual(server.default, {"sync": set(), "press-service": set()})
+
+    def test_rerun_preserves_secret_and_completes_missing_steps(self):
+        server = FakeKeycloak()
+        server.deny[("PUT", "/clients/press-service/optional-client-scopes/scope")] = 403
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 1)
+        self.assertIn("HTTP 403", str(output.call_args_list))
+        self.assertEqual(server.optional["sync"], {"scope"})
+        before = dict(server.clients["site-acme"])
+        server.deny.clear()
+        server.calls.clear()
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 0)
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertNotIn(before["secret"], str(output.call_args_list))
+        writes = [urlsplit(call.full_url).path for call in server.calls if call.get_method() != "GET"]
+        self.assertEqual(writes, ["/admin/realms/platform/clients/press-service/optional-client-scopes/scope"])
+
+    def test_rerun_creates_a_missing_scope_for_an_existing_client(self):
+        server = FakeKeycloak()
+        server.deny[("POST", "/client-scopes")] = 403
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertEqual(server.scopes, {})
+        before = dict(server.clients["site-acme"])
+        server.calls.clear()
+        server.deny.clear()
+
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        self.assertEqual(server.clients["site-acme"], before)
+        posts = [urlsplit(call.full_url).path for call in server.calls if call.get_method() == "POST"]
+        self.assertEqual(posts, ["/admin/realms/platform/client-scopes"])
+        self.assertEqual(server.optional, {"sync": {"scope"}, "press-service": {"scope"}})
+
+    SWITCH_ADDRESS = "https://tenant.example.test/api/method/platform_core.api.auth.start_login?switch_account=1"
+
+    def provision_client_without_switch_address(self, server):
+        """A tenant client created before the account-switch return address existed."""
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        attributes = server.clients["site-acme"]["attributes"]
+        addresses = attributes["post.logout.redirect.uris"].split("##")
+        self.assertIn(self.SWITCH_ADDRESS, addresses)
+        addresses.remove(self.SWITCH_ADDRESS)
+        attributes["post.logout.redirect.uris"] = "##".join(addresses)
+        server.calls.clear()
+        return dict(server.clients["site-acme"])
+
+    def test_missing_logout_address_is_reported_without_changing_the_client(self):
+        server = FakeKeycloak()
+        before = self.provision_client_without_switch_address(server)
+
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 1)
+        report = str(output.call_args_list)
+        self.assertIn("missing", report)
+        self.assertIn(self.SWITCH_ADDRESS, report)
+        self.assertIn("--update-redirects", report)
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_update_redirects_adds_only_the_missing_address(self):
+        server = FakeKeycloak()
+        before = self.provision_client_without_switch_address(server)
+        expected_logout = before["attributes"]["post.logout.redirect.uris"] + "##" + self.SWITCH_ADDRESS
+
+        code, _, output, _ = self.run_command([*ARGS, "--update-redirects"], server=server)
+        self.assertEqual(code, 0)
+        after = server.clients["site-acme"]
+        self.assertEqual(after["attributes"]["post.logout.redirect.uris"], expected_logout)
+        self.assertEqual(after["secret"], before["secret"])
+        self.assertNotIn(before["secret"], str(output.call_args_list))
+        untouched = lambda client: {**client, "attributes": {**client["attributes"], "post.logout.redirect.uris": None}}
+        self.assertEqual(untouched(after), untouched(before))
+        writes = [(call.get_method(), urlsplit(call.full_url).path) for call in server.calls if call.get_method() != "GET"]
+        self.assertEqual(writes, [("PUT", "/admin/realms/platform/clients/site-acme")])
+        payload = json.loads(next(call.data for call in server.calls if call.get_method() == "PUT"))
+        self.assertEqual(payload.keys(), before.keys() - {"secret"})
+        self.assertIn(self.SWITCH_ADDRESS, str(output.call_args_list))
+
+    def test_update_redirects_requires_update_confirmation(self):
+        code, opener, _, prompt = self.run_command([*ARGS, "--update-redirects"], reply="CREATE site-acme")
+        self.assertEqual(code, 2)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_update_redirects_checks_service_and_scope_before_writing(self):
+        for invalid in ("service", "scope"):
+            with self.subTest(invalid=invalid):
+                server = FakeKeycloak()
+                before = self.provision_client_without_switch_address(server)
+                if invalid == "service":
+                    server.clients["site-acme-service"]["serviceAccountsEnabled"] = False
+                else:
+                    server.scopes["aud-site-acme"]["protocol"] = "saml"
+
+                self.assertEqual(self.run_command([*ARGS, "--update-redirects"], server=server)[0], 1)
+                self.assertEqual(server.clients["site-acme"], before)
+                self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_missing_browser_client_is_not_created_before_service_validation(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        del server.clients["site-acme"]
+        server.clients["site-acme-service"]["serviceAccountsEnabled"] = False
+        server.calls.clear()
+
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_update_redirects_adds_a_missing_login_callback_too(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        (callback,) = server.clients["site-acme"]["redirectUris"]
+        server.clients["site-acme"]["redirectUris"] = []
+        server.calls.clear()
+
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertEqual(server.clients["site-acme"]["redirectUris"], [])
+        self.assertEqual(self.run_command([*ARGS, "--update-redirects"], server=server)[0], 0)
+        self.assertEqual(server.clients["site-acme"]["redirectUris"], [callback])
+
+    def test_update_redirects_refuses_an_address_outside_the_template(self):
+        server = FakeKeycloak()
+        before = self.provision_client_without_switch_address(server)
+        attributes = server.clients["site-acme"]["attributes"]
+        attributes["post.logout.redirect.uris"] += "##https://other.example.test/panel"
+        before = dict(server.clients["site-acme"])
+
+        code, _, output, _ = self.run_command([*ARGS, "--update-redirects"], server=server)
+        self.assertEqual(code, 1)
+        self.assertIn("does not match the requested tenant", str(output.call_args_list))
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_update_redirects_without_a_missing_address_writes_nothing(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        before = dict(server.clients["site-acme"])
+        server.calls.clear()
+
+        self.assertEqual(self.run_command([*ARGS, "--update-redirects"], server=server)[0], 0)
+        self.assertEqual(server.clients["site-acme"], before)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_rejects_a_conflicting_default_binding_before_writing_optional_bindings(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        server.optional["sync"].clear()
+        server.default["press-service"].add("scope")
+        server.calls.clear()
+
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 1)
+        self.assertIn("already has a default binding", str(output.call_args_list))
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_rejects_an_existing_scope_on_an_unrelated_client(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        for index in range(100):
+            server.clients[f"other-{index}"] = {"id": f"other-{index}"}
+        server.clients["mobile-app"] = {"id": "mobile", "optionalClientScopes": ["aud-site-acme"]}
+        server.optional["sync"].clear()
+        server.calls.clear()
+
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 1)
+        self.assertIn("unexpected binding", str(output.call_args_list))
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_refuses_to_reuse_a_tenant_client_without_pkce(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        del server.clients["site-acme"]["attributes"]["pkce.code.challenge.method"]
+        server.calls.clear()
+
+        code, _, output, _ = self.run_command(server=server)
+        self.assertEqual(code, 1)
+        self.assertIn("does not match the requested tenant", str(output.call_args_list))
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_refuses_to_reuse_browser_with_default_service_audience(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        server.clients["site-acme"]["defaultClientScopes"].append("aud-identity-sync")
+        server.calls.clear()
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
+    def test_rejects_401_and_403_without_creating_resources(self):
+        for status in (401, 403):
+            with self.subTest(status=status):
+                server = FakeKeycloak()
+                server.deny[("GET", "/clients")] = status
+                code, _, output, _ = self.run_command(server=server)
+                self.assertEqual(code, 1)
+                self.assertIn(f"HTTP {status}", str(output.call_args_list))
+                self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+                self.assertNotIn("dummy-admin-token", str(output.call_args_list))
+                self.assertNotIn("synthetic denial", str(output.call_args_list))
+
+    def test_redirect_handler_refuses_to_forward_the_token(self):
+        command = runpy.run_path(str(COMMAND))
+        handler = command["NoRedirect"]()
+        self.assertIsNone(handler.redirect_request(None, None, 307, "", {}, "https://other.example.test"))
+
+    def test_service_suffix_is_reserved_for_the_generated_client(self):
+        code, opener, _, prompt = self.run_command(["acme-service", *ARGS[1:], "--preview"], tty=False)
+        self.assertEqual(code, 2)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_invalid_origins_are_rejected_without_network_access(self):
+        for invalid in (
+            "http://tenant.example.test",
+            "https://*.example.test",
+            "https://tenant.example.test/x",
+            "https://tenant.example.test?secret=1",
+            "https://user@tenant.example.test",
+        ):
+            with self.subTest(invalid=invalid):
+                code, opener, _, prompt = self.run_command(["acme", invalid, ARGS[2]])
+                self.assertEqual(code, 2)
+                opener.open.assert_not_called()
+                prompt.assert_not_called()
+
+
+@unittest.skipUnless(live_available(), "Keycloak development environment is required")
+class LiveTenantClientTest(unittest.TestCase):
+    def test_keycloak_creates_the_client_with_a_secret_and_tenant_scopes(self):
+        command = runpy.run_path(str(COMMAND))
+        slug = f"fixture-{uuid.uuid4().hex}"
+        client_id = f"site-{slug}"
+        client = command["tenant_client"](slug, ARGS[1])
+        scope = command["tenant_scope"](client_id)
+        service = command["tenant_service_client"](slug)
+        token = admin_token()
+
+        def cleanup():
+            cleanup_token = admin_token()
+            response = admin("/client-scopes", cleanup_token)
+            self.assertEqual(response.status, 200, safe_detail(response))
+            for entry in response.json():
+                if entry["name"] == scope["name"]:
+                    removed = admin(f"/client-scopes/{entry['id']}", cleanup_token, method="DELETE")
+                    self.assertEqual(removed.status, 204, safe_detail(removed))
+            for name in (client_id, service["clientId"]):
+                response = admin(f"/clients?clientId={name}", cleanup_token)
+                self.assertEqual(response.status, 200, safe_detail(response))
+                for entry in response.json():
+                    if entry["clientId"] == name:
+                        removed = admin(f"/clients/{entry['id']}", cleanup_token, method="DELETE")
+                        self.assertEqual(removed.status, 204, safe_detail(removed))
+
+        self.addCleanup(cleanup)
+        request = command["make_admin_request"](get_environment_value("KC_PUBLIC_URL"), token)
+        command["provision_tenant"](request, client, scope, service)
+        response = admin(f"/clients?clientId={client_id}", token)
+        self.assertEqual(response.status, 200, safe_detail(response))
+        (created,) = response.json()
+        self.assertEqual(created["clientId"], client_id)
+        self.assertFalse(created["publicClient"])
+        self.assertEqual(created["attributes"]["pkce.code.challenge.method"], "S256")
+        secret_path = f"/clients/{created['id']}/client-secret"
+        original_secret = request("GET", secret_path)["value"]
+        self.assertTrue(bool(original_secret))
+
+        service_name = service["clientId"]
+        saved_service = command["find_client"](request, service_name)
+        service_secret_path = f"/clients/{saved_service['id']}/client-secret"
+        service_secret = request("GET", service_secret_path)["value"]
+        self.assertTrue(bool(service_secret) and service_secret != original_secret)
+        result = client_token(service_name, service_secret, "aud-identity-sync")
+        self.assertEqual(result.status, 200, safe_detail(result))
+        claims = jwt_payload(result.json()["access_token"])
+        self.assertEqual(claims["azp"], service_name)
+        self.assertEqual(claims["aud"], "identity-sync")
+        denied = client_token(client_id, original_secret, "aud-identity-sync")
+        self.assertEqual(safe_detail(denied), "HTTP 401 unauthorized_client")
+
+        command["provision_tenant"](request, client, scope, service)
+        self.assertTrue(request("GET", secret_path)["value"] == original_secret)
+        self.assertTrue(request("GET", service_secret_path)["value"] == service_secret)
+
+        for name, secret_name in (
+            ("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET"),
+            ("press-service", "ATONOTA_PRESS_SERVICE_SECRET"),
+        ):
+            with self.subTest(client=name):
+                response = client_token(name, get_environment_value(secret_name), scope["name"])
+                self.assertEqual(response.status, 200, safe_detail(response))
+                claims = jwt_payload(response.json()["access_token"])
+                self.assertEqual(claims["azp"], name)
+                self.assertTrue(claims.get("aud") in (client_id, [client_id]))
+                default = client_token(name, get_environment_value(secret_name))
+                self.assertEqual(default.status, 200, safe_detail(default))
+                default_audience = jwt_payload(default.json()["access_token"]).get("aud", [])
+                self.assertFalse(client_id in default_audience)

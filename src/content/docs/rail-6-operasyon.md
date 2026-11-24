@@ -25,11 +25,11 @@ order: 9
 | Temsil (impersonation) | Press + tenant sitesi | Ayrı kapsam ve rıza: belirli kullanıcının rızasıyla `user.impersonate` veya kapsamı daraltılmış destek kullanıcısı; Administrator yalnız ayrı yükseltme rızasıyla (SA-44, K-19) |
 | Co-browsing / uzaktan yardım | Tenant sitesi + Hocuspocus | Paylaşılan ekran durumu (rota, filtre, kaydırma, seçim, maskeli satır özeti, form taslağı) + imleç/presence; kontrol önerileri müşteri onayıyla, müşterinin oturumunda çalışır (SA-42..SA-44) |
 | Operatör kimliği | Keycloak → Press + ops sitesi | Operatör realm rolleri → Press System User hesapları + ops sitesi rolleri; operatör başına API key |
-| Infra ve AI destekli operasyon | Press Desk + Press MCP | `enable_mcp`, System Manager; yalnız ops-admin ve Hüseyin Cengiz |
+| Infra ve AI destekli operasyon | Press Desk + Press MCP | `enable_mcp`, System Manager; yalnız ops-admin ve DevOps sorumlusu |
 
 ## Superadmin paneli (operatör modu)
 
-Panel, tenant SPA ile aynı kabuktur ve yalnız özel ağdaki `operator.<marka>.com.tr` origin'inde sunulur (G-119); Keycloak 'platform' realm'indeki `platform-operator` grubunun `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Gece mutabakat farkları**.
+Panel, tenant SPA ile aynı kabuktur ve yalnız özel ağdaki `operator.atonota.net` origin'inde sunulur (MVP sonrası hedef, backend ad haritasında yok; G-119); Keycloak 'platform' realm'indeki `platform-operator` grubunun `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Gece mutabakat farkları**.
 
 Press erişimi iki katmanlıdır ve gerekçesi koddur: `press.api.client` `get/set_value/delete/run_doc_method` Support Access'i tanır (client.py L246-260, L336-375), fakat başka takımın Team/Invoice/BT tekil yazması yalnız `frappe.local.system_user()` ile açılır (client.py L442-447, takım sahipliği ownership.py L80-105; v0.155.3). Bu yüzden **site düzeyi destek eylemleri** Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden, **ticari yazmalar** ise System User servis hesabı + `press_tr.api.ops` üzerinden yapılır. Operatör BFF'i (`ops-bff`; `operator.` origin'inde, operatör moduyla aynı origin'de, G-119) operatör başına Press API key/secret ve `X-Press-Team` başlığı kullanır; paylaşımlı anahtar yoktur. `press.api.client.get_list` + `skip_team_filter_for_system_user_and_support_agent` bayrağı Press Support Agent'a Support Access'siz çapraz-kiracı liste okuması verdiği için (client.py L164-170) bu rol KVKK envanterinde ayrıcalıklı sayılır ve her çağrı loglanır. Gerçek zamanlılık: panel verisi TanStack Query ile yenilenir; destek oturumu presence'ı Hocuspocus odasından gelir; ops sitesi `frappe.realtime` kanalı ticket güncellemeleri için kullanılır (doğrulanacak).
 
@@ -58,7 +58,7 @@ Her ekonomik olay tek tetikle tek belgeye gider; vergi ve belge zamanlaması mal
 | İade / kısmi iade | `press_tr.api.ops.refund_invoice`, negatif BT | `is_return` Sales Invoice + e-belge iptal/iade | iade onayı; iade kimliği | SA-9 |
 | İtiraz | Payment Dispute | Şüpheli alacak kaydı | itiraz bildirimi; itiraz kimliği | Finans |
 
-Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans olur; aynı ekonomik olay iki yoldan kaydedilmez; gece mutabakatında fark sıfır.
+Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans olur; aynı ekonomik olay iki yoldan kaydedilmez; elle başlatılan mutabakatta fark sıfır. Zamanlanmış iş kurulmaz (backend proje kaydı D-6).
 
 **e-Fatura konumu.** ERPNext v16 `regional/turkey/setup.py` boş fonksiyondur, `country_wise_tax.json` yalnız eski "VAT 18%" kaydını taşır, UBL-TR üreticisi yoktur; buna karşılık `tr_chart_of_accounts.json` doğrulanmıştır. KDV %20/%10/%1 şablonları elle tanımlanır; e-belge, Sales Invoice submit sonrası entegratör köprüsünden gider (VKN + mükellef → e-Fatura, aksi e-Arşiv; ETTN/durum/XML Sales Invoice'ta). `logedosoft/ERPNext-Turkish-Delight` `TD EInvoice Integrator/Settings` kalıbı (Uyumsoft, Bien Teknoloji) referanstır; v16 uyumu doğrulanmamıştır (doğrulanacak).
 
@@ -83,7 +83,7 @@ Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi y
 - **İptal:** Revoke veya süre dolumu Hocuspocus bağlantılarını sunucudan kapatır, yeniden kimlik doğrulamayı reddeder, temsil oturumunu sonlandırır, bekleyen önerileri düşürür ve biletleri iptal listesine alır. Kabul: 2 sn içinde WebSocket kapanır, temsil oturumundaki API çağrısı 401/403.
 - **Maskeleme:** permlevel ile gizli alanlar, uygulamanın `support_mask_fields` listesi ve kişisel veri sınıfları (TCKN, IBAN, kart, maaş) ağa hiç çıkmaz.
 
-**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: Hüseyin Cengiz): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin (`platform_core`) bastığı tek kullanımlık bileti (G-148), aktif Support Session'ı ve kapsamı doğrular. Biletleri tek yayıncı basar: müşteri kendi site oturumuyla, operatör ise operatör BFF'inin (`ops-bff`) kendi belirtecinden token exchange ile aldığı `aud=site-<kiracı>` belirteciyle (`sub` = operatör; G-59, G-82) aynı siteden alır; operatörün kiracı API oturumu yoktur; Origin denetimi bilet türüne bağlıdır: müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden, operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok; G-119); oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
+**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: DevOps sorumlusu): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin (`platform_core`) bastığı tek kullanımlık bileti (G-148), aktif Support Session'ı ve kapsamı doğrular. Biletleri tek yayıncı basar: müşteri kendi site oturumuyla, operatör ise operatör BFF'inin (`ops-bff`) kendi belirtecinden token exchange ile aldığı `aud=site-<kiracı>` belirteciyle (`sub` = operatör; G-59, G-82) aynı siteden alır; operatörün kiracı API oturumu yoktur; Origin denetimi bilet türüne bağlıdır: müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden, operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok; G-119); oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
 
 ```mermaid
 sequenceDiagram
@@ -137,3 +137,62 @@ sequenceDiagram
 - **Operatör modu → ops sitesi (`ops-bff`, `aud=site-ops`; G-59):** `platform_core.api.ops.customer_360(team)` (yeni), operatörün Keycloak kimliği ve operasyon sitesi rolleriyle.
 - **iyzico → Press:** HPP webhook (`token`, `iyziEventType`, `status` SUCCESS/INIT\_\*/PENDING\_CREDIT/FAILURE), `X-IYZ-SIGNATURE-V3`; 15 dk aralıkla 3 yineleme; SUCCESS sonrası CF retrieve zorunlu.
 - **Hocuspocus → kiracı sitesi ve ops:** `extension-webhook` oturum olayları; `onAuthenticate` → kiracı sitesi (`platform_core`): bilet, `Support Session` durumu ve kapsamı.
+
+## Canlı ortamlar ve dağıtım hattı
+
+Bu bölüm backend'in 23 Kasım 2026 Pazartesi günkü dağıtım tasarımını özetler. Kaynak `backend/docs/dagitim/ortamlar.md` dosyasıdır. Dağıtım kodu `backend/deploy/` klasöründedir. Kod yazıldı ve sahte sunucularla sınandı. Henüz hiçbir sunucu kurulmadı ve hiçbir dağıtım yapılmadı (E-10).
+
+Proje sahibi şu sırayı seçti:
+
+1. Önce MVP biter.
+2. Sonra ürün Hetzner sunucusunda canlıya çıkar.
+
+### Dört ortam
+
+| Ortam | Amacı | Nasıl güncellenir |
+| --- | --- | --- |
+| alpha | Ana daldaki son kodu denemek | Ana dal güncellenince Jenkins kendiliğinden dağıtır |
+| beta | Ürün ekibinin iç denemesi | Jenkins'te biri "Move to beta" düğmesine basar |
+| rc | Prod'un aynısında son kabul denemesi | Jenkins'te biri "Move to rc" düğmesine basar |
+| prod | Gerçek müşteri | Jenkins'te biri "Move to prod" düğmesine basar |
+
+Colima yalnız geliştirme içindir. Colima, geliştiricinin yerel bilgisayarındaki konteyner ortamıdır.
+
+### Ad haritası
+
+| Ad | alpha | prod |
+| --- | --- | --- |
+| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.atonota.net` |
+| Press | `press.alpha.atonota.net` | `press.atonota.net` |
+| Kiracı | `<kiracı>.app.alpha.atonota.net` | `<kiracı>.app.atonota.net` |
+| Panel | `https://<kiracı>/panel` | `https://<kiracı>/panel` |
+
+beta ve rc ortamları aynı kalıbı izler. Örneğin beta'da Press `press.beta.atonota.net` adresindedir. Panel her kiracının kendi adresinde `/panel` yolundadır.
+
+### Jenkins hattı
+
+- Dağıtım hattı Jenkins ile kurulur. GitHub Actions yalnız pull request test kapısı olarak kalır.
+- Jenkins kodu bir kez derler. Sonra aynı paketi sırayla bir sonraki ortama taşır. Taşımada kod yeniden derlenmez.
+- Ana daldan gelen iş yalnız alpha ve beta anahtarlarını görür. rc ve prod anahtarları ayrı bir Jenkins klasöründedir. Bu yüzden ana daldaki değişiklik prod'a kendiliğinden gitmez.
+- Jenkins her dağıtımdan sonra sağlık denetimi koşar. Denetim geçmezse sonraki ortama taşıma yapılmaz.
+- alpha ortamında hata olursa hat yedeği kendiliğinden geri yükler. rc ve prod ortamında bu kararı DevOps sorumlusu verir.
+- Yedek her dağıtımdan önce alınır. Düzenli yedek yoktur, çünkü zamanlanmış iş kurulmaz (E-7).
+
+### Canlıya çıkışın önündeki engeller
+
+Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dosyasındadır. Başlıca engeller şunlardır:
+
+| No | Engel | Sahibi |
+| --- | --- | --- |
+| E-1 | Press'in sunucu kurma akışı Frappe 16'da çalışmıyor. MVP'de ilk kiracı sitesini DevOps sorumlusu elle açar | press-tr işi ve DevOps sorumlusu |
+| E-2 | Press üretim imajı yazıldı ve Colima'da denendi. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor. Press anahtarı bugün bütün ortamlarda kapalıdır. rc ve prod'da bu betikler bitmeden açılamaz. alpha'da DevOps sorumlusu Press'i elle açar | press-tr işi ve DevOps sorumlusu |
+| E-3 | `/panel` sayfası arka uçta hazır. Arayüz paketi bu adrese göre henüz ayarlanmadı | atonota-web işi |
+| E-4 | Çözüldü. Ayar listeleri yazıldı. Gerçek değerleri DevOps sorumlusu sunucuya yazar | DevOps sorumlusu |
+| E-5 | CI'da güvenlik kapısı yok | DevOps sorumlusu |
+| E-7 | Zamanlanmış iş yasağı yüzünden düzenli yedek yok | Proje sahibi |
+| E-9 | Gerçek servislerle uçtan uca test yok | integration-e2e işi |
+| E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | DevOps sorumlusu |
+| E-11 | GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı | Alan adı sorumlusu |
+| E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | Hukuk ve ürün sahibi |
+
+Prod'a çıkmadan önce üç yaşam döngüsü testi de geçmelidir. Bu testler TLS aracısı olan hazırlık ortamında koşar (backend proje kaydı O-50).

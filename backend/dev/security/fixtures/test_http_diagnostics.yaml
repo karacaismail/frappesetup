@@ -1,0 +1,53 @@
+rules:
+  - id: test-raw-http-diagnostic
+    languages: [python]
+    severity: ERROR
+    message: "Use the status code instead of the raw response in test failure messages."
+    mode: taint
+    paths:
+      include:
+        - "**/test_*.py"
+        - "**/*_test.py"
+        - "**/tests/**/*.py"
+    pattern-sources:
+      - exact: true
+        pattern: $RESPONSE.get_data(...)
+      - exact: true
+        patterns:
+          - pattern-either:
+              - pattern: $RESPONSE.text
+              - pattern: $RESPONSE.content
+              - pattern: $RESPONSE.body
+              - pattern: $RESPONSE.data
+              - pattern: $RESPONSE.json
+              - pattern: $RESPONSE.json(...)
+              - pattern: $RESPONSE.read(...)
+          - metavariable-regex:
+              metavariable: $RESPONSE
+              regex: ^(?:[a-zA-Z_][a-zA-Z_0-9]*\.)*(?:response|resp|reply|http_response|error_response)$
+    pattern-sanitizers:
+      - exact: true
+        pattern: $RESPONSE.json(...).get("exc_type")
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: assert $CONDITION, $MESSAGE
+              - pattern: raise AssertionError($MESSAGE, ...)
+              - pattern: pytest.fail($MESSAGE, ...)
+              - pattern: self.fail($MESSAGE, ...)
+              - patterns:
+                  - pattern: $TEST.$ASSERT(..., msg=$MESSAGE, ...)
+                  - metavariable-regex:
+                      metavariable: $ASSERT
+                      regex: ^assert[A-Z][a-zA-Z]+$
+              - patterns:
+                  - pattern: $TEST.$ASSERT($VALUE, $MESSAGE)
+                  - metavariable-regex:
+                      metavariable: $ASSERT
+                      regex: ^assert(?:True|False|IsNone|IsNotNone)$
+              - patterns:
+                  - pattern: $TEST.$ASSERT($LEFT, $RIGHT, $MESSAGE)
+                  - metavariable-regex:
+                      metavariable: $ASSERT
+                      regex: ^assert(?:Equal|NotEqual|Is|IsNot|In|NotIn|Greater|GreaterEqual|Less|LessEqual|IsInstance|NotIsInstance|Regex|NotRegex|DictEqual|ListEqual|TupleEqual|SetEqual|SequenceEqual|CountEqual)$
+          - focus-metavariable: $MESSAGE

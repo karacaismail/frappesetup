@@ -5,13 +5,16 @@ import Site from '../layouts/Site.astro';
 import Mermaid from '../components/Mermaid.tsx';
 import PhaseTable from '../components/PhaseTable.astro';
 import PressAiDownloads from '../components/PressAiDownloads.astro';
-import RequirementsExplorer, { toRequirementRow } from '../components/RequirementsExplorer.tsx';
+import RequirementsExplorer, { toBoardMeta, toRequirementRow } from '../components/RequirementsExplorer.tsx';
+import TaskBoardRules from '../components/TaskBoardRules.astro';
 import Rails from '../components/Rails.astro';
 import RequirementSummary from '../components/RequirementSummary.astro';
 import Timeline from '../components/Timeline.astro';
 import { sectionIcon } from '../components/icons';
 import { SECTIONS } from '../data/sections';
 import requirements from '../data/requirements.json';
+import taskBoard from '../data/task-board.json';
+import phases from '../data/phases.json';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
@@ -37,6 +40,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
 const EMBEDS: Record<string, string[]> = {
   raylar: ['rails'],
   'yol-haritasi': ['phase-table', 'timeline'],
+  gereksinimler: ['task-rules'],
   // press-ai indirme blokları (dl-<grup>): statik bağlantılar, dosyalar derlemede üretilir.
   'ai-mcp': ['dl-mcp'],
   'ai-skills': ['dl-skills'],
@@ -70,7 +74,7 @@ const embeds = EMBEDS[entry.id] ?? [];
           .req-explorer {
             --fs-requirements-static: yes;
           }
-          .req-explorer :is(.req-search-help, .req-priority, .req-filters, .req-more, .req-detail-toggle) {
+          .req-explorer :is(.req-search-help, .req-priority, .req-filters, .req-more, .req-detail-toggle, [aria-label="Görünüm"]) {
             display: none;
           }
         </style>
@@ -103,6 +107,14 @@ const embeds = EMBEDS[entry.id] ?? [];
     }
     {embeds.includes('timeline') && <div data-embed-source="timeline"><Timeline /></div>}
     {
+      embeds.includes('task-rules') && (
+        <div data-embed-source="task-rules" class="prose">
+          <TaskBoardRules />
+        </div>
+      )
+    }
+
+    {
       embeds
         .filter((e) => e.startsWith('dl-'))
         .map((e) => (
@@ -118,7 +130,11 @@ const embeds = EMBEDS[entry.id] ?? [];
           <noscript>
             <p>Arama ve süzgeçler JavaScript gerektirir. Tüm gereksinimleri aşağıda okuyabilirsiniz.</p>
           </noscript>
-          <RequirementsExplorer client:visible rowsJson={JSON.stringify(requirements.map(toRequirementRow))} />
+          <RequirementsExplorer
+            client:visible
+            rowsJson={JSON.stringify(requirements.map((r) => toRequirementRow(r, taskBoard)))}
+            metaJson={JSON.stringify(toBoardMeta(taskBoard, phases))}
+          />
         </div>
       )
     }
@@ -267,7 +283,7 @@ const embeds = EMBEDS[entry.id] ?? [];
       }
     });
   };
-  const results = document.querySelector<HTMLElement>('.req-results');
+  let results: HTMLElement | null = null;
   const measureResults = () => {
     if (!results) return;
     const scrolls = results.scrollWidth > results.clientWidth &&
@@ -282,7 +298,7 @@ const embeds = EMBEDS[entry.id] ?? [];
       results.removeAttribute('aria-label');
     }
   };
-  if (results) {
+  if (document.querySelector('.explorer')) {
     const root = document.documentElement;
     const clearKeyboardFocus = () => delete root.dataset.requirementKeyboardFocus;
     document.addEventListener('keydown', (event) => {
@@ -292,8 +308,8 @@ const embeds = EMBEDS[entry.id] ?? [];
     });
     document.addEventListener('pointerdown', clearKeyboardFocus);
     document.addEventListener('touchstart', clearKeyboardFocus, { passive: true });
-    results.addEventListener('keydown', (event) => {
-      if (event.target !== results || !results.hasAttribute('role')) return;
+    document.addEventListener('keydown', (event) => {
+      if (!results || event.target !== results || !results.hasAttribute('role')) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
       event.preventDefault();
@@ -305,21 +321,32 @@ const embeds = EMBEDS[entry.id] ?? [];
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
       markScrollingCode();
+      observeResults();
       measureResults();
     });
   };
-  results?.addEventListener('blur', schedule);
   // Ölçüm başlayınca satır içi kodda break-word ağı kapanır (global.css); betik yoksa ağ yerinde kalır.
   document.documentElement.setAttribute('data-code-measured', '');
   markScrollingCode();
   const resize = new ResizeObserver(schedule);
   resize.observe(document.body);
-  if (results) {
-    measureResults();
-    resize.observe(results);
-    const inner = results.firstElementChild;
-    if (inner) resize.observe(inner);
-  }
+  const observeResults = () => {
+    const current = document.querySelector<HTMLElement>('.req-results');
+    if (current === results) return;
+    if (results) {
+      results.removeEventListener('blur', schedule);
+      resize.unobserve(results);
+      if (results.firstElementChild) resize.unobserve(results.firstElementChild);
+    }
+    results = current;
+    if (results) {
+      results.addEventListener('blur', schedule);
+      resize.observe(results);
+      if (results.firstElementChild) resize.observe(results.firstElementChild);
+    }
+  };
+  observeResults();
+  measureResults();
   document.fonts.addEventListener('loadingdone', schedule);
   document.fonts.ready.then(schedule);
   const explorer = document.querySelector('.explorer');

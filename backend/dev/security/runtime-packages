@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/container-settings"
+if [[ "${FS_COLIMA_PROFILE:-factory}" == factory ]]; then
+    printf '%s\n' 'List runtime packages in the default or CI profile.' >&2
+    exit 1
+fi
+if [[ $# -ne 1 || ! "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    printf '%s\n' 'Use the exact local image ID from docker image inspect.' >&2
+    exit 1
+fi
+
+exec "${docker_command[@]}" run --rm --pull never --network none --read-only \
+    --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp \
+    --tmpfs /home/frappe/frappe-bench/sites --tmpfs /home/frappe/frappe-bench/logs \
+    --entrypoint /home/frappe/frappe-bench/env/bin/python "$1" \
+    -m pip list --disable-pip-version-check --format=json

@@ -1,0 +1,230 @@
+{
+  "scope": "backend",
+  "files": [
+    "backend/apps/press_tr/press_tr/api/__init__.py",
+    "backend/apps/press_tr/press_tr/api/account.py",
+    "backend/apps/press_tr/press_tr/api/auth.py",
+    "backend/apps/press_tr/press_tr/api/identity.py",
+    "backend/apps/press_tr/press_tr/api/maintenance.py",
+    "backend/apps/press_tr/press_tr/hooks.py",
+    "backend/apps/press_tr/press_tr/press_identity/accounts.py",
+    "backend/apps/press_tr/press_tr/press_identity/anonymization.py",
+    "backend/apps/press_tr/press_tr/press_identity/custom/team.json",
+    "backend/apps/press_tr/press_tr/press_identity/deletion.py",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.json",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.py",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.json",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.py",
+    "backend/apps/press_tr/press_tr/press_identity/identity.py",
+    "backend/apps/press_tr/press_tr/press_identity/machine_routes.py",
+    "backend/apps/press_tr/press_tr/press_identity/oidc.py",
+    "backend/apps/press_tr/press_tr/press_identity/request_policy.py",
+    "backend/apps/press_tr/press_tr/press_identity/service.py",
+    "backend/apps/press_tr/press_tr/press_identity/sessions.py",
+    "backend/apps/press_tr/pyproject.toml",
+    "backend/libs/oidc_verify/pyproject.toml",
+    "backend/libs/oidc_verify/src/oidc_verify/__init__.py",
+    "backend/libs/oidc_verify/src/oidc_verify/errors.py",
+    "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
+    "backend/libs/oidc_verify/src/oidc_verify/verification.py"
+  ],
+  "sha256": "f4180cb4973eb476ae2408c995a42a1733a255cfea76280ff3632d176e081dbf",
+  "findings": [
+    {
+      "rule": "frappe-guest-without-limit",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 34,
+      "reason": "The contract exempts signature-verified logout notifications from endpoint rate limiting. Rejected notifications are limited to 120 per minute."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 34,
+      "reason": "Verifies the signed logout notification and restricts revocation to matched sessions."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/account.py",
+      "line": 18,
+      "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/auth.py",
+      "line": 41,
+      "reason": "Starts browser-bound login without reading or modifying an application record."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/auth.py",
+      "line": 152,
+      "reason": "Consumes browser-bound state once and verifies ID token claims before binding identity."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 46,
+      "reason": "Validates the Identity Sync service identity and issuer before provisioning."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 107,
+      "reason": "Validates the Identity Sync service identity and issuer before membership removal."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 184,
+      "reason": "Validates the Identity Sync service identity and issuer before anonymization."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/identity.py",
+      "line": 210,
+      "reason": "Validates the Identity Sync service identity and issuer before identity inventory."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/maintenance.py",
+      "line": 6,
+      "reason": "Requires the System Manager role before touching internal session mappings."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 93,
+      "reason": "Deletes only session mappings selected by the verified logout notification."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/api/maintenance.py",
+      "line": 27,
+      "reason": "System Manager maintenance deletes expired internal session mappings."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/accounts.py",
+      "line": 16,
+      "reason": "Internal callers save only the linked account or the site selected during authorized anonymization."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/anonymization.py",
+      "line": 184,
+      "reason": "Authorized anonymization selects files owned by or attached to its linked account."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/anonymization.py",
+      "line": 328,
+      "reason": "Authorized anonymization selects SSH keys belonging to its linked account."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/identity.py",
+      "line": 51,
+      "reason": "Checks that the current non-guest user owns the identity link before writing the session mapping."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/identity.py",
+      "line": 95,
+      "reason": "Only the verified login callback and authorized service provisioning create identity links."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/identity.py",
+      "line": 148,
+      "reason": "Verified login and service provisioning create a team under its validated local owner."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/sessions.py",
+      "line": 37,
+      "reason": "Matches the current account and exact logout session ID before deleting the internal mapping."
+    }
+  ],
+  "additionalReviews": [
+    {
+      "scope": "backend/apps/platform_core/platform_core",
+      "sha256": "34253bc08f8f745619204ab54b99fa86ac190e922eca527ee33eef16345059ba",
+      "findings": [
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 56,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before search."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 90,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before search."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 137,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before link validation."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 12,
+          "reason": "Checks DocType read permission before explaining access and restricts other-user requests to managers."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 20,
+          "reason": "Checks DocType read permission before returning the session user’s access summary."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
+          "line": 16,
+          "reason": "Answers only for the signed-in session user; a guest gets PermissionError. The server reads that user's own records as evidence and ignores body fields such as user. No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
+          "line": 25,
+          "reason": "Signed-in session user only; a guest gets PermissionError. The final step reruns the same decision and stays closed until the price decision (G-166). No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
+          "line": 108,
+          "reason": "The server opens one owner task per empty rule for the System Manager role (G-167). The text is built from the policy, not from the request. The calling user needs no ToDo write right."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+          "line": 88,
+          "reason": "Writes the verification case only from open_attempt, a server-side call that no endpoint whitelists. The case id is checked for length first (G-164). Both DocTypes are closed to AI writes in hooks.py."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+          "line": 109,
+          "reason": "Stores the notice only after the HMAC signature over the raw body is verified (G-164). The caller is the provider without a session. The unique event_id index refuses duplicates."
+        }
+      ],
+      "files": [
+        "backend/apps/platform_core/platform_core/access/engine.py",
+        "backend/apps/platform_core/platform_core/access/explain.py",
+        "backend/apps/platform_core/platform_core/access/hooks.py",
+        "backend/apps/platform_core/platform_core/access/link_search.py",
+        "backend/apps/platform_core/platform_core/access/reports.py",
+        "backend/apps/platform_core/platform_core/access/rules.py",
+        "backend/apps/platform_core/platform_core/access/subject.py",
+        "backend/apps/platform_core/platform_core/api/access.py",
+        "backend/apps/platform_core/platform_core/api/atonota_login.py",
+        "backend/apps/platform_core/platform_core/hooks.py",
+        "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
+        "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py"
+      ]
+    }
+  ]
+}

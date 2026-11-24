@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Pack a built atonota-web checkout once and write its release manifest.
+# Usage: build-web <atonota-web checkout> <out folder>
+# The checkout must already have passed lint, typecheck, unit tests and "npm run build".
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+checkout="${1:?usage: build-web <checkout> <out folder>}"
+out="${2:?usage: build-web <checkout> <out folder>}"
+build="${BUILD_NUMBER:?BUILD_NUMBER is not set}"
+[[ -f "$checkout/dist/index.html" ]] || fail "dist/index.html is missing; run npm run build first"
+[[ -d "$checkout/dist/assets" ]] || fail "dist/assets is missing"
+# The /panel page of Frappe loads the files this manifest names (build with --manifest).
+[[ -f "$checkout/dist/.vite/manifest.json" ]] || fail "dist/.vite/manifest.json is missing; build with --manifest"
+commit="$(git -C "$checkout" rev-parse HEAD)"
+
+mkdir -p "$out"
+file="atonota-web-${commit:0:12}.tar.gz"
+# A fixed order, owner and time keep the bundle byte for byte the same for one commit.
+tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='@0' \
+    -C "$checkout/dist" -cf - . | gzip -n >"$out/$file"
+sha="$(sha256sum "$out/$file" | cut -d' ' -f1)"
+release_py new --kind web --commit "$commit" --build "$build" \
+    --web-file "$file" --web-sha256 "$sha" --out "$out/release.json"
+printf 'release %s written to %s\n' "$(release_py field "$out/release.json" release_id)" "$out"

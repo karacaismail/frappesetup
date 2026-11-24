@@ -1,0 +1,105 @@
+- term_tr: Kimlik
+  code: identity
+  scope: platform_core module
+  definition_tr: Bu modül giriş ve kimlik denetimini yönetir.
+- term_tr: Kabuk
+  code: shell
+  scope: platform_core module
+  definition_tr: Bu modül arayüzün açılış verisini hazırlar.
+- term_tr: Erişim
+  code: access
+  scope: platform_core module
+  definition_tr: Bu modül kimin hangi kayda erişeceğini belirler.
+- term_tr: Mobil eşitleme
+  code: mobile
+  scope: platform_core module
+  definition_tr: Bu modül telefon ile sunucu arasındaki kayıtları eşitler.
+- term_tr: Yapay zekâ
+  code: ai
+  scope: platform_core module
+  definition_tr: Bu modül yapay zekânın kullanabileceği işlemleri yönetir.
+  avoid: [ai_access, artificial_intelligence]
+- term_tr: Model geçidi
+  code: model_gateway
+  scope: platform_core module
+  definition_tr: Bu modül model çağrısını seçilen sağlayıcıya iletir.
+- term_tr: Erişim kuralı
+  code: plt_access_rule
+  doctype: PLT Access Rule
+  definition_tr: Bu kayıt bir rolün kayıt ve alan izinlerini belirler.
+- term_tr: Platform kimlik bağı
+  code: plt_identity_link
+  doctype: PLT Identity Link
+  definition_tr: Bu kayıt Frappe kullanıcısını Keycloak kimliğine bağlar.
+- term_tr: Telefon hesap durumu
+  code: plt_mobile_account_state
+  doctype: PLT Mobile Account State
+  definition_tr: Bu kayıt telefon eşitlemesinin hesap durumunu saklar.
+- term_tr: Telefon kaydı değişikliği
+  code: plt_mobile_change
+  doctype: PLT Mobile Change
+  definition_tr: Bu kayıt telefona gönderilecek değişikliği saklar.
+- term_tr: Telefon eşitleme teslimi
+  code: plt_mobile_delivery
+  doctype: PLT Mobile Delivery
+  definition_tr: Bu kayıt bir değişikliğin telefona gönderim durumunu saklar.
+- term_tr: Telefon kurulumu
+  code: plt_mobile_installation
+  doctype: PLT Mobile Installation
+  definition_tr: Bu kayıt eşitlemeye katılan uygulama kurulumunu tanır.
+- term_tr: Telefon işlemi
+  code: plt_mobile_operation
+  doctype: PLT Mobile Operation
+  definition_tr: Bu kayıt telefondan gelen işlemin sonucunu saklar.
+- term_tr: Telefon değişiklik sırası
+  code: plt_mobile_sequence
+  doctype: PLT Mobile Sequence
+  definition_tr: Bu kayıt değişikliklere sıra numarası verir.
+- term_tr: Yapay zekâ hesabı
+  code: plt_ai_account
+  doctype: PLT AI Account
+  definition_tr: Bu kayıt bir sağlayıcı hesabının ayarlarını saklar.
+- term_tr: Yapay zekâ bağlantı ayarı
+  code: plt_ai_api
+  doctype: PLT AI API
+  definition_tr: Bu kayıt sağlayıcıyla bağlantı kurmak için gereken ayarları saklar.
+- term_tr: Yapay zekâ modeli
+  code: plt_ai_model
+  doctype: PLT AI Model
+  definition_tr: Bu kayıt kullanılabilecek modeli tanımlar.
+- term_tr: Yapay zekâ sağlayıcısı
+  code: plt_ai_provider
+  doctype: PLT AI Provider
+  definition_tr: Bu kayıt model hizmetini sunan sağlayıcıyı tanımlar.
+- term_tr: Yapay zekâ çağrı yolu
+  code: plt_ai_route
+  doctype: PLT AI Route
+  definition_tr: Bu kayıt model çağrısının nasıl yönlendirileceğini belirler.
+- term_tr: Yapay zekâ kullanım kaydı
+  code: plt_ai_usage_log
+  doctype: PLT AI Usage Log
+  definition_tr: Bu kayıt model çağrısının sonucunu ve kullanımını saklar.
+- term_tr: Yapay zekâ işlem kaydı
+  code: plt_ai_action_log
+  doctype: PLT AI Action Log
+  definition_tr: Bu kayıt yapay zekâ işleminin adımlarını ve sonucunu saklar.
+- term_tr: Yapay zekâ işlem önerisi
+  code: plt_ai_action_proposal
+  doctype: PLT AI Action Proposal
+  definition_tr: Bu kayıt bir yazma işlemini onay için bekletir.
+- term_tr: MCP çağrı sayacı
+  code: plt_mcp_call_budget
+  doctype: PLT MCP Call Budget
+  definition_tr: Bu kayıt bir MCP belirteciyle yapılan araç çağrılarını sayar.
+- term_tr: Yapay zekâ yöneticisi
+  code: PLT AI Manager
+  scope: platform_core role
+  definition_tr: Bu rol model geçidi ayarlarını yönetebilir.
+- term_tr: İptal edilen telefon oturumu
+  code: plt_mobile_revoked_session
+  doctype: PLT Mobile Revoked Session
+  definition_tr: Bu kayıt iptal edilen oturumu tanır.
+- term_tr: Yapay zekâ yolu hedefi
+  code: plt_ai_route_target
+  doctype: PLT AI Route Target
+  definition_tr: Bu kayıt bir model yolunun hedefini tanımlar.

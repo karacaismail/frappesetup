@@ -1,0 +1,22 @@
+# Regenerate with backend/dev/security/compile-lock.
+# Manifest SHA256: f88d26f1d7cc212cd0773362f6a38ce18079e2060fe2d41b1a6cef3530bbd854
+annotated-types==0.8.0
+certifi==2026.11.20
+cffi==2.1.1 ; platform_python_implementation != 'PyPy'
+charset-normalizer==3.5.2
+cryptography==50.0.2
+idna==3.20
+markupsafe==3.0.4
+packaging==26.3
+pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+pydantic==2.12.5
+pydantic-core==2.41.5
+pyjwt==2.15.1
+pypika @ git+https://github.com/frappe/pypika@7ef6e40215d46cd531e8c4e58650b84c11abbd04
+redis==7.1.1
+requests==2.33.1
+typing-extensions==4.16.0
+typing-inspection==0.4.5
+urllib3==2.8.0
+werkzeug==3.1.9
+wrapt==1.15.0

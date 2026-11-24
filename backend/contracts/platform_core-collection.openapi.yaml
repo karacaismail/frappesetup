@@ -1,0 +1,188 @@
+openapi: 3.1.0
+info:
+  title: Platform Core collection API
+  version: 0.1.0
+  description: Read-only collection summaries for the signed-in tenant user.
+servers:
+  - url: /api/method
+    description: Frappe endpoint root of the tenant site
+security:
+  - session: []
+paths:
+  /platform_core.api.collection.group_summary:
+    get:
+      operationId: getCollectionGroupSummary
+      summary: Count readable records by a single field
+      description: |
+        Returns groups ordered by the requested field in ascending order. The total
+        counts all matching readable records, including those in omitted groups.
+        The server applies DocType, record and field permissions before aggregation.
+        The aggregate and aggregate_field parameters must occur together.
+        The request accepts the current browser session cookie.
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Exact DocType name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 140
+          example: Shell Summary Test
+        - name: group_by
+          in: query
+          required: true
+          description: Single readable field name.
+          schema:
+            $ref: '#/components/schemas/FieldName'
+          example: bucket
+        - name: aggregate
+          in: query
+          description: Optional operation on the numeric aggregate field.
+          schema:
+            type: string
+            enum: [sum, avg]
+          example: sum
+        - name: aggregate_field
+          in: query
+          description: Readable numeric field for the optional aggregate.
+          schema:
+            $ref: '#/components/schemas/FieldName'
+          example: amount
+        - name: filters
+          in: query
+          description: |
+            URL-encoded JSON in Frappe filter format. Use a field-value object or an
+            array of three-item conditions. Four-item conditions can name the same DocType.
+            Filter fields must be readable. Each condition applies to the same row.
+            Supported operators are =, !=, >, >=, <, <=, like, not like, in, not in, between, and is.
+            The server accepts up to 100 conditions or values per list.
+          schema:
+            type: string
+            maxLength: 8192
+          example: '{"bucket":"A"}'
+        - name: limit
+          in: query
+          description: Maximum number of groups returned.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+          example: 20
+      responses:
+        '200':
+          description: Summary of the readable rows with the given filters.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                additionalProperties: false
+                properties:
+                  message:
+                    $ref: '#/components/schemas/Summary'
+              example:
+                message:
+                  groups:
+                    - value: A
+                      count: 2
+                      aggregate: 20
+                  total_count: 2
+                  truncated: false
+        '400':
+          description: Invalid parameters, fields, filters or unsupported DocType.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: InvalidSummaryQuery
+        '401':
+          description: The supplied session has expired or is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: SessionExpired
+                session_expired: 1
+        '403':
+          description: Browser session required or permission denied for the DocType or field.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: PermissionError
+        '404':
+          description: The requested DocType does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: DoesNotExistError
+        '429':
+          description: The account exceeded 120 requests per 60 seconds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: RateLimitExceededError
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Host-bound Frappe browser session cookie.
+  schemas:
+    FieldName:
+      type: string
+      pattern: '^[A-Za-z_][A-Za-z0-9_]*$'
+      maxLength: 140
+    Summary:
+      type: object
+      required: [groups, total_count, truncated]
+      additionalProperties: false
+      properties:
+        groups:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Group'
+        total_count:
+          type: integer
+          minimum: 0
+          description: Number of readable matching records before the group limit.
+        truncated:
+          type: boolean
+          description: Whether matching groups were omitted because of the limit.
+    Group:
+      type: object
+      required: [value, count]
+      additionalProperties: false
+      properties:
+        value:
+          type: [string, number, boolean, 'null']
+          description: Grouping field value. A database null forms its own group.
+        count:
+          type: integer
+          minimum: 1
+        aggregate:
+          type: [number, 'null']
+          description: Sum or mean of non-null values, present only when requested.
+    Error:
+      type: object
+      description: Native Frappe error envelope. Developer mode may add diagnostics.
+      properties:
+        exc_type:
+          type: string
+        _server_messages:
+          type: string
+        session_expired:
+          type: integer
+          const: 1
+      additionalProperties: true

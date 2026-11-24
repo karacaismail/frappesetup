@@ -24,7 +24,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 | --- | --- | --- | --- |
 | Keycloak SSO girişi; her site kendi OIDC dönüşüyle (kod sunucuda), tarayıcıya belirteç verilmez (K-25) | Social Login Key provider 'Keycloak' (Press v15, kiracı v16) | configure | G-12, G-44, G-77 |
 | Tekli çıkış: RP-initiated + back-channel | `on_logout`, `keycloak_backchannel_logout`; press\_tr aynı mekanizma | develop (platform\_core, press\_tr) | G-58 |
-| Host'a bağlı oturum çerezi, CSRF token enjeksiyonu; CORS yok (G-119) | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (Hüseyin Cengiz) | develop + configure | G-13, G-45, G-75 |
+| Host'a bağlı oturum çerezi, CSRF token enjeksiyonu; CORS yok (G-119) | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (DevOps sorumlusu) | develop + configure | G-13, G-45, G-75 |
 | Profil (ad, avatar, dil, saat dilimi); parola/MFA/passkey/oturumlar Keycloak Account Console'a markalı yönlendirme (doğrulanacak: v3 tema desteği) | Frappe User, Keycloak Account Console | native | G-78, G-99 |
 | "Hesabımı sil" → KVKK talebi | Personal Data Deletion Request, Team Deletion Request | native | G-52, G-116 |
 
@@ -57,7 +57,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
 | System Settings güvenli alt kümesi (dil, saat dilimi, biçimler, oturum süresi), uygulama ayar doctype'ları meta-driven form | System Settings whitelisted sarmalayıcı | develop (platform\_core) | G-41, G-97 |
-| Kiracı e-posta domaini/hesabı (relay: Hüseyin Cengiz; DNS kayıtları GoDaddy'de: Asistan Hüseyin) | Email Domain, Email Account | configure | G-47 |
+| Kiracı e-posta domaini/hesabı (relay: DevOps sorumlusu; DNS kayıtları GoDaddy'de: alan adı sorumlusu) | Email Domain, Email Account | configure | G-47 |
 | Tenant Branding (logo, birincil renk) token katmanında | Tenant Branding doctype → AntD ConfigProvider | develop (platform\_core, `@platform/design-tokens`) | G-67, G-97 |
 | Alan ekleme/gizleme/yeniden adlandırma, Workspace düzenleme | Customize Form, Custom Field, Property Setter, Custom Workspace | native (API) + develop (UI) | G-40, G-97 |
 | Veri içe/dışa aktarma, göç şablonları | Data Import, `reportview.export_query` | native | G-97, X-15 |
@@ -78,7 +78,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
-| `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | agent servisi (Claude Agent SDK) | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
+| `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | sağlayıcıdan bağımsız agent servisi ve `platform_core` model geçidi | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
 | Sayfa bağlamı ve uygulamanın tek tık Prompts manifesti | `AppModule` AI sözleşmesi, `ai_tools` hook | develop | G-88, G-105 |
 | Yetki eşitliği: sitenin kullanıcı adına bastığı kısa ömürlü aracı belirteci (G-148) ve kullanıcıya bağlı Press bearer'ı | `auth_hooks` adaptörü, Press OAuth Client | develop + configure | G-59, G-82, G-85 |
 | Önizle+onayla, yıkıcı/ücretli sınıflandırma | confirm bayrağı + önizleme hash'i | develop (agent, press\_tr MCP) | G-27, G-86 |
@@ -104,7 +104,7 @@ Her bölüm yukarıdaki ekranları aynı katmandan üretir; bu katman olmadan sh
 - Liste: TanStack Table, sunucu taraflı filtre/sıralama, kayıtlı görünümler, toplu aksiyon, kanban/takvim (G-70).
 - Form: Section/Column/Tab Break yerleşimi, docstatus ve Workflow aksiyonları, child table, belge yan paneli (G-71).
 - Rapor/dashboard/yazdırma: `query_report.run`, Dashboard Chart, `download_pdf` (G-72).
-- i18n: `trTR`, dayjs 'tr', System Settings biçimleri, Frappe çevirileri (G-73).
+- GILT altyapısı tek bir metin kataloğu kullanır. Dil açılış verisinden gelir. Tarih ve sayı `Intl` ile biçimlenir. Frappe etiketleri meta ucundan çevrilmiş gelir (G-73).
 
 ## 10. Rail 6 eklemeleri: destek, kredi, faturalama ve operatör modu
 

@@ -113,7 +113,9 @@ Site ve backend kodunu Pane işçileri yazar. Her iş için bağımsız bir ince
 
 ### GitHub Actions
 
-`ci.yml` ve `deploy.yml` iş akışları değişmedi. Zorunlu test `ci.yml` içindeki `build-and-test` işidir. `main` dalına ilerleme olunca `deploy.yml` siteyi yayına alır.
+Zorunlu test `ci.yml` içindeki `build-and-test` işidir. `main` dalına ilerleme olunca `deploy.yml` siteyi yayına alır.
+
+Testler dört parçaya bölünür. Parçalar aynı anda ayrı makinelerde koşar. `build-and-test` işi bütün parçaların sonucunu toplar. Bir parça bile geçmezse `build-and-test` kırmızı olur. Tarayıcılar ve sistem paketleri önbellekten kurulur. Böylece yavaş paket sunucusu testi geciktirmez.
 
 ## MCP
 

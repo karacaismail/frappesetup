@@ -1,0 +1,4 @@
+.tunnel.pid
+test-results*/
+playwright-report*/
+.env.??????

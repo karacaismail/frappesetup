@@ -10,9 +10,24 @@ Bu bölüm, önceki bölümlerde ray ray gerekçelendirilen tüm gereksinimleri 
 
 - **Öncelik:** MUST = sabit kararların veya mevzuatın doğrudan sonucu; SHOULD = bağlamsal öneri; MAY = isteğe bağlı.
 - **Kaynak:** native = Press/Frappe/Keycloak yerleşik mekanizma; configure = yalnızca ayar/kayıt; develop = özel kod (yaşadığı uygulama metinde adlandırılır: press\_tr, `press_tr_finance`, `press_ops_bridge`, platform\_core, tr\_localization, agent servisi, panel monorepo); integrate = dış servis bağlanır.
-- **Sahip:** Altyapı işleri Hüseyin Cengiz, GoDaddy/DNS işleri Asistan Hüseyin; "Platform ekibi" yazan kalemler platform geliştirme ekibi ve ürün sahibindedir.
+- **Sahip:** Altyapı işleri DevOps sorumlusu, GoDaddy/DNS işleri alan adı sorumlusu; "Platform ekibi" yazan kalemler platform geliştirme ekibi ve ürün sahibindedir.
 - **Güven:** "(doğrulandı)" = Press/Frappe/Keycloak kaynak kodunda, resmi dokümanda veya sürüm notunda teyit edildi ve [kaynak defterinde](/frappesetup/izlenebilirlik/#kaynak-defteri) sürüm/commit ile kayıtlıdır (G-128); "(doğrulanacak)" = olası veya hukuk/mali müşavir/kurulum teyidi bekleyen iddia.
 - **Faz:** gereksinimin kabulünün ilk kanıtlanması gereken fazdır; sonraki fazdaki genişleme ayrıntıda yazılır. Faz hedefleri ve çıkış ölçütleri [yol haritasındadır](/frappesetup/yol-haritasi/).
+
+## Görev panosu kuralları
+
+Yukarıdaki pano her gereksinimi bir görev olarak gösterir. Gereksinim kaydı değişmez. Görevin durumu, olgunluk düzeyi ve epiği ayrı bir dosyadadır. Bu dosya `src/data/task-board.json` dosyasıdır. Aşağıdaki tablolar bu dosyadan derleme anında üretilir.
+
+Panonun iki görünümü vardır:
+
+1. "Tablo" görünümünde her satır bir görevdir. Dar ekranda satırlar kart olarak alt alta dizilir.
+2. "Gruplu" görünümde görevler önce faza, sonra epiğe göre gruplanır. Her grubun başında biten görev sayısı ve toplam görev sayısı yazar.
+
+Biten görevin başlığının üstü çizilir. Görevin yanında "Bitti" etiketi de görünür. Bitti görevin kanıtı da yazar. Kanıt, denetim commit'i ve test dosyasıdır. Kanıtı olmayan iş bitti sayılmaz.
+
+Epicler görevlerin amacına göre kümelendi. Ray ile fazın kesişimi de bir seçenekti. Bu seçenek çok sayıda küçük grup üretirdi. Aynı amaçlı işler de farklı gruplara dağılırdı.
+
+<div data-embed="task-rules"></div>
 
 ## Çapraz boşluk kalemlerinin ana listeye bağlanması
 

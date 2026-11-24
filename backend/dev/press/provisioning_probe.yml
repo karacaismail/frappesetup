@@ -1,0 +1,11 @@
+---
+- name: Check the Ansible controller on a local target
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Resolve and run a builtin assertion
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'localhost'
+        quiet: true

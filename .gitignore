@@ -16,6 +16,8 @@ pnpm-debug.log*
 # environment variables
 .env
 .env.production
+# Staging files for generated e2e credentials (backend/e2e/stack)
+/backend/e2e/.fs-stack-env.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].tmp
 
 # macOS-specific files
 .DS_Store
@@ -26,6 +28,8 @@ pnpm-debug.log*
 # playwright
 test-results/
 playwright-report/
+blob-report/
+all-blob-reports/
 
 # python
 __pycache__/
@@ -33,3 +37,6 @@ __pycache__/
 
 # press-ai indirmeleri (scripts/press-ai-downloads.mjs derlemede üretir)
 /public/downloads/
+
+# Local Pane state and temporary test data
+/.pane/

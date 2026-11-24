@@ -57,7 +57,7 @@ Güvenlik bulguları: `next_ai` oturumsuz çağrılabilen bir LLM ucu açar ve A
 
 | Hedef | Önerilen | Neden |
 | --- | --- | --- |
-| Kiracı sitesinde kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); staging'de Jarvis ve Huf; mimari referans Jarvis (KD-39, AI-08, AI-09) | yazmada kod düzeyinde onay, Frappe izinleri |
+| Kiracı sitesinde kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); beta ortamında Jarvis ve Huf; mimari referans Jarvis (KD-39, AI-08, AI-09) | yazmada kod düzeyinde onay, Frappe izinleri |
 | Sayfa/site kurma | Builder + `frappe-builder` skill, yalnız pazarlama sayfası ve onay kapısı açık (not: sınıf B/C, çok yeni) | resmi; karar AI-08 |
 | Mesajlaşmada bot | Raven AI | okuma ağırlıklı kullanılır; yazmaya onay eklenir |
 | WhatsApp | `frappe_whatsapp` kanalı | AI ayrı katmandan bağlanır (lisans) |

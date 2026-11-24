@@ -1,0 +1,91 @@
+{
+  "modules": {
+    "platform_core.identity": [
+      "atonota_login",
+      "oidc_verify",
+      "platform_core.shell"
+    ],
+    "platform_core.shell": [],
+    "platform_core.ai": [
+      "platform_core.identity",
+      "platform_core.shell",
+      "platform_core.model_gateway",
+      "platform_core.access",
+      "platform_core.mobile"
+    ],
+    "platform_core.model_gateway": [],
+    "platform_core.access": [],
+    "platform_core.mobile": [
+      "platform_core.identity"
+    ],
+    "press_tr.press_identity": [
+      "oidc_verify"
+    ],
+    "press_tr.ansible_bridge": [],
+    "identity_sync": [
+      "oidc_verify"
+    ],
+    "oidc_verify": [],
+    "atonota_login": []
+  },
+  "public_paths": {
+    "platform_core.identity": [
+      "platform_core.identity.api",
+      "platform_core.identity.service_client",
+      "platform_core.api.auth",
+      "platform_core.api.identity",
+      "platform_core.identity.atonota.decision_api",
+      "platform_core.identity.atonota.verification_api"
+    ],
+    "platform_core.shell": [
+      "platform_core.shell.api",
+      "platform_core.api.shell",
+      "platform_core.api.meta",
+      "platform_core.api.collection",
+      "platform_core.shell.http"
+    ],
+    "platform_core.model_gateway": [
+      "platform_core.model_gateway.api",
+      "platform_core.api.model"
+    ],
+    "platform_core.access": [
+      "platform_core.access.api",
+      "platform_core.api.access"
+    ],
+    "platform_core.mobile": [
+      "platform_core.mobile.api",
+      "platform_core.api.mobile"
+    ],
+    "oidc_verify": [
+      "oidc_verify",
+      "oidc_verify.api"
+    ],
+    "atonota_login": [
+      "atonota_login",
+      "atonota_login.decision",
+      "atonota_login.verification_inbox"
+    ]
+  },
+  "path_owners": {
+    "platform_core.api.auth": "platform_core.identity",
+    "platform_core.api.identity": "platform_core.identity",
+    "platform_core.api.shell": "platform_core.shell",
+    "platform_core.api.meta": "platform_core.shell",
+    "platform_core.api.collection": "platform_core.shell",
+    "platform_core.api.model": "platform_core.model_gateway",
+    "platform_core.api.access": "platform_core.access",
+    "platform_core.api.mobile": "platform_core.mobile",
+    "platform_core.api.ai": "platform_core.ai",
+    "platform_core.api.mcp": "platform_core.ai",
+    "platform_core.api.atonota_login": "platform_core.identity"
+  },
+  "forbidden_imports": [
+    "openai",
+    "anthropic",
+    "google.genai",
+    "google.generativeai",
+    "mistralai",
+    "cohere",
+    "ollama"
+  ]
+}

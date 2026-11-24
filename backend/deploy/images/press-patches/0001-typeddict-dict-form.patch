@@ -1,0 +1,24 @@
+Press patch 0001: build the CommandOutput TypedDict from a dict.
+Purpose: Python 3.13 removed the keyword form TypedDict("Name", field=type). Press v0.154.1
+fails to import press/press/doctype/deploy_candidate/cache_utils.py on Python 3.14 with
+"TypeError: TypedDict() got an unexpected keyword argument 'cwd'". The dict form keeps the
+same four fields, types and required keys.
+Upstream: proposal 1 in backend/docs/press-python314-upstream.md.
+Remove when Press ships this change (decision O-52 in backend/PROJECT-RECORD.md).
+
+diff --git a/press/press/doctype/deploy_candidate/cache_utils.py b/press/press/doctype/deploy_candidate/cache_utils.py
+index a599d6d..24288f7 100644
+--- a/press/press/doctype/deploy_candidate/cache_utils.py
++++ b/press/press/doctype/deploy_candidate/cache_utils.py
+@@ -12,10 +12,7 @@ from typing import Tuple, TypedDict
+ 
+ CommandOutput = TypedDict(
+ 	"CommandOutput",
+-	cwd=str,
+-	image_tag=str,
+-	returncode=int,
+-	output=str,
++	{"cwd": str, "image_tag": str, "returncode": int, "output": str},
+ )
+ 
+ 

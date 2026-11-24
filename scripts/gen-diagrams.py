@@ -24,68 +24,110 @@ def figure(cls: str, label: str, svg: str, caption: str, source: str) -> str:
 
 
 def timeline() -> str:
+    """Faz sırası çizimi: sütunlar bağımlılık düzeyi, oklar önkoşuldan bağımlı faza. Zaman ekseni ve süre yoktur."""
     phases = json.loads((ROOT / "src/data/phases.json").read_text(encoding="utf-8"))
     by_id = {p["id"]: p for p in phases}
-    rows = [(p["id"].lower(), p["title"], p["start"], p["end"]) for p in phases]
-    total = max(p["end"] for p in phases)
-    m1 = by_id["P1"]["end"]
-    m2 = max(by_id["P2"]["end"], by_id["P4"]["end"])
-    m3 = by_id["P6"]["end"]
-    m4 = by_id["P5"]["end"]
-    L, R = 290, 996
-    X = lambda w: L + w / total * (R - L)  # noqa: E731
-    # (id, ad, hafta, konum, hizalama, x)
-    gates = [
-        ("m1", "M1 İlk dikey dilim", m1, "above", "middle", None),
-        ("m2", "M2 İlk ödeyen müşteri", m2, "below", "end", X(m2) + 10),
-        ("m3", "M3 Operasyon canlı", m3, "above", "middle", None),
-        ("m4", "M4 CRM/Webshop", m4, "below", "end", X(m4) + 20),
+    level: dict[str, int] = {}
+    for p in phases:  # phases.json önkoşulları önce listeler; düzey = en uzun önkoşul zinciri
+        level[p["id"]] = max((level[a] + 1 for a in p["after"]), default=0)
+    columns: list[list[str]] = [[] for _ in range(max(level.values()) + 1)]
+    for p in phases:
+        columns[level[p["id"]]].append(p["id"])
+    # Düzen: düzey başına bir sütun. Satırlar P1/P3, P0/P4/P5 ve P2/P6 hizalanır. Böylece komşu oklar düz kalır.
+    # P7 (P1 ve P2 sonrası) P6'nın altındaki dördüncü satırdadır. Sütun atlayan oklar P7'nin altından dolaşır.
+    ROW_Y = {"P0": 190, "P1": 100, "P2": 280, "P3": 100, "P4": 190, "P6": 280, "P5": 190, "P7": 370}
+    BOX_W, BOX_H, COL_X0, COL_STEP, BELOW_Y = 200, 64, 40, 256, 462
+    col_x = {pid: COL_X0 + COL_STEP * lvl for pid, lvl in level.items()}
+    name_of = lambda pid: by_id[pid]["title"].split(" ", 1)[1]  # noqa: E731
+    gates = [  # (kimlik, ad, çıkışına bağlı olduğu fazlar)
+        ("M1", "İlk dikey dilim", ["P1"]),
+        ("M2", "İlk ödeyen müşteri", ["P2", "P4"]),
+        ("M3", "Operasyon canlı", ["P6"]),
+        ("M4", "CRM/Webshop", ["P5"]),
     ]
-    spans = ", ".join(f"{p['title']} {p['start']}–{p['end']}" for p in phases)
-    gy = 520
+    join = lambda ids: ids[0] if len(ids) == 1 else ", ".join(ids[:-1]) + " ve " + ids[-1]  # noqa: E731
+    levels_txt = " ".join(f"{i + 1}. sütun {join(c)}." for i, c in enumerate(columns))
+    deps_txt = " ".join(f"{p['id']}, {join(p['after'])} bitince başlar." for p in phases if p["after"])
+    gates_txt = ", ".join(f"{k} {n} ({join(ids)} çıkışı)" for k, n, ids in gates)
     o = [
-        f"<svg viewBox='0 0 1040 600' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
-        "<title id='tl-title'>Yol haritası zaman çizelgesi</title>",
-        f"<desc id='tl-desc'>{total} haftalık plan; {spans}. Kapılar: M1 ilk dikey dilim {m1}. hafta, "
-        f"M2 ilk ödeyen müşteri {m2}. hafta, M3 operasyon canlı {m3}. hafta, M4 CRM/Webshop {m4}. hafta.</desc>",
-        f"<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>{total} haftalık plan: ilk ödeyen müşteri {m2}., operasyon düzlemi {m3}. haftada</text>",
-        "<text x='24' y='60' fill='var(--fs-quiet)'>Göreli süre (hafta); fazlar bağımlılıkla zincirlenir, takvim tarihi yoktur (tahmin)</text>",
+        f"<svg viewBox='0 0 1040 610' role='img' aria-labelledby='tl-title tl-desc' font-size='16' {FONT}>",
+        "<title id='tl-title'>Yol haritası faz sırası</title>",
+        f"<desc id='tl-desc'>Sütunlar bağımlılık düzeyidir. {levels_txt} Oklar önkoşuldan bağımlı faza gider. {deps_txt} "
+        f"P2, P1'deki Keycloak adımı bitince başlar. Kapılar: {gates_txt}. Takvim tarihi ve süre yoktur.</desc>",
+        "<defs><marker id='tl-arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'>"
+        "<path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>",
+        "<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Yol haritası faz sırası: her faz önkoşulu bitince başlar</text>",
+        "<text x='24' y='60' fill='var(--fs-quiet)'>Sütunlar bağımlılık düzeyidir. Oklar önkoşuldan bağımlı faza gider. Takvim tarihi ve süre yoktur.</text>",
     ]
-    for w in range(0, total + 1, 6):
-        x = X(w)
-        o.append(f"<line x1='{x:.1f}' x2='{x:.1f}' y1='96' y2='{gy + 12}' stroke='var(--fs-grid)'/>")
-        o.append(f"<text x='{x:.1f}' y='88' text-anchor='middle' fill='var(--fs-quiet)'>{w}. hafta</text>")
-    o.append(f"<line x1='{L}' x2='{R}' y1='96' y2='96' stroke='var(--fs-line)' stroke-width='1.25'/>")
+    for p in phases:
+        pid = p["id"]
+        x, y = col_x[pid], ROW_Y[pid]
+        acc = pid == "P6"
+        stroke = "var(--fs-accent)" if acc else "var(--fs-line)"
+        fill = "var(--fs-accent-soft)" if acc else "var(--fs-surface)"
+        o.append(f"<rect x='{x}' y='{y}' width='{BOX_W}' height='{BOX_H}' rx='10' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>")
+        o.append(f"<text x='{x + 16}' y='{y + 26}' font-size='18' font-weight='650' fill='var(--fs-ink)'>{pid}</text>")
+        o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
+    # P7'ye giden iki ok kendi yolundan gider. Hiçbiri başka fazın okuyla çizgi ya da çıkış noktası paylaşmaz.
+    # P1 → P7: P1'in sağından ayrı bir noktadan (y=148) çıkar. x=510 şeridinden iner, P7'ye üst yarıdan girer.
+    #   x=510, P1 → P4 şeridinin (x=524) solundadır. Böylece P1 → P4'ün y=222 parçasını kesmez.
+    #   P2 → P6 çizgisini (y=312) kesmek zorunludur. Kesişme noktasında zemin renginde bir boşluk bırakılır.
+    # P2 → P7: P2'nin altından (x=456) çıkar. P2 → P6 sağdan, P2 → P5 x=396'dan çıkar. P7'ye alt yarıdan girer.
+    P7_Y1, P7_Y2 = ROW_Y["P7"] + 16, ROW_Y["P7"] + BOX_H - 16
+    P1P7_X, P1P7_OUT_Y, P2P7_X = col_x["P7"] - 42, ROW_Y["P1"] + 48, col_x["P2"] + 160
+    routes = {
+        "P1-P7": f"M{col_x['P1'] + BOX_W} {P1P7_OUT_Y} L{P1P7_X} {P1P7_OUT_Y} L{P1P7_X} {P7_Y1} L{col_x['P7']} {P7_Y1}",
+        "P2-P7": f"M{P2P7_X} {ROW_Y['P2'] + BOX_H} L{P2P7_X} {P7_Y2} L{col_x['P7']} {P7_Y2}",
+    }
+    halo_y = ROW_Y["P2"] + BOX_H // 2  # P1 → P7'nin P2 → P6 çizgisini kestiği yer
+    for p in phases:
+        for pre in p["after"]:
+            edge = f"{pre}-{p['id']}"
+            if edge in routes:
+                if edge == "P1-P7":
+                    o.append(
+                        f"<path data-halo='{edge}' d='M{P1P7_X} {halo_y - 7} L{P1P7_X} {halo_y + 7}' fill='none' "
+                        "stroke='var(--fs-surface-2)' stroke-width='7'/>"
+                    )
+                o.append(f"<path data-edge='{edge}' d='{routes[edge]}' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>")
+                continue
+            x1, y1 = col_x[pre] + BOX_W, ROW_Y[pre] + BOX_H / 2
+            x2, y2 = col_x[p["id"]], ROW_Y[p["id"]] + BOX_H / 2
+            if level[p["id"]] - level[pre] > 1:  # sütun atlayan ok kutuların altından dolaşır, hedefe alttan girer
+                bx, by = col_x[pre] + BOX_W / 2, ROW_Y[pre] + BOX_H
+                tx, ty = col_x[p["id"]] + BOX_W / 2, ROW_Y[p["id"]] + BOX_H
+                d = f"M{bx:.0f} {by} L{bx:.0f} {BELOW_Y} L{tx:.0f} {BELOW_Y} L{tx:.0f} {ty}"
+            elif y1 == y2:
+                d = f"M{x1} {y1:.0f} L{x2} {y2:.0f}"
+            else:
+                xm = x2 - 28
+                d = f"M{x1} {y1:.0f} L{xm} {y1:.0f} L{xm} {y2:.0f} L{x2} {y2:.0f}"
+            o.append(f"<path data-edge='{pre}-{p['id']}' d='{d}' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>")
+    # P1 → P2 ara kapısı: P1 bitmeden, Keycloak adımı bitince (kesikli ok).
+    gx = col_x["P1"] + 60
     o.append(
-        f"<line x1='{X(m2):.1f}' x2='{X(m2):.1f}' y1='96' y2='{gy + 12}' stroke='var(--fs-accent)' stroke-width='1.5' stroke-dasharray='5 5'/>"
+        f"<path data-edge='P1-P2-gate' d='M{gx} {ROW_Y['P1'] + BOX_H} L{gx} {ROW_Y['P2']}' fill='none' stroke='var(--fs-accent)' "
+        "stroke-width='1.5' stroke-dasharray='5 5' marker-end='url(#tl-arr)'/>"
     )
-    for i, (k, name, s, e) in enumerate(rows):
-        y = 140 + 52 * i
-        acc = k == "p6"
+    o.append(f"<text x='{gx + 10}' y='{(ROW_Y['P1'] + BOX_H + ROW_Y['P2']) / 2 + 6:.0f}' fill='var(--fs-accent-ink)'>Keycloak adımı</text>")
+    gy = 494
+    o.append(f"<text x='24' y='{gy}' font-weight='650' fill='var(--fs-ink)'>Kapılar (hangi fazın çıkışına bağlı)</text>")
+    for i, (k, name, ids) in enumerate(gates):
+        x = 24 + 500 * (i % 2)
+        y = gy + 36 + 34 * (i // 2)
+        acc = k == "M2"
         col = "var(--fs-accent)" if acc else "var(--fs-line)"
-        o.append(f"<line x1='{L}' x2='{X(s):.1f}' y1='{y}' y2='{y}' stroke='var(--fs-grid)'/>")
-        o.append(
-            f"<rect x='{X(s):.1f}' y='{y - 12}' width='{X(e) - X(s):.1f}' height='24' rx='7' fill='{col}' fill-opacity='0.18' stroke='{col}' stroke-width='1.5'/>"
-        )
-        o.append(f"<text x='{X(s) + 8:.1f}' y='{y - 18}' fill='var(--fs-quiet)'>{s}–{e}. hafta</text>")
         fw = " font-weight='650'" if acc else ""
-        o.append(f"<text x='24' y='{y + 6}'{fw} fill='var(--fs-ink)'>{name}</text>")
-    o.append(f"<text x='24' y='{gy + 6}' font-weight='650' fill='var(--fs-ink)'>Kapılar</text>")
-    for k, name, w, pos, anchor, fx in gates:
-        x = X(w)
-        col = "var(--fs-accent)" if k == "m2" else "var(--fs-line)"
-        o.append(f"<path d='M{x:.1f} {gy - 10}l10 10l-10 10l-10 -10z' fill='{col}'/>")
-        ny = gy - 20 if pos == "above" else gy + 36
-        fw = " font-weight='650'" if k == "m2" else ""
-        tx = fx if fx is not None else x
-        o.append(f"<text x='{tx:.1f}' y='{ny}' text-anchor='{anchor}'{fw} fill='var(--fs-ink)'>{name}</text>")
+        o.append(f"<path d='M{x + 10} {y - 14}l10 10l-10 10l-10 -10z' fill='{col}'/>")
+        o.append(f"<text x='{x + 32}' y='{y}'{fw} fill='var(--fs-ink)'>{k} {name} ({join(ids)} çıkışı)</text>")
     o.append("</svg>")
     caption = (
-        "P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini "
-        "içerir; P3 AI ve P4 HRMS TR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca açılır; "
-        "P5 ilk ödeyen müşteriden sonra gelir."
+        "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
+        "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
+        "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. "
+        "P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
     )
-    return figure("diagram-timeline", "Yol haritası zaman çizelgesi", "\n".join(o), caption, "Yol haritası zaman çizelgesi")
+    return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 
 
 def rails() -> str:
@@ -125,7 +167,7 @@ def rails() -> str:
         f"<svg viewBox='0 0 {W} 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' {FONT}>",
         "<title id='rails-title'>Altı mimari ray ve iki taban bandı</title>",
         "<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 "
-        "Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
+        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
         "Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 "
         "ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, "
         "kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
@@ -143,12 +185,12 @@ def rails() -> str:
              ["@platform/shell · meta-ui · frappe-sdk · design-tokens · ai-sidebar · @apps/*",
               "Superadmin operatör modu (Rail 6'nın kullanıcı yüzü)"])
     # Satır 2: AI (120..460), Keycloak (600..940), y 300..470
-    o += box(120, 300, 340, 170, "Rail 5 — AI", "Claude Agent SDK · PostgreSQL/Redis",
-             ["Model yönlendirme · önizle+onayla", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
-    o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "id.&lt;marka&gt; · realm platform · HA",
+    o += box(120, 300, 340, 170, "Rail 5 — AI", "Ajan servisi · model geçidi",
+             ["Önizle+onayla · PostgreSQL/Redis", "Yerel maskeleme · kota · AI Action Log", "Site aracı belirteci (K-25)"])
+    o += box(600, 300, 340, 170, "Rail 4 — Keycloak", "api.login.&lt;marka&gt; · realm platform · HA",
              ["Client'lar: press · site-&lt;kiracı&gt;", "agent-service · identity-sync", "Organizations · MFA · passkey"])
     # Satır 3: Press (40..320), Kiracı (360..680), Ops (720..1000), y 570..740
-    o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe v15 · press.&lt;marka&gt;",
+    o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe 16 · press.&lt;marka&gt;",
              ["Team · Site · Plan · Marketplace", "Abonelik · Fatura · Agent Job", "press_tr · press_ops_bridge"])
     o += box(360, 570, 320, 170, "Rail 2 — Kiracı siteleri", "ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;",
              ["Site + DB kiracı başına", "platform_core · tr_localization", "HRMS TR · CRM · Webshop app'leri"])
@@ -177,7 +219,7 @@ def rails() -> str:
     o.append("<rect x='40' y='856' width='960' height='28' rx='6' fill='var(--fs-accent-soft)' stroke='var(--fs-accent)' stroke-width='1'/>")
     o.append("<text x='520' y='875' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 1 — Ortak sözleşmeler: host'a bağlı oturum · has_permission · tasarım tokenları · audit</text>")
     o.append("<rect x='40' y='892' width='960' height='28' rx='6' fill='var(--fs-tint)' stroke='var(--fs-grid)' stroke-width='1'/>")
-    o.append("<text x='520' y='911' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 2 — Hetzner bare-metal, self-host (Hüseyin Cengiz) · DNS: GoDaddy, app. alt bölgesi Route 53</text>")
+    o.append("<text x='520' y='911' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 2 — Hetzner bare-metal, self-host (DevOps sorumlusu) · DNS: GoDaddy, app. alt bölgesi Route 53</text>")
     o.append("</svg>")
     svg = "\n".join(o)
     caption = (

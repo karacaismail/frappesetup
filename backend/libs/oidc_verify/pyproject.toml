@@ -1,0 +1,37 @@
+[build-system]
+# The PEP 639 license string (`license = "MIT"`) requires setuptools 77 or later.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oidc_verify"
+version = "0.1.0"
+description = "Shared library for verifying Keycloak tokens. Independent of Frappe."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+# Version ranges checked against Frappe 16 installations (22 November 2026):
+# frappe/erpnext:v16.55.0 image: Frappe 16.56.0, Python 3.14.10, PyJWT 2.15.1, cryptography 50.0.2
+# press-local bench: Frappe 16.50.0, Python 3.14.8, PyJWT 2.13.0, cryptography 50.0.2
+# Frappe constraints: PyJWT~=2.13.0 (16.50), PyJWT~=2.15.0 (16.56), cryptography~=50.0.0 (both)
+dependencies = [
+    "PyJWT>=2.13.0,<3",
+    "cryptography>=50.0.0,<51",
+]
+
+[project.urls]
+Repository = "https://github.com/karacaismail/frappesetup"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]

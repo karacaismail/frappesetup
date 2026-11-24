@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Build the backend images once, push them and write the release manifest.
+# Usage: build-release <out/release.json>
+# Needs: GIT_COMMIT and BUILD_NUMBER (set by Jenkins), docker logged in to ATONOTA_REGISTRY.
+set -euo pipefail
+# shellcheck source=lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+
+out="${1:?usage: build-release <out/release.json>}"
+commit="${GIT_COMMIT:?GIT_COMMIT is not set}"
+build="${BUILD_NUMBER:?BUILD_NUMBER is not set}"
+registry="${ATONOTA_REGISTRY:-ghcr.io/karacaismail}"
+backend="$(cd -- "$DEPLOY_DIR/.." && pwd)"
+tag="${commit:0:12}-b$build"
+# Every release image is built for linux/amd64, on any build agent (E-15, review 1 finding 2).
+# On arm64 the Press image would carry Go code without a pinned version (press.Dockerfile). An
+# arm64 agent needs QEMU emulation (binfmt) and takes the same amd64 build path.
+platform=linux/amd64
+
+# name|context|dockerfile|target
+components=(
+    "tenant|$backend|$backend/deploy/images/tenant.Dockerfile|"
+    "keycloak|$backend/identity/keycloak|$backend/identity/keycloak/Dockerfile|prod"
+    "identity-sync|$backend|$backend/identity/identity_sync/Dockerfile|"
+    "press|$backend|$backend/deploy/images/press.Dockerfile|"
+)
+
+image_arguments=()
+for entry in "${components[@]}"; do
+    IFS='|' read -r name context dockerfile target <<<"$entry"
+    repository="$registry/atonota-$name"
+    build_arguments=(--pull --platform "$platform" --file "$dockerfile" --tag "$repository:$tag"
+        --label "org.opencontainers.image.revision=$commit"
+        --label "org.opencontainers.image.source=https://github.com/karacaismail/frappesetup")
+    if [[ -n "$target" ]]; then
+        build_arguments+=(--target "$target")
+    fi
+    # BuildKit reads <Dockerfile>.dockerignore; the legacy builder would send .env files too.
+    DOCKER_BUILDKIT=1 docker build "${build_arguments[@]}" "$context"
+    docker push "$repository:$tag"
+    digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repository:$tag" |
+        grep -m1 "^$repository@sha256:")" || fail "no registry digest for $repository:$tag"
+    image_arguments+=("--image=$name=$digest")
+done
+
+mkdir -p "$(dirname -- "$out")"
+release_py new --kind backend --commit "$commit" --build "$build" --out "$out" "${image_arguments[@]}"
+printf 'release %s written to %s\n' "$(release_py field "$out" release_id)" "$out"

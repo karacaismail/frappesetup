@@ -1,0 +1,131 @@
+{
+	"version": 1,
+	"categories": [
+		{
+			"id": "ai_llm",
+			"label": "AI LLM",
+			"description": "Large language model providers."
+		}
+	],
+	"providers": [
+		{
+			"id": "openai",
+			"category": "ai_llm",
+			"label": "OpenAI",
+			"description": "OpenAI API with an organization API key.",
+			"adapter": "openai",
+			"default_url": "https://api.openai.com",
+			"auth_type": "api_key",
+			"fields": [
+				{
+					"name": "api_key",
+					"label": "API key",
+					"kind": "secret",
+					"required": true,
+					"target": "api.api_key",
+					"description": "Secret API key from the provider console."
+				},
+				{
+					"name": "organization_id",
+					"label": "Organization ID",
+					"kind": "text",
+					"required": false,
+					"target": "account.organization_id",
+					"description": "Optional organization identifier. The gateway sends it with every request of this account."
+				},
+				{
+					"name": "project_id",
+					"label": "Project ID",
+					"kind": "text",
+					"required": false,
+					"target": "account.project_id",
+					"description": "Optional project identifier. The gateway sends it with every request of this account."
+				}
+			]
+		},
+		{
+			"id": "anthropic",
+			"category": "ai_llm",
+			"label": "Anthropic",
+			"description": "Anthropic API with a workspace API key.",
+			"adapter": "anthropic",
+			"default_url": "https://api.anthropic.com",
+			"auth_type": "api_key",
+			"fields": [
+				{
+					"name": "api_key",
+					"label": "API key",
+					"kind": "secret",
+					"required": true,
+					"target": "api.api_key",
+					"description": "Secret API key from the provider console."
+				}
+			]
+		},
+		{
+			"id": "gemini",
+			"category": "ai_llm",
+			"label": "Google Gemini",
+			"description": "Gemini API with a Google AI Studio API key.",
+			"adapter": "gemini",
+			"default_url": "https://generativelanguage.googleapis.com",
+			"auth_type": "api_key",
+			"fields": [
+				{
+					"name": "api_key",
+					"label": "API key",
+					"kind": "secret",
+					"required": true,
+					"target": "api.api_key",
+					"description": "Secret API key from the provider console."
+				}
+			]
+		},
+		{
+			"id": "openai_compatible",
+			"category": "ai_llm",
+			"label": "OpenAI-compatible service",
+			"description": "A service that accepts the OpenAI request format at its own address.",
+			"adapter": "openai",
+			"default_url": "",
+			"auth_type": "bearer",
+			"fields": [
+				{
+					"name": "base_url",
+					"label": "Service address",
+					"kind": "url",
+					"required": true,
+					"target": "api.base_url",
+					"description": "Service address without a path to the operation."
+				},
+				{
+					"name": "api_key",
+					"label": "API key",
+					"kind": "secret",
+					"required": true,
+					"target": "api.api_key",
+					"description": "Secret bearer token of the service."
+				}
+			]
+		},
+		{
+			"id": "ollama",
+			"category": "ai_llm",
+			"label": "Ollama",
+			"description": "A model server in the platform's own network. Needs no credential.",
+			"adapter": "ollama",
+			"default_url": "",
+			"auth_type": "none",
+			"fields": [
+				{
+					"name": "base_url",
+					"label": "Service address",
+					"kind": "url",
+					"required": true,
+					"target": "api.base_url",
+					"description": "Address of the model server in the platform's own network."
+				}
+			]
+		}
+	]
+}

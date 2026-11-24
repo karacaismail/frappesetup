@@ -1,0 +1,18 @@
+# Only these folders enter the image: realm, themes, conf, event-listener, event-sink and magic-link-fork.
+*
+!realm/
+!conf/
+!conf/**
+!realm/**
+!themes/
+!event-listener/
+!event-listener/**
+event-listener/target/
+!event-sink/
+!event-sink/**
+!magic-link-fork/
+!magic-link-fork/**
+!themes/**
+themes/**/*.md
+themes/atonota/test/
+.env

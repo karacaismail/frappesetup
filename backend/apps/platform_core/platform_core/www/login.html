@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="{{ lang | e }}" dir="ltr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="robots" content="noindex">
+	<title>{{ title | e }}</title>
+	<link rel="stylesheet" href="/assets/platform_core/identity/login.css">
+	<script src="/assets/platform_core/identity/login.js"></script>
+</head>
+<body data-page="platform-core-login">
+	<main class="login" aria-labelledby="login-title">
+		<h1 id="login-title" class="login__title">{{ title | e }}</h1>
+		{% if configured %}
+			<p class="login__lead">{{ _("Use your {0} account to continue.", context="platform_core.identity").format(brand_name) | e }}</p>
+			<a class="button button--primary" href="{{ start_url | e }}" rel="nofollow">{{ button_label | e }}</a>
+			{% if not keycloak_only %}
+				<section class="login__local" aria-labelledby="local-title">
+					<h2 id="local-title" class="login__subtitle">{{ _("Sign in with password", context="platform_core.identity") | e }}</h2>
+					<form class="form" method="post" action="{{ login_endpoint | e }}" data-login-endpoint="{{ login_endpoint | e }}" data-after-login="{{ after_login | e }}" data-failed-message="{{ _("Sign-in failed. Check your e-mail and password.", context="platform_core.identity") | e }}" data-offline-message="{{ _("The server could not be reached. Try again.", context="platform_core.identity") | e }}" novalidate>
+						<label class="form__label" for="usr">{{ _("E-mail", context="platform_core.identity") | e }}</label>
+						<input class="form__input" id="usr" name="usr" type="email" autocomplete="username" required>
+						<label class="form__label" for="pwd">{{ _("Password", context="platform_core.identity") | e }}</label>
+						<input class="form__input" id="pwd" name="pwd" type="password" autocomplete="current-password" required>
+						<p class="form__error" id="login-error" role="alert" aria-live="assertive" hidden></p>
+						<button class="button button--secondary" type="submit">{{ _("Sign in", context="platform_core.identity") | e }}</button>
+					</form>
+				</section>
+			{% endif %}
+		{% else %}
+			<p class="login__lead" role="alert">{{ _("Sign in with the identity provider is not configured.", context="platform_core.identity") | e }}</p>
+		{% endif %}
+	</main>
+</body>
+</html>

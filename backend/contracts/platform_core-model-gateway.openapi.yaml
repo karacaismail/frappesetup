@@ -1,0 +1,859 @@
+openapi: 3.1.0
+info:
+  title: Platform Core Model Gateway
+  version: 0.1.0
+paths:
+  /api/method/platform_core.api.model.complete:
+    post:
+      summary: Generate a model response
+      description: >
+        Selects an eligible API for the active tenant and route. Checks permissions, quota,
+        and the route data policy before dispatch. External dispatch masks content when the route permits it. Attempts may incur provider charges.
+        Tool calls are returned as data for the caller to authorize and execute. Selection and provider attempts share a 60-second deadline.
+      operationId: completeModelRequest
+      security:
+        - session: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Completion'
+            example:
+              route: fixture-route
+              messages:
+                - role: user
+                  content: Count the three imaginary moons.
+              limit: 64
+      responses:
+        '200':
+          $ref: '#/components/responses/Result'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/QuotaError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.test_api:
+    post:
+      summary: Test one configured API
+      description: >
+        Requires an authenticated AI Manager or System Manager. Sends one short model
+        request and may incur a charge. Records the attempt and returns no credentials. The gateway deadline is 60 seconds.
+      operationId: testModelApi
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [api, model]
+              properties:
+                api:
+                  type: string
+                  minLength: 1
+                  description: AI API document name
+                model:
+                  type: string
+                  minLength: 1
+                  description: AI Model document name
+            example:
+              api: fixture-api
+              model: fixture-model-record
+      responses:
+        '200':
+          $ref: '#/components/responses/Result'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/QuotaError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.resolve_usage:
+    post:
+      summary: Resolve an unsettled attempt
+      description: A manager records the verified charge as decimal text with the attempt currency and can add a short note. The original result is retained. The amount must be exact to at most nine fractional digits. The gateway does not round it.
+      operationId: resolveModelUsage
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [log, cost, currency]
+              properties:
+                log: {type: string, minLength: 1, maxLength: 140}
+                cost:
+                  $ref: '#/components/schemas/DecimalCost'
+                currency:
+                  $ref: '#/components/schemas/CurrencyCode'
+                note:
+                  type: string
+                  maxLength: 240
+                  description: Optional single-line reconciliation note.
+            example:
+              log: fixture-attempt
+              cost: '0.125000001'
+              currency: USD
+              note: Checked against a synthetic invoice.
+      responses:
+        '200':
+          description: Reconciled usage record
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [name, result, cost, currency]
+                    properties:
+                      name: {type: string}
+                      result: {const: resolved}
+                      cost:
+                        $ref: '#/components/schemas/DecimalCost'
+                      currency:
+                        $ref: '#/components/schemas/CurrencyCode'
+              example:
+                message: {name: fixture-attempt, result: resolved, cost: '0.125000001', currency: USD}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '417':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/QuotaError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.reconcile_stale_pending:
+    post:
+      summary: Reconcile expired pending reservations
+      description: Requires a manager session. Changes up to 500 expired pending reservations to unknown and retains their reserved cost.
+      operationId: reconcile_stale_pending
+      security:
+        - session: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Reservations changed to unknown
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [closed, targets]
+                    properties:
+                      closed: {type: integer, minimum: 0, maximum: 500}
+                      targets:
+                        type: array
+                        maxItems: 500
+                        uniqueItems: true
+                        items: {type: string}
+              example:
+                message: {closed: 1, targets: [672234b3-483c-4364-a40a-82a484a88173]}
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+  /api/method/platform_core.api.model.purge_usage:
+    post:
+      summary: Preview or purge old usage records
+      description: Requires a System Manager session. Retention is fixed at 365 days. Preview returns the exact batch of up to 500 closed records. The same manager must confirm it within five minutes. O-32 permanently deletes the confirmed records without a Deleted Document copy. Recovery requires a database backup.
+      operationId: purgeModelUsage
+      security:
+        - session: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                dry_run: {type: boolean, default: true}
+                preview_token: {type: string, pattern: '^[0-9a-f]{64}$'}
+              if:
+                required: [dry_run]
+                properties:
+                  dry_run: {const: false}
+              then:
+                required: [preview_token]
+              else:
+                not:
+                  required: [preview_token]
+            examples:
+              preview:
+                value: {dry_run: true}
+              confirm:
+                value:
+                  dry_run: false
+                  preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
+      responses:
+        '200':
+          description: Eligible and deleted counts, exact batch and preview token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [eligible, deleted, dry_run, targets, preview_token]
+                    properties:
+                      eligible: {type: integer, minimum: 0}
+                      deleted: {type: integer, minimum: 0, maximum: 500}
+                      dry_run: {type: boolean}
+                      targets:
+                        type: array
+                        maxItems: 500
+                        uniqueItems: true
+                        items: {type: string}
+                      preview_token: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+              examples:
+                preview:
+                  value:
+                    message:
+                      eligible: 1
+                      deleted: 0
+                      dry_run: true
+                      targets: [672234b3-483c-4364-a40a-82a484a88173]
+                      preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
+                confirm:
+                  value:
+                    message:
+                      eligible: 1
+                      deleted: 1
+                      dry_run: false
+                      targets: [672234b3-483c-4364-a40a-82a484a88173]
+                      preview_token: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '417':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/QuotaError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.clear_api_credential:
+    post:
+      summary: Clear a disabled API credential
+      description: This destructive manager operation removes the stored credential from a disabled API.
+      operationId: clearApiCredential
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [api]
+              properties:
+                api: {type: string, minLength: 1, maxLength: 140}
+            example: {api: fixture-api}
+      responses:
+        '200':
+          description: Credential cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [name, cleared]
+                    properties:
+                      name: {type: string}
+                      cleared: {const: true}
+              example:
+                message: {name: fixture-api, cleared: true}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '417':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/QuotaError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.provider_catalog:
+    post:
+      summary: List the provider definitions for the connection form
+      description: >
+        Requires an authenticated AI Manager or System Manager. Returns the categories and provider
+        definitions that the "Add API" form draws from. Each provider lists the fields it needs and
+        whether a field is a secret. The definitions come from the shipped catalog data file, not
+        from a list in code. The response holds no credentials and no model names. Sends no provider request.
+      operationId: listProviderCatalog
+      security:
+        - session: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties: {}
+            example: {}
+      responses:
+        '200':
+          description: Provider catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    $ref: '#/components/schemas/ProviderCatalog'
+              example:
+                message:
+                  version: 1
+                  categories:
+                    - {id: ai_llm, label: AI LLM, description: Large language model providers.}
+                  providers:
+                    - id: openai
+                      category: ai_llm
+                      label: OpenAI
+                      description: OpenAI API with an organization API key.
+                      auth_type: api_key
+                      fields:
+                        - {name: api_key, label: API key, kind: secret, required: true, scope: api, description: Secret API key from the provider console.}
+                        - {name: organization_id, label: Organization ID, kind: text, required: false, scope: account, description: Optional organization identifier.}
+                      common_fields:
+                        - {name: account_name, label: Account name, kind: text, required: true, scope: account, description: Name of the provider account in this site.}
+                        - {name: api_name, label: Connection name, kind: text, required: true, scope: api, description: Name of this API connection.}
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.save_connection:
+    post:
+      summary: Save a provider connection
+      description: >
+        Requires an authenticated AI Manager or System Manager with create permission on the registry.
+        Validates the fields against the provider definition. Creates the provider record on first use,
+        a new account or uses an existing account, and always a new API connection. Writes secrets only
+        to the encrypted password field. The response never returns a secret. Sends no provider request.
+        The connection status starts as not_checked; call check_connection next.
+        Each user may call this endpoint 10 times in 60 seconds; the next call answers 429 gateway_busy
+        and saves nothing.
+      operationId: saveProviderConnection
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectionInput'
+            examples:
+              newAccount:
+                value:
+                  provider: openai
+                  account_name: Main account
+                  api_name: Primary connection
+                  fields: {api_key: fixture-placeholder, organization_id: org-fixture}
+              existingAccount:
+                value:
+                  provider: ollama
+                  account: fixture-account
+                  api_name: Second connection
+                  fields: {base_url: 'http://127.0.0.1:19091/first'}
+      responses:
+        '200':
+          description: Connection saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    $ref: '#/components/schemas/SavedConnection'
+              example:
+                message: {provider: fixture-provider, account: fixture-account, api: fixture-api, connection_status: not_checked}
+        '400':
+          $ref: '#/components/responses/FieldError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '417':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/Busy'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.check_connection:
+    post:
+      summary: Check a saved connection live
+      description: >
+        Requires an authenticated AI Manager or System Manager. Sends one model-list request to the
+        provider. Model-list requests use no tokens, so the check creates no usage charge; the
+        provider may still count it against its rate limit. Writes the result and time to the API
+        record and returns them. A failed check still answers with HTTP 200 and a status code. The
+        response holds no credentials, no provider message and no model names. The deployment must
+        approve the address in model_gateway_endpoints first. connected proves only that the provider
+        accepted the credential; the model list does not show the remaining quota or credit, so a spent
+        quota may appear only on the first billable request. Each user may call this endpoint 10 times
+        in 60 seconds. The next call, or a check while another check of the same connection runs,
+        answers 429 gateway_busy and sends no provider request.
+      operationId: checkProviderConnection
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [api]
+              properties:
+                api:
+                  type: string
+                  minLength: 1
+                  maxLength: 140
+                  description: AI API document name
+            example: {api: fixture-api}
+      responses:
+        '200':
+          description: Check finished
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    $ref: '#/components/schemas/ConnectionCheck'
+              examples:
+                connected:
+                  value:
+                    message: {api: fixture-api, status: connected, checked_at: '2026-11-23 10:00:00', models_visible: 3}
+                invalidKey:
+                  value:
+                    message: {api: fixture-api, status: invalid_credentials, checked_at: '2026-11-23 10:00:00', models_visible: null}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/Busy'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Frappe session with the required CSRF header
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Native Frappe User API credentials in token or Basic form.
+  responses:
+    BadRequest:
+      description: Invalid gateway request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: invalid_request}
+    AuthenticationError:
+      description: Authentication required or the Frappe session has expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            gateway:
+              value: {message: {error: authentication_required}}
+            expiredSession:
+              value: {exc_type: SessionExpired}
+    PermissionError:
+      description: Frappe permission denial or a gateway data-policy restriction
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            dataPolicy:
+              value: {message: {error: data_policy_denied}}
+            framework:
+              value: {exc_type: PermissionError}
+    FieldError:
+      description: Invalid request or invalid connection fields
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            fields:
+              value: {message: {error: invalid_fields, fields: [api_key]}}
+            provider:
+              value: {message: {error: unknown_provider}}
+    Conflict:
+      description: Operation conflicts with the current gateway state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: transaction_active}
+    ValidationError:
+      description: Frappe rejected the operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            exc_type: ValidationError
+    QuotaError:
+      description: Request exceeded a quota or the account lock is busy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: quota_exceeded}
+    Busy:
+      description: The per-user rate limit is spent or the same connection check is already running
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: gateway_busy}
+    Unavailable:
+      description: Gateway or provider unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: provider_unavailable}
+    Result:
+      description: Normalized Frappe RPC response
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                $ref: '#/components/schemas/Result'
+          example:
+            message:
+              text: Fixture response.
+              tool_calls: []
+              usage: {input: 4, output: 3}
+              api: fixture-api
+              model: fixture-model
+  schemas:
+    DecimalCost:
+      type: string
+      pattern: '^(?:0|[1-9][0-9]{0,11})(?:[.][0-9]{1,9})?(?![\s\S])'
+      description: Nonnegative decimal text with at most 12 whole digits and nine fractional digits. No rounding or exponent notation.
+    CurrencyCode:
+      type: string
+      minLength: 3
+      maxLength: 3
+      pattern: '^[A-Z]{3}$'
+      description: Three-letter uppercase currency code matching the usage record.
+    Error:
+      anyOf:
+        - type: object
+          required: [message]
+          properties:
+            message:
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: string
+                  enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_currency, currency_mismatch,
+                    invalid_note, output_limit_exceeds_deadline, authentication_required, data_policy_denied,
+                    transaction_active, attempt_in_progress, attempt_already_settled, quota_exceeded, gateway_busy,
+                    endpoint_unavailable, gateway_unavailable, provider_unavailable, provider_timeout, preview_required, preview_invalid,
+                    unknown_provider, invalid_fields, catalog_unavailable]
+                fields:
+                  type: array
+                  description: Names of the connection fields that failed validation
+                  items: {type: string}
+        - type: object
+          required: [exc_type]
+          properties:
+            exc_type: {type: string}
+    Completion:
+      type: object
+      additionalProperties: false
+      required: [route, messages]
+      description: Messages, tools, and schema together may occupy at most 256 KiB when encoded as UTF-8 JSON.
+      properties:
+        route:
+          type: string
+          minLength: 1
+          description: AI Route document name
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 128
+          items:
+            type: object
+            additionalProperties: false
+            required: [role, content]
+            properties:
+              role:
+                enum: [system, user, assistant]
+              content:
+                type: string
+        tools:
+          type: array
+          maxItems: 12
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, parameters]
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 64
+                pattern: '^[A-Za-z_][A-Za-z0-9_-]{0,63}$'
+              description:
+                type: string
+              parameters:
+                type: object
+                description: JSON Schema for the tool arguments
+        schema:
+          type: object
+          description: Optional JSON Schema for structured output
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 16384
+          default: 1024
+          description: Maximum output tokens. The gateway rejects limits that exceed the model speed and route deadline.
+    Result:
+      type: object
+      required: [text, tool_calls, usage, model, api]
+      properties:
+        text:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
+            required: [id, name, arguments]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              arguments:
+                type: object
+        usage:
+          type: object
+          required: [input, output]
+          properties:
+            input:
+              type: [integer, 'null']
+              minimum: 0
+            output:
+              type: [integer, 'null']
+              minimum: 0
+        model:
+          type: string
+        api:
+          type: string
+    FieldDefinition:
+      type: object
+      additionalProperties: false
+      required: [name, label, kind, required, scope, description]
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,39}$'
+        label:
+          type: string
+          description: Translated field label
+        kind:
+          enum: [secret, text, url]
+          description: A secret field is write-only and never returned.
+        required:
+          type: boolean
+        scope:
+          enum: [account, api]
+          description: Record that stores the field
+        description:
+          type: string
+    ProviderCatalog:
+      type: object
+      additionalProperties: false
+      required: [version, categories, providers]
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        categories:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, label, description]
+            properties:
+              id: {type: string, pattern: '^[a-z][a-z0-9_]{0,39}$'}
+              label: {type: string}
+              description: {type: string}
+        providers:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, category, label, description, auth_type, fields, common_fields]
+            properties:
+              id: {type: string, pattern: '^[a-z][a-z0-9_]{0,39}$'}
+              category: {type: string}
+              label: {type: string}
+              description: {type: string}
+              auth_type:
+                enum: [none, api_key, bearer, oauth_client_credentials]
+              fields:
+                type: array
+                items: {$ref: '#/components/schemas/FieldDefinition'}
+              common_fields:
+                type: array
+                description: Name fields every connection needs. account_name is required only for a new account.
+                items: {$ref: '#/components/schemas/FieldDefinition'}
+    ConnectionInput:
+      type: object
+      additionalProperties: false
+      required: [provider, api_name, fields]
+      description: Give either account (existing account) or account_name (new account), not both.
+      properties:
+        provider:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,39}$'
+          description: Provider definition id from the catalog
+        account:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: Existing AI Account document name of the same provider
+        account_name:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: Name of a new account
+        api_name:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: Name of the new API connection
+        fields:
+          type: object
+          description: Values of the provider's fields keyed by field name. Account fields are allowed only with a new account.
+          additionalProperties:
+            type: string
+            maxLength: 4096
+      oneOf:
+        - required: [account]
+          not: {required: [account_name]}
+        - required: [account_name]
+          not: {required: [account]}
+    SavedConnection:
+      type: object
+      additionalProperties: false
+      required: [provider, account, api, connection_status]
+      properties:
+        provider: {type: string, description: AI Provider document name}
+        account: {type: string, description: AI Account document name}
+        api: {type: string, description: AI API document name}
+        connection_status: {const: not_checked}
+    ConnectionCheck:
+      type: object
+      additionalProperties: false
+      required: [api, status, checked_at, models_visible]
+      properties:
+        api: {type: string}
+        status:
+          enum: [connected, invalid_credentials, permission_denied, quota_exceeded, network_error,
+            provider_error, endpoint_not_approved, configuration_error]
+          description: >
+            connected means the provider accepted the credential. invalid_credentials means HTTP 401.
+            permission_denied means HTTP 403. quota_exceeded means HTTP 429 for a rate limit or a spent quota.
+            Many providers still answer the model list when the credit is spent, so connected does not
+            rule out a spent quota. Anthropic may answer a spent credit with HTTP 400, which becomes provider_error.
+            network_error means the connection failed or timed out. provider_error means another
+            provider answer. endpoint_not_approved means the deployment has not approved the address.
+            configuration_error means the saved record is incomplete.
+        checked_at:
+          type: string
+          description: Site-local check time in Frappe datetime format
+        models_visible:
+          type: [integer, 'null']
+          minimum: 0
+          description: Count of models the credential can see on the first page. Names are not returned.

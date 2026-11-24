@@ -14,7 +14,7 @@ Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları
 | Press teşhisi | Press içi MCP (`enable_mcp`) | `press-build-triage`, `press-diagnoser` | Araçlar hazır, teşhis sırası yok |
 | Press kurulum ve dağıtım | — | `press-ai` MCP, `press-operations`, `press-operator` | Hiçbir hazır depo onaylı biçimde karşılamıyor |
 | Site içi veri araçları | `frappe/mcp` çatısı ya da kullanıcı kimlikli sunucu | `platform_core` araçları (Rail 5) | Kullanıcı kimliği ve denetim izi gerekir |
-| Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf staging'de denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
+| Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf beta ortamında denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
 
 AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı süreçte birleştirilmeden önce lisans uyumu kullanıcıyla netleştirilir; yeni depolara lisans onaysız seçilmez.
 
@@ -89,9 +89,9 @@ Tüm paket ZIP'i depo yerleşimini izler: kökte lisans dosyaları ve `packages/
 | Aşama | Görev | Sahip | Bağımlılık | Kabul |
 | --- | --- | --- | --- | --- |
 | A1 | Fixture testleri, bağımsız inceleme, senaryo koşusu | Geliştirme ekibi | — | Testler ve senaryolar geçer; başarısız vaka gevşetilmez |
-| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi; ortam Hüseyin Cengiz | A1 | Okuma sonuçları kontrat alanlarıyla eşleşir; gizli alan dönmez |
-| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi; altyapı Hüseyin Cengiz | A2 | Her adımda insan onayı; build Success olmadan deploy önerisi reddedilir |
-| A4 | DNS gereksinimi çıktısı | Hüseyin Cengiz hazırlar, Asistan Hüseyin GoDaddy'de uygular, Hüseyin Cengiz doğrular | A3 | Ajan DNS'e dokunmaz; yalnız kayıt gereksinimi üretir |
+| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi; ortam DevOps sorumlusu | A1 | Okuma sonuçları kontrat alanlarıyla eşleşir; gizli alan dönmez |
+| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi; altyapı DevOps sorumlusu | A2 | Her adımda insan onayı; build Success olmadan deploy önerisi reddedilir |
+| A4 | DNS gereksinimi çıktısı | DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular, DevOps sorumlusu doğrular | A3 | Ajan DNS'e dokunmaz; yalnız kayıt gereksinimi üretir |
 | A5 | OAuth2 delegasyonu ve AI denetim izi | Geliştirme ekibi | Rail 5 | G-28 ve G-87 kabul ölçütleri |
 
 ## Riskler

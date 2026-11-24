@@ -1,0 +1,5 @@
+include:
+  - compose.tenant.yaml
+  - compose.keycloak.yaml
+  - compose.press.yaml
+  - compose.identity-sync.yaml

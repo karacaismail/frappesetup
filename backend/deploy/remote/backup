@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Back up one environment from its running release and print the backup folder.
+# Usage: backup <env> <release folder>
+# Holds: every tenant site (database and files), the Keycloak database, the identity-sync database.
+# Needs running: tenant-web and keycloak-db. identity-sync may be stopped (remote/apply stops it first).
+# With ATONOTA_REQUIRE_OFFSITE_BACKUP=1 the copy to the offsite store must succeed too.
+# This script runs only when a person or a deployment starts it. It is not scheduled.
+set -euo pipefail
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$here/common.sh"
+
+env="${1:?usage: backup <env> <release folder>}"
+folder="${2:?usage: backup <env> <release folder>}"
+check_env_name "$env"
+load_host_env "$folder/host.env"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+out="$ATONOTA_ROOT/$env/backups/$stamp"
+install -d -m 0700 "$out"
+{
+    for site in $ATONOTA_TENANT_SITES; do
+        inside="/home/frappe/frappe-bench/sites/deploy-backups/$stamp/$site"
+        stack "$folder" exec -T tenant-web bench --site "$site" backup --with-files --backup-path "$inside"
+        install -d -m 0700 "$out/tenant/$site"
+        stack "$folder" exec -T tenant-web tar -C "$inside" -cf - . | tar -xf - -C "$out/tenant/$site"
+        stack "$folder" exec -T tenant-web rm -rf "$inside"
+    done
+    stack "$folder" exec -T keycloak-db pg_dump --username keycloak --format custom keycloak >"$out/keycloak.dump"
+    # A one-off container reads the identity-sync volume, so the service itself can stay stopped.
+    stack "$folder" run --rm --no-deps -T --entrypoint python identity-sync -c '
+import sqlite3, sys
+source = sqlite3.connect("file:/data/identity_sync.sqlite3?mode=ro", uri=True)
+copy = sqlite3.connect("/tmp/backup.sqlite3")
+source.backup(copy)
+copy.close()
+with open("/tmp/backup.sqlite3", "rb") as data:
+    sys.stdout.buffer.write(data.read())' >"$out/identity-sync.sqlite3"
+    json_field "$folder/release.json" release_id >"$out/release-id"
+    (cd "$out" && find . -type f -print0 | sort -z | xargs -0 sha256sum >"$out.sums" && mv "$out.sums" SHA256SUMS)
+} >&2
+
+# Offsite copy: rclone remote from $ATONOTA_ETC/<env>/offsite.env (Hetzner Object Storage).
+if [[ -r "$ATONOTA_ETC/$env/offsite.env" ]]; then
+    load_host_env "$ATONOTA_ETC/$env/offsite.env"
+    rclone copy --immutable "$out" "${ATONOTA_OFFSITE_REMOTE:?}/$env/$stamp" >&2
+    rclone check "$out" "$ATONOTA_OFFSITE_REMOTE/$env/$stamp" >&2
+elif [[ "$ATONOTA_REQUIRE_OFFSITE_BACKUP" == 1 ]]; then
+    fail "$env needs an offsite backup, but $ATONOTA_ETC/$env/offsite.env is missing"
+fi
+printf '%s\n' "$out"

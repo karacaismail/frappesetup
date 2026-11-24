@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+APP="${1:-platform_core}"
+if [[ ! "$APP" =~ ^[a-z][a-z0-9_]*$ ]]; then
+    printf '%s\n' 'Expected an installed app name, such as platform_core.' >&2
+    exit 2
+fi
+shift || true
+SITE="test-${APP//_/-}.localhost"
+# Apps the tests of an app need on the test site, installed before the app itself.
+# The access rule tests of platform_core use ERPNext's Employee and Department trees.
+REQUIRED_APPS=()
+# Extra options for the test run. The shell tests read the shell contract.
+test_options=()
+if [[ "$APP" == platform_core ]]; then
+    REQUIRED_APPS=(--app erpnext)
+    test_options=(
+        -e SHELL_TEST_OPENAPI=/workspace/contracts/platform_core-shell.openapi.yaml
+    )
+fi
+python3 "$DEV_DIR/init_env.py"
+"$DEV_DIR/bin/compose" config --quiet
+"$DEV_DIR/bin/compose" build tenant-web
+"$DEV_DIR/bin/compose" up -d --wait --wait-timeout 90 tenant-db tenant-redis
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web \
+    env/bin/python /workspace/dev/bootstrap.py "$SITE" ${REQUIRED_APPS[@]+"${REQUIRED_APPS[@]}"} --app "$APP"
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web \
+    bench --site "$SITE" migrate --skip-search-index
+# Frappe's run-tests prints "Testing is disabled" and exits 0 when allow_tests is off.
+# Stop with a non-zero code instead, so a skipped run cannot pass as a green one.
+status=0
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web env/bin/python -c \
+    'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("allow_tests") is True else 3)' \
+    "sites/$SITE/site_config.json" || status=$?
+if [[ "$status" == 3 ]]; then
+    printf 'Tests are disabled on %s: allow_tests is not true in its site_config.json.\n' "$SITE" >&2
+    exit 3
+elif [[ "$status" != 0 ]]; then
+    printf 'Could not read the test settings of %s.\n' "$SITE" >&2
+    exit "$status"
+fi
+"$DEV_DIR/bin/compose" run --rm --no-deps ${test_options[@]+"${test_options[@]}"} tenant-web \
+    bench --site "$SITE" run-tests --app "$APP" "$@"

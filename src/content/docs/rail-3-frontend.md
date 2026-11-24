@@ -4,7 +4,7 @@ nav: "Rail 3 · Frontend"
 order: 6
 ---
 
-Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.<marka>.com.tr/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.<marka>.com.tr`, `press.api.*` / `press_tr.api.*`, Frappe v15). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.<marka>.com.tr` origin'inde, operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
+Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.atonota.net/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.atonota.net`, MVP sonrası hedef, MVP'de Press `press.atonota.net` adresindedir; `press.api.*` / `press_tr.api.*`, Frappe 16). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.atonota.net` origin'inde (MVP sonrası hedef, backend ad haritasında yok), operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
 
 ## 1. Monorepo ve paket sınırları (G-66, G-103)
 
@@ -72,9 +72,19 @@ Sidebar şu veriden kurulur: kurulu uygulama → üst öğe (Marketplace App iko
 
 SDK kuralları: `credentials: include` + `X-Frappe-CSRF-Token` (token `www/<panel>.py` enjeksiyonundan, G-45); `_server_messages`/`exc_type` eşlemesi — `ValidationError` → alan hataları, `PermissionError` → yetki ekranı + `explain_permission` (G-62), `CSRFTokenError` → token yenile ve bir kez tekrar dene; TanStack Query anahtarları `[site, doctype, 'list'|'doc'|'meta', params]`; mutasyon sonrası ilgili anahtarlar geçersizlenir. Realtime: kiracıda socket.io `doc_subscribe`/`doctype_subscribe` ile `doc_update`, `list_update`, `meta_changed`; Press'te `agent_job_update` (G-15) aktivasyon ilerlemesini ve site durumunu besler; her bağlantı kendi host'unun oturumuyla, aynı origin'den açılır (G-119).
 
-## 6. i18n (G-73)
+## 6. GILT altyapısı (G-73)
 
-Türkçe birinci dil, İngilizce ikinci. AntD `trTR` locale, dayjs `tr`, biçimler System Settings'ten. Frappe çevirileri için `frappe.translate.get_all_translations(lang)` v16'da whitelisted değildir (doğrulandı), bu yüzden `platform_core.api.i18n.get_translations(lang)` sarmalayıcısı uygulama `.po` çevirilerini tek sözlükte döner ve dil + uygulama sürümüyle önbelleklenir. Panel metinleri `@platform/shell` kataloğunda; backend Select değerleri (`NEFT` gibi) yalnızca etiket katmanında Türkçeleştirilir (G-19).
+GILT dört işin ortak adıdır: küreselleştirme, i18n, yerelleştirme ve çeviri. MVP'de yalnız altyapı kurulur. Metin çevirisi ve varsayılan dilin İngilizce olması MVP dışıdır.
+
+- Panel metinleri arayüzün kendi kataloğundadır. Katalog anahtarı İngilizce ve ASCII olur.
+- Var olan Türkçe metin `tr` kataloğuna harfi harfine girer. İngilizce metin çeviri işinde girer.
+- Katalog yerli ve küçüktür. Mesaj sözdizimi ICU MessageFormat'ın bir alt kümesidir. Çoğul biçimi `Intl.PluralRules` ile seçilir.
+- Dil açılış verisindeki kullanıcı dilinden gelir. Dil boşsa arayüz `tr` yedek dilini kullanır. Backend'in yedek dili `en` kalır.
+- AntD, Ant Design X, dayjs ve `<html lang dir>` aynı dile bağlanır.
+- Tarih, saat, sayı ve para `Intl` ile biçimlenir. Saat dilimi ve para birimi açılış verisinden gelir.
+- Gömülü metin denetimi izin listesiyle başlar. Yeni kod gömülü metin ekleyemez. Ekranlar sözde dilde denenir.
+
+Frappe etiketleri meta ucundan çevrilmiş gelir. Bu yüzden MVP'de ayrı bir çeviri ucu yoktur. Backend Select değerleri (`NEFT` gibi) yalnız etiket katmanında çevrilir (G-19).
 
 ## 7. Token sistemi AntD üzerinde (G-67)
 

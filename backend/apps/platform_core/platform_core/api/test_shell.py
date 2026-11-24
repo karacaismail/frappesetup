@@ -1,0 +1,272 @@
+import json
+from unittest.mock import patch
+from urllib.parse import quote, urlencode
+
+import frappe
+from frappe.sessions import delete_session
+from frappe.utils.password import remove_encrypted_password
+
+from platform_core.shell.bootstrap import get_bootstrap, safe_url
+from platform_core.shell.test_panel import PanelMetadata
+from platform_core.tests.shell_http_fixture import DESK, DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
+
+
+class TestBootstrapHTTP(ShellHTTPFixture):
+	def test_get_bootstrap_guest_denied(self):
+		status, _unused_headers, _unused_body = self.request(
+			"/api/method/platform_core.api.shell.get_bootstrap"
+		)
+		self.assertEqual(status, 403)
+
+	def test_session_id_in_query_does_not_replace_cookie(self):
+		query = urlencode({"sid": self.reader_sid})
+		status, _unused_headers, _unused_body = self.request(
+			"/api/method/platform_core.api.shell.get_bootstrap?" + query
+		)
+		self.assertEqual(status, 403)
+
+	def test_get_bootstrap_foreign_data_denied(self):
+		status, _unused_headers, body = self.request(
+			"/api/method/platform_core.api.shell.get_bootstrap", self.reader_sid
+		)
+		self.assertEqual(status, 200)
+		payload = json.loads(body)["message"]
+		self.assertEqual(payload["user"]["name"], READER)
+		self.assertIn("platform_core", payload["installed_apps"])
+		names = [page["name"] for page in payload["workspaces"]]
+		self.assertIn("Kabuk Visible", names)
+		self.assertNotIn("Kabuk Hidden", names)
+		self.assertNotIn("Kabuk Restricted", names)
+		self.assertNotIn("Kabuk Hidden", json.dumps(payload["sidebars"]))
+		self.assertNotIn("Kabuk Restricted", json.dumps(payload["sidebars"]))
+
+	def test_sidebar_includes_own_private_workspace_only(self):
+		status, _unused_headers, body = self.request(
+			"/api/method/platform_core.api.shell.get_bootstrap", self.reader_sid
+		)
+		self.assertEqual(status, 200)
+		sidebars = json.loads(body)["message"]["sidebars"]
+		targets = {item.get("link_to") for sidebar in sidebars for item in sidebar["data"]["items"]}
+		self.assertIn("Kabuk Reader Private", targets)
+		self.assertNotIn("Kabuk Other Private", targets)
+
+	def test_sidebar_commit_invalidates_cached_bootstrap(self):
+		path = "/api/method/platform_core.api.shell.get_bootstrap"
+		sidebar_name = "Shell Review Links"
+
+		def change_link(url):
+			sidebar = frappe.get_doc("Sidebar", sidebar_name)
+			link = next(item for item in sidebar.items if item.label == "Shell Safe Link")
+			link.url = url
+			sidebar.save()
+			frappe.db.commit()
+
+		status, headers, body = self.request(path, self.reader_sid)
+		self.assertEqual(status, 200)
+		self.assertIn(b'"/panel"', body)
+		try:
+			change_link("/shell-updated")
+			status, updated_headers, body = self.request(
+				path, self.reader_sid, headers={"If-None-Match": headers["ETag"]}
+			)
+			self.assertEqual(status, 200)
+			self.assertNotEqual(updated_headers["ETag"], headers["ETag"])
+			self.assertIn(b'"/shell-updated"', body)
+		finally:
+			change_link("/panel")
+
+	def issue_reader_api_keys(self):
+		"""Use the HTTP worker that caches the site's encryption settings."""
+		sid = None
+		try:
+			frappe.get_doc("User", DESK).add_roles("System Manager")
+			frappe.db.commit()
+			sid = self.login(DESK)
+			status, _unused_headers, body = self.request("/panel", sid)
+			self.assertEqual(status, 200)
+			token = PanelMetadata(body).token
+			self.assertTrue(token)
+			status, _unused_headers, body = self.request(
+				"/api/method/frappe.core.doctype.user.user.generate_keys",
+				sid,
+				method="POST",
+				data={"user": READER},
+				headers={"X-Frappe-CSRF-Token": token},
+			)
+			self.assertEqual(status, 200)
+			return json.loads(body)["message"]
+		finally:
+			try:
+				if sid:
+					delete_session(sid=sid, user=DESK)
+			finally:
+				frappe.get_doc("User", DESK).remove_roles("System Manager")
+				frappe.db.commit()
+
+	def test_api_key_does_not_create_browser_session(self):
+		try:
+			keys = self.issue_reader_api_keys()
+			headers = {"Authorization": f"token {keys['api_key']}:{keys['api_secret']}"}
+			status, _unused_headers, body = self.request(
+				"/api/method/frappe.auth.get_logged_user", headers=headers
+			)
+			self.assertEqual(status, 200)
+			self.assertEqual(json.loads(body)["message"], READER)
+			status, _unused_headers, _unused_body = self.request(
+				"/api/method/platform_core.api.shell.get_bootstrap", headers=headers
+			)
+			self.assertEqual(status, 403)
+			status, _unused_headers, _unused_body = self.request(
+				f"/api/v2/doctype/{quote(DOCTYPE)}/meta", headers=headers
+			)
+			self.assertEqual(status, 403)
+			status, _unused_headers, _unused_body = self.request("/panel", headers=headers)
+			self.assertEqual(status, 302)
+		finally:
+			frappe.db.rollback()
+			frappe.db.set_value("User", READER, "api_key", None, update_modified=False)
+			remove_encrypted_password("User", READER, "api_secret")
+			frappe.db.commit()
+
+	def test_direct_bootstrap_cannot_switch_users(self):
+		frappe.set_user(READER)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				get_bootstrap(PRIVILEGED)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_workspace_manager_cannot_see_hidden_or_unsafe_navigation(self):
+		user = frappe.get_doc("User", READER)
+		user.append("roles", {"role": "Workspace Manager"})
+		user.save()
+		frappe.db.commit()
+		try:
+			sid = self.login(READER)
+			status, _unused_headers, body = self.request(
+				"/api/method/platform_core.api.shell.get_bootstrap", sid
+			)
+			self.assertEqual(status, 200)
+			payload = json.loads(body)["message"]
+			self.assertIn("Workspace Manager", payload["user"]["roles"])
+			self.assertIn("Kabuk Visible", body.decode("utf-8"))
+			self.assertIn("Shell Safe Link", body.decode("utf-8"))
+			for target in ("Kabuk Hidden", "Shell Unsafe Shortcut", "Shell Unsafe Link", "javascript:"):
+				self.assertNotIn(target, body.decode("utf-8"))
+		finally:
+			frappe.db.rollback()
+			user = frappe.get_doc("User", READER)
+			user.set("roles", [{"role": "Kabuk Test Reader"}])
+			user.save()
+			frappe.db.commit()
+
+	def test_safe_url_rejects_disallowed_links(self):
+		for url in (
+			"javascript:void(0)",
+			"JAVASCRIPT:void(0)",
+			"data:text/plain,example",
+			"//example.test/path",
+			"/\\example.test",
+			"https:example.test",
+		):
+			with self.subTest(url=url):
+				self.assertFalse(safe_url(url))
+		self.assertTrue(safe_url("/panel"))
+		self.assertFalse(safe_url("https://example.test/panel"))
+		with patch.dict(frappe.conf, {"shell_navigation_hosts": ["example.test"], "developer_mode": False}):
+			self.assertTrue(safe_url("https://example.test/panel"))
+			self.assertTrue(safe_url("HTTPS://example.test/panel"))
+			self.assertFalse(safe_url("http://example.test/panel"))
+			self.assertFalse(safe_url("https://sub.example.test/panel"))
+			self.assertFalse(safe_url("https://example.test@external.test/panel"))
+		with patch.dict(frappe.conf, {"shell_navigation_hosts": ["example.test"], "developer_mode": True}):
+			self.assertTrue(safe_url("http://example.test/panel"))
+
+	def test_bootstrap_includes_formatting_settings(self):
+		status, _unused_headers, body = self.request(
+			"/api/method/platform_core.api.shell.get_bootstrap", self.reader_sid
+		)
+		self.assertEqual(status, 200)
+		formatting = json.loads(body)["message"]["formatting"]
+		for key in ("time_zone", "number_format", "rounding_method"):
+			self.assertTrue(formatting[key])
+		self.assertEqual(formatting["currency"], frappe.get_system_settings("currency") or None)
+
+	def test_sidebar_drops_unknown_fields(self):
+		from platform_core.shell.bootstrap import project_sidebar
+
+		data = project_sidebar(
+			{
+				"name": "Example",
+				"internal": "ignore",
+				"items": [
+					{
+						"type": "Link",
+						"link_type": "DocType",
+						"link_to": DOCTYPE,
+						"new_key": "ignore",
+						"url": "javascript:void(0)",
+						"report": {"report_type": "Script Report", "private": "ignore"},
+					}
+				],
+			}
+		)
+		self.assertNotIn("internal", data)
+		self.assertNotIn("new_key", data["items"][0])
+		self.assertNotIn("url", data["items"][0])
+		self.assertEqual(data["items"][0]["report"], {"report_type": "Script Report"})
+
+	def test_session_probe_and_shell_distinguish_guest_and_expired_sessions(self):
+		from frappe.sessions import delete_session
+
+		sid = self.login(READER)
+		probe = "/api/method/frappe.auth.get_logged_user"
+		status, _unused_headers, body = self.request(probe, sid)
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(body)["message"], READER)
+		delete_session(sid=sid)
+		frappe.db.commit()
+		for path in (probe, "/api/method/platform_core.api.shell.get_bootstrap"):
+			self.assertEqual(self.request(path)[0], 403)
+			self.assertEqual(self.request(path, sid)[0], 401)
+		self.assertEqual(self.metadata(sid)[0], 401)
+
+	def test_shell_requests_refuse_unknown_parameters(self):
+		paths = (
+			"/api/method/platform_core.api.shell.get_bootstrap?",
+			"/api/method/platform_core.api.meta.get_doctype?" + urlencode({"doctype": DOCTYPE}) + "&",
+		)
+		for path in paths:
+			for key in ("role", "user", "ignore_permissions"):
+				with self.subTest(path=path, key=key):
+					status, _unused_headers, body = self.request(
+						path + urlencode({key: "forbidden-user-marker"}), self.reader_sid
+					)
+					self.assertEqual(status, 417)
+					self.assertEqual(json.loads(body)["exc_type"], "ValidationError")
+					self.assertNotIn(b"forbidden-user-marker", body)
+
+	def test_metadata_missing_doctype_is_a_validation_error(self):
+		status, _unused_headers, body = self.request(
+			"/api/method/platform_core.api.meta.get_doctype", self.reader_sid
+		)
+		self.assertEqual(status, 417)
+		self.assertEqual(json.loads(body)["exc_type"], "ValidationError")
+
+	def test_shell_rate_limits_apply_per_account_and_endpoint(self):
+		for suffix, limit in (("shell.get_bootstrap", 120), ("meta.get_doctype", 240)):
+			with self.subTest(endpoint=suffix):
+				endpoint = f"platform_core.api.{suffix}"
+				path = f"/api/method/{endpoint}"
+				if suffix == "meta.get_doctype":
+					path += "?" + urlencode({"doctype": DOCTYPE})
+				key = frappe.cache.make_key(f"rl:{endpoint}:{READER}") + b":60"
+				frappe.cache.setex(key, 60, limit - 1)
+				try:
+					self.assertEqual(self.request(path, self.reader_sid)[0], 200)
+					status, _unused_headers, body = self.request(path, self.reader_sid)
+					self.assertEqual(status, 429)
+					self.assertEqual(json.loads(body)["exc_type"], "RateLimitExceededError")
+					self.assertEqual(self.request(path, self.privileged_sid)[0], 200)
+				finally:
+					frappe.cache.delete(key)

@@ -1,0 +1,542 @@
+openapi: 3.1.0
+info:
+  title: Press TR
+  version: 0.1.0
+paths:
+  /api/method/press_tr.api.auth.get_login_url:
+    post:
+      operationId: getLoginUrl
+      summary: Get a single-use Keycloak login URL.
+      description: Starts a rate-limited browser login. A separate random value in an HttpOnly SameSite=Lax cookie binds the state record to the initiating browser for 600 seconds. HTTPS uses a Secure cookie with the __Host- prefix.
+      responses:
+        "200":
+          description: The URL contains state, nonce and a PKCE S256 challenge.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [url]
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+        "429":
+          description: Login URL request limit reached.
+        "503":
+          description: The Keycloak client or issuer is not configured.
+  /api/method/press_tr.api.auth.keycloak_callback:
+    get:
+      operationId: completeLogin
+      summary: Exchange the authorization code and open a Press session.
+      description: Requires the initiating browser cookie and consumes the matching state record atomically before verifying Keycloak identity. May create a local user and a team. Does not start billing.
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+      responses:
+        "302":
+          description: Redirected to the Press dashboard after sign-in or to account deletion after reauthentication.
+          headers:
+            Location:
+              schema:
+                type: string
+                enum: [/dashboard, /account-deletion]
+        "403":
+          description: State, token or identity binding was rejected.
+        "409":
+          description: A concurrent account update interrupted sign-in. Start a new login.
+        "429":
+          description: Login callback request limit reached.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.keycloak_backchannel_logout:
+    post:
+      operationId: closeSessions
+      summary: Close sessions associated with a verified Keycloak logout token.
+      description: Revokes matching Press sessions and deletes their session mappings. This is destructive and does not incur charges.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [logout_token]
+              properties:
+                logout_token:
+                  type: string
+                  minLength: 1
+                  maxLength: 8192
+      responses:
+        "200":
+          description: Logout processed, including a repeated logout.
+        "403":
+          description: Logout token was rejected.
+        "429":
+          description: Rejected logout token limit reached. Valid logout notifications do not count.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.identity.ensure_team:
+    post:
+      operationId: ensureTeam
+      summary: Ensure a Press team and membership.
+      description: Identity Sync sends an email it verified in Keycloak. Press creates a team for the organization or adds the user to its existing team. This operation does not start billing.
+      security:
+        - identitySync: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject, email, email_verified, organization_id]
+              properties:
+                issuer:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                  description: Required for the first identity binding.
+                email_verified:
+                  type: boolean
+                  description: Must be true for the first identity binding.
+                organization_id:
+                  type: string
+                  description: Keycloak organization identifier.
+                organization_name:
+                  type: string
+                  description: Display name used only when Press creates the team. The organization identifier is used if omitted.
+      responses:
+        "200":
+          description: Press team name and whether this request created the team.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [team, created]
+                    properties:
+                      team:
+                        type: string
+                      created:
+                        type: boolean
+                      owner_disabled:
+                        type: boolean
+                        description: True when the recorded team owner is disabled.
+        "403":
+          description: Service identity or user binding was rejected.
+        "409":
+          description: Another request is updating this organization.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.identity.remove_team_member:
+    post:
+      operationId: removeTeamMember
+      summary: Revoke memberships in one or all Keycloak organizations.
+      description: Removes the member and their team role assignments. Bulk removal affects only mapped teams and disables the linked user and API credentials. This destructive operation preserves the user and teams. Bulk removal preserves the recorded team owner while removing their membership and access. A single-team request requires ownership transfer before removing the owner.
+      security:
+        - identitySync: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject]
+              oneOf:
+                - required: [organization_id]
+                - required: [all_organizations]
+              properties:
+                issuer:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                organization_id:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  pattern: '\S'
+                  description: Keycloak organization identifier.
+                all_organizations:
+                  type: boolean
+                  const: true
+                  description: Remove memberships in all teams mapped to Keycloak.
+      responses:
+        "200":
+          description: The user has no membership in the mapped team, including on retry. The team is null for bulk removal or when no mapping exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [team, member]
+                    properties:
+                      team:
+                        type: [string, "null"]
+                      member:
+                        const: false
+        "400":
+          description: The request must contain exactly one valid organization selector.
+        "403":
+          description: Service identity or owner removal was rejected.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.identity.list_identities:
+    get:
+      operationId: listIdentities
+      summary: List Press identities for reconciliation.
+      description: Lists identities for the configured issuer in subject order. Anonymous deletion records are omitted.
+      security:
+        - identitySync: []
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 18446744073709551615
+            default: 0
+          description: Number of matching records to skip.
+        - name: page_length
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 500
+      responses:
+        "200":
+          description: An identity page and a flag that indicates whether another page exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    additionalProperties: false
+                    required: [identities, has_next_page]
+                    properties:
+                      identities:
+                        type: array
+                        maxItems: 500
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required: [issuer, subject, enabled]
+                          properties:
+                            issuer:
+                              type: string
+                            subject:
+                              type: string
+                            enabled:
+                              type: boolean
+                      has_next_page:
+                        type: boolean
+        "400":
+          description: The page start or length is invalid.
+        "403":
+          description: The service token or request parameters were rejected.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.identity.anonymize_user:
+    post:
+      operationId: anonymizeUser
+      summary: Anonymize a linked Press user and revoke access.
+      description: Irreversibly anonymizes a linked account after revoking access. Invoices remain unchanged. An unknown identity returns found false. A repeat of a completed request returns the same result.
+      security:
+        - identitySync: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject]
+              properties:
+                issuer:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+      responses:
+        "200":
+          description: The operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [anonymized, found]
+                    properties:
+                      anonymized:
+                        const: true
+                      found:
+                        type: boolean
+        "403":
+          description: Service identity or issuer was rejected.
+        "409":
+          description: An account update is in progress or a database lock timed out. Retry the request.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.account.request_deletion:
+    post:
+      operationId: requestAccountDeletion
+      summary: Request deletion of your own Press account.
+      description: Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. The Keycloak authentication time may precede the start of reauthentication by up to five seconds. Invoices remain unchanged.
+      security:
+        - pressSession: []
+      parameters:
+        - in: header
+          name: X-Frappe-CSRF-Token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm]
+              properties:
+                confirm:
+                  type: boolean
+                  description: Send false to start reauthentication and true to confirm deletion.
+      responses:
+        "200":
+          description: Returns a Keycloak login URL or the latest known deletion request state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    oneOf:
+                      - type: object
+                        required: [url]
+                        properties:
+                          url:
+                            type: string
+                            format: uri
+                      - type: object
+                        required: [submitted]
+                        properties:
+                          submitted:
+                            const: true
+                      - type: object
+                        required: [pending]
+                        properties:
+                          pending:
+                            const: true
+                            description: Press timed out reading the Identity Sync response or Identity Sync reported an unknown outcome. The same account can be retried safely.
+        "400":
+          description: Frappe rejected the browser request or its CSRF token.
+        "403":
+          description: A human Press session and fresh Keycloak reauthentication are required.
+        "502":
+          description: Keycloak or Identity Sync did not accept the service request.
+        "503":
+          description: The account deletion service or Keycloak verification keys are unavailable.
+  /api/method/press_tr.api.maintenance.cleanup_expired_sessions:
+    post:
+      operationId: cleanupExpiredPressSessions
+      summary: Remove expired Keycloak session mappings.
+      description: A System Manager starts this maintenance operation. It deletes expired or orphaned session mappings and leaves active mappings in place.
+      security:
+        - deskSession: []
+      responses:
+        "200":
+          description: Number of removed session mappings in the message object.
+        "403":
+          description: The caller cannot run System Manager maintenance.
+components:
+  securitySchemes:
+    pressSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: A human Press browser session with a Frappe CSRF token.
+    deskSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: An authenticated System Manager session with standard Frappe CSRF protection.
+    identitySync:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A Keycloak access token with only press as audience and identity-sync as authorized party.
+
+x-press-machine-routes:
+  /api/method/press.press.doctype.stripe_webhook_log.stripe_webhook_log.stripe_webhook_handler:
+    credential: stripe
+    description: Stripe signature verified before webhook insertion.
+  /api/method/press.api.github.hook:
+    credential: github
+    description: GitHub signature verified by the webhook document controller before insertion.
+  /api/method/press.api.monitoring.targets:
+    credential: monitoringTargets
+    description: Configured monitor token required before loading target inventory.
+  /api/method/press.api.monitoring.alert:
+    credential: monitoringAlert
+    description: Nonempty callback token required and compared to the configured monitor server token.
+  /api/method/press.api.email.send_mime_mail:
+    credential: email
+    description: Active mail subscription key required before message delivery.
+  /api/method/press.api.site_backup.create_snapshot:
+    credential: backup
+    description: Snapshot request key must match the named backup.
+  /api/method/press.saas.api.auth.is_access_token_valid:
+    credential: saasValidation
+    description: Compares the supplied access token against its stored credential and returns a boolean.
+  /api/method/press.saas.api.auth.generate_access_token:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.country_list:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_information:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.update_information:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.validate_gst:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.change_payment_mode:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_publishable_key_and_setup_intent:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.setup_intent_success:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.create_payment_intent_for_micro_debit:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.create_payment_intent_for_buying_credits:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.create_razorpay_order:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.handle_razorpay_payment_failed:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_invoices:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.upcoming_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_unpaid_invoices:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.total_unpaid_amount:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.download_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_stripe_payment_url_for_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_payment_methods:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.set_as_default:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.remove_payment_method:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.get_domains:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.check_dns:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.add_domain:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.remove_domain:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.retry_add_domain:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.set_host_name:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.set_redirect:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.unset_redirect:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.get_inbound_ip:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.info:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.change_plan:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.get_plans:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.get_first_support_plan:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.team.info:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+x-press-withheld-machine-routes:
+  /api/method/press.api.callbacks.callback:
+    reason: The handler checks origin address and job ID. It has no request signature or key.
+  /api/method/press.api.email.event_log:
+    reason: The handler can fall back to message metadata without validating a subscription key or webhook signature.
+  /api/method/press.api.email.email_ping:
+    reason: The handler has no credential check. Use the standard Press ping route.
+  /api/method/press.api.email.get_analytics:
+    reason: The key is a result filter. The handler does not independently authenticate an active subscription.
