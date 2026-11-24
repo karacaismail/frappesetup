@@ -15,9 +15,12 @@
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.py",
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.json",
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.py",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_recovery_review/ptr_recovery_review.json",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_recovery_review/ptr_recovery_review.py",
     "backend/apps/press_tr/press_tr/press_identity/identity.py",
     "backend/apps/press_tr/press_tr/press_identity/machine_routes.py",
     "backend/apps/press_tr/press_tr/press_identity/oidc.py",
+    "backend/apps/press_tr/press_tr/press_identity/recovery.py",
     "backend/apps/press_tr/press_tr/press_identity/request_policy.py",
     "backend/apps/press_tr/press_tr/press_identity/service.py",
     "backend/apps/press_tr/press_tr/press_identity/sessions.py",
@@ -28,7 +31,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "f4180cb4973eb476ae2408c995a42a1733a255cfea76280ff3632d176e081dbf",
+  "sha256": "795f1cc9615daa91463c62f4ac47ea2bde63c0efa8eaf4fe4ffb1d5e2ccef56e",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -45,7 +48,7 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/account.py",
-      "line": 18,
+      "line": 21,
       "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
     },
     {
@@ -143,6 +146,18 @@
       "path": "backend/apps/press_tr/press_tr/press_identity/sessions.py",
       "line": 37,
       "reason": "Matches the current account and exact logout session ID before deleting the internal mapping."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/account.py",
+      "line": 49,
+      "reason": "Guest recovery request is POST-only and rate limited, accepts only an address, gives the same answer for every address and only opens a review record."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/recovery.py",
+      "line": 29,
+      "reason": "Guests cannot create records, so the recovery request inserts one Open review for a verified identity link. The controller freezes the record and a non-owner reviewer decides."
     }
   ],
   "additionalReviews": [
