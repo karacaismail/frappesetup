@@ -5,18 +5,26 @@ Conditions under test:
 2. The link is bound to the login request and the browser session. Another browser cannot log in with it.
 3. Short life (at most 300 s), single use, and a mail preview must not consume the link (mobile MT-7).
 4. No REST endpoint issues links. The extension's REST resource is disabled and answers 404.
+5. G-162: the answer does not show whether the account exists. Text, format and time are the same.
+6. G-162: an expired link and a used link are refused.
+7. G-162: the link code is not written to logs or events.
+8. G-162: the system limits how often a link is sent to one address.
 Expected values come from docs/sozlesmeler.md section 2, docs/kararlar/0003-keycloak-eklentileri.md and MT-7.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import statistics
+import subprocess
 import time
 import unittest
 import urllib.parse
 
 from test_extensions import AKIS, _open, _cookie_opener, _form_action, _follow_keycloak_redirect
 from test_second_factor import TOTP_USER, fresh_totp_code
+from test_event_listener import _sink_requests
 from helpers import DIRECTORY, admin, live_available, request, get_environment_value, read_realm, tenant_authorize_url, admin_token
 
 MAGIC_LINK = "magiclink"
@@ -27,6 +35,14 @@ MAX_LIFETIME = 300
 PINNED_COMMIT = "7b4ee949a39a7ee953987162479ae1da2c57c3cb"
 PLAIN_USER = "ayse.ornek@example.test"
 OTHER_USER = "mehmet.ornek@example.test"
+UNKNOWN_USER = "kimse.yok@example.test"
+# G-162 gives no number. Proposal for the product owner: at most 3 mails per address in a short window.
+SEND_LIMIT = 3
+SEND_ATTEMPTS = 8
+# Median gap allowed between an existing and an unknown address. Measured gap on 24 November 2026: about 4 ms.
+TIMING_TOLERANCE_SECONDS = 0.002
+TIMING_ROUNDS = 15
+EXPIRED_LIFETIME = 2
 
 
 class MagicLinkFileTest(unittest.TestCase):
@@ -105,9 +121,8 @@ class MagicLinkLiveTest(unittest.TestCase):
         cls.mailpit = Mailpit(f"http://127.0.0.1:{get_environment_value('MAILPIT_UI_PORT')}")
         cls.execution_id = _magic_link_execution_id(cls.admin_token)
 
-    def _request_link(self, email: str):
-        """Opens the login page, switches to the magic link step and submits the e-mail address."""
-        self.mailpit.clear()
+    def _open_email_form(self):
+        """Opens the login page and switches to the magic link step. Returns (opener, html)."""
         opener = _cookie_opener()
         status, _, html = _open(opener, tenant_authorize_url())
         self.assertEqual(status, 200)
@@ -116,9 +131,25 @@ class MagicLinkLiveTest(unittest.TestCase):
         status, _, html = _open(opener, _form_action(html), urllib.parse.urlencode({"authenticationExecution": self.execution_id}).encode())
         self.assertEqual(status, 200)
         self.assertTrue('name="username"' in html and 'name="password"' not in html, "e-mail form expected")
+        return opener, html
+
+    def _submit_email(self, email: str):
+        """Submits the address on a fresh e-mail form. Returns (opener, status, html, seconds)."""
+        opener, html = self._open_email_form()
+        started = time.perf_counter()
         status, _, html = _open(opener, _form_action(html), urllib.parse.urlencode({"username": email}).encode())
+        return opener, status, html, time.perf_counter() - started
+
+    def _request_link(self, email: str):
+        """Opens the login page, switches to the magic link step and submits the e-mail address."""
+        self.mailpit.clear()
+        opener, status, _, _ = self._submit_email(email)
         self.assertEqual(status, 200)
         return opener, self.mailpit.latest_link(email)
+
+    def _mail_count(self, recipient: str) -> int:
+        messages = request("GET", f"{self.mailpit.base}/api/v1/messages").json().get("messages", [])
+        return sum(1 for m in messages if any(a.get("Address") == recipient for a in m.get("To", [])))
 
     def test_link_logs_in_only_in_the_requesting_browser_and_only_once(self):
         opener, link = self._request_link(PLAIN_USER)
@@ -174,3 +205,84 @@ class MagicLinkLiveTest(unittest.TestCase):
         _open(other, tenant_authorize_url())
         status, headers, _ = _follow_keycloak_redirect(other, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
+
+    # G-162 tests start here.
+
+    def test_existing_and_unknown_address_get_the_same_text_and_format(self):
+        _, known_status, known_html, _ = self._submit_email(PLAIN_USER)
+        _, unknown_status, unknown_html, _ = self._submit_email(UNKNOWN_USER)
+        self.assertEqual((known_status, unknown_status), (200, 200))
+        self.assertEqual(_without_session_values(known_html), _without_session_values(unknown_html))
+        self.assertNotIn(PLAIN_USER, known_html)
+        self.assertNotIn(UNKNOWN_USER, unknown_html)
+
+    def test_existing_and_unknown_address_take_the_same_time(self):
+        # The extension sends the mail before it answers, and only for an existing user (AbstractMagicLinkAuthenticator).
+        # Real SMTP makes the gap larger than the local Mailpit does.
+        known, unknown = [], []
+        for _ in range(TIMING_ROUNDS):
+            known.append(self._submit_email(PLAIN_USER)[3])
+            unknown.append(self._submit_email(UNKNOWN_USER)[3])
+        gap = statistics.median(known) - statistics.median(unknown)
+        self.assertLessEqual(abs(gap), TIMING_TOLERANCE_SECONDS,
+                             f"median gap {gap * 1000:.1f} ms shows whether the account exists")
+
+    def test_unknown_address_gets_no_mail(self):
+        self.mailpit.clear()
+        self._submit_email(UNKNOWN_USER)
+        time.sleep(2)
+        self.assertEqual(self._mail_count(UNKNOWN_USER), 0)
+
+    def test_send_rate_is_limited_per_address(self):
+        self.mailpit.clear()
+        for _ in range(SEND_ATTEMPTS):
+            self._submit_email(PLAIN_USER)
+        time.sleep(3)
+        sent = self._mail_count(PLAIN_USER)
+        self.assertLessEqual(sent, SEND_LIMIT, f"{sent} mails for {SEND_ATTEMPTS} requests, no send limit")
+
+    def test_expired_link_is_refused(self):
+        executions = admin(f"/authentication/flows/{AKIS}/executions", self.admin_token).json()
+        config_id = [e for e in executions if e.get("providerId") == MAGIC_LINK][0]["authenticationConfig"]
+        original = admin(f"/authentication/config/{config_id}", self.admin_token).json()
+        short = dict(original, config=dict(original["config"], **{"magickey.validity.duration": str(EXPIRED_LIFETIME)}))
+        self.assertEqual(admin(f"/authentication/config/{config_id}", self.admin_token, "PUT", short).status, 204)
+        self.addCleanup(lambda: admin(f"/authentication/config/{config_id}", admin_token(), "PUT", original))
+        opener, link = self._request_link(PLAIN_USER)
+        time.sleep(EXPIRED_LIFETIME + 2)
+        status, headers, html = _follow_keycloak_redirect(opener, link, self.kc)
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
+        self.assertTrue('name="username"' in html, "an expired link must return to the e-mail form")
+
+    def test_used_link_is_refused_in_the_same_browser(self):
+        opener, link = self._request_link(PLAIN_USER)
+        status, headers, _ = _follow_keycloak_redirect(opener, link, self.kc)
+        self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
+        status, headers, _ = _follow_keycloak_redirect(opener, link, self.kc)
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
+
+    def test_link_code_is_not_in_logs_or_events(self):
+        since = int(time.time()) - 1
+        opener, link = self._request_link(PLAIN_USER)
+        magic_key = urllib.parse.parse_qs(urllib.parse.urlsplit(link).query)["magickey"][0]
+        self.assertGreaterEqual(len(magic_key), 16)
+        _follow_keycloak_redirect(opener, link, self.kc)
+        _follow_keycloak_redirect(opener, link, self.kc)
+        time.sleep(2)
+        # Same container naming as _sink_requests in test_event_listener.
+        context = os.environ.get("DOCKER_CONTEXT", "colima-factory")
+        project = os.environ.get("COMPOSE_PROJECT_NAME", "fs-kimlik-realm")
+        logs = subprocess.run(["docker", "--context", context, "logs", "--since", str(since), f"{project}-keycloak-1"],
+                              capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(logs.returncode, 0, "Keycloak logs are not readable")
+        self.assertNotIn(magic_key, logs.stdout + logs.stderr, "the link code is in the Keycloak log")
+        events = admin("/events?max=200", self.admin_token)
+        self.assertEqual(events.status, 200)
+        self.assertNotIn(magic_key, events.body.decode("utf-8", "replace"), "the link code is in the login events")
+        self.assertNotIn(magic_key, repr(_sink_requests()), "the link code is in the event webhook")
+
+
+def _without_session_values(html: str) -> str:
+    """Removes values that change on every login request, so two answers can be compared."""
+    html = re.sub(r"(session_code|execution|tab_id|client_data|kc_locale)=[^&\"]*", r"\1=", html)
+    return re.sub(r'checkAuthSession\(\s*"[^"]*"', 'checkAuthSession("")', html)
