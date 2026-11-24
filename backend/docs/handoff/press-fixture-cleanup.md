@@ -20,7 +20,7 @@ Cloud Region kaydında açma ve kapatma alanı yoktur. Temizlik bu kayda dokunma
 İki değer site ayarından okunur. Değer yoksa ilgili adım hiçbir şeyi değiştirmez.
 
 - `press_tr_team_tiers` ayarı Team Tier tablosudur. Ürün sahibi bu tabloyu verir. Fiyat kapısı G-166 kapalıdır.
-- `press_tr_enabled_clusters` ayarı kullanılan Cluster adlarının listesidir. Hüseyin Cengiz bu listeyi verir.
+- `press_tr_enabled_clusters` ayarı kullanılan Cluster adlarının listesidir. Altyapı sorumlusu bu listeyi verir.
 
 Team Tier tablosu her Press Team Tier kaydını bir kez içermelidir. Her satırda `amount` ve `last_invoice_amount` alanı olmalıdır. `paying_user_since` alanı isteğe bağlıdır. Değerler sıfır ya da daha büyük sayı olmalıdır. Tablo eksikse temizlik hata verir ve hiçbir Team Tier kaydını değiştirmez.
 
