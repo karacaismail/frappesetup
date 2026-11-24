@@ -111,7 +111,7 @@ class PlanSetTest(unittest.TestCase):
 				self.assertEqual(self.plans.missing_limits(plan), ["cpu_time_per_day"])
 		warnings = self.plans.sync_plans()
 		self.assertEqual(len(warnings), len(self.plans.PLANS))
-		for plan, warning in zip(self.plans.PLANS, warnings):
+		for plan, warning in zip(self.plans.PLANS, warnings, strict=True):
 			self.assertIn(plan["title"], warning)
 			self.assertIn("missing limits: cpu_time_per_day.", warning)
 

@@ -1,4 +1,4 @@
-"""Install the Press fields used for priced Site Plan revisions."""
+"""Install the Press fields used for priced Site Plan revisions and the invoice lira rate."""
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
@@ -27,6 +27,44 @@ def sync_pricing_fields():
 					"read_only": 1,
 					"no_copy": 1,
 					"insert_after": "price_effective_date",
+				},
+			],
+			# G-10: set once when the invoice leaves Draft (press_tr.exchange_rates.set_invoice_rate).
+			"Invoice": [
+				{
+					"fieldname": "try_exchange_rate",
+					"fieldtype": "Float",
+					"label": "Turkish Lira Rate",
+					"precision": "4",
+					"read_only": 1,
+					"no_copy": 1,
+					"insert_after": "exchange_rate",
+					"description": "US dollar selling rate on the invoice day.",
+				},
+				{
+					"fieldname": "try_exchange_rate_date",
+					"fieldtype": "Date",
+					"label": "Turkish Lira Rate Date",
+					"read_only": 1,
+					"no_copy": 1,
+					"insert_after": "try_exchange_rate",
+				},
+				{
+					"fieldname": "try_exchange_rate_source",
+					"fieldtype": "Data",
+					"label": "Turkish Lira Rate Source",
+					"read_only": 1,
+					"no_copy": 1,
+					"insert_after": "try_exchange_rate_date",
+				},
+				{
+					"fieldname": "try_total",
+					"fieldtype": "Float",
+					"label": "Total in Turkish Lira",
+					"precision": "2",
+					"read_only": 1,
+					"no_copy": 1,
+					"insert_after": "try_exchange_rate_source",
 				},
 			],
 		}

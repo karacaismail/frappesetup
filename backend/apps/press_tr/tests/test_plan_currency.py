@@ -80,7 +80,9 @@ class PlanSchemaTest(unittest.TestCase):
 			"frappe.custom": SimpleNamespace(),
 			"frappe.custom.doctype": SimpleNamespace(),
 			"frappe.custom.doctype.custom_field": SimpleNamespace(),
-			"frappe.custom.doctype.custom_field.custom_field": SimpleNamespace(create_custom_fields=self.fields),
+			"frappe.custom.doctype.custom_field.custom_field": SimpleNamespace(
+				create_custom_fields=self.fields
+			),
 			"frappe.custom.doctype.property_setter": SimpleNamespace(),
 			"frappe.custom.doctype.property_setter.property_setter": SimpleNamespace(
 				make_property_setter=self.setter

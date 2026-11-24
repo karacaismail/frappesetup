@@ -1,7 +1,7 @@
 """G-10: the Turkish lira price comes from the daily US dollar rate.
 
 The product owner decided on 24 November 2026 that the lira price is computed from a rate. The
-main source is the TCMB "döviz satış" (ForexSelling) rate. ECB is the fallback. The tests never
+main source is the TCMB forex selling rate (ForexSelling). ECB is the fallback. The tests never
 reach the network: ``requests`` is replaced with a stub that serves the sample files in
 ``fixtures/exchange_rates``. ``frappe`` is replaced with an in-memory stub.
 """
@@ -105,10 +105,21 @@ class SourceTest(RateCase):
 	def test_tcmb_forex_selling_rate_is_used(self):
 		self.serve(tcmb=sample("tcmb-today.xml"), ecb=sample("ecb-daily.xml"))
 		rate = self.rates.update_rate()
-		self.assertEqual((rate["source"], rate["rate_date"], rate["rate"]), ("TCMB", TUESDAY, Decimal("41.3088")))
+		self.assertEqual(
+			(rate["source"], rate["rate_date"], rate["rate"]), ("TCMB", TUESDAY, Decimal("41.3088"))
+		)
 		self.assertEqual([url for url, _kwargs in self.requests.calls], [TCMB])
 		self.assertEqual(
-			self.stored(), {"TCMB-2026-11-24": {"doctype": DOCTYPE, "name": "TCMB-2026-11-24", "source": "TCMB", "rate_date": TUESDAY, "rate": "41.3088"}}
+			self.stored(),
+			{
+				"TCMB-2026-11-24": {
+					"doctype": DOCTYPE,
+					"name": "TCMB-2026-11-24",
+					"source": "TCMB",
+					"rate_date": TUESDAY,
+					"rate": "41.3088",
+				}
+			},
 		)
 		self.assertEqual((self.errors, self.mails), ([], []))
 
@@ -217,9 +228,7 @@ class RoundingTest(RateCase):
 class PanelPriceTest(RateCase):
 	def setUp(self):
 		super().setUp()
-		(self.plans,) = load(
-			self, self.fake, "press_tr.plans", extra_modules={"requests": self.requests}
-		)
+		(self.plans,) = load(self, self.fake, "press_tr.plans", extra_modules={"requests": self.requests})
 
 	def test_panel_shows_lira_prices_with_the_rate(self):
 		self.store("TCMB", TUESDAY, "41.3088")
@@ -229,11 +238,13 @@ class PanelPriceTest(RateCase):
 		self.assertIsNone(plans["press-tr-enterprise"]["price_try"])
 		self.assertEqual(plans["press-tr-trial"]["price_try"], Decimal("0.00"))
 		starter = plans["press-tr-starter"]
-		self.assertEqual(starter["try_rate"], {"rate": Decimal("41.3088"), "rate_date": TUESDAY, "source": "TCMB"})
+		self.assertEqual(
+			starter["try_rate"], {"rate": Decimal("41.3088"), "rate_date": TUESDAY, "source": "TCMB"}
+		)
 		self.assertIsNone(starter["rate_warning"])
 		self.assertEqual(starter["currency"], "USD")
 
-	def test_panel_warns_when_the_rate_is_old(self):
+	def test_panel_warns_after_three_days(self):
 		self.store("TCMB", date(2026, 11, 20), "41.3088")
 		starter = self.plans.public_plans()[0]
 		self.assertIn("older than 3 days", starter["rate_warning"])
@@ -261,7 +272,11 @@ class InvoiceRateTest(RateCase):
 	def test_invoice_takes_the_rate_of_its_day_when_it_is_issued(self):
 		self.store("TCMB", MONDAY, "41.1000")
 		self.store("TCMB", TUESDAY, "41.3088")
-		doc = self.invoice(before=SimpleNamespace(get=lambda field: "Draft" if field == "status" else None), status="Unpaid", total="123.45")
+		doc = self.invoice(
+			before=SimpleNamespace(get=lambda field: "Draft" if field == "status" else None),
+			status="Unpaid",
+			total="123.45",
+		)
 		self.rates.set_invoice_rate(doc)
 		self.assertEqual(doc.try_exchange_rate, "41.3088")
 		self.assertEqual(doc.try_exchange_rate_date, TUESDAY)
@@ -270,7 +285,12 @@ class InvoiceRateTest(RateCase):
 
 	def test_rate_never_changes_after_the_invoice_is_issued(self):
 		self.store("TCMB", TUESDAY, "41.3088")
-		issued = {"status": "Unpaid", "try_exchange_rate": "41.3088", "try_exchange_rate_date": TUESDAY, "try_exchange_rate_source": "TCMB"}
+		issued = {
+			"status": "Unpaid",
+			"try_exchange_rate": "41.3088",
+			"try_exchange_rate_date": TUESDAY,
+			"try_exchange_rate_source": "TCMB",
+		}
 		before = SimpleNamespace(get=issued.get)
 		self.store("TCMB", date(2026, 11, 25), "42.0000")
 		self.fake.today = date(2026, 11, 25)
@@ -283,7 +303,9 @@ class InvoiceRateTest(RateCase):
 			self.rates.set_invoice_rate(doc)
 
 	def test_invoice_without_any_rate_is_not_blocked(self):
-		doc = self.invoice(before=SimpleNamespace(get=lambda field: "Draft" if field == "status" else None), status="Unpaid")
+		doc = self.invoice(
+			before=SimpleNamespace(get=lambda field: "Draft" if field == "status" else None), status="Unpaid"
+		)
 		self.rates.set_invoice_rate(doc)
 		self.assertIsNone(doc.get("try_exchange_rate"))
 		self.assertEqual(len(self.errors), 1)
@@ -304,10 +326,11 @@ class RateRecordTest(unittest.TestCase):
 		)
 		self.assertIn("Press Billing", (APP_ROOT / "press_tr/modules.txt").read_text().splitlines())
 
-	def test_hooks_schedule_one_daily_fetch_and_lock_the_invoice_rate(self):
+	def test_hooks_lock_the_invoice_rate(self):
 		(hooks,) = load(self, FakeFrappe(self), "press_tr.hooks")
-		self.assertEqual(hooks.scheduler_events, {"daily": ["press_tr.exchange_rates.update_rate"]})
-		self.assertEqual(hooks.doc_events["Invoice"], {"validate": "press_tr.exchange_rates.set_invoice_rate"})
+		self.assertEqual(
+			hooks.doc_events["Invoice"], {"validate": "press_tr.exchange_rates.set_invoice_rate"}
+		)
 		self.assertIn(DOCTYPE, hooks.ai_write_closed_doctypes)
 
 

@@ -4,8 +4,16 @@ Every plan value lives in this file only. The product owner gave the prices on 2
 Prices are stored and shown in US dollars. The Enterprise plan has no price: the panel shows a
 contact message and an operator opens the tenant.
 
-The plan limits are still open. They stay ``None`` until the product owner gives them, and each
-plan with an empty limit warns on every migrate. Empty limits are never written to Press.
+The product owner gave the storage and database limits on 24 November 2026. Press keeps both in
+MiB, so one GB is written as 1024 MiB. CPU time (``cpu_time_per_day``) stays ``None`` until
+the DevOps owner approves it, so each plan still warns on every migrate. Empty limits are never
+written to Press.
+
+The backup schedule, the four tenant roles and the custom app rule are plan data only. The backup
+copy job belongs to G-5, and the roles are created by G-62.
+
+The Turkish lira price is never stored. ``public_plans`` computes it from the daily rate in
+``press_tr.exchange_rates``.
 
 Migrate creates a missing plan closed (``enabled=0``). It never edits an existing plan record:
 a price changes only through ``press_tr.pricing.create_price_revision``.
@@ -13,34 +21,60 @@ a price changes only through ``press_tr.pricing.create_price_revision``.
 
 import frappe
 
+from press_tr import exchange_rates
+
 CURRENCY = "USD"
 TRIAL_DAYS = 14
 OPERATOR_ROLE = "System Manager"
 CUSTOMER_ROLE = "Press User"
 TRIAL_SETTING = ("Press Settings", "press_trial_plan")
 
-# Press has fields for the first two limits only. The other three wait for a design decision.
-PRESS_LIMIT_FIELDS = ("max_database_usage", "max_storage_usage")
-LIMIT_FIELDS = (*PRESS_LIMIT_FIELDS, "backup_count", "role_count", "app_count")
+# Press labels both size fields "(MiB)" in site_plan.json.
+MIB_PER_GB = 1024
+# The warning counts these Press fields. Press pushes the size limits to a site only when
+# cpu_time_per_day is above zero (press.press.doctype.site_plan.site_plan.get_plan_config).
+LIMIT_FIELDS = ("max_database_usage", "max_storage_usage", "cpu_time_per_day")
+
+# Same schedule on every plan. Each kind keeps its last backup, the twice weekly kind keeps two.
+BACKUP_SCHEDULE = (
+	{"kind": "on_demand", "keep": 1},
+	{"kind": "daily", "keep": 1},
+	{"kind": "twice_weekly", "weekdays": ("Wednesday", "Saturday"), "keep": 2},
+	{"kind": "fortnightly", "keep": 1},
+	{"kind": "monthly", "keep": 1},
+	{"kind": "quarterly", "keep": 1},
+	{"kind": "half_yearly", "keep": 1},
+	{"kind": "yearly", "keep": 1},
+)
+# Every plan has these roles. They have no count limit.
+TENANT_ROLES = ("Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Admin Assistant")
 
 
-def _plan(name, title, price_usd, *, self_service=True, trial=False):
+def _plan(name, title, price_usd, gigabytes, *, self_service=True, trial=False):
 	return {
 		"name": name,
 		"title": title,
 		"price_usd": price_usd,
 		"self_service": self_service,
 		"trial": trial,
-		"limits": dict.fromkeys(LIMIT_FIELDS),
+		"limits": {
+			"max_database_usage": gigabytes * MIB_PER_GB,
+			"max_storage_usage": gigabytes * MIB_PER_GB,
+			"cpu_time_per_day": None,
+		},
+		"backups": BACKUP_SCHEDULE,
+		"tenant_roles": TENANT_ROLES,
+		# Apps have no limit. Only the Enterprise plan may install a custom app.
+		"custom_apps": not self_service,
 	}
 
 
 PLANS = (
-	_plan("press-tr-starter", "Başlangıç", 400),
-	_plan("press-tr-growth", "Büyüme", 750),
+	_plan("press-tr-starter", "Başlangıç", 400, 5),
+	_plan("press-tr-growth", "Büyüme", 750, 10),
 	# No price is written. The panel shows "Fiyat için bize ulaşın" for this plan.
-	_plan("press-tr-enterprise", "Kurumsal", None, self_service=False),
-	_plan("press-tr-trial", "Deneme", 0, trial=True),
+	_plan("press-tr-enterprise", "Kurumsal", None, 20, self_service=False),
+	_plan("press-tr-trial", "Deneme", 0, 1, trial=True),
 )
 
 
@@ -54,15 +88,28 @@ def plan_names(*, self_service=None, trial=None):
 
 
 def public_plans():
-	"""The plan list for the panel, in US dollars. The Enterprise plan shows a contact message."""
+	"""The plan list for the panel. Prices are US dollars with a Turkish lira price from the rate.
+
+	The Enterprise plan shows a contact message. ``rate_warning`` is set when there is no rate yet
+	or the rate is older than three days.
+	"""
+	rate = exchange_rates.current_rate()
+	warning = exchange_rates.rate_warning(rate)
+	shown_rate = {key: rate[key] for key in ("rate", "rate_date", "source")} if rate else None
 	return [
 		{
 			"name": plan["name"],
 			"title": plan["title"],
 			"currency": CURRENCY,
 			"price_usd": plan["price_usd"],
+			"price_try": exchange_rates.to_try(plan["price_usd"], rate["rate"])
+			if rate and plan["price_usd"] is not None
+			else None,
+			"try_rate": shown_rate,
+			"rate_warning": warning,
 			"self_service": plan["self_service"],
 			"contact_us": plan["price_usd"] is None,
+			"custom_apps": plan["custom_apps"],
 			"trial_days": TRIAL_DAYS if plan["trial"] else None,
 		}
 		for plan in PLANS
@@ -93,11 +140,12 @@ def _site_plan(plan):
 		"price_usd": plan["price_usd"] or 0,
 		"price_inr": 0,
 		"is_trial_plan": int(plan["trial"]),
+		"private_benches": int(plan["custom_apps"]),
 		"enabled": 0,
 		# Press lists a plan only to the roles on it, so customers never see the Enterprise plan.
 		"roles": [{"role": role}],
 	}
-	for field in PRESS_LIMIT_FIELDS:
+	for field in LIMIT_FIELDS:
 		if plan["limits"][field] is not None:
 			values[field] = plan["limits"][field]
 	return values

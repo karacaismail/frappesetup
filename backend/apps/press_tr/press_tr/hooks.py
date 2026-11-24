@@ -298,6 +298,8 @@ doc_events = {
 	"Subscription": {
 		"validate": ["press_tr.pricing.reject_early_subscription", "press_tr.plans.reject_operator_plan"]
 	},
+	# G-10: an issued invoice keeps the Turkish lira rate of its day.
+	"Invoice": {"validate": "press_tr.exchange_rates.set_invoice_rate"},
 }
 extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
 
@@ -305,4 +307,4 @@ extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.Ac
 after_install = ["press_tr.pricing_schema.sync_pricing_fields", "press_tr.plans.sync_plans"]
 after_migrate.extend(after_install)
 
-ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session"]
+ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session", "PTR Exchange Rate"]

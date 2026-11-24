@@ -159,3 +159,21 @@ Price Start Date,Fiyat Başlangıç Tarihi,press_tr
 First date when the revised price can be enabled.,Yeni fiyatın başlayabileceği ilk tarih.,press_tr
 Previous Plan,Önceki Plan,press_tr
 Site Plan Price Change,Site Planı Fiyat Değişikliği,press_tr
+Turkish lira rate could not be updated,Türk lirası kuru güncellenemedi,press_tr
+TCMB and ECB did not answer. The last known rate stays in use.,TCMB ve ECB yanıt vermedi. Son bilinen kur kullanılmaya devam ediyor.,press_tr
+No Turkish lira rate is recorded yet.,Henüz kayıtlı bir Türk lirası kuru yok.,press_tr
+The Turkish lira rate is older than 3 days. Rate date: {0}.,Türk lirası kuru 3 günden eski. Kur tarihi: {0}.,press_tr
+You cannot change the invoice exchange rate.,Faturanın kurunu değiştiremezsiniz.,press_tr
+Invoice has no Turkish lira rate,Faturada Türk lirası kuru yok,press_tr
+Turkish Lira Rate,Türk Lirası Kuru,press_tr
+US dollar selling rate on the invoice day.,Fatura günündeki dolar satış kuru.,press_tr
+Turkish Lira Rate Date,Türk Lirası Kuru Tarihi,press_tr
+Turkish Lira Rate Source,Türk Lirası Kuru Kaynağı,press_tr
+Total in Turkish Lira,Türk Lirası Toplam,press_tr
+US dollar to Turkish lira rate used for prices and invoices.,Fiyatlarda ve faturalarda kullanılan dolar–Türk lirası kuru.,PTR Exchange Rate
+Rate Date,Kur Tarihi,PTR Exchange Rate
+Date the source published the rate.,Kaynağın kuru yayımladığı tarih.,PTR Exchange Rate
+Source,Kaynak,PTR Exchange Rate
+TCMB is the main source. ECB is used when TCMB fails.,Ana kaynak TCMB'dir. TCMB yanıt vermezse ECB kullanılır.,PTR Exchange Rate
+Rate,Kur,PTR Exchange Rate
+Turkish lira for one US dollar.,Bir dolar karşılığı Türk lirası.,PTR Exchange Rate

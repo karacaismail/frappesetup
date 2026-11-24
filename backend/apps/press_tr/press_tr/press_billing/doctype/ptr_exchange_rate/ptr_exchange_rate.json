@@ -1,0 +1,55 @@
+{
+  "doctype": "DocType",
+  "description": "US dollar to Turkish lira rate used for prices and invoices.",
+  "name": "PTR Exchange Rate",
+  "module": "Press Billing",
+  "autoname": "Prompt",
+  "engine": "InnoDB",
+  "sort_field": "rate_date",
+  "sort_order": "DESC",
+  "field_order": [
+    "rate_date",
+    "source",
+    "rate"
+  ],
+  "fields": [
+    {
+      "fieldname": "rate_date",
+      "label": "Rate Date",
+      "fieldtype": "Date",
+      "description": "Date the source published the rate.",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1,
+      "search_index": 1
+    },
+    {
+      "fieldname": "source",
+      "label": "Source",
+      "fieldtype": "Select",
+      "description": "TCMB is the main source. ECB is used when TCMB fails.",
+      "options": "TCMB\nECB",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "rate",
+      "label": "Rate",
+      "fieldtype": "Float",
+      "description": "Turkish lira for one US dollar.",
+      "precision": "4",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "report": 1,
+      "export": 1
+    }
+  ]
+}
