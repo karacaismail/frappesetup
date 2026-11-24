@@ -36,8 +36,16 @@ PINNED_COMMIT = "7b4ee949a39a7ee953987162479ae1da2c57c3cb"
 PLAIN_USER = "ayse.ornek@example.test"
 OTHER_USER = "mehmet.ornek@example.test"
 UNKNOWN_USER = "kimse.yok@example.test"
-# G-162 gives no number. Proposal for the product owner: at most 3 mails per address in a short window.
+# Used only by the send limit test, so no other test fills its slots (decision note 0003, G-162 section).
+RATE_USER = "siklik.ornek@example.test"
+# Product owner decision (AJA-353): at most 3 mails to one address in 15 minutes.
 SEND_LIMIT = 3
+SEND_WINDOW_SECONDS = 900
+SEND_LIMIT_KEY = "magiclink.send.limit"
+SEND_WINDOW_KEY = "magiclink.send.window.seconds"
+# Other live tests ask for more than 3 links to one address. The class raises the limit while it runs.
+RAISED_SEND_LIMIT = 1000
+FORK_DIRECTORY = "magic-link-fork"
 SEND_ATTEMPTS = 8
 # Median gap allowed between an existing and an unknown address. Measured gap on 24 November 2026: about 4 ms.
 TIMING_TOLERANCE_SECONDS = 0.002
@@ -79,6 +87,27 @@ class MagicLinkFileTest(unittest.TestCase):
         config = {c["alias"]: c["config"] for c in self.realm["authenticatorConfig"]}[MAGIC_LINK_CONFIG]
         self.assertLessEqual(int(config["magickey.validity.duration"]), MAX_LIFETIME)
 
+    def test_send_limit_is_three_mails_in_fifteen_minutes(self):
+        config = {c["alias"]: c["config"] for c in self.realm["authenticatorConfig"]}[MAGIC_LINK_CONFIG]
+        self.assertEqual(config[SEND_LIMIT_KEY], str(SEND_LIMIT))
+        self.assertEqual(config[SEND_WINDOW_KEY], str(SEND_WINDOW_SECONDS))
+
+    def test_image_builds_the_fork_files_over_the_pinned_source(self):
+        # G-162: the changed files are copied over the unpacked pinned archive, then Maven builds.
+        stage = self.dockerfile.split("AS magiclink-build", 1)[1].split("\nFROM ", 1)[0]
+        copy = f"COPY {FORK_DIRECTORY}/src/ /build/keycloak-magic-link/src/"
+        self.assertIn(copy, stage)
+        self.assertLess(stage.index("tar -xzf"), stage.index(copy))
+        self.assertLess(stage.index(copy), stage.index("mvn "))
+        ignore = (DIRECTORY / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn(f"!{FORK_DIRECTORY}/", ignore)
+        self.assertIn(f"!{FORK_DIRECTORY}/**", ignore)
+        fork = DIRECTORY / FORK_DIRECTORY
+        self.assertTrue((fork / "NOTICE").is_file(), "Apache-2.0 section 4 asks for a change notice")
+        for changed in sorted(fork.joinpath("src").rglob("*.java")):
+            with self.subTest(file=changed.name):
+                self.assertIn(changed.name, (fork / "NOTICE").read_text(encoding="utf-8"))
+
     def test_rest_resource_and_continuation_are_disabled_by_the_image(self):
         # Merge review E1: the setting lives in the image's conf/keycloak.conf (test_production_image).
         conf = (DIRECTORY / "conf" / "keycloak.conf").read_text(encoding="utf-8")
@@ -89,6 +118,18 @@ class MagicLinkFileTest(unittest.TestCase):
 def _magic_link_execution_id(admin_token: str) -> str:
     executions = admin(f"/authentication/flows/{AKIS}/executions", admin_token).json()
     return [e["id"] for e in executions if e.get("providerId") == MAGIC_LINK][0]
+
+
+def _magic_link_config(token: str) -> tuple[str, dict]:
+    """Returns the id and body of the live magic link step configuration."""
+    executions = admin(f"/authentication/flows/{AKIS}/executions", token).json()
+    config_id = [e for e in executions if e.get("providerId") == MAGIC_LINK][0]["authenticationConfig"]
+    return config_id, admin(f"/authentication/config/{config_id}", token).json()
+
+
+def _put_magic_link_config(config_id: str, body: dict, **values: str) -> int:
+    changed = dict(body, config=dict(body["config"], **values))
+    return admin(f"/authentication/config/{config_id}", admin_token(), "PUT", changed).status
 
 
 class Mailpit:
@@ -120,6 +161,11 @@ class MagicLinkLiveTest(unittest.TestCase):
         cls.admin_token = admin_token()
         cls.mailpit = Mailpit(f"http://127.0.0.1:{get_environment_value('MAILPIT_UI_PORT')}")
         cls.execution_id = _magic_link_execution_id(cls.admin_token)
+        # Several tests ask for more than SEND_LIMIT links to one address. The limit test sets it back.
+        cls.config_id, cls.file_config = _magic_link_config(cls.admin_token)
+        status = _put_magic_link_config(cls.config_id, cls.file_config, **{SEND_LIMIT_KEY: str(RAISED_SEND_LIMIT)})
+        assert status == 204, f"HTTP {status}"
+        cls.addClassCleanup(lambda: admin(f"/authentication/config/{cls.config_id}", admin_token(), "PUT", cls.file_config))
 
     def _open_email_form(self):
         """Opens the login page and switches to the magic link step. Returns (opener, html)."""
@@ -234,17 +280,25 @@ class MagicLinkLiveTest(unittest.TestCase):
         self.assertEqual(self._mail_count(UNKNOWN_USER), 0)
 
     def test_send_rate_is_limited_per_address(self):
+        # The realm file value applies here. Other tests in this class run with the raised limit.
+        self.assertEqual(self.file_config["config"][SEND_LIMIT_KEY], str(SEND_LIMIT))
+        _, raised = _magic_link_config(admin_token())
+        self.assertEqual(_put_magic_link_config(self.config_id, raised, **{SEND_LIMIT_KEY: str(SEND_LIMIT)}), 204)
+        self.addCleanup(lambda: admin(f"/authentication/config/{self.config_id}", admin_token(), "PUT", raised))
         self.mailpit.clear()
+        answers = set()
         for _ in range(SEND_ATTEMPTS):
-            self._submit_email(PLAIN_USER)
+            _, status, html, _ = self._submit_email(RATE_USER)
+            answers.add((status, _without_session_values(html)))
         time.sleep(3)
-        sent = self._mail_count(PLAIN_USER)
-        self.assertLessEqual(sent, SEND_LIMIT, f"{sent} mails for {SEND_ATTEMPTS} requests, no send limit")
+        sent = self._mail_count(RATE_USER)
+        self.assertEqual(sent, SEND_LIMIT, f"{sent} mails for {SEND_ATTEMPTS} requests, expected exactly {SEND_LIMIT}")
+        # Over the limit the person sees the same answer as before.
+        self.assertEqual(len(answers), 1, "the answer changed after the send limit")
+        self.assertEqual(next(iter(answers))[0], 200)
 
     def test_expired_link_is_refused(self):
-        executions = admin(f"/authentication/flows/{AKIS}/executions", self.admin_token).json()
-        config_id = [e for e in executions if e.get("providerId") == MAGIC_LINK][0]["authenticationConfig"]
-        original = admin(f"/authentication/config/{config_id}", self.admin_token).json()
+        config_id, original = _magic_link_config(self.admin_token)
         short = dict(original, config=dict(original["config"], **{"magickey.validity.duration": str(EXPIRED_LIFETIME)}))
         self.assertEqual(admin(f"/authentication/config/{config_id}", self.admin_token, "PUT", short).status, 204)
         self.addCleanup(lambda: admin(f"/authentication/config/{config_id}", admin_token(), "PUT", original))
