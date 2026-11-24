@@ -9,6 +9,7 @@ app_license = "mit"
 # Other tasks append to the same list keys; do not replace them.
 before_login = ["platform_core.identity.login_policy.before_login"]
 before_request = [
+	"platform_core.development_access.guard_development_endpoints",
 	"platform_core.identity.login_policy.before_request",
 	"platform_core.identity.session_policy.before_request",
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
