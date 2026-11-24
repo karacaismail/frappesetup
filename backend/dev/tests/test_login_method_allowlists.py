@@ -98,11 +98,10 @@ EXPECTED = {
 }
 
 # Methods that other open branches add. The test checks them once they are in the tree.
-# AJA-459 (paperclip/aja-457-login-okuma) and AJA-410 (pc/g163-kurtarma) own these methods.
+# AJA-459 (paperclip/aja-457-login-okuma) owns these methods.
 PENDING = {
     "platform_core.api.auth.list_login_providers": "AJA-459",
     "platform_core.api.auth.list_linked_accounts": "AJA-459",
-    "press_tr.api.account.request_recovery": "AJA-410",
 }
 
 # Where AtonotA Login methods live. A new file in these places is scanned too.
