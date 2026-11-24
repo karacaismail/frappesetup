@@ -24,7 +24,7 @@ AGENT_SOURCE=<Agent kopyası> python3 -I -m unittest discover -s backend/deploy/
 
 ## Henüz yapılmayanlar
 
-- Bu depoda Agent imajı yoktur. Yamayı sunucudaki Agent'a Hüseyin Cengiz uygular.
+- Bu depoda Agent imajı yoktur. Yamayı sunucudaki Agent'a DevOps mühendisi uygular.
 - Press'te `offsite_backups_provider` alanında yalnız "AWS S3" seçeneği vardır. Yama bu yüzden adresi sağlayıcı adından bağımsız okur.
 - Press yedeği indirirken kendi bağlantısını kurar. Bu bağlantının Hetzner adresiyle çalıştığı deneme ortamında doğrulanmalıdır.
 
