@@ -1643,7 +1643,10 @@
       "config": {
         "magickey.validity.duration": "300",
         "magiclink.send.limit": "3",
-        "magiclink.send.window.seconds": "900"
+        "magiclink.send.window.seconds": "900",
+        "magiclink.send.source.share": "2",
+        "magiclink.request.source.limit": "20",
+        "magiclink.send.queue.max": "1000"
       }
     },
     {
