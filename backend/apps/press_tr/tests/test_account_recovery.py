@@ -95,7 +95,13 @@ class RecoveryDecisionTest(unittest.TestCase):
 		self.recovery = recovery
 
 	def _doc(self, status, before=None, note="Identity confirmed by phone call."):
-		previous = SimpleNamespace(status=before, review_note="") if before else None
+		previous = (
+			SimpleNamespace(
+				status=before, review_note="", identity_link="link-1", reviewed_by=None, reviewed_at=None
+			)
+			if before
+			else None
+		)
 		return SimpleNamespace(
 			status=status,
 			review_note=note,
@@ -148,6 +154,99 @@ class RecoveryDecisionTest(unittest.TestCase):
 				self._check(doc)
 
 
+class RecoveryRecordFreezeTest(unittest.TestCase):
+	"""AJA-402: a decided record must not change through any API write.
+
+	Frappe applies `read_only` only in the desk form. `frappe.client.set_value` and
+	`frappe.client.save` load the stored record, change the given field and save it,
+	so the controller check is the only guard. These tests replay that path.
+	"""
+
+	STORED = {
+		"identity_link": "link-1",
+		"status": "Approved",
+		"requested_at": "2026-11-20 10:00:00",
+		"review_note": "Identity confirmed by phone call.",
+		"reviewed_by": "reviewer@example.test",
+		"reviewed_at": "2026-11-21 09:00:00",
+	}
+
+	def setUp(self):
+		from press_tr.press_identity import recovery
+
+		self.recovery = recovery
+
+	def _set_value_through_api(self, stored, field, value, session_user="reviewer@example.test"):
+		# Same steps as frappe.client.set_value: read the stored record, change one field, save.
+		previous = SimpleNamespace(**stored)
+		doc = SimpleNamespace(**stored, get_doc_before_save=lambda: previous)
+		setattr(doc, field, value)
+		owners = {"link-1": "customer@example.test", "link-own": "attacker@example.test"}
+		framework = _framework(session_user=session_user)
+		framework.db.get_value.side_effect = lambda doctype, name, column: owners.get(name)
+		with (
+			patch.object(self.recovery, "frappe", framework),
+			patch.object(self.recovery, "_", lambda text, context=None: text),
+		):
+			self.recovery.check_decision(doc)
+		return doc
+
+	def test_api_cannot_change_any_field_of_a_decided_record(self):
+		changes = {
+			"identity_link": "link-own",
+			"reviewed_by": "someone-else@example.test",
+			"reviewed_at": "2026-11-22 08:00:00",
+			"requested_at": "2026-11-22 08:00:00",
+		}
+		for status in ("Approved", "Rejected"):
+			for field, value in changes.items():
+				with self.subTest(status=status, field=field), self.assertRaises(PermissionError):
+					self._set_value_through_api(self.STORED | {"status": status}, field, value)
+
+	def test_owner_cannot_approve_their_own_request_indirectly(self):
+		# A System Manager approves another person's request, then points the
+		# approved record at their own identity. The record must stay unchanged.
+		with self.assertRaises(PermissionError):
+			self._set_value_through_api(
+				self.STORED, "identity_link", "link-own", session_user="attacker@example.test"
+			)
+
+	def test_open_record_keeps_its_identity_and_review_fields(self):
+		stored = self.STORED | {"status": "Open", "review_note": "", "reviewed_by": None, "reviewed_at": None}
+		for field, value in (
+			("identity_link", "link-own"),
+			("requested_at", "2026-11-22 08:00:00"),
+			("reviewed_by", "reviewer@example.test"),
+			("reviewed_at", "2026-11-22 08:00:00"),
+		):
+			with self.subTest(field=field), self.assertRaises(PermissionError):
+				self._set_value_through_api(stored, field, value)
+		doc = self._set_value_through_api(stored, "review_note", "Called the customer.")
+		self.assertEqual(doc.review_note, "Called the customer.")
+
+	def test_resaving_a_decided_record_without_changes_is_allowed(self):
+		doc = self._set_value_through_api(self.STORED, "review_note", self.STORED["review_note"])
+		self.assertEqual(doc.reviewed_by, "reviewer@example.test")
+
+	def test_new_record_cannot_arrive_already_reviewed(self):
+		framework = _framework()
+		doc = SimpleNamespace(
+			identity_link="link-1",
+			status="Open",
+			requested_at="2026-11-20 10:00:00",
+			review_note="",
+			reviewed_by="reviewer@example.test",
+			reviewed_at=None,
+			get_doc_before_save=lambda: None,
+		)
+		with (
+			patch.object(self.recovery, "frappe", framework),
+			patch.object(self.recovery, "_", lambda text, context=None: text),
+			self.assertRaises(PermissionError),
+		):
+			self.recovery.check_decision(doc)
+
+
 class RecoveryRouteTest(unittest.TestCase):
 	def test_route_is_rate_limited_guest_post_with_the_same_answer(self):
 		tree = ast.parse((APP / "api/account.py").read_text(encoding="utf-8"))
@@ -175,6 +274,7 @@ class RecoveryRouteTest(unittest.TestCase):
 		self.assertEqual(fields["identity_link"]["options"], "PTR Identity Link")
 		for name in ("reviewed_by", "reviewed_at", "identity_link", "requested_at"):
 			self.assertTrue(fields[name].get("read_only"), name)
+		self.assertTrue(fields["identity_link"].get("set_only_once"))
 		self.assertTrue(all(field.get("description") for field in doc["fields"]))
 		roles = {permission["role"]: permission for permission in doc["permissions"]}
 		self.assertEqual(set(roles), {"System Manager"})
