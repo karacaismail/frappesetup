@@ -270,6 +270,10 @@ before_request = [
 ]
 before_job = ["press_tr.ansible_bridge.activate"]
 
+# G-8: Frappe imports Press fixtures before after_migrate, so the cleanup runs on every migrate.
+# Keep this a list: other press_tr groups add their own migrate steps here.
+after_migrate = ["press_tr.fixture_cleanup.disable_cloud_defaults"]
+
 auth_hooks = [
 	"press_tr.press_identity.service.authorize_identity_sync",
 	"press_tr.press_identity.request_policy.enforce_guest_allowlist",
