@@ -11,6 +11,7 @@ Expected behavior comes from the contract (`contracts/platform_core-identity.ope
 
 import json
 import secrets
+from unittest import mock
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -18,7 +19,8 @@ from frappe.tests.test_api import make_request
 from frappe.utils import get_test_client
 from frappe.utils.password import update_password
 
-from platform_core.identity.atonota import decision_api
+from platform_core.api import test_atonota_verification as notice
+from platform_core.identity.atonota import decision_api, verification_api
 from platform_core.identity.tests import helpers as h
 
 API = "/api/method/platform_core.api.atonota_login."
@@ -212,3 +214,59 @@ class TestAtonotaLoginEndpoints(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		with self.assertRaises(decision_api.ActionRefused):
 			decision_api.open_paid_plan()
+
+
+class TestAtonotaVerificationNoticeAccess(IntegrationTestCase):
+	"""The two access tests of `verification_notice` (G-164). The other inbox tests are in
+	`test_atonota_verification.py`. The endpoint is open to guests: the signature is the only key."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		notice.clear_records()
+		h.reset_rate_limits()
+		settings = h.SiteSettings({notice.CONFIG_FIELD: notice.SECRET})
+		settings.__enter__()
+		self.addCleanup(settings.__exit__, None, None, None)
+		self.addCleanup(notice.clear_records)
+
+	def post(self, body: bytes, header: str | None):
+		headers = {"Accept": "application/json", "Content-Type": "application/json"}
+		if header is not None:
+			headers[verification_api.SIGNATURE_HEADER] = header
+		kwargs = {"path": notice.ENDPOINT, "method": "POST", "headers": headers, "data": body}
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
+		try:
+			return make_request(get_test_client().open, args=(), kwargs=kwargs, site=frappe.local.site)
+		finally:
+			frappe.db.rollback()
+
+	def stored(self) -> list:
+		return frappe.get_all(
+			notice.NOTICE, filters={"case_id": ("like", f"{notice.CASE_PREFIX}%")}, fields=["*"]
+		)
+
+	def test_verification_notice_guest_denied(self):
+		# A guest without the provider signature stores nothing and starts no job.
+		with mock.patch("frappe.enqueue") as enqueue:
+			response = self.post(notice.notice_body("e-guest"), None)
+		self.assertEqual(response.status_code, 401, response.data[:300])
+		self.assertEqual(response.json.get("exc_type"), "NoticeSignatureRejected")
+		self.assertEqual(self.stored(), [])
+		enqueue.assert_not_called()
+
+	def test_verification_notice_foreign_data_denied(self):
+		# A signed body cannot set the state, the record name or a user. Only four fields are kept.
+		body = notice.notice_body(
+			"e-foreign", state="applied", name="foreign-name", user="Administrator", owner="Administrator"
+		)
+		with mock.patch("frappe.enqueue"):
+			response = self.post(body, notice.signature(body))
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		rows = self.stored()
+		self.assertEqual(len(rows), 1)
+		self.assertEqual(rows[0].state, "pending")
+		self.assertNotEqual(rows[0].name, "foreign-name")
+		self.assertNotEqual(rows[0].owner, "Administrator")
+		self.assertFalse(frappe.db.exists(notice.NOTICE, "foreign-name"))
