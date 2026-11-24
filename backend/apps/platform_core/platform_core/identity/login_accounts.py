@@ -30,7 +30,8 @@ from platform_core.identity.exceptions import (
 )
 from platform_core.identity.service_client import identity_sync_bearer, invalidate_identity_sync_bearer
 
-# Requests per minute and signed-in user for each of the two methods.
+# Requests per minute for each of the two methods: per signed-in user for the linked accounts,
+# per IP address for the platform list, which guests may call (AJA-516).
 RATE_LIMIT = 30
 PROVIDERS_PATH = "/v1/login-providers"
 LINKED_PATH = "/v1/linked-accounts"

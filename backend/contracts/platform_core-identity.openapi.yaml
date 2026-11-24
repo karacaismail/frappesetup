@@ -669,16 +669,18 @@ paths:
         identity-sync finds the tenant from the token. The list has the general platforms and the platforms of this tenant only.
         A platform without a secret is not in the list. A platform of another tenant is never in the list.
 
-        The method needs a signed-in session. A guest gets 403 and `PermissionError`, not 417.
+        The method needs no session (AJA-516). The sign-in screen calls it before sign-in.
+        A signed-in panel account may call it too. The panel contract says so: G-159, "Uç oturum istemez".
+        The reply names no person. It carries no client secret, no internal address and no provider configuration.
+        The method takes only GET. A POST gets 403 and `PermissionError`.
         The method takes no parameters. A `subject`, a `user` or any other value gets 400 and `InvalidInput`.
         The reply is built from an allow list. Each row has only `alias` and `display_name`.
         The reply carries `Cache-Control: private, no-store`.
         If identity-sync or Keycloak does not answer, the method returns 503 and `IdentityServiceUnavailable`.
         The message carries no secret, no token and no internal address.
-        The limit is 30 requests per minute per signed-in user. The method only reads.
+        The limit is 30 requests per minute per IP address. The method only reads.
       x-yikici: false
-      security:
-        - frappeSession: []
+      security: []
       responses:
         "200":
           description: The platforms this site may show, in the order of identity-sync.
@@ -703,7 +705,7 @@ paths:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "403":
           description: |
-            The request has no session cookie, or identity-sync refused the site. The `exc_type` value is `PermissionError` or `LoginReadForbidden`.
+            The request method is not GET, or identity-sync refused the site. The `exc_type` value is `PermissionError` or `LoginReadForbidden`.
             A cookie of an expired session gets 401, not 403.
           content:
             application/json:
