@@ -195,14 +195,63 @@ class TestLoginReads(FrappeAPITestCase):
 
 	# --- refusals ---
 
-	def test_guest_gets_403_not_417(self):
+	def test_guest_gets_403_not_417_for_linked_accounts(self):
+		"""The linked accounts still need a session (AJA-516)."""
 		fake = self.serve(FakeIdentitySync())
-		for path in (PROVIDERS, LINKED):
-			with self.subTest(path=path):
-				response = h.request(h.new_client().get, path)
-				self.assertEqual(response.status_code, 403)
-				self.assertEqual(response.json["exc_type"], "PermissionError")
+		response = h.request(h.new_client().get, LINKED)
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(response.json["exc_type"], "PermissionError")
 		self.assertEqual(fake.calls, [])
+
+	# --- the sign-in screen reads the platform list without a session (AJA-516) ---
+
+	def test_guest_reads_the_platform_list(self):
+		"""The panel contract G-159 says: "Uç oturum istemez". The board opened it on 24 November 2026."""
+		fake = self.serve(FakeIdentitySync())
+		response = h.request(h.new_client().get, PROVIDERS)
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"], PROVIDER_REPLY)
+		# The site calls with its own service token. A guest request names no person.
+		self.assertEqual(fake.calls, [("GET", SERVICE_URL + "/v1/login-providers", None, BEARER)])
+
+	def test_guest_reply_has_only_the_panel_fields(self):
+		self.serve(FakeIdentitySync({"/v1/login-providers": (200, {"providers": [{**LEAKY_REPLY["providers"][0]}]})}))
+		response = h.request(h.new_client().get, PROVIDERS)
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		message = response.json["message"]
+		self.assertEqual(set(message), {"providers"})
+		self.assertEqual([set(row) for row in message["providers"]], [{"alias", "display_name"}])
+		text = response.data.decode("utf-8")
+		for leak in ("config", "clientSecret", "fixture-secret-value", "userName", "linked", SERVICE_URL, BEARER):
+			self.assertNotIn(leak, text)
+
+	def test_guest_reply_is_not_stored(self):
+		self.serve(FakeIdentitySync())
+		response = h.request(h.new_client().get, PROVIDERS)
+		directives = {part.strip() for part in response.headers.get("Cache-Control", "").split(",")}
+		self.assertIn("no-store", directives)
+
+	def test_guest_post_is_refused(self):
+		fake = self.serve(FakeIdentitySync())
+		response = h.request(h.new_client().post, PROVIDERS)
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(fake.calls, [])
+
+	def test_guest_parameter_is_refused(self):
+		fake = self.serve(FakeIdentitySync())
+		response = h.request(h.new_client().get, PROVIDERS, query_string={"subject": OTHER_SUBJECT})
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json["exc_type"], "InvalidInput")
+		self.assertEqual(fake.calls, [])
+
+	def test_guest_platform_list_is_rate_limited(self):
+		self.serve(FakeIdentitySync())
+		client = h.new_client()
+		statuses = [
+			h.request(client.get, PROVIDERS).status_code for _attempt in range(login_accounts.RATE_LIMIT + 1)
+		]
+		self.assertEqual(statuses[:-1], [200] * login_accounts.RATE_LIMIT)
+		self.assertEqual(statuses[-1], 429)
 
 	def test_subject_or_user_parameter_is_refused(self):
 		fake = self.serve(FakeIdentitySync())
