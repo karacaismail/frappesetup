@@ -18,7 +18,6 @@ from frappe.utils import now_datetime
 from platform_core.identity import enterprise_membership, enterprise_rules, enterprise_sync
 from platform_core.identity.tests import helpers as h
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["User"]
 DOCTYPE = "PLT Enterprise IdP Exception"
 OWNER = "kurulus.sahibi@example.test"
 SECURITY = "guvenlik.sorumlusu@example.test"

@@ -30,7 +30,6 @@ from frappe.utils import get_datetime, get_system_timezone, now_datetime
 from platform_core.identity import enterprise_rules
 from platform_core.identity.enterprise_rules import EnterpriseRuleError
 
-CONTEXT = "platform_core.identity"
 DOCTYPE = "PLT Enterprise IdP Exception"
 APPROVER_ROLE = "System Manager"
 APPROVAL_FIELDS = ("approved_by", "approved_on", "approval_principal")
@@ -91,7 +90,9 @@ def check_or_throw(function, record: dict) -> dict:
 		return function(record)
 	except EnterpriseRuleError as error:
 		frappe.throw(
-			_("The corporate provider exception breaks the rule {0}.", context=CONTEXT).format(error.rule),
+			_(
+				"The corporate provider exception breaks the rule {0}.", context="platform_core.identity"
+			).format(error.rule),
 			frappe.ValidationError,
 		)
 
@@ -131,16 +132,24 @@ def _check_chain(doc) -> None:
 	if current is None:
 		if doc.supersedes:
 			frappe.throw(
-				_("The first record of a provider and organisation supersedes no record.", context=CONTEXT),
+				_(
+					"The first record of a provider and organisation supersedes no record.",
+					context="platform_core.identity",
+				),
 				frappe.ValidationError,
 			)
 	elif doc.supersedes != current.name:
 		frappe.throw(
-			_("This record must supersede the current record {0}.", context=CONTEXT).format(current.name),
+			_("This record must supersede the current record {0}.", context="platform_core.identity").format(
+				current.name
+			),
 			frappe.ValidationError,
 		)
 	if doc.kind == "revocation" and (current is None or current.kind != "grant"):
-		frappe.throw(_("Only a current grant can be revoked.", context=CONTEXT), frappe.ValidationError)
+		frappe.throw(
+			_("Only a current grant can be revoked.", context="platform_core.identity"),
+			frappe.ValidationError,
+		)
 	if doc.kind == "grant":
 		others = {
 			row.organization
@@ -153,7 +162,8 @@ def _check_chain(doc) -> None:
 			if other is not None and other.kind == "grant":
 				frappe.throw(
 					_(
-						"The provider {0} already has an exception for another organisation.", context=CONTEXT
+						"The provider {0} already has an exception for another organisation.",
+						context="platform_core.identity",
 					).format(doc.provider_alias),
 					frappe.ValidationError,
 				)
@@ -164,7 +174,7 @@ def before_insert(doc) -> None:
 	doc.requested_by = frappe.session.user
 	if any(doc.get(field) for field in APPROVAL_FIELDS):
 		frappe.throw(
-			_("Only the approval endpoint fills the approval fields.", context=CONTEXT),
+			_("Only the approval endpoint fills the approval fields.", context="platform_core.identity"),
 			frappe.ValidationError,
 		)
 
@@ -181,13 +191,13 @@ def validate(doc) -> None:
 		frappe.throw(
 			_(
 				"An approved exception record cannot change. Open a new record that supersedes it.",
-				context=CONTEXT,
+				context="platform_core.identity",
 			),
 			frappe.ValidationError,
 		)
 	if not doc.flags.enterprise_approval or _data(doc) != _data(before):
 		frappe.throw(
-			_("Only the approval endpoint fills the approval fields.", context=CONTEXT),
+			_("Only the approval endpoint fills the approval fields.", context="platform_core.identity"),
 			frappe.ValidationError,
 		)
 
@@ -203,7 +213,10 @@ def _data(doc) -> tuple:
 
 def on_trash(doc) -> None:
 	frappe.throw(
-		_("An exception record cannot be deleted. Open a revocation record instead.", context=CONTEXT),
+		_(
+			"An exception record cannot be deleted. Open a revocation record instead.",
+			context="platform_core.identity",
+		),
 		frappe.ValidationError,
 	)
 
@@ -214,7 +227,7 @@ def approve(name: str, *, principal: str):
 	doc = frappe.get_doc(DOCTYPE, name)
 	if doc.kind != "grant" or doc.approved_by:
 		frappe.throw(
-			_("Only a grant record waiting for approval can be approved.", context=CONTEXT),
+			_("Only a grant record waiting for approval can be approved.", context="platform_core.identity"),
 			frappe.ValidationError,
 		)
 	doc.approved_by = frappe.session.user
@@ -265,7 +278,9 @@ def request_principal() -> str:
 def _require_human() -> str:
 	principal = request_principal()
 	if principal != HUMAN_SESSION:
-		raise frappe.PermissionError(_("This action needs a human session.", context=CONTEXT))
+		raise frappe.PermissionError(
+			_("This action needs a human session.", context="platform_core.identity")
+		)
 	return principal
 
 
