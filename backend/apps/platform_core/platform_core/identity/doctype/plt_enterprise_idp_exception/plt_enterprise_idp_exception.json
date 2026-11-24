@@ -1,0 +1,178 @@
+{
+ "actions": [],
+ "autoname": "EIDP-.#####",
+ "creation": "2026-11-24 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "description": "Approved exception for a corporate sign-in provider that does not send the email_verified claim (G-160, security opinion AJA-212). One provider and one organisation per record. A record never changes after approval and is never deleted: a change opens a new record that supersedes the old one, and a revocation record ends the exception. The record holds no secret.",
+ "field_order": [
+  "kind",
+  "provider_alias",
+  "issuer",
+  "organization",
+  "supersedes",
+  "column_break_main",
+  "reason",
+  "provider_document",
+  "expires_on",
+  "section_domains",
+  "allowed_domains",
+  "section_approval",
+  "requested_by",
+  "approved_by",
+  "approval_principal",
+  "approved_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "grant\nrevocation",
+   "default": "grant",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "provider_alias",
+   "fieldtype": "Data",
+   "label": "Provider Alias",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "length": 64,
+   "set_only_once": 1,
+   "description": "The identity provider alias in Keycloak. Lowercase letters, digits and dashes."
+  },
+  {
+   "fieldname": "issuer",
+   "fieldtype": "Data",
+   "label": "Issuer",
+   "length": 1000,
+   "set_only_once": 1,
+   "description": "The provider's own https issuer. A shared issuer such as Microsoft's common is refused. Required for a grant."
+  },
+  {
+   "fieldname": "organization",
+   "fieldtype": "Data",
+   "label": "Organization",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "length": 140,
+   "set_only_once": 1,
+   "description": "The one organisation of this exception. The organisation record does not exist yet, so the field keeps its identifier."
+  },
+  {
+   "fieldname": "supersedes",
+   "fieldtype": "Link",
+   "label": "Supersedes",
+   "options": "PLT Enterprise IdP Exception",
+   "set_only_once": 1,
+   "search_index": 1,
+   "description": "The record this one replaces. Empty only for the first record of a provider and organisation."
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "reqd": 1,
+   "set_only_once": 1,
+   "description": "Why the provider does not send email_verified, or why the exception ends."
+  },
+  {
+   "fieldname": "provider_document",
+   "fieldtype": "Data",
+   "label": "Provider Document",
+   "length": 1000,
+   "set_only_once": 1,
+   "description": "The https address of the provider document. Required for a grant."
+  },
+  {
+   "fieldname": "expires_on",
+   "fieldtype": "Datetime",
+   "label": "Expires On",
+   "set_only_once": 1,
+   "description": "Required for a grant. There is no default: the length is a product decision."
+  },
+  {
+   "fieldname": "section_domains",
+   "fieldtype": "Section Break",
+   "label": "Allowed Domains"
+  },
+  {
+   "fieldname": "allowed_domains",
+   "fieldtype": "Table",
+   "label": "Allowed Domains",
+   "options": "PLT Enterprise IdP Domain"
+  },
+  {
+   "fieldname": "section_approval",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User",
+   "read_only": 1,
+   "description": "Filled with the user who opened the record."
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1,
+   "description": "Filled by the approval endpoint. Never the requester, never an agent."
+  },
+  {
+   "fieldname": "approval_principal",
+   "fieldtype": "Data",
+   "label": "Approval Principal",
+   "read_only": 1,
+   "length": 40,
+   "description": "The identity type of the approval request. Only a human session counts."
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1
+  }
+ ],
+ "in_create": 0,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-24 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Identity",
+ "name": "PLT Enterprise IdP Exception",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "search_fields": "provider_alias,organization",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "provider_alias",
+ "track_changes": 1
+}
