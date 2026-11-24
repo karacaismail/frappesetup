@@ -277,7 +277,11 @@ auth_hooks = [
 
 before_login = "press_tr.press_identity.request_policy.block_native_login"
 on_logout = "press_tr.press_identity.sessions.remove_mapping"
-doc_events = {"User": {"on_update": "press_tr.press_identity.accounts.revoke_disabled_user_keys"}}
+doc_events = {
+	"User": {"on_update": "press_tr.press_identity.accounts.revoke_disabled_user_keys"},
+	# G-49: Press's own key format check never runs, so press_tr checks it on every Site save.
+	"Site": {"validate": "press_tr.backup_keys.validate_site_keys"},
+}
 override_doctype_class = {"Site": "press_tr.site_setup.SetupSite"}
 extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
 

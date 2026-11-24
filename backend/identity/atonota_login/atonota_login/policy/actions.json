@@ -1,0 +1,65 @@
+{
+  "rules": [
+    {"id": "verification-provider", "owner": "product-owner", "value": null, "description": "Which external provider checks documents and faces (G-164)."},
+    {"id": "country-document-rule", "owner": "compliance-owner", "value": null, "description": "Which countries and document types are accepted."},
+    {"id": "proof-lifetimes", "owner": "security-owner", "value": null, "description": "How long a sign-in proof and a verification proof stay valid."},
+    {"id": "retry-limits", "owner": "security-owner", "value": null, "description": "How many verification attempts a person may start."},
+    {"id": "verification-data-region", "owner": "compliance-owner", "value": null, "description": "Where the verification provider may keep data."},
+    {"id": "guest-actions", "owner": "product-owner", "value": null, "description": "Which actions a person may take without signing in."},
+    {"id": "paid-plan-pricing", "owner": "product-owner", "value": null, "description": "Plan, price and unit of the paid AtonotA Login use (G-166, K-61)."}
+  ],
+  "actions": [
+    {
+      "id": "submit-form",
+      "description": "Send a form as a signed-in person.",
+      "controls": [
+        {"id": "identity", "applies": true, "required": true, "evidence": "identity", "rules": []}
+      ]
+    },
+    {
+      "id": "start-trial",
+      "description": "Start a trial site.",
+      "controls": [
+        {"id": "identity", "applies": true, "required": true, "evidence": "identity", "rules": []},
+        {"id": "email-verified", "applies": true, "required": true, "evidence": "email-verified", "rules": []}
+      ]
+    },
+    {
+      "id": "place-order",
+      "description": "Place an order for a tenant.",
+      "controls": [
+        {"id": "identity", "applies": true, "required": true, "evidence": "identity", "rules": []},
+        {"id": "membership", "applies": true, "required": true, "evidence": "membership", "rules": []}
+      ]
+    },
+    {
+      "id": "open-paid-plan",
+      "description": "Open a paid AtonotA Login plan for a customer.",
+      "controls": [
+        {"id": "membership", "applies": true, "required": true, "evidence": "membership", "rules": []},
+        {"id": "pricing", "applies": true, "required": true, "evidence": "pricing-decision", "rules": ["paid-plan-pricing"]}
+      ]
+    },
+    {
+      "id": "identity-verification",
+      "description": "Start a document and face check with the external provider.",
+      "controls": [
+        {"id": "identity", "applies": true, "required": true, "evidence": "identity", "rules": []},
+        {
+          "id": "provider-check",
+          "applies": true,
+          "required": true,
+          "evidence": "provider-result",
+          "rules": ["verification-provider", "country-document-rule", "verification-data-region", "retry-limits", "proof-lifetimes"]
+        }
+      ]
+    },
+    {
+      "id": "guest-action",
+      "description": "Any action a person takes without signing in.",
+      "controls": [
+        {"id": "guest-list", "applies": true, "required": true, "evidence": "guest-allowed", "rules": ["guest-actions"]}
+      ]
+    }
+  ]
+}
