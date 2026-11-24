@@ -100,6 +100,9 @@ Bu bölüm 24 Kasım 2026 Salı günü eklendi. Kaynak güvenlik incelemesidir (
 3. `identity-sync` hesabına yalnız `view-identity-providers` rolü eklendi. Rol yalnız `admin-api kc-admin-api` kapsamlı belirtece girer.
 4. `manage-identity-providers` rolü verilmez. Site servis hesabının rolleri değişmez.
 5. Platform listesi kiracıya göre süzülür. Başka kiracının kurumsal platformu listeye girmez.
+6. Sırrı olmayan platform listeye girmez. Servis bunu `config.clientSecret` alanından anlar. Boş değer ve çözülmemiş `${...}` değeri sır sayılmaz.
+7. Keycloak yönetim yanıtı sırrı `**********` diye gizler. Keycloak boş sırrı da böyle gizleyebilir. Bu durumda asıl denetim platformun açık olmasıdır. Kapalı platform listeye hiç girmez. Bu davranış canlı Keycloak 26 denemesiyle doğrulanmalıdır.
+8. Servis platform listesini 30 saniye tutar. Kapatılan bir platform bu süre boyunca listede kalabilir.
 
 Kalan risk şudur: ele geçirilmiş bir kiracı sitesi kendi üyelerinin bağlı hesaplarını okuyabilir. Site başka kiracının üyelerini okuyamaz. `identity-sync` kişinin kiracı üyesi olup olmadığına bakar. Bu sınır `/v1/sessions/revoke` ucundaki sınırla aynıdır. Güvenlik incelemesi bu riski kabul etti.
 

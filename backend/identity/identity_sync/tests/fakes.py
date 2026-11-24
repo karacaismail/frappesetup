@@ -229,16 +229,16 @@ class FakeKeycloak(FakeServer):
         display_name: str | None = None,
         enabled: bool = True,
         hide_on_login: bool = False,
-        secret: str | None = "**********",
+        stored_value: str | None = "**********",
         organization_id: str | None = None,
     ) -> dict[str, object]:
         """Add a sign-in platform in the shape of the Keycloak 26 Admin API.
 
-        Keycloak masks a stored client secret as `**********`. `secret=None` leaves the secret out.
+        Keycloak masks a stored client secret as `**********`. `stored_value=None` leaves the secret out.
         """
         config: dict[str, object] = {"clientId": f"{alias}-client-id", "syncMode": "IMPORT"}
-        if secret is not None:
-            config["clientSecret"] = secret
+        if stored_value is not None:
+            config["clientSecret"] = stored_value
         row: dict[str, object] = {
             "alias": alias,
             "internalId": f"idp-{alias}",

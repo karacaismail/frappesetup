@@ -26,7 +26,7 @@ from platform_core.identity.exceptions import (
 	IdentityLinkMissing,
 	IdentityServiceUnavailable,
 	InvalidInput,
-	LinkedAccountsForbidden,
+	LoginReadForbidden,
 )
 from platform_core.identity.service_client import identity_sync_bearer, invalidate_identity_sync_bearer
 
@@ -132,9 +132,13 @@ def _call(endpoint: str, method: str, path: str, payload: dict | None) -> object
 	failure = None
 	try:
 		url = _identity_sync_origin() + path
-		bearer = identity_sync_bearer()
 	except _TRANSPORT_ERRORS:
 		failure = "not_configured"
+	if failure is None:
+		try:
+			bearer = identity_sync_bearer()
+		except _TRANSPORT_ERRORS:
+			failure = "token_failed"
 	if failure is not None:
 		raise _unavailable(endpoint, failure)
 	for attempt in range(2):
@@ -149,8 +153,8 @@ def _call(endpoint: str, method: str, path: str, payload: dict | None) -> object
 			frappe.logger("login_reads").info(
 				"identity-sync read refused: endpoint=%s outcome=forbidden", endpoint
 			)
-			raise LinkedAccountsForbidden(
-				_("You cannot read the sign-in accounts on this site.", context="platform_core.identity")
+			raise LoginReadForbidden(
+				_("This sign-in information cannot be read on this site.", context="platform_core.identity")
 			)
 		failure = f"status_{status}"
 		if status != 401 or attempt:

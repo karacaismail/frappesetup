@@ -51,6 +51,11 @@ LEAKY_REPLY = {
 }
 
 
+def clear_sample_links():
+	frappe.db.delete("PLT Identity Link", {"user": ["in", [h.AYSE, h.MEHMET]]})
+	h.refresh()
+
+
 class FakeIdentitySync:
 	"""Stands in for the transport. Records each call and answers like the service."""
 
@@ -76,8 +81,11 @@ class TestLoginReads(FrappeAPITestCase):
 		settings = h.SiteSettings({"mobile_identity_sync_url": SERVICE_URL})
 		settings.__enter__()
 		self.addCleanup(settings.__exit__, None, None, None)
+		clear_sample_links()
 		h.clear_links()
 		self.addCleanup(h.clear_links)
+		# A test moves a link to another issuer. `h.clear_links` keeps such rows, so remove them by user.
+		self.addCleanup(clear_sample_links)
 		provider_setup.ensure_social_login_key()
 		for user in (h.AYSE, h.MEHMET):
 			h.ensure_user(user)
@@ -215,14 +223,14 @@ class TestLoginReads(FrappeAPITestCase):
 		self.serve(FakeIdentitySync({"/v1/linked-accounts": (403, {"error": "forbidden"})}))
 		response = h.request(self.login().get, LINKED)
 		self.assertEqual(response.status_code, 403)
-		self.assertEqual(response.json["exc_type"], "LinkedAccountsForbidden")
+		self.assertEqual(response.json["exc_type"], "LoginReadForbidden")
 
 	def test_refused_site_client_gets_403(self):
 		# Operator, preview and deletion clients get 403 from identity-sync. The method passes it on.
 		self.serve(FakeIdentitySync({"/v1/login-providers": (403, {"error": "forbidden"})}))
 		response = h.request(self.login().get, PROVIDERS)
 		self.assertEqual(response.status_code, 403)
-		self.assertEqual(response.json["exc_type"], "LinkedAccountsForbidden")
+		self.assertEqual(response.json["exc_type"], "LoginReadForbidden")
 
 	def test_service_outage_gives_a_plain_error_without_secrets(self):
 		outages = (
@@ -255,6 +263,15 @@ class TestLoginReads(FrappeAPITestCase):
 							"Traceback",
 						):
 							self.assertNotIn(secret, text)
+
+	def test_outage_writes_no_error_log_row(self):
+		self.serve(FakeIdentitySync(error=OSError("connection refused")))
+		client = self.login()
+		before = frappe.db.count("Error Log")
+		for path in (PROVIDERS, LINKED):
+			self.assertEqual(h.request(client.get, path).status_code, 503)
+		h.refresh()
+		self.assertEqual(frappe.db.count("Error Log"), before)
 
 	def test_rejected_bearer_is_dropped_and_retried_once(self):
 		fake = self.serve(FakeIdentitySync({"/v1/login-providers": (401, {"error": "unauthorized"})}))

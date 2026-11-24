@@ -98,7 +98,7 @@ class IdentityLinkMissing(frappe.PermissionError):
 	http_status_code = 403
 
 
-class LinkedAccountsForbidden(frappe.PermissionError):
+class LoginReadForbidden(frappe.PermissionError):
 	"""identity-sync refused the read. The person is unknown or belongs to another tenant (AJA-459).
 
 	Both cases give the same answer, so the reply does not tell whether a person exists."""
@@ -109,7 +109,9 @@ class LinkedAccountsForbidden(frappe.PermissionError):
 class IdentityServiceUnavailable(frappe.ValidationError):
 	"""identity-sync or Keycloak did not answer, or the answer was not usable (AJA-459).
 
-	The message carries no secret, no token and no internal address."""
+	The message carries no secret, no token and no internal address. An outage is expected:
+	`safe_errors` writes no Error Log row for it, so an outage cannot flood the Error Log."""
 
 	http_status_code = 503
 	skip_error_log = True
+	expected_outage = True

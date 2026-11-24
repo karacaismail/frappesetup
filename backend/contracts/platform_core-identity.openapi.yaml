@@ -703,10 +703,13 @@ paths:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "403":
           description: |
-            The request has no session, or identity-sync refused the site. The `exc_type` value is `PermissionError` or `LinkedAccountsForbidden`.
+            The request has no session cookie, or identity-sync refused the site. The `exc_type` value is `PermissionError` or `LoginReadForbidden`.
+            A cookie of an expired session gets 401, not 403.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
         "429":
           $ref: "#/components/responses/IstekSiniri"
         "503":
@@ -726,7 +729,7 @@ paths:
         The person comes only from the session. The site takes the `keycloak_sub` value of the session.
         The value must match a `PLT Identity Link` record of `frappe.session.user` with the configured issuer.
         If there is no such record, the method makes no call and returns 403 and `IdentityLinkMissing`.
-        identity-sync checks that the person is a member of this tenant. If not, the method returns 403 and `LinkedAccountsForbidden`.
+        identity-sync checks that the person is a member of this tenant. If not, the method returns 403 and `LoginReadForbidden`.
         An unknown person gets the same 403.
 
         The method needs a signed-in session. A guest gets 403 and `PermissionError`, not 417.
@@ -768,10 +771,12 @@ paths:
         "403":
           description: |
             The request has no session, the session has no matching identity link, or the person is not a member of this tenant.
-            The `exc_type` value is `PermissionError`, `IdentityLinkMissing` or `LinkedAccountsForbidden`.
+            The `exc_type` value is `PermissionError`, `IdentityLinkMissing` or `LoginReadForbidden`.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
         "429":
           $ref: "#/components/responses/IstekSiniri"
         "503":

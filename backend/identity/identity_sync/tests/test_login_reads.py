@@ -13,6 +13,10 @@ Only tenant site clients may call. The tenant comes from the token's `azp`, neve
 from __future__ import annotations
 
 import json
+import unittest
+
+from identity_sync import login_reads
+from identity_sync.httpjson import TransportError
 
 from .fakes import ORG_ID, SUBJECT, keycloak_user
 from .test_server import (
@@ -46,7 +50,7 @@ class LoginReadCase(ServerCase):
         kc.add_identity_provider("google", display_name="Google")
         kc.add_identity_provider("facebook", display_name="Facebook", hide_on_login=True)
         kc.add_identity_provider("linkedin", display_name="LinkedIn", enabled=False)
-        kc.add_identity_provider("apple", display_name="Apple", secret=None)
+        kc.add_identity_provider("apple", display_name="Apple", stored_value=None)
         # Enterprise platforms: one for each tenant's organization.
         kc.add_identity_provider("tenant1-sso", display_name="Tenant One SSO", organization_id=ORG_ID)
         kc.add_identity_provider("tenant2-sso", display_name="Tenant Two SSO", organization_id=OTHER_ORG_ID)
@@ -94,8 +98,8 @@ class LoginProvidersTest(LoginReadCase):
     def test_platform_without_a_secret_is_not_listed(self) -> None:
         kc = self.stack.keycloak
         # An empty secret and an unresolved setting placeholder are no secret either.
-        kc.add_identity_provider("github", display_name="GitHub", secret="")
-        kc.add_identity_provider("gitlab", display_name="GitLab", secret="${ATONOTA_GITLAB_CLIENT_SECRET}")
+        kc.add_identity_provider("github", display_name="GitHub", stored_value="")
+        kc.add_identity_provider("gitlab", display_name="GitLab", stored_value="${ATONOTA_GITLAB_CLIENT_SECRET}")
 
         _status, body = self.get_providers()
 
@@ -277,3 +281,54 @@ class LinkedAccountsTest(LoginReadCase):
         self.post_linked()
 
         self.assertEqual(self.keycloak_writes(), [])
+
+
+class CatalogCacheTest(unittest.TestCase):
+    """The platform list is kept for a short time. Nothing else is kept (AJA-459)."""
+
+    def setUp(self) -> None:
+        self.now = 100.0
+        self.loads = 0
+        self.fail = False
+
+    def load(self) -> tuple[login_reads.Platform, ...]:
+        self.loads += 1
+        if self.fail:
+            raise TransportError("unexpected Keycloak response")
+        return (login_reads.Platform("google", "Google"),)
+
+    def cache(self) -> login_reads.CatalogCache:
+        return login_reads.CatalogCache(self.load, seconds=30.0, clock=lambda: self.now)
+
+    def test_a_second_read_within_the_window_does_not_load_again(self) -> None:
+        cache = self.cache()
+        cache.get()
+        self.now += 29.9
+
+        cache.get()
+
+        self.assertEqual(self.loads, 1)
+
+    def test_a_read_after_the_window_loads_again(self) -> None:
+        cache = self.cache()
+        cache.get()
+        self.now += 30.0
+
+        cache.get()
+
+        self.assertEqual(self.loads, 2)
+
+    def test_a_failed_load_is_not_kept(self) -> None:
+        cache = self.cache()
+        self.fail = True
+        with self.assertRaises(TransportError):
+            cache.get()
+        self.fail = False
+
+        self.assertEqual(cache.get(), (login_reads.Platform("google", "Google"),))
+        self.assertEqual(self.loads, 2)
+
+    def test_the_server_keeps_the_list_for_thirty_seconds(self) -> None:
+        from identity_sync import server
+
+        self.assertEqual(server.LOGIN_PROVIDER_CACHE_SECONDS, 30.0)
