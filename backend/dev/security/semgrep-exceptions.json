@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "e61e3cec25cfd699373f419b6fbeedd2cda03b6c71224cbc52d30d9781d466c1",
+      "sha256": "5396f89c3c65ccc0eb3618170c4fcc729b7dc955d75a29067d76fd30e913ab1f",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -229,8 +229,10 @@
       "files": [
         "backend/apps/platform_core/platform_core/access/engine.py",
         "backend/apps/platform_core/platform_core/access/explain.py",
+        "backend/apps/platform_core/platform_core/access/files.py",
         "backend/apps/platform_core/platform_core/access/hooks.py",
         "backend/apps/platform_core/platform_core/access/link_search.py",
+        "backend/apps/platform_core/platform_core/access/realtime.py",
         "backend/apps/platform_core/platform_core/access/reports.py",
         "backend/apps/platform_core/platform_core/access/rules.py",
         "backend/apps/platform_core/platform_core/access/subject.py",
