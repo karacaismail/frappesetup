@@ -17,6 +17,8 @@ from atonota_login import keycloak_apply, platforms
 from atonota_login.keycloak_apply import ApplyError
 
 MASK = "**********"
+# The apply step never reads this value; tests only need the variable to exist.
+UNUSED_BOOTSTRAP_VALUE = "not-used"
 
 
 def record(alias):
@@ -48,7 +50,7 @@ class FakeKeycloak:
             if alias not in self.providers:
                 return 404, None
             shown = copy.deepcopy(self.providers[alias])
-            if "clientSecret" in shown.get("config", {}):
+            if "clientSecret" in (shown.get("config") or {}):
                 shown["config"]["clientSecret"] = MASK
             return 200, shown
         if method == "PUT":
@@ -115,6 +117,18 @@ class ApplyTest(unittest.TestCase):
         self.assertEqual(actions["corporate"], "not-in-registry-unverified-email")
         self.assertEqual(actions["corporate-safe"], "not-in-registry")
 
+    def test_provider_with_null_config_does_not_stop_the_command(self):
+        # Review 2, finding 1: Keycloak may return "config": null. The command must not crash.
+        self.keycloak.providers["closed-one"]["config"] = None
+        self.keycloak.providers["corporate"]["config"] = None
+        report = keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
+        actions = {line["alias"]: line["action"] for line in report}
+        self.assertEqual(actions["closed-one"], "updated")
+        self.assertEqual(actions["corporate"], "not-in-registry-unverified-email")
+        closed = self.keycloak.providers["closed-one"]
+        self.assertFalse(closed["enabled"])
+        self.assertEqual(closed["config"]["clientSecret"], "")
+
     def test_errors_hold_no_secret(self):
         def failing(method, path, payload=None):
             return (404, None) if method == "GET" else (500, None)
@@ -179,6 +193,46 @@ class CommandTest(unittest.TestCase):
         for name in ("alpha", "beta", "rc", "prod", "all"):
             with self.subTest(name=name):
                 self.assertEqual(self.run_command("redirects", "--env", name)[0], 0)
+
+    def write_local_http_registry(self, folder):
+        local = record("local-oidc")
+        local["config"]["tokenUrl"] = "http://localhost/token"
+        (Path(folder) / "local-oidc.json").write_text(json.dumps(local), encoding="utf-8")
+
+    def test_registry_with_local_http_is_refused_without_the_development_switch(self):
+        # Review 2, finding 2: the realm file and the platform list reach every environment.
+        with tempfile.TemporaryDirectory() as folder:
+            self.write_local_http_registry(folder)
+            self.assertNotEqual(self.run_command("--platforms-dir", folder, "render", "--check")[0], 0)
+            self.assertNotEqual(self.run_command("--platforms-dir", folder, "redirects", "--env", "prod")[0], 0)
+
+    def test_development_switch_only_for_apply_to_a_local_keycloak(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.write_local_http_registry(folder)
+            for arguments in (("render", "--check"), ("redirects", "--env", "prod")):
+                with self.subTest(arguments=arguments):
+                    code, _ = self.run_command("--platforms-dir", folder, "--allow-local-http", *arguments)
+                    self.assertNotEqual(code, 0)
+            remote = {"KC_PUBLIC_URL": "https://api.login.atonota.net", "KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
+                      "KC_BOOTSTRAP_ADMIN_PASSWORD": UNUSED_BOOTSTRAP_VALUE}
+            with mock.patch.dict("os.environ", remote), \
+                    mock.patch.object(keycloak_apply, "admin_caller") as caller:
+                code, _ = self.run_command("--platforms-dir", folder, "--allow-local-http", "apply", "--from-env",
+                                           "--remote-host", "api.login.atonota.net")
+            self.assertNotEqual(code, 0)
+            caller.assert_not_called()
+
+    def test_development_switch_lets_apply_reach_a_local_keycloak(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.write_local_http_registry(folder)
+            local = {"KC_PUBLIC_URL": "http://identity.localhost:5280", "KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
+                     "KC_BOOTSTRAP_ADMIN_PASSWORD": UNUSED_BOOTSTRAP_VALUE}
+            loopback = [(2, 1, 6, "", ("127.0.0.1", 0))]
+            with mock.patch.dict("os.environ", local), mock.patch("socket.getaddrinfo", return_value=loopback), \
+                    mock.patch.object(keycloak_apply, "admin_caller", return_value=FakeKeycloak([])):
+                code, output = self.run_command("--platforms-dir", folder, "--allow-local-http", "apply", "--from-env")
+            self.assertEqual(code, 0)
+            self.assertIn("local-oidc: created, closed", output)
 
     def test_public_url_accepts_only_a_local_address(self):
         self.assertNotEqual(self.run_command("redirects", "--public-url", "https://evil.example")[0], 0)
