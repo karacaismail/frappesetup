@@ -13,14 +13,17 @@ RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git app
     && uv pip check --python env/bin/python \
     && printf '\nhrms\n' >> sites/apps.txt
 COPY --chown=1000:0 libs/oidc_verify /tmp/oidc_verify
+# AtonotA Login decision code (G-161). Frappe imports the package; the code is not copied into the app.
+COPY --chown=1000:0 identity/atonota_login /tmp/atonota_login
 COPY --chown=1000:0 apps/platform_core /home/frappe/frappe-bench/apps/platform_core
 COPY --chown=1000:0 apps/hrms_tr /home/frappe/frappe-bench/apps/hrms_tr
 COPY --chown=1000:0 contracts/platform_core-ai.openapi.yaml contracts/platform_core-identity.openapi.yaml contracts/platform_core-access.openapi.yaml /home/frappe/frappe-bench/contracts/
 COPY --chown=1000:0 contracts/platform_core-model-gateway.openapi.yaml /home/frappe/frappe-bench/apps/platform_core/contracts/
 RUN uv pip install --python env/bin/python --no-deps -e apps/platform_core \
     && uv pip install --python env/bin/python --no-deps /tmp/oidc_verify \
+    && uv pip install --python env/bin/python --no-deps /tmp/atonota_login \
     && uv pip install --python env/bin/python --no-deps -e apps/hrms_tr \
     && uv pip check --python env/bin/python \
-    && rm -rf /tmp/oidc_verify \
+    && rm -rf /tmp/oidc_verify /tmp/atonota_login \
     && printf '\nplatform_core\nhrms_tr\n' >> sites/apps.txt \
     && bench build --apps hrms,platform_core,hrms_tr

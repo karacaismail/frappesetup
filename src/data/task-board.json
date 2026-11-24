@@ -24,14 +24,27 @@
   ]
  },
  "update": {
-  "date": "2026-11-23",
-  "commit": "e44fba2f",
-  "release": null,
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı.",
+  "date": "2026-11-24",
+  "commit": "18a9fff8",
+  "release": {
+   "pr": 23,
+   "commit": "22e70ad7"
+  },
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23 ile yayımlanan ürün birleşmesidir. İşlem kararının Frappe ucu backend dalındaki e7130aaa birleşmesindedir. Bu uç henüz yayımlanmadı ve canlıda denenmedi. Bu kalemlerin hiçbiri bitti sayılmadı. Kurumsal sağlayıcı ve gerçek platform hesapları henüz yoktur.",
   "reviewed": [
    "G-155",
    "G-156",
-   "G-158"
+   "G-157",
+   "G-158",
+   "G-159",
+   "G-160",
+   "G-161",
+   "G-162",
+   "G-163",
+   "G-164",
+   "G-165",
+   "G-166",
+   "G-167"
   ]
  },
  "statuses": [
@@ -1341,7 +1354,7 @@
   },
   "G-157": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-158": {
@@ -1351,47 +1364,47 @@
   },
   "G-159": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-160": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "enterprise"
   },
   "G-161": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-162": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-163": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-164": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-165": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "not-started",
    "level": "post-mvp"
   },
   "G-166": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-167": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   }
  }

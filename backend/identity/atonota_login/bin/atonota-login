@@ -5,6 +5,8 @@
   atonota-login render --check          exit 1 when the realm file differs from the registry
   atonota-login render --write          rewrite only the realm file's identityProviders array
   atonota-login apply --from-env        open or close platforms on a running Keycloak
+  atonota-login --allow-local-http apply --from-env
+                                        development only: records may use http to a local name
   atonota-login redirects --env alpha   print each platform's return address for an environment
   atonota-login redirects --public-url http://identity.localhost:5280
 
@@ -52,6 +54,9 @@ def apply(arguments, registry):
             print(f"Set {name}.", file=sys.stderr)
             return 2
     url = keycloak_apply.checked_keycloak_url(environment["KC_PUBLIC_URL"], arguments.remote_host)
+    if arguments.allow_local_http and not platforms.LOCAL_HOST.fullmatch(urllib.parse.urlsplit(url).hostname or ""):
+        print("--allow-local-http works only with a local development Keycloak.", file=sys.stderr)
+        return 2
     call = keycloak_apply.admin_caller(
         url, environment["KC_BOOTSTRAP_ADMIN_USERNAME"], environment["KC_BOOTSTRAP_ADMIN_PASSWORD"]
     )
@@ -92,6 +97,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="atonota-login", description="AtonotA Login platform tools.")
     parser.add_argument("--platforms-dir", type=Path, default=platforms.REGISTRY_DIR,
                         help="Folder of platform records. Default: the product's platforms folder.")
+    parser.add_argument("--allow-local-http", action="store_true",
+                        help="Development only, with apply to a local Keycloak: records may use http to a local name.")
     commands = parser.add_subparsers(dest="command", required=True)
     render_parser = commands.add_parser("render", help="Compare or rewrite the realm file's platforms.")
     group = render_parser.add_mutually_exclusive_group(required=True)
@@ -106,8 +113,12 @@ def main(argv=None):
     target.add_argument("--public-url", help="A local development Keycloak address.")
     redirect_parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args(argv)
+    if arguments.allow_local_http and arguments.command != "apply":
+        # The realm file and the return addresses reach every environment (review 2, finding 2).
+        print("--allow-local-http works only with apply.", file=sys.stderr)
+        return 2
     try:
-        registry = platforms.load_platforms(arguments.platforms_dir)
+        registry = platforms.load_platforms(arguments.platforms_dir, allow_local_http=arguments.allow_local_http)
         handler = {"render": render, "apply": apply, "redirects": redirects}[arguments.command]
         return handler(arguments, registry)
     except (platforms.RegistryError, keycloak_apply.ApplyError) as error:
