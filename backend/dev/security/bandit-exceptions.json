@@ -2146,7 +2146,7 @@
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
     "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.identity.login_policy.reset_password\",",
-    "statementSha256": "3b643a2d6e2ef91f0640a3a4b86289344db01f8d1adecab77a6edefa266a7b90",
+    "statementSha256": "2c86c3634252a0b111e65bfbdfee090147a64c7fc2b0e746714c489d1d5614f2",
     "owner": "platform-core-kimlik",
     "reason": "This hook maps dotted method names and stores no credential.",
     "ignoreUntil": "2027-02-22"
@@ -2155,7 +2155,7 @@
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
     "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.identity.login_policy.update_password\",",
-    "statementSha256": "3b643a2d6e2ef91f0640a3a4b86289344db01f8d1adecab77a6edefa266a7b90",
+    "statementSha256": "2c86c3634252a0b111e65bfbdfee090147a64c7fc2b0e746714c489d1d5614f2",
     "owner": "platform-core-kimlik",
     "reason": "This hook maps dotted method names and stores no credential.",
     "ignoreUntil": "2027-02-22"
@@ -2164,7 +2164,7 @@
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
     "code": "\"frappe.www.login.login_via_token\": \"platform_core.identity.login_policy.login_via_token\",",
-    "statementSha256": "3b643a2d6e2ef91f0640a3a4b86289344db01f8d1adecab77a6edefa266a7b90",
+    "statementSha256": "2c86c3634252a0b111e65bfbdfee090147a64c7fc2b0e746714c489d1d5614f2",
     "owner": "platform-core-kimlik",
     "reason": "This hook maps dotted method names and stores no credential.",
     "ignoreUntil": "2027-02-22"
