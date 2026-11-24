@@ -436,8 +436,9 @@ class MagicLinkLiveTest(unittest.TestCase):
         _, current = _magic_link_config(admin_token())
         self.assertEqual(_put_magic_link_config(self.config_id, current, **{
             SOURCE_REQUEST_LIMIT_KEY: str(LOWERED_SOURCE_REQUEST_LIMIT)}), 204)
-        # A fresh /64 block, so the slots of an earlier run do not count.
+        # Fresh /64 blocks, so the slots of earlier tests and runs do not count at the lowered ceiling.
         source = f"2001:db8:{uuid.uuid4().hex[:4]}:{uuid.uuid4().hex[:4]}::1"
+        other_source = f"2001:db8:{uuid.uuid4().hex[:4]}:{uuid.uuid4().hex[:4]}::1"
         owner = self._rate_user()
         self.mailpit.clear()
         answers = set()
@@ -445,7 +446,7 @@ class MagicLinkLiveTest(unittest.TestCase):
             self._send_from(f"kimse-{uuid.uuid4().hex[:8]}@example.test", source, 1, answers)
         self._send_from(owner, source, 1, answers)
         self.assertEqual(self._wait_for_mails(owner, 1), 0, "the source ceiling must stop the 6th request")
-        self._send_from(owner, OWNER_SOURCE, 1, answers)
+        self._send_from(owner, other_source, 1, answers)
         self.assertEqual(self._wait_for_mails(owner, 1), 1, "another source must still get the mail")
         self.assertEqual(len(answers), 1, "the answer changed at the source ceiling")
 

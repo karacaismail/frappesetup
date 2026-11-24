@@ -516,3 +516,54 @@ Değişmeyecek dosyalar şunlardır: `backend/identity/keycloak/Dockerfile`, `ba
 - IPv6 önkoşulu bitene kadar IPv6 saldırganı tek kaynak sayılmaz. O zamana kadar bu koruma yalnız IPv4 için çalışır.
 - Aynı ağı paylaşan kişiler tek kaynak sayılır. Örneğin bir ofis tek IPv4 adresiyle çıkabilir. Bu kişiler kaynak tavanını paylaşır. Tavan 20 istek olarak bu yüzden geniş seçildi.
 - Kümede sayaç ve bekleyen iş sayısı düğüme göre değişebilir. Çok düğümlü kurulumda sınırlar yeniden sınanır.
+
+### Uygulama ve kanıt (24 Kasım 2026 Salı günü, AJA-440)
+
+Geliştirici bu bölümdeki kararı `pc/g162-ip-limit` dalında uyguladı. Düşen testler ayrı commit'tedir. Bu commit `1f673217` olur.
+
+#### IP bilgisi nereden okunur
+
+1. Caddy isteği alır. Caddy `X-Forwarded-For` başlığını kendi gördüğü adresle yazar.
+2. Keycloak bu başlığa güvenir. Bunu `KC_PROXY_HEADERS: xforwarded` ayarı sağlar.
+3. Eklenti adresi `context.getConnection().getRemoteAddr()` ile okur.
+
+Güvenilen tek başlık `X-Forwarded-For` başlığıdır. Bu güven iki koşula dayanır:
+
+- Keycloak'ın dışarıya açık portu yoktur. Keycloak'a yalnız Caddy ulaşır.
+- Caddy, istemcinin gönderdiği başlığı kullanmaz. Depoda `trusted_proxies` ayarı yoktur.
+
+`backend/deploy/tests/test_client_address.py` testi bu iki koşulu denetler. Biri bozulursa test düşer.
+
+Yerel Keycloak da aynı ayarla çalışır. Yerel port yalnız `127.0.0.1` adresini dinler. Bu yüzden başlığı yalnız yerel testler gönderebilir.
+
+#### Kodda değişenler
+
+- `MagicLinkSendLimiter.java` kaynak payını, kaynak tavanını ve kuyruk tavanını sayar.
+- Aynı dosya kaynağı bulur. Kaynak bir IPv4 adresi ya da bir IPv6 adresinin ilk 64 bitidir.
+- Özel ağ adresleri kaynak sayılmaz. Bu adreslerin listesi "Geçersiz kaynak" bölümündedir.
+- Kod yalnız yazılı IP adresini okur. Kod bir ad için DNS sorgusu yapmaz.
+- `AbstractMagicLinkAuthenticator.java` kaynağı arka plan işine verir.
+- Arka plan işi önce kaynak tavanını, sonra kaynak payını, en son adres sınırını dener.
+- Bekleyen iş sayısı 1000'e ulaşırsa sistem yeni işi kuyruğa koymaz.
+- Realm dosyasına üç ayar eklendi: `2`, `20` ve `1000`.
+
+Kaynak payı adres sınırından küçük tutulur. Örneğin yönetici payı 3 yaparsa kod payı 2'ye indirir. Böylece bir kaynak bir adresin bütün hakkını hiçbir ayarda alamaz.
+
+#### Testler
+
+Yeni canlı testler şunlardır:
+
+1. `test_one_source_cannot_use_up_another_persons_mails`
+2. `test_one_ipv6_block_counts_as_one_source`
+3. `test_two_sources_still_get_at_most_three_mails`
+4. `test_source_request_ceiling_counts_unknown_addresses`
+5. `test_private_source_gets_no_source_limit`
+6. `test_upper_case_address_and_username_share_the_address_limit`
+
+Eski kodda 1, 2 ve 4 numaralı testler düştü. Öbür testler eski kodda da geçti. Yeni kodda hepsi geçti.
+
+2 numaralı test bu nota sonradan eklendi. Test, aynı IPv6 /64 bloğundaki üç adresin tek kaynak sayıldığını denetler.
+
+Testler açık IP adresiyle istek gönderir. Yerel realm açık adresten HTTPS ister. Yerel Keycloak ise düz HTTP ile çalışır. Bu yüzden her test realm'in `sslRequired` ayarını geçici olarak `none` yapar. Test bitince eski değer geri yazılır.
+
+Kuyruk tavanı canlı denenmedi. Bu durum `not_run` olarak kalır. Gerçek SMTP ile deneme yapılmadı. IPv6 önkoşulu canlı sunucuda doğrulanmadı.
