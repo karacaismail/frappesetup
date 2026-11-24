@@ -27,8 +27,13 @@ LOCK_WAIT="${PW_APT_LOCK_WAIT_SECONDS:-60}"
 # `sudo` komutu ayrı bir oturumda (pty) çalıştırır; içteki `apt-get` grupta değildi.
 # Süre dolunca `apt-get` çalışmayı sürdürdü ve dpkg kilidini tuttu. Sonraki denemeler
 # "Could not get lock /var/lib/dpkg/lock-frontend" hatasıyla hemen düştü.
-# Bu yüzden süre dolunca apt ve dpkg süreçleri adlarıyla da durdurulur.
-APT_PROC_PATTERN='^(/usr/bin/)?(apt-get|apt|dpkg)( |$)|^/usr/lib/apt/methods/'
+# AJA-389: süreçler adla durdurulmaz. Ad deseni betiğin başlatmadığı apt işlerini de
+# durdururdu. Süre dolunca betik yalnız kendi başlattığı komutun süreç ağacını durdurur.
+# Ağaç üst süreç kimliğinden (ppid) bulunur; ayrı oturumdaki `apt-get` de ağaçtadır.
+# Kilit beklemesi apt süreçlerini yalnız tam adla arar ve yalnız bekler.
+APT_PROC_NAMES='apt-get|apt|dpkg'
+# `dpkg --configure -a` komutunun süre sınırı.
+DPKG_CONFIGURE_SECONDS="${PW_DPKG_CONFIGURE_SECONDS:-120}"
 APT_LOCK_FILES="/var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock"
 
 # Ağ yavaşsa beklemek yerine zaman aşımı ve yeniden deneme; indirilen paketler silinmesin.
@@ -75,7 +80,19 @@ undo_cache_copy() {
   done
   COPIED=()
   # Yarım kalan dpkg işi varsa tamamlanır; ağdan kurulum temiz durumdan başlar.
-  sudo dpkg --configure -a || true
+  configure_dpkg
+}
+
+# Yarım kalan dpkg işini süre sınırıyla tamamlar. dpkg hatası yutulur; sonraki
+# kurulum sorunu yeniden gösterir. Süre dolarsa açık hata yazar ve 1 döner.
+configure_dpkg() {
+  local rc=0
+  run_with_deadline "$DPKG_CONFIGURE_SECONDS" sudo dpkg --configure -a || rc=$?
+  if [ "$rc" -eq 124 ]; then
+    echo "dpkg --configure -a ${DPKG_CONFIGURE_SECONDS} sn içinde bitmedi; komut durduruldu" >&2
+    return 1
+  fi
+  return 0
 }
 
 # Ayna listesindeki ilk aynayı sona alır. Yavaş ama yanıt veren ayna apt'ye hata
@@ -98,9 +115,36 @@ demote_first_mirror() {
   rm -f "$tmp"
 }
 
-# Komutu kendi süreç grubunda çalıştırır. Süre dolunca grubu durdurur ve 124 döner.
+# Verilen süreçleri ve onların bütün alt süreçlerini yazar (ppid ağacı).
+process_tree() {
+  ps -A -o pid= -o ppid= | awk -v roots="$*" '
+    BEGIN { n = split(roots, r, " "); for (i = 1; i <= n; i++) keep[r[i]] = 1 }
+    { pid[++m] = $1; parent[$1] = $2 }
+    END {
+      do {
+        changed = 0
+        for (i = 1; i <= m; i++) {
+          p = pid[i]
+          if (!(p in keep) && (parent[p] in keep)) { keep[p] = 1; changed = 1 }
+        }
+      } while (changed)
+      for (p in keep) print p
+    }'
+}
+
+# Listedeki süreçlerden yaşayan var mı?
+any_alive() {
+  local p
+  for p in "$@"; do
+    kill -0 "$p" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# Komutu kendi süreç grubunda çalıştırır. Süre dolunca yalnız bu komutun süreç
+# ağacını durdurur ve 124 döner. `sudo` alt süreci ayrı oturumda da olsa ağaçtadır.
 run_with_deadline() {
-  local secs="$1" pid rc=0 start
+  local secs="$1" pid rc=0 start tree
   shift
   set -m
   "$@" &
@@ -109,11 +153,22 @@ run_with_deadline() {
   start=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
     if ((SECONDS - start >= secs)); then
-      kill -TERM -- "-$pid" 2>/dev/null || true
+      # Ağaç TERM'den önce okunur: üst süreç ölünce alt süreç ondan kopar.
+      tree=$(process_tree "$pid")
+      # shellcheck disable=SC2086
+      sudo kill -TERM -- "-$pid" $tree 2>/dev/null || true
       start=$SECONDS
-      while kill -0 "$pid" 2>/dev/null && ((SECONDS - start < KILL_AFTER)); do sleep 1; done
-      kill -KILL -- "-$pid" 2>/dev/null || true
+      # shellcheck disable=SC2086
+      while any_alive $tree && ((SECONDS - start < KILL_AFTER)); do sleep 1; done
+      # TERM sırasında doğan alt süreçler de ağaca eklenir.
+      # shellcheck disable=SC2086
+      tree=$(process_tree $tree)
+      # shellcheck disable=SC2086
+      sudo kill -KILL -- "-$pid" $tree 2>/dev/null || true
       wait "$pid" 2>/dev/null || true
+      start=$SECONDS
+      # shellcheck disable=SC2086
+      while any_alive $tree && ((SECONDS - start < KILL_AFTER)); do sleep 1; done
       return 124
     fi
     sleep 1
@@ -122,21 +177,10 @@ run_with_deadline() {
   return "$rc"
 }
 
-# Süreç grubunun dışında kalan apt ve dpkg süreçlerini durdurur.
-stop_apt_processes() {
-  local start
-  sudo pkill -TERM -f "$APT_PROC_PATTERN" 2>/dev/null || true
-  start=$SECONDS
-  while pgrep -f "$APT_PROC_PATTERN" >/dev/null 2>&1 && ((SECONDS - start < KILL_AFTER)); do
-    sleep 1
-  done
-  sudo pkill -KILL -f "$APT_PROC_PATTERN" 2>/dev/null || true
-}
-
 # apt ya da dpkg çalışıyorsa veya bir apt kilidi tutuluyorsa başarılı döner.
 apt_busy() {
   local f
-  pgrep -f "$APT_PROC_PATTERN" >/dev/null 2>&1 && return 0
+  pgrep -x -- "$APT_PROC_NAMES" >/dev/null 2>&1 && return 0
   command -v fuser >/dev/null 2>&1 || return 1
   for f in $APT_LOCK_FILES; do
     if [ -e "$f" ] && sudo fuser "$f" >/dev/null 2>&1; then
@@ -166,14 +210,13 @@ install_from_network() {
     run_with_deadline "$NET_ATTEMPT_SECONDS" npx playwright install-deps "${BROWSERS[@]}" || rc=$?
     [ "$rc" -eq 0 ] && break
     echo "ağ denemesi $attempt başarısız (çıkış kodu $rc)"
-    stop_apt_processes
     if ((attempt == NET_ATTEMPTS)); then
       echo "apt paketleri $NET_ATTEMPTS denemede kurulamadı" >&2
       return "$rc"
     fi
     wait_for_apt_lock || return 1
     # Yarım kalan kurulum varsa tamamlanır; yeni deneme temiz durumdan başlar.
-    sudo dpkg --configure -a || true
+    configure_dpkg || return 1
     demote_first_mirror
   done
   after=$(mktemp)

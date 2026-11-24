@@ -104,6 +104,7 @@ class NetworkAttemptTimeout(unittest.TestCase):
             "PYTHON": PYTHON,
             "PW_APT_KILL_AFTER_SECONDS": "2",
             "PW_APT_LOCK_WAIT_SECONDS": str(lock_wait),
+            "PW_DPKG_CONFIGURE_SECONDS": "2",
         }
         script = self.work / "harness.sh"
         script.write_text(harness)
@@ -137,6 +138,52 @@ class NetworkAttemptTimeout(unittest.TestCase):
         out = proc.stdout + proc.stderr
         self.assertNotEqual(proc.returncode, 0, out)
         self.assertEqual((self.work / "calls").read_text().strip(), "1", out)
+        self.assertLess(elapsed, 60, out)
+
+    def test_timeout_leaves_foreign_apt_processes_alone(self):
+        # An apt-get process in its own session that the script did not start.
+        bystander = textwrap.dedent(
+            """\
+            "$PYTHON" -c 'import os; os.setsid(); os.execv("/bin/sleep", ["apt-get", "300"])' \\
+              </dev/null >/dev/null 2>&1 &
+            echo $! > "$WORK/pid.bystander"
+            # The lock wait is tested separately; here the lock is free at once.
+            apt_busy() { return 1; }
+            """
+        )
+        proc, elapsed = self.run_loop(extra=bystander)
+        out = proc.stdout + proc.stderr
+        self.assertEqual(proc.returncode, 0, out)
+        pids = self.pids()
+        self.assertEqual(set(pids), {"pid.apt", "pid.group", "pid.bystander"}, out)
+        # The script's own processes stopped; the foreign one still runs.
+        self.assertFalse(alive(pids["pid.apt"]), out)
+        self.assertFalse(alive(pids["pid.group"]), out)
+        self.assertTrue(alive(pids["pid.bystander"]), out)
+        # No process is stopped by a name pattern.
+        log = (self.work / "sudo.log").read_text()
+        self.assertNotIn("pkill", log, out)
+        self.assertLess(elapsed, 60, out)
+
+    def test_dpkg_configure_has_a_time_limit(self):
+        # `dpkg --configure -a` hangs: the loop must stop it and fail with a clear error.
+        hang = textwrap.dedent(
+            """\
+            sudo() {
+              echo "sudo $*" >> "$WORK/sudo.log"
+              case "$1" in
+                dpkg) sleep 300 ;;
+                tee) return 0 ;;
+                *) "$@" ;;
+              esac
+            }
+            """
+        )
+        proc, elapsed = self.run_loop(extra=hang)
+        out = proc.stdout + proc.stderr
+        self.assertNotEqual(proc.returncode, 0, out)
+        self.assertEqual((self.work / "calls").read_text().strip(), "1", out)
+        self.assertIn("dpkg --configure -a 2 sn içinde bitmedi", proc.stderr, out)
         self.assertLess(elapsed, 60, out)
 
 

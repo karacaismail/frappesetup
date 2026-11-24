@@ -235,7 +235,7 @@ Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcı
 
 ## Tanıtım sayfası
 
-Ürünün bir tanıtım sayfası olur. Sayfa bu işte yapılmadı. Sayfanın içeriği ve kuralları aşağıdadır (G-165).
+Ürünün bir tanıtım sayfası olur (G-165). Sayfanın taslağı [AtonotA Login tanıtımı](/frappesetup/atonota-login-tanitim/) sayfasındadır. Ürün sahibi taslağı henüz onaylamadı. Sayfanın kuralları aşağıdadır.
 
 Sayfa şu değer önerilerini anlatır. Her öneri, yeteneği kurulunca tanıtım sayfasına girer:
 
@@ -308,11 +308,11 @@ Kararın gerekçesi şudur:
 
 ## Bugünkü durum
 
-Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundaki durumlarla aynıdır. Hiçbir kalem "Bitti" değildir. Yerel testler geçti. Ama her kalemde kalan bir iş vardır.
+Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundaki durumlarla aynıdır. Yalnız G-157 "Bitti" durumundadır. Bu kalemin testi yalnız yerel yığında geçti. Öteki kalemlerin yerel testleri geçti. Ama her birinde kalan bir iş vardır.
 
 | Kimlik | Durum | Kalan iş |
 | --- | --- | --- |
-| G-157 | Sürüyor | Giriş ekranı, e-posta ve hata sayfalarındaki ad ekranda denenmedi. |
+| G-157 | Bitti | Kanıt `test_product_boundary.py` ve `brand.spec.ts` dosyalarıdır. Ad canlı sunucuda denenmedi. |
 | G-158 | Sürüyor | DNS kaydı ve canlı adres denemesi dış iştir. |
 | G-159 | Sürüyor | Gerçek platform hesapları açılmadı. Facebook ve X kapalıdır. |
 | G-160 | Sürüyor | İstisna kaydı ve `apply` denetimi PR 27 ile yayımlandı. Yerel testler geçti. Bu iş canlıda denenmedi. DNS sorgusu ve rolü veren üyelik kodu yoktur. Üyelik kanıtı şimdilik masaüstü rolünden okunur. Masaüstü rolü, Frappe yönetim ekranını açan roldür. |
@@ -320,7 +320,7 @@ Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundak
 | G-162 | Sürüyor | Bağlantı tek kullanımlıktır. Aynı yanıt ve ekranda onay denenmedi. |
 | G-163 | Sürüyor | İkinci adım vardır. Kurtarma, cihaz ve çıkış kapsamı yoktur. |
 | G-164 | Sürüyor | Bildirim ucu Frappe'de vardır. Uç yerel testlerden geçti. Sağlayıcı seçilmediği için uç her bildirimi geri çevirir. Doğrulamayı başlatan kod yoktur. Uç canlı sunucuda denenmedi. |
-| G-165 | Başlamadı | Tanıtım sayfası yapılmadı. |
+| G-165 | Sürüyor | [Tanıtım sayfası](/frappesetup/atonota-login-tanitim/) yazıldı. Ürün sahibi metni onaylamadı. |
 | G-166 | Sürüyor | Fiyat kararı açıktır. Frappe'deki kapı `open_paid_plan` ucudur. Fiyat kuralı boş olduğu için kapı kapalıdır. |
 | G-167 | Sürüyor | Kural boşsa Frappe bir görev açar. Görev "System Manager" rolüne açılır. Kural sahibinin adı görevin metnindedir. Bu kod `decision_api.py` dosyasındadır. Kod canlı sunucuda denenmedi. Kural sahipleri değerleri henüz girmedi. |
 
