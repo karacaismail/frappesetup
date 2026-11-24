@@ -37,7 +37,9 @@ PRESS = APPS / "press_tr/press_tr"
 
 # Callers. "guest" has no session: a browser before sign-in, or a provider with a signed body.
 # "closed" is a Frappe local sign-in wrapper: guest by Frappe, refused by the Keycloak-only gate.
-GUEST, CLOSED, PANEL, ADMIN, SERVICE = "guest", "closed", "panel", "admin", "service"
+# "public" is called by the sign-in screen before sign-in and also by a signed-in panel account,
+# so it is a guest method and it is on the Website User list too (AJA-516).
+GUEST, CLOSED, PANEL, ADMIN, SERVICE, PUBLIC = "guest", "closed", "panel", "admin", "service", "public"
 
 LOCAL_SIGN_IN_WRAPPERS = (
     "reset_password",
@@ -66,7 +68,8 @@ EXPECTED = {
     "platform_core.api.auth.logout": PANEL,
     "platform_core.api.auth.get_csrf_token": PANEL,
     "platform_core.api.auth.setup_keycloak_login": ADMIN,
-    "platform_core.api.auth.list_login_providers": PANEL,
+    # The sign-in screen reads the platform list before sign-in (AJA-516, panel contract G-159).
+    "platform_core.api.auth.list_login_providers": PUBLIC,
     "platform_core.api.auth.list_linked_accounts": PANEL,
     # Keycloak's logout notice. The signed logout token authorizes it.
     "platform_core.api.keycloak_backchannel_logout": GUEST,
@@ -98,11 +101,8 @@ EXPECTED = {
 }
 
 # Methods that other open branches add. The test checks them once they are in the tree.
-# AJA-459 (paperclip/aja-457-login-okuma) owns these methods.
-PENDING = {
-    "platform_core.api.auth.list_login_providers": "AJA-459",
-    "platform_core.api.auth.list_linked_accounts": "AJA-459",
-}
+# The two AtonotA Login reads of AJA-459 are in the tree now, so the list is empty.
+PENDING: dict[str, str] = {}
 
 # Where AtonotA Login methods live. A new file in these places is scanned too.
 SCANNED = (
@@ -284,7 +284,7 @@ class LoginMethodAllowListTests(unittest.TestCase):
             if caller is None:
                 continue
             with self.subTest(method=method):
-                self.assertEqual(guest, caller in (GUEST, CLOSED), f"{method} is {caller}")
+                self.assertEqual(guest, caller in (GUEST, CLOSED, PUBLIC), f"{method} is {caller}")
 
     def test_tenant_panel_methods_are_on_the_website_user_list(self):
         allowed = website_user_methods()
@@ -292,7 +292,7 @@ class LoginMethodAllowListTests(unittest.TestCase):
             if not method.startswith("platform_core."):
                 continue
             with self.subTest(method=method):
-                if EXPECTED.get(method) == PANEL:
+                if EXPECTED.get(method) in (PANEL, PUBLIC):
                     self.assertIn(method, allowed)
                 else:
                     self.assertNotIn(method, allowed)
