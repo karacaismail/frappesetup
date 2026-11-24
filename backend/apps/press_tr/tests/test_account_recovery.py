@@ -93,6 +93,62 @@ class RecoveryRequestTest(unittest.TestCase):
 		framework.get_doc.assert_not_called()
 
 
+class RecoveryRequestQueueTest(unittest.TestCase):
+	# AJA-505: the account lookup ran inside the request. An address with an account took
+	# more queries than one without, so the answer time showed who has an account.
+	def setUp(self):
+		from press_tr.press_identity import recovery
+
+		self.recovery = recovery
+
+	def test_request_does_the_same_work_for_every_address(self):
+		calls = []
+		for user, link, email in (
+			("customer@example.test", "link-1", "customer@example.test"),
+			("customer@example.test", None, "customer@example.test"),
+			(None, None, "nobody@example.test"),
+		):
+			with self.subTest(email=email, link=link):
+				framework = _framework(user=user, link=link)
+				with patch.object(self.recovery, "frappe", framework):
+					self.recovery.request_review(f"  {email} ")
+				# The request itself never looks up the account and never writes a record.
+				framework.db.get_value.assert_not_called()
+				framework.db.exists.assert_not_called()
+				framework.get_doc.assert_not_called()
+				framework.enqueue.assert_called_once()
+				calls.append(framework.enqueue.call_args)
+		job = calls[0]
+		self.assertEqual(job.args, ("press_tr.press_identity.recovery.open_review",))
+		self.assertEqual(job.kwargs["email"], "customer@example.test")
+		self.assertEqual(calls[1], calls[0])
+		self.assertEqual(
+			{key: value for key, value in calls[2].kwargs.items() if key != "email"},
+			{key: value for key, value in job.kwargs.items() if key != "email"},
+		)
+
+	def test_request_does_not_queue_an_unbounded_address(self):
+		framework = _framework()
+		with patch.object(self.recovery, "frappe", framework):
+			self.recovery.request_review("a" * 10_000 + "@example.test")
+		queued = framework.enqueue.call_args.kwargs["email"]
+		# The stored job stays small, and the background job still rejects the long address.
+		self.assertEqual(len(queued), self.recovery.MAX_EMAIL_LENGTH + 1)
+
+	def test_recovery_route_queues_the_request(self):
+		tree = ast.parse((APP / "api/account.py").read_text(encoding="utf-8"))
+		route = next(
+			node
+			for node in ast.walk(tree)
+			if isinstance(node, ast.FunctionDef) and node.name == "request_recovery"
+		)
+		called = {
+			node.func.id for node in ast.walk(route) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+		}
+		self.assertIn("request_review", called)
+		self.assertNotIn("open_review", called)
+
+
 class RecoveryDecisionTest(unittest.TestCase):
 	def setUp(self):
 		from press_tr.press_identity import recovery
