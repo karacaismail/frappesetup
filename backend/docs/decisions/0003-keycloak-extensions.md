@@ -248,6 +248,25 @@ Bu yolla iki adreste yanıt aynı işi yapar. Veritabanı kaydı ve e-posta yan�
 - Komut şöyle çalıştırılır: `PANE_PORT=<boş port> COMPOSE_PROJECT_NAME=<ayrı ad> bin/kc-dev.sh test`.
 - Gerçek SMTP ile süre denenmedi. Yerel ortam Mailpit kullanır. Gerçek SMTP ile de farkın yanıt süresine girmemesi beklenir. Bunun nedeni gönderimin arka planda olmasıdır.
 
+### Uygulama ve kanıt (24 Kasım 2026 Salı günü, AJA-373)
+
+Claude 02 ajanı tasarımı `pc/g162-rate-limit` dalında uyguladı. Düşen testler `5c3236b4` commit'indedir. Kod, bu bölümü taşıyan commit'tedir.
+
+Tasarımdan iki sapma var:
+
+1. Onuncu bir dosya değişti. Dosya `AbstractMagicLinkAuthenticatorFactory.java` şeklindedir. Keycloak, tanımlanmamış ayarı yönetim arayüzünde yıldızla gizler. Gizli değer geri yazılınca eski değer kalır. Bu yüzden iki ayar fabrikada tanımlandı. Ayarlar yönetim konsolunda da görünür.
+2. Sıklık testi örnek kullanıcı dosyasını kullanmaz. Test her koşuda yeni bir adres açar. Koşu bitince adresi siler. Sabit adresin yuvaları 15 dakika dolu kalır. Testler bu sürede yeniden koşarsa sabit adrese e-posta gitmez. Bu yüzden `platform-users-0.json` dosyası değişmedi.
+
+E-posta gönderimi, yuva sayımı ve kayıt arka plan işindedir. Her yuva kendi işleminde denenir. Böylece JPA deposu da aynı anda gelen iki isteğin birini reddeder.
+
+Canlı kanıt yerel Keycloak 26.8.2 ve Mailpit ile alındı:
+
+- `bin/kc-dev.sh test -p test_magic_link.py` komutu 19 testi geçti. Yeni testler `test_send_rate_is_limited_per_address`, `test_existing_and_unknown_address_take_the_same_time`, `test_send_limit_is_three_mails_in_fifteen_minutes` ve `test_image_builds_the_fork_files_over_the_pinned_source` şeklindedir.
+- `bin/kc-dev.sh test` komutu 244 testi koştu. Hepsi geçti. 20 test ortam eksikliği yüzünden atlandı. Eksikler `PROD_KC_URL` ve ayrı MCP realm'idir.
+- `bin/kc-dev.sh prod-check` komutu 8 testi geçti.
+
+Testte bilinen bir sınır var. `fresh_totp_code` kullanılan kodları yalnız bir koşu içinde hatırlar. İki koşu 30 saniye içinde art arda yapılırsa `test_link_does_not_skip_totp` düşebilir. Bu davranış bu işten önce de vardı.
+
 ## Kurulum
 
 - `backend/identity/keycloak/Dockerfile` Apple jar dosyasını ve derlenen sihirli bağlantı jar dosyasını `/opt/keycloak/providers/` klasörüne ekler. Özetler sabittir.
