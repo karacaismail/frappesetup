@@ -43,13 +43,15 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | `site-tenant1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
-| `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | Yok |
+| `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `account-console` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | Realm dosyasındaki Keycloak hesap sayfaları | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
 - Keycloak hesap ekranı kendi belirtecini kullanır. Bu belirtecin hedefi `account` olur.
 - `account-console` yalnız kullanıcıya verilmiş hesap rollerini taşır. İstemci yönetim rolü alamaz.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
+- `mobile-app` istemcisi de çıkış bildirimi alır. Bu sayede telefon oturumu hemen kapanır. Telefon erişim anahtarının süresini beklemez (G-163).
+- Keycloak bir istemciye tek çıkış adresi verir. Bu adres `site-tenant1` sitesidir. Yeni kiracının telefon oturumu bu bildirimi almaz. O oturum en çok 300 saniye daha açık kalır.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
 - Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. Kiracının iki istemcisi içinde `aud-identity-sync` kapsamını yalnız servis istemcisi isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
 - `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.

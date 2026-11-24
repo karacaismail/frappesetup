@@ -71,7 +71,8 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "Keycloak session ID",
-   "length": 140
+   "length": 140,
+   "search_index": 1
   },
   {
    "description": "The Keycloak user identifier bound to this session.",
@@ -106,7 +107,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-22 14:34:54.626328",
+ "modified": "2026-11-24 10:30:00.000000",
  "modified_by": "Administrator",
  "module": "Mobile",
  "name": "PLT Mobile Installation",

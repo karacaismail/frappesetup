@@ -1059,6 +1059,9 @@
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",
+        "backchannel.logout.url": "${ATONOTA_SITE_TENANT1_URL}/api/method/platform_core.api.keycloak_backchannel_logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
         "post.logout.redirect.uris": "${ATONOTA_MOBILE_REDIRECT_URI}",
         "client.session.idle.timeout": "3600",
         "client.session.max.lifespan": "86400",
@@ -1722,7 +1725,10 @@
       "config": {
         "magickey.validity.duration": "300",
         "magiclink.send.limit": "3",
-        "magiclink.send.window.seconds": "900"
+        "magiclink.send.window.seconds": "900",
+        "magiclink.send.source.share": "2",
+        "magiclink.request.source.limit": "20",
+        "magiclink.send.queue.max": "1000"
       }
     },
     {
