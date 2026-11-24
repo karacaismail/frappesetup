@@ -21,6 +21,7 @@ import subprocess
 import time
 import unittest
 import urllib.parse
+import uuid
 
 from test_extensions import AKIS, _open, _cookie_opener, _form_action, _follow_keycloak_redirect
 from test_second_factor import TOTP_USER, fresh_totp_code
@@ -36,8 +37,9 @@ PINNED_COMMIT = "7b4ee949a39a7ee953987162479ae1da2c57c3cb"
 PLAIN_USER = "ayse.ornek@example.test"
 OTHER_USER = "mehmet.ornek@example.test"
 UNKNOWN_USER = "kimse.yok@example.test"
-# Used only by the send limit test, so no other test fills its slots (decision note 0003, G-162 section).
-RATE_USER = "siklik.ornek@example.test"
+# The send limit test makes a new address on every run. Slots stay taken for 15 minutes, so a fixed
+# address would get no mail when the suite runs again within that time.
+RATE_USER_PREFIX = "siklik-"
 # Product owner decision (AJA-353): at most 3 mails to one address in 15 minutes.
 SEND_LIMIT = 3
 SEND_WINDOW_SECONDS = 900
@@ -193,6 +195,15 @@ class MagicLinkLiveTest(unittest.TestCase):
         self.assertEqual(status, 200)
         return opener, self.mailpit.latest_link(email)
 
+    def _new_user(self, email: str) -> str:
+        """Creates a user without a password for one test and deletes it afterwards."""
+        body = {"username": email, "email": email, "emailVerified": True, "enabled": True,
+                "firstName": "Sıklık", "lastName": "Örnek"}
+        self.assertEqual(admin("/users", admin_token(), "POST", body).status, 201)
+        user_id = admin(f"/users?email={urllib.parse.quote(email)}&exact=true", admin_token()).json()[0]["id"]
+        self.addCleanup(lambda: admin(f"/users/{user_id}", admin_token(), "DELETE"))
+        return email
+
     def _mail_count(self, recipient: str) -> int:
         messages = request("GET", f"{self.mailpit.base}/api/v1/messages").json().get("messages", [])
         return sum(1 for m in messages if any(a.get("Address") == recipient for a in m.get("To", [])))
@@ -285,13 +296,15 @@ class MagicLinkLiveTest(unittest.TestCase):
         _, raised = _magic_link_config(admin_token())
         self.assertEqual(_put_magic_link_config(self.config_id, raised, **{SEND_LIMIT_KEY: str(SEND_LIMIT)}), 204)
         self.addCleanup(lambda: admin(f"/authentication/config/{self.config_id}", admin_token(), "PUT", raised))
+        rate_user = self._new_user(f"{RATE_USER_PREFIX}{uuid.uuid4().hex[:12]}@example.test")
         self.mailpit.clear()
         answers = set()
         for _ in range(SEND_ATTEMPTS):
-            _, status, html, _ = self._submit_email(RATE_USER)
+            _, status, html, _ = self._submit_email(rate_user)
+            self.assertNotIn(rate_user, html)
             answers.add((status, _without_session_values(html)))
         time.sleep(3)
-        sent = self._mail_count(RATE_USER)
+        sent = self._mail_count(rate_user)
         self.assertEqual(sent, SEND_LIMIT, f"{sent} mails for {SEND_ATTEMPTS} requests, expected exactly {SEND_LIMIT}")
         # Over the limit the person sees the same answer as before.
         self.assertEqual(len(answers), 1, "the answer changed after the send limit")
