@@ -84,7 +84,7 @@ class PlanSetTest(unittest.TestCase):
 		for plan in self.plans.PLANS:
 			with self.subTest(plan=plan["name"]):
 				self.assertEqual(set(plan["limits"]), set(self.plans.LIMIT_FIELDS))
-				self.assertTrue(all(value is None for value in plan["limits"].values()))
+				self.assertTrue(all(limit is None for limit in plan["limits"].values()))
 				self.assertEqual(self.plans.missing_limits(plan), list(self.plans.LIMIT_FIELDS))
 		warnings = self.plans.sync_plans()
 		self.assertEqual(len(warnings), len(self.plans.PLANS))

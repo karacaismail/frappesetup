@@ -107,7 +107,7 @@ def sync_plans():
 	"""Create missing plans and point Press at our trial plan. Return the limit warnings."""
 	for plan in PLANS:
 		if not frappe.db.exists("Site Plan", plan["name"]):
-			frappe.get_doc(_site_plan(plan)).insert(set_name=plan["name"], ignore_permissions=True)
+			frappe.get_doc(_site_plan(plan)).insert(set_name=plan["name"])
 	# The G-8 cleanup closes the Press trial plans, so Press must use ours.
 	frappe.db.set_single_value(*TRIAL_SETTING, plan_names(trial=True)[0])
 	warnings = limit_warnings()

@@ -27,20 +27,20 @@ MONTHS = (
 WEEKDAYS = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar")
 
 
-def turkish_date(value: date) -> str:
+def turkish_date(day: date) -> str:
 	"""Write a date as "23 Aralık 2026 Çarşamba"."""
-	return f"{value.day} {MONTHS[value.month - 1]} {value.year} {WEEKDAYS[value.weekday()]}"
+	return f"{day.day} {MONTHS[day.month - 1]} {day.year} {WEEKDAYS[day.weekday()]}"
 
 
-def turkish_amount(value: Decimal) -> str:
+def turkish_amount(amount: Decimal) -> str:
 	"""Write an amount as "1.250,00"."""
-	return f"{value:,.2f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+	return f"{amount:,.2f}".replace(",", " ").replace(".", ",").replace(" ", ".")
 
 
-def parse_price(value: str) -> Decimal:
-	if not isinstance(value, str) or not PRICE_PATTERN.fullmatch(value):
+def parse_price(text: str) -> Decimal:
+	if not isinstance(text, str) or not PRICE_PATTERN.fullmatch(text):
 		frappe.throw(frappe._("Enter a price with at most two decimal places.", context="press_tr"))
-	return Decimal(value)
+	return Decimal(text)
 
 
 def reject_price_edit(doc, method=None):
