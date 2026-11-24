@@ -15,7 +15,7 @@ Dağıtım denetimi üç ayarı denetler: `developer_mode`, `server_script_enabl
 
 ### Açık maddeler
 
-1. Ayrı bench planının koşulu ve fiyatı ürün sahibinin kararıdır. Bu madde C durumundadır. Karar gelince `docs/decisions/` altına karar dosyası yazılır.
+1. Ayrı bench koşulu 24 Kasım 2026 Salı günü karara bağlandı. Kural [`docs/decisions/0020-dedicated-bench.md`](../decisions/0020-dedicated-bench.md) dosyasındadır. Ayrı bench iki koşulda verilir. Kiracı Kurumsal plandadır ya da özel uygulaması vardır. Fiyat bu kararda yoktur.
 2. `platform_core/tests/test_development_access.py` ve `test_schema_source.py` gerçek Frappe ister. Bu testler `bin/test` ile ayrı test sitesinde koşar. Testler bu dalda koşulmadı.
 3. API yüzeyinin izin listesiyle daraltılması G-143 işidir. G-40 bu işi yapmaz.
 
@@ -29,13 +29,13 @@ Yazılan değerler şunlardır:
 - ERPNext kuruluysa Global Defaults içinde ülke ve para birimi yazılır. TRY para birimi etkinleşir.
 - Kod `default_company` değerine dokunmaz. Bu değeri kurulum sihirbazı yazar.
 
-### Açık maddeler
+### Kararlar
 
-Bu üç madde C durumundadır. Değerleri ürün sahibi verir. Değer gelmeden kod bu alanları yazmaz.
+Üç madde 24 Kasım 2026 Salı günü karara bağlandı. Artık açık madde yoktur.
 
-1. `rounding_method` değeri seçilmedi. Frappe üç değer sunar: "Banker's Rounding (legacy)", "Banker's Rounding" ve "Commercial Rounding".
-2. Marka adı onaylanmadı. Bu ad System Settings içindeki `app_name` alanına yazılacak. Kiracı ayarında `identity_brand_name` adlı bir değer zaten var.
-3. Accounts, Selling ve Buying için Türkiye değerleri yazılmadı.
+1. `rounding_method` değeri "Commercial Rounding" oldu. Yarım değer yukarı yuvarlanır. Değer `turkey_setup.py` içindeki `SYSTEM_SETTINGS` sözlüğündedir.
+2. Marka adı `identity_brand_name` ayarından gelir. Kod bu değeri System Settings içindeki `app_name` alanına yazar. Ayar boşsa kod `app_name` alanına dokunmaz.
+3. Accounts, Selling ve Buying ayarları ERPNext varsayılanında kalır. Kod bu ayarlara yazmaz. Türkiye'ye özel değer ayrı bir gereksinimle gelir.
 
 ### Gerçek sitede deneme
 
