@@ -25,12 +25,12 @@
  },
  "update": {
   "date": "2026-11-24",
-  "commit": "5b755eb5",
+  "commit": "065bf90c",
   "release": {
-   "pr": 25,
-   "commit": "262e1dae"
+   "pr": 27,
+   "commit": "ec669626"
   },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23 ve PR 25 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı backend dalındaki 43f13477 birleşmesindedir. Bu birleşme henüz yayımlanmadı. G-160 bu yüzden sürüyor. Bu kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur.",
   "reviewed": [
    "G-155",
    "G-156",
