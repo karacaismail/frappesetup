@@ -25,12 +25,12 @@
  },
  "update": {
   "date": "2026-11-24",
-  "commit": "065bf90c",
+  "commit": "8faecc6e",
   "release": {
-   "pr": 27,
-   "commit": "ec669626"
+   "pr": 34,
+   "commit": "2c1d3d6a"
   },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-163 de 24 Kasım 2026 Salı günü 8faecc6e birleşmesine göre okundu. Bu birleşme çıkış ekranına kapsam seçimini ekledi. Kullanıcı bu oturumu, başka bir oturumu ya da bütün cihazları seçer. Bütün cihazlardan çıkışta telefon oturumu da hemen kapanır. Kanıt backend/apps/press_tr/tests/test_logout_scope.py ve backend/apps/platform_core/platform_core/mobile/tests/test_sessions.py dosyalarıdır. Bu birleşme PR 34 ile yayımlandı ama canlıda denenmedi. Güçlü giriş ve hesap kurtarma parçaları da bitmedi. Bu yüzden G-163 sürüyor.",
   "reviewed": [
    "G-155",
    "G-156",

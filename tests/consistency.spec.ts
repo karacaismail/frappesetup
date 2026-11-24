@@ -255,6 +255,22 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('task board update note names a test file from its own merge', () => {
+    // Güncelleme notu kanıtını adıyla gösterir: notta en az bir test dosyası yolu geçer (AJA-464).
+    // Notta geçen her dosya yolu depoda vardır. Commit yerelde varsa test dosyası o birleşmede değişmiştir.
+    const u: TaskBoard['update'] = JSON.parse(read('src/data/task-board.json')).update;
+    const paths = [...u.note.matchAll(/(?:[\w.-]+\/)+[\w.-]+\.(?:py|ts|tsx|mjs|js|json|ftl|yaml)\b/g)].map((m) => m[0]);
+    expect(paths.filter((p) => !existsSync(new URL(p, root))), 'notta adı geçen ama depoda olmayan dosya').toEqual([]);
+    const tests = paths.filter((p) => /(^|\/)tests?\/|\.spec\.ts$|(^|\/)test_[\w-]+\.py$/.test(p));
+    expect(tests.length, 'update.note en az bir test dosyasını adıyla anar').toBeGreaterThan(0);
+    if (hasCommit(u.commit)) {
+      const parents = git('rev-list', '--parents', '-n', '1', u.commit).split(' ');
+      const base = parents.length > 1 ? parents[1] : `${u.commit}^`;
+      const changed = new Set(git('diff', '--name-only', base, u.commit).split('\n'));
+      expect(tests.filter((p) => changed.has(p)).length, `notta ${u.commit} birleşmesinde değişen test dosyası`).toBeGreaterThan(0);
+    }
+  });
+
   test('fabricated evidence commits fail in full history', () => {
     // Uydurma commit kodu tam geçmişte geçmez (inceleme r2-1, E-1). release null olsa da geçmez.
     // Sığ kopyada geçmiş yoktur; orada bu denetim koşamaz.
