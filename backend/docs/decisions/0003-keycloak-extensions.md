@@ -106,6 +106,19 @@ Bu bölüm 24 Kasım 2026 Salı günü eklendi. Kaynak güvenlik incelemesidir (
 
 Kalan risk şudur: ele geçirilmiş bir kiracı sitesi kendi üyelerinin bağlı hesaplarını okuyabilir. Site başka kiracının üyelerini okuyamaz. `identity-sync` kişinin kiracı üyesi olup olmadığına bakar. Bu sınır `/v1/sessions/revoke` ucundaki sınırla aynıdır. Güvenlik incelemesi bu riski kabul etti.
 
+Panel hesabı Frappe'de “Website User” türündedir. Frappe bu hesaba yalnız izin listesindeki yöntemleri açar. İki okuma yöntemi `platform_core/hooks.py` içindeki `website_user_allowed_methods` listesine eklendi. Yöntemler kişiyi yalnız oturumdan alır. `subject` ve `user` parametrelerini reddeder.
+
+#### Yerel yığında servis belirteci
+
+Bu karar 24 Kasım 2026 Salı günü yazıldı.
+
+1. Kiracı sitesi servis belirtecini Keycloak'tan HTTPS ile alır. Kod HTTP adresini her ortamda reddeder. Geliştirme bayrakları açıkken de reddeder. `test_keycloak_requires_https_even_with_both_development_flags` testi bu kuralı korur.
+2. Bu kural gevşetilmedi. Üretimde HTTP kabul eden yeni bir ayar eklenmedi.
+3. Yerel yığında Keycloak HTTP kullanır. Bu yüzden iki okuma ucu yerel yığında 503 verir. Telefon oturumu kapatma ucu da aynı nedenle yerelde çalışmaz.
+4. Yerel çözüm, birleştirme önizlemesindeki HTTPS aktarıcısıdır: `e2e/preview/session-tls.sh`. Aktarıcı `identity-sync` kapsayıcısında çalışır. Keycloak belirteç ucunu 9444 portunda, `identity-sync` uçlarını 9443 portunda HTTPS ile sunar.
+5. Aktarıcı yalnız adı yazılı yolları geçirir. İki okuma ucu bu listeye eklendi.
+6. Gerekçe şudur: belirteç bir sırla alınır. Sırrın düz HTTP ile gitmesine kod izin vermemelidir. Yerel kolaylık için üretim kodunda istisna açılmaz.
+
 ### Olay dinleyici eklentisi (sözleşme 26a274c, Proje kaydı A-10)
 
 İhtiyaç: Keycloak kullanıcı ve yönetim olaylarını `identity_sync` servisinin `/v1/events` ucuna imzalı göndersin. İmza biçimi identity-sync sözleşmesindedir (`contracts/identity_sync.openapi.yaml`, `webhookSignature`): başlık `X-Identity-Sync-Signature: sha256=<onaltılık özet>`, başlık `X-Identity-Sync-Timestamp` (Unix saniye), HMAC-SHA256 anahtarı `IDENTITY_SYNC_WEBHOOK_SECRET`, imzalanan içerik `<zaman damgası>.<kip>.<ham gövde>`, kip `execute` ya da `preview`. Servis zaman damgasını 300 saniye payla denetler ve aynı imzayı bir kez kabul eder.
