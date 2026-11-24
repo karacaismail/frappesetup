@@ -108,6 +108,25 @@ class TestLoginReads(FrappeAPITestCase):
 		self.addCleanup(transport.stop)
 		return fake
 
+	# --- the panel account may call both methods ---
+
+	def test_panel_users_may_call_both_reads(self):
+		"""The panel account is a Website User. Frappe refuses every method outside this list with 403."""
+		allowed = set(frappe.get_hooks("website_user_allowed_methods"))
+		for method in ("list_login_providers", "list_linked_accounts"):
+			with self.subTest(method=method):
+				self.assertIn("platform_core.api.auth." + method, allowed)
+
+	def test_website_user_reads_the_platform_list(self):
+		"""The real panel account type: a Website User signs in and gets 200, not 403."""
+		self.serve(FakeIdentitySync())
+		client = self.login()
+		self.assertEqual(frappe.db.get_value("User", h.AYSE, "user_type"), "Website User")
+		for path in (PROVIDERS, LINKED):
+			with self.subTest(path=path):
+				response = h.request(client.get, path)
+				self.assertEqual(response.status_code, 200, response.data[:300])
+
 	# --- the signed-in user gets the panel's reply shape ---
 
 	def test_signed_in_user_reads_the_platform_list(self):
