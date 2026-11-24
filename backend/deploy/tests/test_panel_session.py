@@ -7,8 +7,13 @@ The chain is browser -> Caddy (https) -> nginx in the frontend container -> guni
 nginx forwards X-Forwarded-Proto: https. gunicorn honours that header only from the addresses in
 forwarded_allow_ips; the default is 127.0.0.1 and ::1. nginx runs in another container, so
 without the option the scheme stays http and "sid" leaves without Secure.
-Trusting every sender is safe only while no one but nginx reaches gunicorn: the web services
-publish no port, and nginx writes the header itself.
+Trusting every sender does not mean only nginx reaches gunicorn. Every container on the
+"internal" network reaches tenant-web:8000. The containers on "press-internal" reach
+press-web:8000, and identity-sync reaches it over "press-identity". nginx does not write the header
+itself either: the map in the image's nginx template passes an incoming "https" value on unchanged.
+The real boundary has two parts. The web services publish no port, so no outside client reaches
+gunicorn directly. Caddy is the only public entry, and it has no trusted_proxies setting, so it
+drops the client's X-Forwarded-Proto and writes its own scheme (test_edge_replaces_the_forwarded_scheme).
 """
 
 import re
@@ -49,7 +54,7 @@ class PanelSessionCookieTest(unittest.TestCase):
                 self.assertIn("--forwarded-allow-ips=*", args)
                 self.assertEqual(args[-1], "frappe.app:application")
 
-    def test_only_nginx_reaches_gunicorn(self):
+    def test_web_services_publish_no_port(self):
         for name in WEB_SERVICES:
             with self.subTest(service=name):
                 block = service(self.stack, name)
@@ -58,6 +63,16 @@ class PanelSessionCookieTest(unittest.TestCase):
         for name, backend in FRONTENDS.items():
             with self.subTest(service=name):
                 self.assertIn(f"BACKEND: {backend}", service(self.stack, name))
+
+    def test_edge_replaces_the_forwarded_scheme(self):
+        # Caddy trusts no proxy, so it removes the client's X-Forwarded-Proto and sends its own
+        # scheme. trusted_proxies or a header_up line for the scheme would let an outside client
+        # choose the scheme that gunicorn trusts.
+        for name in ("Caddyfile", "site.caddy.template"):
+            text = (DEPLOY / "compose" / name).read_text(encoding="utf-8")
+            with self.subTest(file=name):
+                self.assertNotRegex(text, r"(?im)^\s*trusted_proxies\b")
+                self.assertNotRegex(text, r"(?im)^\s*header_up\s+[+-]?X-Forwarded-Proto\b")
 
     def test_realtime_comes_from_the_same_origin(self):
         # socket.io sits behind the nginx of the same host (location /socket.io in the image's
