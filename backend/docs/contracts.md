@@ -285,6 +285,7 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.auth.get_login_url` | POST | Misafir, istek sınırlı | Keycloak giriş adresini üretir. |
 | `press_tr.api.auth.keycloak_callback` | GET | Misafir, `state` ve kod | Kodu belirteçle değiştirir. Kullanıcıyı `(iss, sub)` ile bulur. Takım yoksa açar (G-12). |
 | `press_tr.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Press oturumlarını kapatır. |
+| `press_tr.api.account.request_recovery` | POST | Misafir, yalnız e-posta adresi | Bağlı hesap varsa bir kurtarma inceleme kaydı açar. Saatte 5 istek sınırı vardır. Her adrese aynı yanıtı verir (G-163). |
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
 | `press_tr.api.identity.anonymize_user` | POST | Servis belirteci, `azp=identity-sync` | Press kullanıcısını kapatır, API anahtarlarını geçersiz kılar ve kişiyi gösteren alanları anonim yapar. Fatura gibi iş kayıtları silinmez. |
@@ -327,7 +328,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
-- Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.
+- Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`, `press_tr.api.account.request_recovery`. Kurtarma isteği listededir, çünkü anahtarını kaybeden kişi giriş yapamaz. Bu yöntemin sıklık sınırı vardır ve her adrese aynı yanıtı verir (G-163). Öteki bütün yöntemler misafire 403 döner.
 - Denetim yöntemin adına değil, çağrılan işleve uygulanır. Böylece başka modülün içe aktardığı aynı işlev de kapanır. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi aynı denetimden geçer.
 - Takım üyeliği yalnız Keycloak kuruluşundan gelir. Press'in kendi takım davet ve davet kabul uçları kapanır.
 - G-12'deki yerel giriş, kayıt, parola, tek kullanımlık kodla giriş ve bağlantıyla giriş uçları her çağırana kapalıdır. Misafir de, oturum açmış kullanıcı da 403 alır. Denetim işlev nesnesiyle yapılır.

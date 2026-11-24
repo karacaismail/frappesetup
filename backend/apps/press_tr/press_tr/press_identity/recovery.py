@@ -41,10 +41,22 @@ FIELDS = ("identity_link", "status", "requested_at", "review_note", "reviewed_by
 FIXED_WHILE_OPEN = ("identity_link", "requested_at", "reviewed_by", "reviewed_at")
 
 
+DATETIME_FIELDS = ("requested_at", "reviewed_at")
+
+
 def _value(record, field):
-	# Stored datetimes and API strings compare by their text form.
+	# The database gives a datetime. An API client may send the same moment as
+	# "2026-11-20 10:00:00" or as "2026-11-20T10:00:00", so dates compare by value.
 	value = getattr(record, field, None)
-	return "" if value is None else str(value)
+	if value is None or value == "":
+		return None
+	if field in DATETIME_FIELDS:
+		try:
+			return frappe.utils.get_datetime(value)
+		except (TypeError, ValueError, OverflowError):
+			# An unreadable date never matches a stored one.
+			return str(value)
+	return str(value)
 
 
 def _changed(doc, previous, fields):
