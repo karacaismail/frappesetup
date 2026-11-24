@@ -19,6 +19,7 @@ EXPECTED = {
 	"first_day_of_the_week": "Monday",
 	"float_precision": "2",
 	"currency_precision": "2",
+	"rounding_method": "Commercial Rounding",
 }
 
 
@@ -39,6 +40,9 @@ class TestTurkeySetup(IntegrationTestCase):
 				self.assertEqual(str(settings.get(field)), value)
 				self.assertEqual(frappe.db.get_default(field), value)
 		self.assertEqual(frappe.db.get_default("lang"), "tr")
+		brand = (frappe.conf.get("identity_brand_name") or "").strip()
+		if brand:
+			self.assertEqual(settings.app_name, brand)
 		if "erpnext" in frappe.get_installed_apps():
 			self.assertEqual(frappe.db.get_single_value("Global Defaults", "country"), "Türkiye")
 			self.assertEqual(frappe.db.get_single_value("Global Defaults", "default_currency"), "TRY")
