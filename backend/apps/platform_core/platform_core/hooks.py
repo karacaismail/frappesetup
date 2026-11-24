@@ -47,6 +47,8 @@ override_whitelisted_methods = {
 	"frappe.desk.search.search_widget": "platform_core.access.link_search.search_widget",
 	# Link validation hands a search function from the request to the same search.
 	"frappe.client.validate_link_and_fetch": "platform_core.access.link_search.validate_link_and_fetch",
+	# The realtime room check. The list room is closed to a user whom an access rule narrows (G-121).
+	"frappe.realtime.has_permission": "platform_core.access.realtime.has_permission",
 }
 
 # Identity: Frappe idle timeout of 1 hour (O-25, identity/session_policy.py).

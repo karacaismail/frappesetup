@@ -667,6 +667,8 @@ paths:
                   message:
                     type: boolean
                     const: true
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
             Guest request without permission, no permission on the record, or a list room on a

@@ -7,7 +7,7 @@ In Frappe 16, access is denied if the `has_permission` hook returns `None`
 
 import frappe
 
-from platform_core.access import engine, reports, rules
+from platform_core.access import engine, files, reports, rules
 
 
 def has_permission(doc, ptype: str | None = None, user: str | None = None, debug: bool = False) -> bool:
@@ -30,4 +30,7 @@ def query_conditions(user: str | None = None, doctype: str | None = None):
 	user = user or frappe.session.user
 	if user == "Administrator" or not doctype:
 		return None
+	if doctype == files.FILE:
+		# An attachment of a governed record is listed only if the record passes the list rule (G-121).
+		return files.list_criterion(user)
 	return engine.list_criterion(doctype, user)
