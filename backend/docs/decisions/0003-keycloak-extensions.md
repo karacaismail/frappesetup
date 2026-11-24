@@ -404,13 +404,13 @@ Seçilen yol gerçek istemci adresine dayanır. Depoda iki kanıt var:
 
 Bir açık var. `site.caddy.template` dosyası bunu yazar: "a public IPv6 client can reach Caddy from the Docker gateway address." Yani IPv6 ile gelen kişiyi Caddy, Docker ağ geçidi adresinden görür. Bu adres özel ağdadır. Bu yüzden sistem IPv6 kişileri için yalnız adres sınırını uygular. Saldırgan IPv6 kullanırsa Ayşe'yi yine engelleyebilir.
 
-Bu açığı kapatmak altyapı işidir. İş Hüseyin Cengiz'e aittir. PO bu işi açar. Önerilen teknik yol şudur:
+Bu açığı kapatmak altyapı işidir. İş DevOps sorumlusuna aittir. PO bu işi açar. Önerilen teknik yol şudur:
 
 1. Docker'da IPv6 açılır. Caddy'nin ağı IPv6 adresi alır.
 2. Docker'ın `userland-proxy` aracı kapatılır. Böylece kaynak adres korunur.
-3. Bu iki adım olmazsa Caddy `network_mode: host` ile çalışır. Seçimi Hüseyin Cengiz yapar.
+3. Bu iki adım olmazsa Caddy `network_mode: host` ile çalışır. Seçimi DevOps sorumlusu yapar.
 
-Hüseyin Cengiz sonucu şöyle doğrular: IPv6 ile bir istek gönderilir. Caddy kaydında Docker ağ geçidi değil, gerçek IPv6 adresi görünmelidir. Bu iş canlı sunucuya dokunur. Bu yüzden bu not bu işi yapmaz.
+DevOps sorumlusu sonucu şöyle doğrular: IPv6 ile bir istek gönderilir. Caddy kaydında Docker ağ geçidi değil, gerçek IPv6 adresi görünmelidir. Bu iş canlı sunucuya dokunur. Bu yüzden bu not bu işi yapmaz.
 
 ### Ayşe'nin öbür giriş yolları
 
