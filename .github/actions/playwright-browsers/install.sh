@@ -19,6 +19,17 @@ MIRRORS=/etc/apt/apt-mirrors.txt
 # Bir ağ denemesinin süre sınırı ve deneme sayısı. İş sınırı 20 dk; testler yaklaşık 4 dk.
 NET_ATTEMPT_SECONDS="${PW_APT_ATTEMPT_SECONDS:-240}"
 NET_ATTEMPTS="${PW_APT_ATTEMPTS:-3}"
+# Süre dolunca süreçlere önce TERM gider; bu kadar saniye sonra KILL gider.
+KILL_AFTER="${PW_APT_KILL_AFTER_SECONDS:-15}"
+# Yeni denemeden önce apt kilidinin bırakılması en çok bu kadar beklenir.
+LOCK_WAIT="${PW_APT_LOCK_WAIT_SECONDS:-60}"
+# 24 Kasım 2026 bulgusu (AJA-382): GNU `timeout` yalnız kendi süreç grubunu durdurdu.
+# `sudo` komutu ayrı bir oturumda (pty) çalıştırır; içteki `apt-get` grupta değildi.
+# Süre dolunca `apt-get` çalışmayı sürdürdü ve dpkg kilidini tuttu. Sonraki denemeler
+# "Could not get lock /var/lib/dpkg/lock-frontend" hatasıyla hemen düştü.
+# Bu yüzden süre dolunca apt ve dpkg süreçleri adlarıyla da durdurulur.
+APT_PROC_PATTERN='^(/usr/bin/)?(apt-get|apt|dpkg)( |$)|^/usr/lib/apt/methods/'
+APT_LOCK_FILES="/var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock"
 
 # Ağ yavaşsa beklemek yerine zaman aşımı ve yeniden deneme; indirilen paketler silinmesin.
 # Kesilen bir denemeden sonra dpkg kilidi için bir süre beklenir.
@@ -87,20 +98,81 @@ demote_first_mirror() {
   rm -f "$tmp"
 }
 
+# Komutu kendi süreç grubunda çalıştırır. Süre dolunca grubu durdurur ve 124 döner.
+run_with_deadline() {
+  local secs="$1" pid rc=0 start
+  shift
+  set -m
+  "$@" &
+  pid=$!
+  set +m
+  start=$SECONDS
+  while kill -0 "$pid" 2>/dev/null; do
+    if ((SECONDS - start >= secs)); then
+      kill -TERM -- "-$pid" 2>/dev/null || true
+      start=$SECONDS
+      while kill -0 "$pid" 2>/dev/null && ((SECONDS - start < KILL_AFTER)); do sleep 1; done
+      kill -KILL -- "-$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+  done
+  wait "$pid" || rc=$?
+  return "$rc"
+}
+
+# Süreç grubunun dışında kalan apt ve dpkg süreçlerini durdurur.
+stop_apt_processes() {
+  local start
+  sudo pkill -TERM -f "$APT_PROC_PATTERN" 2>/dev/null || true
+  start=$SECONDS
+  while pgrep -f "$APT_PROC_PATTERN" >/dev/null 2>&1 && ((SECONDS - start < KILL_AFTER)); do
+    sleep 1
+  done
+  sudo pkill -KILL -f "$APT_PROC_PATTERN" 2>/dev/null || true
+}
+
+# apt ya da dpkg çalışıyorsa veya bir apt kilidi tutuluyorsa başarılı döner.
+apt_busy() {
+  local f
+  pgrep -f "$APT_PROC_PATTERN" >/dev/null 2>&1 && return 0
+  command -v fuser >/dev/null 2>&1 || return 1
+  for f in $APT_LOCK_FILES; do
+    if [ -e "$f" ] && sudo fuser "$f" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+wait_for_apt_lock() {
+  local start=$SECONDS
+  while apt_busy; do
+    if ((SECONDS - start >= LOCK_WAIT)); then
+      echo "apt kilidi ${LOCK_WAIT} sn içinde bırakılmadı" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
 install_from_network() {
   local before="$1" after attempt rc
   echo "apt paketleri ağdan kuruluyor"
   for ((attempt = 1; attempt <= NET_ATTEMPTS; attempt++)); do
     echo "ağ denemesi $attempt/$NET_ATTEMPTS (süre sınırı ${NET_ATTEMPT_SECONDS} sn)"
     rc=0
-    # timeout kendi süreç grubunu kurar ve süre dolunca bütün grubu durdurur (apt dahil).
-    timeout --kill-after=15 "$NET_ATTEMPT_SECONDS" npx playwright install-deps "${BROWSERS[@]}" || rc=$?
+    run_with_deadline "$NET_ATTEMPT_SECONDS" npx playwright install-deps "${BROWSERS[@]}" || rc=$?
     [ "$rc" -eq 0 ] && break
     echo "ağ denemesi $attempt başarısız (çıkış kodu $rc)"
+    stop_apt_processes
     if ((attempt == NET_ATTEMPTS)); then
       echo "apt paketleri $NET_ATTEMPTS denemede kurulamadı" >&2
       return "$rc"
     fi
+    wait_for_apt_lock || return 1
+    # Yarım kalan kurulum varsa tamamlanır; yeni deneme temiz durumdan başlar.
     sudo dpkg --configure -a || true
     demote_first_mirror
   done
