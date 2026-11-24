@@ -115,13 +115,42 @@ Kapatma çağrılan işleve uygulanır. `/api/method`, `/api/v1/method`, `/api/v
 
 ### Geri açma yolu
 
-Yönetici erişimi kaybolursa sunucu kabuğundan ayarı kapatın:
+Bu yol acil yönetici girişi içindir. Keycloak çalışmazsa yönetici siteye giremez. O zaman yerel girişi kısa süre için açarsınız.
 
-```bash
-bench --site <site> set-config identity_keycloak_only 0
-```
+Acil girişi DevOps sorumlusu yapar. DevOps sorumlusu sunucu kabuğuna erişimi olan kişidir. Başka bir kişi bu ayarı değiştirmez.
 
-Ayar kapanınca yerel giriş hemen açılır. Yeniden başlatma gerekmez.
+DevOps sorumlusu şu adımları sırayla uygular:
+
+1. Sunucuya Tailscale ağı üzerinden bağlanın.
+2. Ayarı kiracı sitesinde `0` yapın. Örnek komut:
+
+   ```bash
+   bench --site <site> set-config identity_keycloak_only 0
+   ```
+
+3. Yerel girişin açıldığını görün. Yeniden başlatma gerekmez. `/login` sayfasında parola alanı görünür.
+4. Yerel yönetici hesabıyla girin. Yalnız sorunu çözen işi yapın. Örneğin Keycloak bağlantı ayarını düzeltin.
+5. Keycloak ile girişin yeniden çalıştığını deneyin.
+6. Ayarı yeniden `1` yapın. Örnek komut:
+
+   ```bash
+   bench --site <site> set-config identity_keycloak_only 1
+   ```
+
+7. `/login` sayfasını yeniden açın. Sayfada yalnız marka düğmesi görünmelidir.
+8. Ne yaptığınızı ve ayarı ne zaman `1` yaptığınızı kayda yazın. Kayda parola, token ya da anahtar yazmayın.
+
+İş bitince ayarı hemen `1` yapın. Ayarı `0` olarak bırakmayın. Ayar `0` iken herkes parolayla girmeyi deneyebilir.
+
+#### Ayar `0` iken rc ve prod dağıtımı durur
+
+rc ve prod ortamlarında ayarın değeri `1` olmalıdır. Dağıtım betiği her kiracı sitesinde bu değeri denetler. Değer `1` değilse rc ya da prod dağıtımı durur. Eski sürüm çalışmaya devam eder.
+
+Bu kural bilerek konmuştur. Acil giriş açık kalırsa sonraki dağıtım bunu yakalar. Böylece ayar unutulmaz.
+
+Dağıtım bu yüzden durduysa önce acil işi bitirin. Sonra ayarı `1` yapın. Sonra dağıtımı yeniden başlatın.
+
+alpha ve beta ortamlarında bu denetim yoktur. Ortamların kuralları [ortamlar belgesindedir](../../../../../docs/dagitim/ortamlar.md#acil-yönetici-girişi).
 
 ## Hesap silme sırasında bozuk geçmiş kaydını onarma
 

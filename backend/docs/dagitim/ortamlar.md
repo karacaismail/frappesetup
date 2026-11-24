@@ -545,6 +545,18 @@ Press sitesinin ayarları bugün denetlenmez. Press imajı vardır, ama Press si
 
 Paket listeleri kendi commit'inden taşır. Böylece rc, alpha'da kullanılan listeyle denetlenir.
 
+### Acil yönetici girişi
+
+`identity_keycloak_only` ayarı kiracı sitesinde yerel girişi kapatır. Değer `1` ise yalnız Keycloak ile giriş açılır.
+
+rc ve prod ortamlarında değer `1` olmalıdır. Dağıtım betiği her kiracı sitesinde bu değeri denetler. Değer `1` değilse rc ya da prod dağıtımı durur. Eski sürüm çalışmaya devam eder. alpha ve beta ortamlarında bu denetim yoktur.
+
+Keycloak çalışmazsa DevOps sorumlusu değeri kısa süre `0` yapabilir. Böylece yerel yönetici girişi açılır. Bu iş acil yönetici girişidir.
+
+Acil iş bitince DevOps sorumlusu değeri yeniden `1` yapar. Değer `0` kalırsa sonraki rc ya da prod dağıtımı durur. Bu kural ayarın unutulmasını önler.
+
+Acil girişin adımları [kimlik belgesindeki "Geri açma yolu" bölümündedir](../../apps/platform_core/platform_core/identity/README.md#geri-açma-yolu).
+
 ### Listenin eksiksiz kalması
 
 `backend/deploy/tests/test_settings.py` dosyası kodu tarar. Kodda okunan bir ayar listede yoksa test düşer. Tarananlar şunlardır:
