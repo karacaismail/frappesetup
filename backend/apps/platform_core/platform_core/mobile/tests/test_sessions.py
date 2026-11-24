@@ -51,9 +51,12 @@ class MobileSessionTest(IntegrationTestCase):
 			if previous:
 				self.assertTrue(is_session_revoked(previous))
 			previous = current
-		self.assertEqual(frappe.db.count("PLT Mobile Installation", {"account": self.account, "revoked": 0}), 1)
 		self.assertEqual(
-			frappe.db.get_value("PLT Mobile Installation", self.body["installation_id"], "session_id"), current
+			frappe.db.count("PLT Mobile Installation", {"account": self.account, "revoked": 0}), 1
+		)
+		self.assertEqual(
+			frappe.db.get_value("PLT Mobile Installation", self.body["installation_id"], "session_id"),
+			current,
 		)
 
 	def test_http_delivery_is_enqueued_only_after_commit(self):
@@ -206,7 +209,8 @@ class MobileSessionTest(IntegrationTestCase):
 		MobileStore().install(legacy, self.body["installation_id"])
 		_register(self.identity, self.body)
 		self.assertEqual(
-			frappe.db.get_value("PLT Mobile Installation", self.body["installation_id"], "session_id"), self.sid
+			frappe.db.get_value("PLT Mobile Installation", self.body["installation_id"], "session_id"),
+			self.sid,
 		)
 
 	def test_idle_boundary_checks_each_installation_and_background_does_not_renew_it(self):
@@ -306,7 +310,9 @@ class MobileSessionTest(IntegrationTestCase):
 		deliver.assert_called_once_with(((self.sid, self.identity.subject),))
 		self.assertTrue(is_session_revoked(self.sid))
 		self.assertFalse(is_session_revoked(other_identity.sid))
-		self.assertTrue(frappe.db.get_value("PLT Mobile Installation", self.body["installation_id"], "revoked"))
+		self.assertTrue(
+			frappe.db.get_value("PLT Mobile Installation", self.body["installation_id"], "revoked")
+		)
 		self.assertFalse(frappe.db.get_value("PLT Mobile Installation", other["installation_id"], "revoked"))
 		MobileStore().require_installation(other_identity, other["installation_id"])
 		self.assertIn("last_user_activity_at", _activity(other_identity, other))

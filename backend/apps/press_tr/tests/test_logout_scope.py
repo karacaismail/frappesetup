@@ -45,7 +45,8 @@ class FakeSite:
 		return self.mappings[mapping][2]
 
 	def delete_session(self, sid, user, reason):
-		assert self.sessions.pop(sid) == user
+		if self.sessions.pop(sid) != user:
+			raise AssertionError(f"session {sid} belongs to another user")
 
 	def delete_mapping(self, doctype, name, ignore_permissions):
 		del self.mappings[name]
@@ -69,8 +70,8 @@ class LogoutScopeTest(unittest.TestCase):
 		sessions = MagicMock()
 		sessions.sid.isin.side_effect = lambda sids: selected.update(sids=list(sids))
 		framework.qb.DocType.return_value = sessions
-		framework.qb.from_.return_value.select.return_value.where.return_value.run.side_effect = (
-			lambda: self.site.users_for(selected["sids"])
+		framework.qb.from_.return_value.select.return_value.where.return_value.run.side_effect = lambda: (
+			self.site.users_for(selected["sids"])
 		)
 		stack.enter_context(patch.object(api, "session_mapping_pages", side_effect=self.site.pages))
 		stack.enter_context(patch.object(api, "read_press_session_id", side_effect=self.site.press_sid))
@@ -78,9 +79,13 @@ class LogoutScopeTest(unittest.TestCase):
 		stack.enter_context(patch.object(api, "verify", side_effect=self.claims))
 		stack.enter_context(patch.object(api, "client_id", return_value="press"))
 		stack.enter_context(
-			patch.object(api, "find_identity", side_effect=lambda issuer, subject: SimpleNamespace(name=subject))
+			patch.object(
+				api, "find_identity", side_effect=lambda issuer, subject: SimpleNamespace(name=subject)
+			)
 		)
-		stack.enter_context(patch.dict("sys.modules", {"oidc_verify": SimpleNamespace(verify_logout_token=None)}))
+		stack.enter_context(
+			patch.dict("sys.modules", {"oidc_verify": SimpleNamespace(verify_logout_token=None)})
+		)
 
 	@staticmethod
 	def claims(_verify, token, client_id):

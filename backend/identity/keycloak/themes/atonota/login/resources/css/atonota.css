@@ -592,6 +592,46 @@
 }
 
 /*
+ * Sign-out scope (G-163). The three choices are a plain list. Space and a heading separate them.
+ * No card or border is drawn around a choice.
+ */
+.login-pf .atonota-logout-scopes {
+  display: grid;
+  gap: var(--at-space-6);
+  margin: var(--at-space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.login-pf .atonota-logout-scope {
+  display: grid;
+  gap: var(--at-space-2);
+  margin: 0;
+}
+
+.login-pf .atonota-logout-scope-title {
+  margin: 0;
+  font-size: var(--at-text-lg);
+  font-weight: var(--at-weight-bold);
+  color: var(--at-color-ink);
+}
+
+.login-pf .atonota-logout-scope-text {
+  margin: 0;
+  font-size: var(--at-text-md);
+}
+
+.login-pf .atonota-logout-scope .form-actions,
+.login-pf .atonota-logout-scope #kc-form-buttons {
+  margin: 0;
+}
+
+.login-pf .atonota-logout-scope .pf-v5-c-button {
+  margin-block-start: var(--at-space-2);
+  white-space: normal;
+}
+
+/*
  * Link-style button, for example the print, download and copy actions of the recovery codes screen.
  * The base theme gives it its own blue and changes colour and background on plain focus.
  * Here it uses the link tokens. Focus alone changes nothing. The shared focus line shows keyboard focus.

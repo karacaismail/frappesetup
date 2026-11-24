@@ -84,7 +84,12 @@ class LogoutScopeTemplateTest(unittest.TestCase):
             with self.subTest(element_id):
                 link = _element(self.template, element_id)
                 self.assertTrue(link.startswith("<a"), link)
-                self.assertEqual(self._href(link), 'url.loginUrl?keep_before("/protocol/") + "' + DEVICE_ACTIVITY + '"')
+                self.assertEqual(
+                    self._href(link),
+                    """url.resourcesPath?keep_before("/resources/") + "/realms/" + realm.name?url('UTF-8') + \""""
+                    + DEVICE_ACTIVITY
+                    + '"',
+                )
                 self.assertIn(f'msg("{label}")', self.template[self.template.index(link) :])
 
     def _href(self, link: str) -> str:
