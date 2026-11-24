@@ -307,4 +307,7 @@ extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.Ac
 after_install = ["press_tr.pricing_schema.sync_pricing_fields", "press_tr.plans.sync_plans"]
 after_migrate.extend(after_install)
 
+# G-10: Frappe's own scheduler fetches the US dollar rate once a day. No system cron is used.
+scheduler_events = {"daily": ["press_tr.exchange_rates.update_rate"]}
+
 ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session", "PTR Exchange Rate"]

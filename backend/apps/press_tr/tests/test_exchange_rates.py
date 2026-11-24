@@ -326,6 +326,10 @@ class RateRecordTest(unittest.TestCase):
 		)
 		self.assertIn("Press Billing", (APP_ROOT / "press_tr/modules.txt").read_text().splitlines())
 
+	def test_hooks_schedule_one_daily_fetch(self):
+		(hooks,) = load(self, FakeFrappe(self), "press_tr.hooks")
+		self.assertEqual(hooks.scheduler_events, {"daily": ["press_tr.exchange_rates.update_rate"]})
+
 	def test_hooks_lock_the_invoice_rate(self):
 		(hooks,) = load(self, FakeFrappe(self), "press_tr.hooks")
 		self.assertEqual(
