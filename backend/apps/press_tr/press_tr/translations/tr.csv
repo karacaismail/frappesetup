@@ -128,6 +128,7 @@ Reviewed At,İnceleme zamanı,PTR Recovery Review
 Time of the decision.,Kararın verildiği zaman.,PTR Recovery Review
 A recovery review starts open.,Kurtarma incelemesi açık durumda başlar.,press_tr
 A recovery review decision is final.,Kurtarma incelemesindeki karar kesindir.,press_tr
+Only the decision step fills the review fields.,İnceleme alanlarını yalnız karar adımı doldurur.,press_tr
 Choose Approved or Rejected.,Onaylandı ya da Reddedildi seçin.,press_tr
 The account owner cannot review their own recovery request.,Hesap sahibi kendi kurtarma isteğini inceleyemez.,press_tr
 Write a review note before you decide.,Karar vermeden önce inceleme notunu yazın.,press_tr

@@ -36,18 +36,38 @@ def open_review(email: str) -> None:
 	).insert(ignore_permissions=True)
 
 
+FIELDS = ("identity_link", "status", "requested_at", "review_note", "reviewed_by", "reviewed_at")
+# Only the decision step writes these. An API write cannot set them on an open record.
+FIXED_WHILE_OPEN = ("identity_link", "requested_at", "reviewed_by", "reviewed_at")
+
+
+def _value(record, field):
+	# Stored datetimes and API strings compare by their text form.
+	value = getattr(record, field, None)
+	return "" if value is None else str(value)
+
+
+def _changed(doc, previous, fields):
+	return [field for field in fields if _value(doc, field) != _value(previous, field)]
+
+
 def check_decision(doc) -> None:
+	# Frappe applies read_only only in the desk form. This check also guards API writes.
 	previous = doc.get_doc_before_save()
 	if previous is None:
-		if doc.status != OPEN:
+		if doc.status != OPEN or _value(doc, "reviewed_by") or _value(doc, "reviewed_at"):
 			frappe.throw(_("A recovery review starts open.", context="press_tr"), frappe.PermissionError)
 		return
 	if previous.status in DECISIONS:
-		if doc.status != previous.status or (doc.review_note or "") != (previous.review_note or ""):
+		if _changed(doc, previous, FIELDS):
 			frappe.throw(
 				_("A recovery review decision is final.", context="press_tr"), frappe.PermissionError
 			)
 		return
+	if _changed(doc, previous, FIXED_WHILE_OPEN):
+		frappe.throw(
+			_("Only the decision step fills the review fields.", context="press_tr"), frappe.PermissionError
+		)
 	if doc.status == previous.status:
 		return
 	if doc.status not in DECISIONS:

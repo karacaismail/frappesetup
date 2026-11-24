@@ -22,6 +22,7 @@
       "description": "Verified identity whose account recovery was requested.",
       "reqd": 1,
       "read_only": 1,
+      "set_only_once": 1,
       "options": "PTR Identity Link",
       "search_index": 1
     },
