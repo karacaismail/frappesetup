@@ -44,11 +44,15 @@ Press'te bu işlevi çağıran kod yoktur. Yeni sitenin sahibi kurulum sihirbaz�
 
 Önerilen düzeltme şudur:
 
-1. Site etkin olunca Press bu işi bir kez başlatır.
+1. Site etkin olunca Press bu işi bir kez başlatır. Press bugün site durumunu `frappe.db.set_value` ile yazar. Bu yazım `on_update` olayını çalıştırmaz. Bu yüzden `press_tr` eki Press'in 5 dakikalık sihirbaz denetimini bekler.
 2. İş verisini Press site sahibinin kayıtlarından alır.
 3. Deneme siteleri ve önceden hazırlanan bekleme siteleri bu akışa girmez. Press bu sitelerde sihirbazı zaten doldurur.
 
-İş verisinde altı alan vardır. Alanlar `language`, `country`, `timezone`, `currency`, `full_name` ve `email` alanlarıdır. Biri boşsa iş başlamaz.
+İş verisinde yedi alan vardır. Alanlar `language`, `lang`, `country`, `timezone`, `currency`, `full_name` ve `email` alanlarıdır. Biri boşsa iş başlamaz.
+
+Frappe 16 `language` ve `lang` alanlarında dilin adını bekler. Örneğin `tr` kodu yerine dilin adı gönderilir. Kod gönderilirse site İngilizce açılır.
+
+ERPNext gibi uygulamalar sihirbazda şirket bilgisi ister. Bu veri iş verisinde yoktur. Bu yüzden `press_tr` yalnız `frappe` uygulaması olan sitede işi başlatır. Diğer uygulamalar için ürün sahibi karar verir.
 
 `press_tr` bugün bu işi `press_tr.setup_wizard.start_setup_wizard` ile başlatır. Press düzeltmeyi yayımlayınca bu ek kaldırılır.
 

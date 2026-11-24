@@ -180,12 +180,14 @@ class SetupWizardTest(unittest.TestCase):
 
 	def test_country_with_one_time_zone_fills_a_missing_timezone(self):
 		self.values[("Account Request", "request-1")] = {"geo_location": None}
+		self.values[("Account Request", "team-request")] = {"geo_location": None}
 		self.start(self.site(), "on_update")
 		self.assertEqual(len(self.jobs), 1)
 		self.assertEqual(self.jobs[0]["data"]["timezone"], "Europe/Istanbul")
 
 	def test_missing_owner_data_starts_no_job_and_logs_the_reason_once(self):
 		self.values[("Account Request", "request-1")] = {"geo_location": None}
+		self.values[("Account Request", "team-request")] = {"geo_location": None}
 		self.values[("Country", "Turkey")] = {"time_zones": "Europe/Istanbul\nAsia/Nicosia"}
 		site = self.site()
 		self.start(site, "on_update")

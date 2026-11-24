@@ -9,7 +9,9 @@ Two values are human decisions and come from site config, never from this file:
 - ``press_tr_team_tiers``: the approved Team Tier table (product owner, G-166 price gate).
 - ``press_tr_enabled_clusters``: the Cluster names in use (infrastructure owner).
 
-When a value is missing, its step changes nothing.
+When a value is missing, its step changes nothing. When a value is set but wrong, the step throws
+before it writes, and ``bench migrate`` stops. This is on purpose: a wrong price or region table
+must not reach Press records. A new Press Team Tier also stops migrate until the table lists it.
 """
 
 import json
@@ -86,6 +88,9 @@ def _validated_team_tiers(table, tiers):
 		for field, value in values.items():
 			if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
 				frappe.throw(frappe._("Team Tier values must be numbers that are zero or more."))
+			# paying_user_since is an Int field; Frappe would cut 1.5 to 1 without a warning.
+			if field in TEAM_TIER_OPTIONAL_FIELDS and not isinstance(value, int):
+				frappe.throw(frappe._("paying_user_since must be a whole number."))
 		rows[tier] = dict(values)
 	return rows
 
@@ -94,13 +99,17 @@ def close_unused_clusters():
 	"""Hide unused Clusters and disable their Server Plans.
 
 	Cloud Region has no enabled field, so the region record is kept as it is. A Server Plan
-	without a Cluster is not tied to a region and stays unchanged.
+	without a Cluster is not tied to a region and stays unchanged. This step only closes records:
+	removing a name from the list later does not reopen its Cluster or plans.
 	"""
 	enabled = frappe.conf.get(ENABLED_CLUSTERS_KEY)
 	if not enabled:
 		return
 	if not isinstance(enabled, list) or not all(isinstance(name, str) and name for name in enabled):
 		frappe.throw(frappe._("The enabled Cluster list must be a list of Cluster names."))
+	# A wrong name would match every Cluster with "not in" and close them all.
+	if not all(frappe.db.exists("Cluster", name) for name in enabled):
+		frappe.throw(frappe._("The enabled Cluster list has a name that is not a Cluster."))
 
 	clusters = frappe.get_all("Cluster", filters=[["Cluster", "name", "not in", enabled]], pluck="name")
 	if clusters:

@@ -26,6 +26,12 @@ Team Tier tablosu her Press Team Tier kaydını bir kez içermelidir. Her satır
 
 Press, Team Tier `amount` değerini ekibin harcama sınırı yapar. Press bu sınırı dolar fiyatıyla karşılaştırır. Bu yüzden tablodaki tutarlar dolar karşılığıdır.
 
+Listede Cluster olmayan bir ad varsa temizlik hata verir. Bu durumda hiçbir Cluster kaydı değişmez.
+
+Temizlik yalnız kapatır. Bir ad listeden sonra çıkarılırsa Cluster kendiliğinden açılmaz. Bu Cluster kaydını yönetim ekranında elle açın.
+
+Ayar yanlışsa `bench migrate` komutu durur. Bu bilinçli bir seçimdir. Yanlış fiyat ya da bölge Press kayıtlarına yazılmamalıdır. Press yeni bir Team Tier eklerse tabloya da eklenmelidir. Eklenmezse güncelleme durur.
+
 Cluster kaydını gizleme yöntemi mimar onayı ister. SAFe System Architect bu öneriyi onaylamalıdır.
 
 ## Ayrı deneme sitesinde yapılacaklar
