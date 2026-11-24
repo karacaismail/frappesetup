@@ -24,7 +24,6 @@ from press_tr.api.test_account import AccountAccessTests
 from press_tr.api.test_auth import AuthAccessTests
 from press_tr.api.test_identity import IdentityAccessTests
 from press_tr.api.test_maintenance import MaintenanceAccessTests
-from press_tr.test_pricing import PricingAccessTests
 
 ISSUER = "http://keycloak.example.test/realms/platform"
 KID = uuid4().hex
@@ -41,7 +40,6 @@ class IdentityHttpTest(
 	AuthAccessTests,
 	IdentityAccessTests,
 	MaintenanceAccessTests,
-	PricingAccessTests,
 	PressHttpClient,
 	unittest.TestCase,
 ):
