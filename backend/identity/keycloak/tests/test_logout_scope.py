@@ -21,7 +21,9 @@ from helpers import DIRECTORY
 THEME = DIRECTORY / "themes" / "atonota"
 TEMPLATE = THEME / "login" / "logout-confirm.ftl"
 MESSAGES = {locale: THEME / "login" / "messages" / f"messages_{locale}.properties" for locale in ("tr", "en")}
-ACCOUNT_MESSAGES = THEME / "account" / "messages" / "messages_tr.properties"
+ACCOUNT_MESSAGES = {
+    locale: THEME / "account" / "messages" / f"messages_{locale}.properties" for locale in ("tr", "en")
+}
 DEVICE_ACTIVITY = "/account/account-security/device-activity"
 SCOPES = ("kc-logout", "kc-logout-other-session", "kc-logout-all-devices")
 
@@ -117,9 +119,13 @@ class LogoutScopeTemplateTest(unittest.TestCase):
 
     def test_every_device_text_names_the_account_console_button(self):
         # The every-device choice tells the user which button to press on the next page.
-        # The button text there comes from the account theme. The two texts must stay equal.
-        button = _messages(ACCOUNT_MESSAGES)["signOutAllDevices"]
-        self.assertIn(button, self.messages["tr"]["logoutScopeAllText"])
+        # The button text there comes from the account theme. The two texts must stay equal
+        # in every language of the screen.
+        for locale, path in ACCOUNT_MESSAGES.items():
+            with self.subTest(locale):
+                button = _messages(path).get("signOutAllDevices")
+                self.assertTrue(button, f"account theme has no signOutAllDevices text in {locale}")
+                self.assertIn(f"“{button}”", self.messages[locale]["logoutScopeAllText"])
 
     def test_buttons_use_the_formal_imperative(self):
         tr = self.messages["tr"]
