@@ -10,6 +10,7 @@ Expected behavior comes from the contract (`contracts/platform_core-identity.ope
 """
 
 import json
+import secrets
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -21,7 +22,8 @@ from platform_core.identity.atonota import decision_api
 from platform_core.identity.tests import helpers as h
 
 API = "/api/method/platform_core.api.atonota_login."
-PASSWORD = "Sahte-Parola-230-ak!"
+# Fresh test password for each run. It has upper case, lower case, digits and a symbol.
+PASSWORD = f"Sahte-{secrets.token_hex(8)}-Ak!"
 MEMBER = "atonota.member@example.test"
 VISITOR = "atonota.visitor@example.test"
 MANAGER = "atonota.manager@example.test"
