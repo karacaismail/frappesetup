@@ -59,6 +59,19 @@ class PanelSessionCookieTest(unittest.TestCase):
             with self.subTest(service=name):
                 self.assertIn(f"BACKEND: {backend}", service(self.stack, name))
 
+    def test_realtime_comes_from_the_same_origin(self):
+        # socket.io sits behind the nginx of the same host (location /socket.io in the image's
+        # template), so realtime uses the same origin and the same sid cookie. No socket port is
+        # published, and the edge has no separate realtime host.
+        for name, socket in (("tenant-frontend", "tenant-socket"), ("press-frontend", "press-socket")):
+            with self.subTest(service=name):
+                self.assertIn(f"SOCKETIO: {socket}:9000", service(self.stack, name))
+                self.assertNotRegex(service(self.stack, socket), r"(?m)^    (ports|network_mode):")
+        template = (DEPLOY / "compose" / "site.caddy.template").read_text(encoding="utf-8")
+        self.assertNotRegex(template, r"(?i)socket|:9000")
+        tenant = re.search(r"(?ms)^__TENANT_SITES__ \{\n(.*?)^\}", template).group(1)
+        self.assertRegex(tenant, r"(?m)^\treverse_proxy __ENV__-tenant:8080$")
+
     def test_no_shared_cookie_domain_and_no_cross_origin_access(self):
         # Panel and Press API share one origin, so Press needs no allow_cors (G-13, G-45).
         # A Domain cookie would carry one host's session to every other name.
