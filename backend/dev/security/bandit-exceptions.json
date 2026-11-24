@@ -3306,5 +3306,32 @@
     "reason": "The apply command test sets the fake admin password not-used. The test never reaches Keycloak. No real secret exists.",
     "owner": "platform-core-kimlik",
     "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_ci_browser_install.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the CI install script it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_ci_browser_install.py",
+    "code": "proc = subprocess.run(",
+    "statementSha256": "f17701dccdf3a2735d7f4143b6f4a43ffc7e48fa5998b4ad8b75a1108d5ff2b0",
+    "reason": "Test runs the repository's CI install script with bash, a fixed argument list and no shell string; PATH is fixed by the test.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_ci_browser_install.py",
+    "code": "proc = subprocess.run(",
+    "statementSha256": "f17701dccdf3a2735d7f4143b6f4a43ffc7e48fa5998b4ad8b75a1108d5ff2b0",
+    "reason": "Test runs the repository's CI install script with bash, a fixed argument list and no shell string; PATH is fixed by the test.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
   }
 ]
