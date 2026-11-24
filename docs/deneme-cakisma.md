@@ -1,5 +1,5 @@
 # Deneme: havuz
 
-Renk: mavi
+Renk: kırmızı (B ekibi)
 
 Son satır: değişmez
