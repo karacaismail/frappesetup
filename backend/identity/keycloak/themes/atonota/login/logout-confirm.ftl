@@ -21,10 +21,10 @@
         <div id="kc-logout-confirm" class="content-area">
             <p class="instruction">${msg("logoutScopeQuestion")}</p>
 
-            <ul id="kc-logout-scopes" class="atonota-logout-scopes">
-                <li class="atonota-logout-scope">
-                    <h2 class="atonota-logout-scope-title">${msg("logoutScopeThisTitle")}</h2>
-                    <p class="atonota-logout-scope-text">${msg("logoutScopeThisText")}</p>
+            <ul id="kc-logout-scopes" class="at-logout-scopes">
+                <li class="at-logout-scope">
+                    <h2 class="at-logout-scope-title">${msg("logoutScopeThisTitle")}</h2>
+                    <p class="at-logout-scope-text">${msg("logoutScopeThisText")}</p>
                     <form class="form-actions" action="${url.logoutConfirmAction}" onsubmit="confirmLogout.disabled = true; return true;" method="POST">
                         <input type="hidden" name="session_code" value="${logoutConfirm.code}">
                         <div id="kc-form-buttons" class="${properties.kcFormGroupClass!}">
@@ -34,15 +34,15 @@
                         </div>
                     </form>
                 </li>
-                <li class="atonota-logout-scope">
-                    <h2 class="atonota-logout-scope-title">${msg("logoutScopeOtherTitle")}</h2>
-                    <p class="atonota-logout-scope-text">${msg("logoutScopeOtherText")}</p>
+                <li class="at-logout-scope">
+                    <h2 class="at-logout-scope-title">${msg("logoutScopeOtherTitle")}</h2>
+                    <p class="at-logout-scope-text">${msg("logoutScopeOtherText")}</p>
                     <a id="kc-logout-other-session" href="${deviceActivityUrl}"
                        class="${properties.kcButtonSecondaryClass!} ${properties.kcButtonBlockClass!} ${properties.kcButtonLargeClass!}">${msg("logoutOtherSession")}</a>
                 </li>
-                <li class="atonota-logout-scope">
-                    <h2 class="atonota-logout-scope-title">${msg("logoutScopeAllTitle")}</h2>
-                    <p class="atonota-logout-scope-text">${msg("logoutScopeAllText")}</p>
+                <li class="at-logout-scope">
+                    <h2 class="at-logout-scope-title">${msg("logoutScopeAllTitle")}</h2>
+                    <p class="at-logout-scope-text">${msg("logoutScopeAllText")}</p>
                     <a id="kc-logout-all-devices" href="${deviceActivityUrl}"
                        class="${properties.kcButtonSecondaryClass!} ${properties.kcButtonBlockClass!} ${properties.kcButtonLargeClass!}">${msg("logoutAllDevices")}</a>
                 </li>

@@ -595,7 +595,7 @@
  * Sign-out scope (G-163). The three choices are a plain list. Space and a heading separate them.
  * No card or border is drawn around a choice.
  */
-.login-pf .atonota-logout-scopes {
+.login-pf .at-logout-scopes {
   display: grid;
   gap: var(--at-space-6);
   margin: var(--at-space-5) 0 0;
@@ -603,30 +603,30 @@
   list-style: none;
 }
 
-.login-pf .atonota-logout-scope {
+.login-pf .at-logout-scope {
   display: grid;
   gap: var(--at-space-2);
   margin: 0;
 }
 
-.login-pf .atonota-logout-scope-title {
+.login-pf .at-logout-scope-title {
   margin: 0;
   font-size: var(--at-text-lg);
   font-weight: var(--at-weight-bold);
   color: var(--at-color-ink);
 }
 
-.login-pf .atonota-logout-scope-text {
+.login-pf .at-logout-scope-text {
   margin: 0;
   font-size: var(--at-text-md);
 }
 
-.login-pf .atonota-logout-scope .form-actions,
-.login-pf .atonota-logout-scope #kc-form-buttons {
+.login-pf .at-logout-scope .form-actions,
+.login-pf .at-logout-scope #kc-form-buttons {
   margin: 0;
 }
 
-.login-pf .atonota-logout-scope .pf-v5-c-button {
+.login-pf .at-logout-scope .pf-v5-c-button {
   margin-block-start: var(--at-space-2);
   white-space: normal;
 }
