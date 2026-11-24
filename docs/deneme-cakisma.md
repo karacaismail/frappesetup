@@ -1,5 +1,5 @@
 # Deneme: çakışma
 
-Selamlama: merhaba
+Selamlama: iyi akşamlar (B ekibi)
 
 Son satır: değişmez
