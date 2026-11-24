@@ -28,7 +28,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "b73c3558c475ef4b903213343b708829384ec1a872f38ae59ea8f35412b425f4",
+  "sha256": "f4180cb4973eb476ae2408c995a42a1733a255cfea76280ff3632d176e081dbf",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -148,7 +148,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "e80c605c7a90926eec93895ebcd66a34d8d170121ef8ad1436b68347cfa4caaf",
+      "sha256": "34253bc08f8f745619204ab54b99fa86ac190e922eca527ee33eef16345059ba",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -179,6 +179,36 @@
           "path": "backend/apps/platform_core/platform_core/api/access.py",
           "line": 20,
           "reason": "Checks DocType read permission before returning the session user’s access summary."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
+          "line": 16,
+          "reason": "Answers only for the signed-in session user; a guest gets PermissionError. The server reads that user's own records as evidence and ignores body fields such as user. No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
+          "line": 25,
+          "reason": "Signed-in session user only; a guest gets PermissionError. The final step reruns the same decision and stays closed until the price decision (G-166). No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
+          "line": 108,
+          "reason": "The server opens one owner task per empty rule for the System Manager role (G-167). The text is built from the policy, not from the request. The calling user needs no ToDo write right."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+          "line": 88,
+          "reason": "Writes the verification case only from open_attempt, a server-side call that no endpoint whitelists. The case id is checked for length first (G-164). Both DocTypes are closed to AI writes in hooks.py."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+          "line": 109,
+          "reason": "Stores the notice only after the HMAC signature over the raw body is verified (G-164). The caller is the provider without a session. The unique event_id index refuses duplicates."
         }
       ],
       "files": [
@@ -190,7 +220,10 @@
         "backend/apps/platform_core/platform_core/access/rules.py",
         "backend/apps/platform_core/platform_core/access/subject.py",
         "backend/apps/platform_core/platform_core/api/access.py",
-        "backend/apps/platform_core/platform_core/hooks.py"
+        "backend/apps/platform_core/platform_core/api/atonota_login.py",
+        "backend/apps/platform_core/platform_core/hooks.py",
+        "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
+        "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py"
       ]
     }
   ]

@@ -12,7 +12,8 @@ Bu klasör ürünün kendi kodunu tutar. Kod MIT lisanslıdır (`LICENSE`). Keyc
 | `atonota_login/platforms.py` | Kayıtları denetler ve Keycloak kaydına çevirir. |
 | `atonota_login/keycloak_apply.py` | Platformları çalışan Keycloak'ta açar ya da kapatır. |
 | `atonota_login/decision.py` | Bir işlemin şimdi yapılıp yapılamayacağına karar verir (G-161). |
-| `policy/actions.json` | İşlemler, kontroller ve değer bekleyen kurallar (G-166, G-167). |
+| `atonota_login/policy/actions.json` | İşlemler, kontroller ve değer bekleyen kurallar (G-166, G-167). Dosya paket verisidir. |
+| `pyproject.toml` | Paket tanımı. Kiracı imajı paketi `uv pip install --no-deps` ile kurar. |
 | `atonota_login/verification_inbox.py` | Dış kimlik doğrulama bildirimlerinin gelen kutusu (G-164). |
 | `bin/atonota-login` | Komut satırı aracı. |
 | `tests/` | Ürünün testleri. |
@@ -38,7 +39,7 @@ Platform şu kurala göre açılır:
 
 Açık bir platform e-postanın doğrulandığını bildirmelidir. Kayıt bunun için `email_verified` iddiasını zorunlu kılar. Örnek `google.json` dosyasındadır. Bu kural yoksa biri başkasının e-postasıyla önceden hesap açabilir. Kişi sonra kaydolunca hesap saldırganın olur. Bu saldırıya önceden ele geçirme denir.
 
-Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını kapatan kayıt reddedilir. Platform adresleri https kullanır. Yalnız yerel deneme adresi http kullanabilir.
+Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını kapatan kayıt reddedilir. Platform adresleri https kullanır. Kayıt bütün ortamlara gider. Bu yüzden yerel `http` adresi de reddedilir. Tek istisna geliştirme için yerel Keycloak'a yapılan `apply` işidir. Bu işte `--allow-local-http` seçeneği yerel `http` adresine izin verir. Canlı test bu seçeneği kullanır.
 
 Facebook ve X bu iddiayı Keycloak'a göndermez. Bu yüzden iki kayıt `"active": false` ile gelir. İki platformu açmak için önce ek bir denetim gerekir. Borç satırı proje kaydındadır (O-56).
 

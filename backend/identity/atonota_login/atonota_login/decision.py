@@ -24,7 +24,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Mapping
 
-POLICY_FILE = Path(__file__).resolve().parents[1] / "policy" / "actions.json"
+# Package data: an installed package finds the file without the source tree (pyproject.toml).
+POLICY_FILE = Path(__file__).resolve().parent / "policy" / "actions.json"
 READY = "ready"
 DENIED = "denied"
 CONFIGURATION_REQUIRED = "configuration_required"
