@@ -22,6 +22,7 @@ from platform_core.access.tests.base import (
 	HR,
 	MANAGER_1,
 	MANAGER_2,
+	NO_RULE,
 	ROLE_EMPLOYEE,
 	ROLE_HR,
 	ROLE_MANAGER,
@@ -80,6 +81,10 @@ class TestRealtimeRooms(SurfaceMatrixTestCase):
 		for user in (EMPLOYEE_1, MANAGER_1, MANAGER_2):
 			with self.subTest(user=user):
 				self.assertEqual(self.room_answer(self.login(user), "").status_code, 403)
+
+	def test_list_room_is_closed_to_a_signed_in_user_without_a_rule(self):
+		"""A role may read the type, but no rule gives the user a record. The list would be empty."""
+		self.assertEqual(self.room_answer(self.login(NO_RULE), "").status_code, 403)
 
 	def test_list_room_stays_open_to_a_user_who_sees_every_record(self):
 		self.assertEqual(self.room_answer(self.login(HR), "").status_code, 200)
@@ -255,10 +260,10 @@ class TestFiles(FileSurfaceTestCase):
 		)
 
 		self.assertEqual(response.status_code, 200)
+		# Equal, not a subset: an empty list must fail too.
 		self.assertEqual(
-			{row["attached_to_name"] for row in response.json["data"]}
-			- self.names_of(EXPECTED_VISIBLE[EMPLOYEE_1]),
-			set(),
+			{row["attached_to_name"] for row in response.json["data"]},
+			self.names_of(EXPECTED_VISIBLE[EMPLOYEE_1]),
 		)
 
 	def test_file_list_condition_keeps_only_attachments_of_visible_records(self):
@@ -285,6 +290,58 @@ class TestFiles(FileSurfaceTestCase):
 
 		self.assertEqual(response.status_code, 403)
 		self.assertNotIn(self.files[self.records[MANAGER_1]][1], response.get_data(as_text=True))
+
+
+class TestFileListKeepsFilesOfNoRecord(FileSurfaceTestCase):
+	"""The engine condition narrows only attachments of governed records. Frappe still lists other files."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		own = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": "g121-own.txt",
+				"is_private": 1,
+				"content": b"g121 own file of an employee",
+			}
+		).insert()
+		# Test setup as the administrator: the file is given to the employee on purpose.
+		frappe.db.set_value("File", own.name, "owner", EMPLOYEE_1, update_modified=False)
+		public = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": "g121-public.txt",
+				"is_private": 0,
+				"content": b"g121 public file",
+			}
+		).insert()
+		cls.own_file = own.name
+		cls.public_file = public.name
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+	@classmethod
+	def tearDownClass(cls):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		for file_name in (cls.own_file, cls.public_file):
+			frappe.delete_doc("File", file_name, force=True, ignore_permissions=True)
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
+		super().tearDownClass()
+
+	def test_file_list_over_http_keeps_the_own_file_and_the_public_file(self):
+		client = self.login(EMPLOYEE_1)
+		response = self.rest_list(
+			client,
+			doctype="File",
+			fields=("name",),
+			filters=[["name", "in", [self.own_file, self.public_file]]],
+		)
+
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual({row["name"] for row in response.json["data"]}, {self.own_file, self.public_file})
 
 
 class TestFileRuleOnTheFileList(FileSurfaceTestCase):
