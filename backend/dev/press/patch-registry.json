@@ -126,5 +126,34 @@
       "removal_condition": "Yeni Press sürümünün bağımlılıkları Frappe 16 ile birlikte kurulmalıdır. Yamasız tam kurulumda uv pip check başarılı olmalıdır.",
       "upstream": "docs/press-python314-upstream.md#öneri-4-tam-bağımlılık-çözümünü-doğrulayın"
     }
+  ],
+  "press_tr_fixes": [
+    {
+      "id": "site-validate-encryption-key",
+      "hook": "press_tr.backup_keys.validate_site_keys",
+      "owner": "press-tr",
+      "test": "apps/press_tr/tests/test_backup_keys.py::BackupKeyFormatTest.test_malformed_key_rejects_site",
+      "removal_condition": "Press, Site.validate_encryption_key koşulunu and ile düzelten sürümü yayımlamalıdır. Yeni sürümde bozuk anahtar press_tr eki olmadan reddedilmelidir.",
+      "upstream": "docs/press-tr-upstream.md#öneri-1-anahtar-biçim-denetimini-düzeltin",
+      "upstream_status": "draft"
+    },
+    {
+      "id": "agent-complete-setup-wizard",
+      "hook": "press_tr.setup_wizard.start_setup_wizard",
+      "owner": "press-tr",
+      "test": "apps/press_tr/tests/test_setup_wizard.py::SetupWizardTest.test_new_active_site_starts_the_job_once",
+      "removal_condition": "Press, yeni etkin sitede Complete Setup Wizard işini kendisi başlatmalıdır. press_tr eki kaldırılınca iş yine bir kez açılmalıdır.",
+      "upstream": "docs/press-tr-upstream.md#öneri-2-kurulum-sihirbazı-işini-çağırın",
+      "upstream_status": "draft"
+    },
+    {
+      "id": "cloud-fixture-defaults",
+      "hook": "press_tr.fixture_cleanup.disable_cloud_defaults",
+      "owner": "press-tr",
+      "test": "apps/press_tr/tests/test_fixture_cleanup.py::FixtureCleanupTest.test_fixture_with_new_modified_stamp_is_closed_again",
+      "removal_condition": "Press, Frappe Cloud hazır kayıtlarını bir ayarla kapatılabilir yapmalıdır. Ayar kapalıyken güncellemeden sonra Frappe Cloud planı açık kalmamalıdır.",
+      "upstream": "docs/press-tr-upstream.md#öneri-3-frappe-cloud-hazır-kayıtlarını-ayırın",
+      "upstream_status": "draft"
+    }
   ]
 }
