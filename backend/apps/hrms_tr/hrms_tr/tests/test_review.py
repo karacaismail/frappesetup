@@ -52,7 +52,7 @@ class RoleFixtureTest(unittest.TestCase):
 class LinkSearchPermissionTest(unittest.TestCase):
 	"""A role that fills in a leave application can search its "Leave Type" link field."""
 
-	ROLES = {"HRT Employee", "HRT Manager", "HRT Admin", "System Manager"}
+	ROLES = frozenset({"HRT Employee", "HRT Manager", "HRT Admin", "System Manager"})
 
 	def test_every_leave_role_can_select_leave_types_only(self):
 		rows = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Leave Type"]
@@ -66,14 +66,18 @@ class LinkSearchPermissionTest(unittest.TestCase):
 	def test_install_and_migrate_keep_standard_leave_type_permissions(self):
 		# Frappe ignores the standard rows once a custom row exists, so the copy must come first.
 		for step in (setup.check_install, setup.before_migrate):
-			with self.subTest(step=step.__name__), patch.object(setup, "frappe") as fake, patch.object(
-				setup, "setup_custom_perms"
-			) as copy:
+			with (
+				self.subTest(step=step.__name__),
+				patch.object(setup, "frappe") as fake,
+				patch.object(setup, "setup_custom_perms") as copy,
+			):
 				fake.db.exists.return_value = False
 				fake.get_all.return_value = []
-				with patch.object(setup, "require_access_engine"), patch.object(
-					setup, "require_unshared_applications"
-				), patch.object(setup, "fixture_rows", return_value=[]):
+				with (
+					patch.object(setup, "require_access_engine"),
+					patch.object(setup, "require_unshared_applications"),
+					patch.object(setup, "fixture_rows", return_value=[]),
+				):
 					step()
 				fake.throw.assert_not_called()
 				copied = [call.args[0] for call in copy.call_args_list]
