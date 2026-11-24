@@ -1,23 +1,20 @@
 """G-10: prices are stored and shown in US dollars.
 
-The orchestrator decided on 24 November 2026 that prices stay in US dollars for now. No Turkish
-lira field is written. Press's own price checks read ``price_usd``, so a paid plan needs a dollar
+Prices are stored in US dollars. The product owner decided on 24 November 2026 that the Turkish
+lira price is computed from the daily rate (``test_exchange_rates.py``). No lira price is stored on
+a Site Plan. Press's own price checks read ``price_usd``, so a paid plan needs a dollar
 price above zero and a free plan keeps zero. Press already gives a team from Türkiye the USD
 currency (``Team.before_insert``), so press_tr changes no team currency.
 
 The test needs no Frappe install: ``frappe`` is replaced with an in-memory stub.
 """
 
-import csv
 import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 from plan_stubs import APP_ROOT, FakeFrappe, Rejected, load
-
-SOURCES = ("plans.py", "pricing.py", "pricing_schema.py", "hooks.py")
 
 
 class PlanCurrencyTest(unittest.TestCase):
@@ -95,7 +92,7 @@ class PlanSchemaTest(unittest.TestCase):
 		(self.schema,) = load(self, self.fake, "press_tr.pricing_schema", extra_modules=extra)
 		sys.modules["frappe"].get_meta = lambda doctype: meta
 
-	def test_no_turkish_lira_field_is_created(self):
+	def test_no_turkish_lira_field_is_created_on_site_plan(self):
 		self.schema.sync_pricing_fields()
 		fields = self.fields.call_args.args[0]["Site Plan"]
 		names = [field["fieldname"] for field in fields]
@@ -103,21 +100,19 @@ class PlanSchemaTest(unittest.TestCase):
 		self.assertEqual(fields[0]["insert_after"], "price_usd")
 		self.setter.assert_called_once()
 
+	def test_invoice_keeps_its_rate_in_read_only_fields(self):
+		self.schema.sync_pricing_fields()
+		fields = self.fields.call_args.args[0]["Invoice"]
+		names = [field["fieldname"] for field in fields]
+		self.assertEqual(
+			names, ["try_exchange_rate", "try_exchange_rate_date", "try_exchange_rate_source", "try_total"]
+		)
+		for field in fields:
+			with self.subTest(field=field["fieldname"]):
+				self.assertEqual((field["read_only"], field["no_copy"]), (1, 1))
 
-class NoTurkishLiraTest(unittest.TestCase):
-	def test_sources_have_no_turkish_lira_price(self):
-		for name in SOURCES:
-			text = (APP_ROOT / "press_tr" / name).read_text(encoding="utf-8")
-			with self.subTest(source=name):
-				self.assertNotIn("price_try", text)
-				self.assertNotIn('"TRY"', text)
 
-	def test_translations_have_no_turkish_lira_price(self):
-		path = APP_ROOT / "press_tr/translations/tr.csv"
-		with path.open(encoding="utf-8", newline="") as source:
-			rows = [row for row in csv.reader(source) if row[2] == "press_tr"]
-		self.assertFalse([row for row in rows if "Turkish lira" in row[0] or "TRY" in row[0]])
-
+class NoStoredLiraPriceTest(unittest.TestCase):
 	def test_hooks_keep_press_dollar_pricing(self):
 		(hooks,) = load(self, FakeFrappe(self), "press_tr.hooks")
 		self.assertNotIn("Site Plan", hooks.extend_doctype_class)

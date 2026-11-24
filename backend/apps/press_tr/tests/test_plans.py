@@ -1,7 +1,7 @@
 """G-9: the press_tr plan set, the trial and the plan limits.
 
-The product owner gave the prices on 24 November 2026. The plan limits are still open, so every
-limit stays empty and each plan warns that its limits are missing. The test needs no Frappe
+The product owner gave the prices and the limits on 24 November 2026. CPU time is still open, so
+each plan warns that its limits are missing. The test needs no Frappe
 install: ``frappe`` is replaced with an in-memory stub.
 """
 
@@ -80,27 +80,94 @@ class PlanSetTest(unittest.TestCase):
 		self.assertEqual(self.site_plans()[NAMES["starter"]]["enabled"], 1)
 		self.assertEqual(len(self.fake.inserted), inserted)
 
-	def test_limits_are_empty_and_each_plan_warns(self):
+	def test_press_limits_are_stored_in_mib(self):
+		# Press labels both fields "(MiB)" (site_plan.json, Press 7a4384d5). One GB is 1024 MiB.
+		self.assertEqual(self.plans.MIB_PER_GB, 1024)
+		expected_gb = {"starter": 5, "growth": 10, "enterprise": 20, "trial": 1}
+		by_name = {plan["name"]: plan for plan in self.plans.PLANS}
+		for key, gigabytes in expected_gb.items():
+			with self.subTest(plan=key):
+				limits = by_name[NAMES[key]]["limits"]
+				self.assertEqual(limits["max_storage_usage"], gigabytes * 1024)
+				self.assertEqual(limits["max_database_usage"], gigabytes * 1024)
+
+	def test_limits_are_written_to_press_in_mib(self):
+		self.plans.sync_plans()
+		starter = self.site_plans()[NAMES["starter"]]
+		self.assertEqual(starter["max_storage_usage"], 5120)
+		self.assertEqual(starter["max_database_usage"], 5120)
+		self.assertEqual(self.site_plans()[NAMES["trial"]]["max_storage_usage"], 1024)
+		self.assertEqual(self.site_plans()[NAMES["enterprise"]]["max_database_usage"], 20480)
+
+	def test_only_cpu_time_is_missing_and_each_plan_warns(self):
+		# The warning counts exactly these Press fields. CPU time waits for the DevOps owner.
+		self.assertEqual(
+			self.plans.LIMIT_FIELDS, ("max_database_usage", "max_storage_usage", "cpu_time_per_day")
+		)
 		for plan in self.plans.PLANS:
 			with self.subTest(plan=plan["name"]):
 				self.assertEqual(set(plan["limits"]), set(self.plans.LIMIT_FIELDS))
-				self.assertTrue(all(limit is None for limit in plan["limits"].values()))
-				self.assertEqual(self.plans.missing_limits(plan), list(self.plans.LIMIT_FIELDS))
+				self.assertIsNone(plan["limits"]["cpu_time_per_day"])
+				self.assertEqual(self.plans.missing_limits(plan), ["cpu_time_per_day"])
 		warnings = self.plans.sync_plans()
 		self.assertEqual(len(warnings), len(self.plans.PLANS))
 		for plan, warning in zip(self.plans.PLANS, warnings):
 			self.assertIn(plan["title"], warning)
-			self.assertIn("missing limits", warning)
+			self.assertIn("missing limits: cpu_time_per_day.", warning)
 
-	def test_empty_limits_are_not_written_to_press(self):
+	def test_empty_cpu_time_is_not_written_to_press(self):
 		self.plans.sync_plans()
 		for row in self.site_plans().values():
-			self.assertNotIn("max_database_usage", row)
-			self.assertNotIn("max_storage_usage", row)
+			self.assertNotIn("cpu_time_per_day", row)
 
 	def test_plan_with_all_limits_does_not_warn(self):
 		plan = dict(self.plans.PLANS[0], limits=dict.fromkeys(self.plans.LIMIT_FIELDS, 10))
 		self.assertEqual(self.plans.missing_limits(plan), [])
+
+	def test_every_plan_has_the_same_backup_schedule(self):
+		schedule = self.plans.BACKUP_SCHEDULE
+		self.assertEqual(
+			[entry["kind"] for entry in schedule],
+			[
+				"on_demand",
+				"daily",
+				"twice_weekly",
+				"fortnightly",
+				"monthly",
+				"quarterly",
+				"half_yearly",
+				"yearly",
+			],
+		)
+		keep = {entry["kind"]: entry["keep"] for entry in schedule}
+		self.assertEqual(keep.pop("twice_weekly"), 2)
+		self.assertEqual(set(keep.values()), {1})
+		twice_weekly = next(entry for entry in schedule if entry["kind"] == "twice_weekly")
+		self.assertEqual(twice_weekly["weekdays"], ("Wednesday", "Saturday"))
+		for plan in self.plans.PLANS:
+			self.assertIs(plan["backups"], schedule)
+
+	def test_every_plan_has_the_four_roles_without_a_count(self):
+		self.assertEqual(
+			self.plans.TENANT_ROLES,
+			("Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Admin Assistant"),
+		)
+		for plan in self.plans.PLANS:
+			self.assertEqual(plan["tenant_roles"], self.plans.TENANT_ROLES)
+			self.assertNotIn("role_count", plan["limits"])
+			self.assertNotIn("app_count", plan["limits"])
+			self.assertNotIn("backup_count", plan["limits"])
+
+	def test_only_the_enterprise_plan_has_custom_apps(self):
+		custom = {plan["name"] for plan in self.plans.PLANS if plan["custom_apps"]}
+		self.assertEqual(custom, {NAMES["enterprise"]})
+		self.plans.sync_plans()
+		flags = {name: row["private_benches"] for name, row in self.site_plans().items()}
+		self.assertEqual(flags.pop(NAMES["enterprise"]), 1)
+		self.assertEqual(set(flags.values()), {0})
+		panel = {plan["name"]: plan["custom_apps"] for plan in self.plans.public_plans()}
+		self.assertEqual(panel[NAMES["enterprise"]], True)
+		self.assertEqual(panel[NAMES["starter"]], False)
 
 	def test_plan_names_are_not_press_fixture_names(self):
 		names = {plan["name"] for plan in self.plans.PLANS}

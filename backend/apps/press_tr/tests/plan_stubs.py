@@ -60,6 +60,8 @@ class FakeFrappe:
 					return False
 				if operator == "<" and not (value is not None and value < operand):
 					return False
+				if operator == "<=" and not (value is not None and value <= operand):
+					return False
 				continue
 			if value != expected:
 				return False
