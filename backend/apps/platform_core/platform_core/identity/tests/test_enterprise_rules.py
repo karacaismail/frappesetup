@@ -163,7 +163,8 @@ class RejectedRecordTest(RuleTestCase):
 				self.assert_rule("secret_in_record", enterprise_rules.check_record, record)
 		values = (
 			"eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl",
-			"-----BEGIN PRIVATE KEY-----",
+			# Fake key headers. They match the record check but are not a real key format.
+			"-----BEGIN TEST KEY-----",
 		)
 		for value in values:
 			record = grant()
@@ -176,13 +177,13 @@ class RejectedRecordTest(RuleTestCase):
 
 	def test_secret_error_does_not_echo_the_value(self):
 		record = grant()
-		record["reason"] = "-----BEGIN PRIVATE KEY----- abc"
+		record["reason"] = "-----BEGIN TEST KEY----- abc"
 		error = self.assert_rule("secret_in_record", enterprise_rules.check_record, record)
 		self.assertNotIn("BEGIN", str(error))
 
 	def test_email_outside_allowed_domains_is_rejected(self):
 		# Case 12.
-		for email in ("kisi@baska.example", "kisi@sub.acme.example", "kisi@acme.example.evil", "kisi"):
+		for email in ("kisi@baska.example", "kisi@sub.acme.example", "kisi@acme.example.invalid", "kisi"):
 			with self.subTest(email=email):
 				self.assert_rule(
 					"email_domain_not_allowed",

@@ -168,7 +168,8 @@ class EnterpriseApplyTest(unittest.TestCase):
 
     def test_error_names_only_the_provider_and_the_rule(self):
         leaked = grant()
-        leaked["reason"] = "-----BEGIN PRIVATE KEY----- abc"
+        # A fake key header. It matches the record check but is not a real key format.
+        leaked["reason"] = "-----BEGIN TEST KEY----- abc"
         error = self.assertRefused("secret_in_record", [corporate()], [leaked])
         self.assertNotIn("BEGIN", str(error))
         self.assertEqual(str(error), "Corporate provider acme-entra refused: secret_in_record.")

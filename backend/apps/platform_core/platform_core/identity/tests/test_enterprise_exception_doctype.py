@@ -186,12 +186,12 @@ class TestEnterpriseException(IntegrationTestCase):
 class TestApprovalPrincipal(IntegrationTestCase):
 	"""Only a cookie session with a checked CSRF token approves. An agent token never does."""
 
-	def principal(self, headers, token="csrf-1"):
+	def principal(self, headers, session_csrf="csrf-1"):
 		with (
 			mock.patch.object(
 				frappe, "get_request_header", side_effect=lambda key, default=None: headers.get(key)
 			),
-			mock.patch.dict(frappe.session.data, {"csrf_token": token}),
+			mock.patch.dict(frappe.session.data, {"csrf_token": session_csrf}),
 		):
 			return enterprise_membership.request_principal()
 
@@ -207,4 +207,4 @@ class TestApprovalPrincipal(IntegrationTestCase):
 		self.assertEqual(self.principal(bearer), "other")
 		self.assertEqual(self.principal({}), "other")
 		self.assertEqual(self.principal({"X-Frappe-CSRF-Token": "wrong"}), "other")
-		self.assertEqual(self.principal({"X-Frappe-CSRF-Token": "csrf-1"}, token=None), "other")
+		self.assertEqual(self.principal({"X-Frappe-CSRF-Token": "csrf-1"}, session_csrf=None), "other")

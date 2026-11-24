@@ -236,7 +236,11 @@ def approve(name: str, *, principal: str):
 	check_or_throw(enterprise_rules.check_record, to_record(doc))
 	_check_chain(doc)
 	doc.flags.enterprise_approval = True
-	doc.save(ignore_permissions=True)
+	# No role has write permission on this DocType; the record is immutable (design AJA-238).
+	# This line is the only writer of the approval fields. Before it runs, the approver holds
+	# `APPROVER_ROLE`, the endpoint has checked read permission and a human session, and the rules
+	# above have passed. `validate` still refuses any change other than the approval fields.
+	doc.save(ignore_permissions=True)  # nosemgrep: frappe-ignore-permissions
 	return doc
 
 
@@ -288,11 +292,22 @@ def _require_human() -> str:
 def approve_exception(name: str) -> str:
 	"""Approval endpoint. Needs a human session with a checked CSRF token; an agent token is refused."""
 	frappe.only_for(APPROVER_ROLE)
+	if not frappe.has_permission(DOCTYPE, "read", name):
+		frappe.throw(
+			_("You cannot open this exception record.", context="platform_core.identity"),
+			frappe.PermissionError,
+		)
 	return approve(name, principal=_require_human()).name
 
 
 @frappe.whitelist(methods=["POST"])
 def revoke_exception(name: str, reason: str) -> str:
+	"""Revocation endpoint. Needs a human session with a checked CSRF token; an agent token is refused."""
 	frappe.only_for(APPROVER_ROLE)
+	if not frappe.has_permission(DOCTYPE, "read", name):
+		frappe.throw(
+			_("You cannot open this exception record.", context="platform_core.identity"),
+			frappe.PermissionError,
+		)
 	_require_human()
 	return revoke(name, reason).name

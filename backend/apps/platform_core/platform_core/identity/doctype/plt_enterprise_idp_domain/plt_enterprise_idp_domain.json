@@ -28,7 +28,8 @@
    "in_list_view": 1,
    "reqd": 1,
    "options": "dns-txt",
-   "default": "dns-txt"
+   "default": "dns-txt",
+   "description": "How the organisation proved that it owns the domain. Only a DNS TXT record is accepted."
   },
   {
    "fieldname": "verified_on",
