@@ -25,12 +25,9 @@
  },
  "update": {
   "date": "2026-11-24",
-  "commit": "065bf90c",
-  "release": {
-   "pr": 27,
-   "commit": "ec669626"
-  },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı.",
+  "commit": "2c21c9f5",
+  "release": null,
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-11 Press erişim izinleri 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 3a918f8b commit'i ve test_press_access.py dosyasıdır. Gerçek Frappe denemesinde 8 testin 8'i geçti. Bu kanıt henüz main dalına yayımlanmadı.",
   "reviewed": [
    "G-155",
    "G-156",
@@ -287,8 +284,15 @@
   },
   "G-11": {
    "epic": "press-ext",
-   "status": "in-progress",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "3a918f8b",
+    "release": null,
+    "tests": [
+     "backend/apps/press_tr/tests/test_press_access.py"
+    ]
+   }
   },
   "G-12": {
    "epic": "identity",
