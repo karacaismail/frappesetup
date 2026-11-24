@@ -9,6 +9,7 @@
  * Changes:
  * - getConfigProperties() also declares the send limit and the window (MagicLinkSendLimiter).
  *   Keycloak masks undeclared settings in the admin API, so they must be declared to be readable.
+ * - AJA-440: also declares the source share, the source ceiling and the queue ceiling.
  */
 package io.cloudflight.keycloak.magiclink.authenticators;
 
@@ -73,7 +74,29 @@ public abstract class AbstractMagicLinkAuthenticatorFactory implements Authentic
         sendWindow.setType(ProviderConfigProperty.INTEGER_TYPE);
         sendWindow.setHelpText("Length of the sliding window for the send limit, in seconds");
         sendWindow.setDefaultValue(MagicLinkSendLimiter.DEFAULT_WINDOW_SECONDS);
-        return List.of(magicKeyValidityDuration, sendLimit, sendWindow);
+        ProviderConfigProperty sourceShare = integer(MagicLinkSendLimiter.SOURCE_SHARE_CONFIG_KEY,
+              "Mails per address from one source",
+              "How many of one address's mails one client address may cause in the window. Below the mail limit.",
+              MagicLinkSendLimiter.DEFAULT_SOURCE_SHARE);
+        ProviderConfigProperty sourceRequests = integer(MagicLinkSendLimiter.SOURCE_REQUEST_LIMIT_CONFIG_KEY,
+              "Link requests per source in the window",
+              "How many magic link requests one client address may make in the window, for any address",
+              MagicLinkSendLimiter.DEFAULT_SOURCE_REQUEST_LIMIT);
+        ProviderConfigProperty queueMax = integer(MagicLinkSendLimiter.QUEUE_MAX_CONFIG_KEY,
+              "Waiting mail jobs",
+              "How many magic link mail jobs may wait at once on one node",
+              MagicLinkSendLimiter.DEFAULT_QUEUE_MAX);
+        return List.of(magicKeyValidityDuration, sendLimit, sendWindow, sourceShare, sourceRequests, queueMax);
+    }
+
+    private static ProviderConfigProperty integer(String name, String label, String help, Object defaultValue) {
+        ProviderConfigProperty property = new ProviderConfigProperty();
+        property.setName(name);
+        property.setLabel(label);
+        property.setType(ProviderConfigProperty.INTEGER_TYPE);
+        property.setHelpText(help);
+        property.setDefaultValue(defaultValue);
+        return property;
     }
 
     @Override

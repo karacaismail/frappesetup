@@ -223,6 +223,19 @@ class MobileStore:
 				return total, changed
 			after = rows[-1].name
 
+	def revoke_session_installations(self, sid):
+		"""Keycloak ended the session. Its installations are revoked without a call back to Keycloak."""
+		# The back-channel request runs as Guest. This internal read needs no document permission.
+		rows = frappe.db.get_values(
+			"PLT Mobile Installation",
+			{"session_id": sid},
+			REVOCATION_FIELDS,
+			as_dict=True,
+			order_by="name asc",
+			for_update=True,
+		)
+		return self._revoke_rows(rows, remote=False)
+
 	def revocation_targets(
 		self,
 		account,

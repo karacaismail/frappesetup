@@ -873,6 +873,12 @@ paths:
            This fallback path closes only sessions opened before the `iat` value of the token.
            Sessions opened after the notice stay open.
 
+        The `aud` value is this site's client or a phone client in the `kimlik_mobil_azp` setting.
+        A phone token closes only the phone session. It must carry `sid`.
+        The phone session is denied at once. Its installations are revoked.
+        The phone does not keep its access token until the token expires.
+        A phone token never closes a web session through `sub` (G-163).
+
         If no session matches, the response is still 200. The `closed_sessions` value is 0.
         The response carries the `Cache-Control: no-store` header.
 

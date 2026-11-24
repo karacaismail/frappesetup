@@ -9,6 +9,7 @@ from frappe.sessions import delete_session
 from frappe.utils import get_datetime, now_datetime
 
 from platform_core.identity import helpers, jwks, sign_in, site_settings
+from platform_core.identity.api import mobile_azp
 from platform_core.identity.exceptions import InvalidLogoutToken, KeycloakKeysUnavailable
 
 LEEWAY = 30
@@ -35,8 +36,14 @@ def logout_current_session() -> dict:
 	}
 
 
-def handle_logout_token(logout_token: object) -> dict:
-	"""Verifies the logout token and closes the matching Frappe sessions."""
+def handle_logout_token(logout_token: object, close_mobile_session=None) -> dict:
+	"""Verifies the logout token and closes the matching Frappe sessions.
+
+	The token audience is this site's client or a phone client (`kimlik_mobil_azp`). A phone token
+	closes only the phone session: `close_mobile_session(sid, subject)` denies it at once and returns
+	the number of closed installations (G-163). The mobile module owns that closure, so the caller
+	passes it in.
+	"""
 	frappe.local.response_headers["Cache-Control"] = "no-store"
 	sign_in.guard_guest_request()
 	if frappe.session.user != "Guest":
@@ -49,14 +56,25 @@ def handle_logout_token(logout_token: object) -> dict:
 	from oidc_verify import TokenError, verify_logout_token
 
 	settings = site_settings.get()
+	audiences = (
+		settings.client_id,
+		*(sorted(mobile_azp() - {settings.client_id}) if close_mobile_session else ()),
+	)
 	try:
-		claims = verify_logout_token(
-			logout_token,
-			cache=jwks.jwks_cache(settings.jwks_url),
-			issuer=settings.issuer,
-			client_id=settings.client_id,
-			leeway=LEEWAY,
-		)
+		for audience in audiences:
+			try:
+				claims = verify_logout_token(
+					logout_token,
+					cache=jwks.jwks_cache(settings.jwks_url),
+					issuer=settings.issuer,
+					client_id=audience,
+					leeway=LEEWAY,
+				)
+				break
+			except TokenError as error:
+				# Only the audience may differ between the allowed clients. Any other error is final.
+				if error.code != "wrong_audience" or audience == audiences[-1]:
+					raise
 	except TokenError as error:
 		_reject(_("Logout token rejected: {0}", context="platform_core.identity").format(error.code))
 	except Exception as error:
@@ -70,6 +88,13 @@ def handle_logout_token(logout_token: object) -> dict:
 
 	_validate_logout_claims(claims)
 	_mark_used_or_reject(claims)
+
+	if audience != settings.client_id:
+		sid = claims.get("sid")
+		if not helpers.is_session_id(sid):
+			_reject(_("Logout token rejected: {0}", context="platform_core.identity").format("missing_sid"))
+		subject = claims.get("sub")
+		return {"closed_sessions": close_mobile_session(sid, subject if isinstance(subject, str) else None)}
 
 	closed = 0
 	sid = claims.get("sid")
