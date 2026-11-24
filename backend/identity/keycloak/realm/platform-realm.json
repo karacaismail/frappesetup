@@ -1219,6 +1219,7 @@
   ],
   "browserFlow": "atonota-browser",
   "firstBrokerLoginFlow": "atonota-first-broker-login",
+  "resetCredentialsFlow": "atonota-reset-credentials",
   "authenticationFlows": [
     {
       "alias": "atonota-browser",
@@ -1353,7 +1354,7 @@
     },
     {
       "alias": "atonota-magic-link-2fa",
-      "description": "Second factor after the magic link.",
+      "description": "Second factor after the magic link. Asks for every strong credential the user already has, including a passkey, so the email alone never opens an account that has a key (G-163).",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -1386,6 +1387,87 @@
           "priority": 40,
           "userSetupAllowed": false,
           "authenticator": "webauthn-authenticator"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 50,
+          "userSetupAllowed": false,
+          "authenticator": "webauthn-authenticator-passwordless"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-reset-credentials",
+      "description": "Forgotten password flow (G-163). The email link proves only the mailbox. A user who has a second factor must present it before the new password. The flow never removes or replaces a second factor; a lost key goes to the recovery review record.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "reset-credentials-choose-user"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "reset-credential-email"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-reset-credentials-2fa"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 40,
+          "userSetupAllowed": false,
+          "authenticator": "reset-password"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-reset-credentials-2fa",
+      "description": "Existing second factor before a new password. Runs only when the user has one.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-configured"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "authenticator": "webauthn-authenticator"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "userSetupAllowed": false,
+          "authenticator": "webauthn-authenticator-passwordless"
         }
       ]
     },

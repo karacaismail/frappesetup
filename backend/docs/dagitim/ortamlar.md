@@ -70,7 +70,7 @@ Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bild
 2. Giriş adresi `api.login.<ortam tabanı>` biçimindedir. Bu biçim öteki adların kuralını korur. Eski `id.` adları kalkar. Ürün canlıda olmadığı için yönlendirme gerekmez (O-51).
 3. Kiracı adları karar sitesindeki K-2 biçimini korur. K-2'de kiracılar `<kiracı>.app.<marka>` biçimindedir.
 4. Panel her kiracının kendi adresinde `/panel` yolundadır. Ayrı bir `panel.` adı açılmaz. Nedeni şudur: panel Frappe çerezini ve CSRF belirtecini aynı kökten okur (SZ-7). CSRF belirteci, sahte istekleri engelleyen tek kullanımlık koddur.
-5. `press.` adı DNS'te geneldir. Kenar vekil bu adı yalnız Tailscale ağına tam açar. Müşteri yalnız hesap silme akışının yollarına ulaşır. Öteki her istek 404 alır. Yol listesi O-55 kararındadır. Bu kural G-6, G-13 ve G-119 ile uyumludur.
+5. `press.` adı DNS'te geneldir. Kenar vekil bu adı yalnız Tailscale ağına tam açar. Müşteri yalnız hesap silme akışının yollarına ve hesap kurtarma isteğine ulaşır. Öteki her istek 404 alır. Yol listesi O-55 kararındadır. Bu kural G-6, G-13 ve G-119 ile uyumludur.
 6. Prod temel adı `atonota.net` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
 
 Bir kural daha geçerlidir. Hiçbir servis `Domain=atonota.net` çerezi yazmaz. Yazarsa prod çerezi alpha'ya da gider. Frappe ve Keycloak çerezleri yalnız kendi adlarında geçerlidir.
