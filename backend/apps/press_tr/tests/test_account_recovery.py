@@ -9,6 +9,7 @@ Expected behaviour comes from the G-163 gap table (AJA-354, rows 3, 5 and 11):
 import ast
 import json
 import unittest
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -31,6 +32,10 @@ def _framework(user=None, link=None, open_review=False, session_user="reviewer@e
 	framework.db.get_value.side_effect = get_value
 	framework.db.exists.return_value = open_review
 	framework.throw.side_effect = PermissionError
+	# Stand-in for frappe.utils.get_datetime: both "2026-11-20 10:00:00" and "2026-11-20T10:00:00" parse.
+	framework.utils.get_datetime.side_effect = lambda value: (
+		value if isinstance(value, datetime) else datetime.fromisoformat(value)
+	)
 	return framework
 
 
@@ -227,6 +232,42 @@ class RecoveryRecordFreezeTest(unittest.TestCase):
 	def test_resaving_a_decided_record_without_changes_is_allowed(self):
 		doc = self._set_value_through_api(self.STORED, "review_note", self.STORED["review_note"])
 		self.assertEqual(doc.reviewed_by, "reviewer@example.test")
+
+	def test_dates_compare_by_value_not_by_text(self):
+		# The database returns a datetime. An API client may send it back in Frappe form or in ISO form
+		# with "T". Both name the same moment, so the decision goes through (orchestrator test, AJA-410).
+		stored = self.STORED | {
+			"status": "Open",
+			"review_note": "",
+			"reviewed_by": None,
+			"reviewed_at": None,
+			"requested_at": datetime(2026, 11, 20, 10, 0, 0, 123456),
+		}
+		for text in ("2026-11-20 10:00:00.123456", "2026-11-20T10:00:00.123456"):
+			with self.subTest(text=text):
+				previous = SimpleNamespace(**stored)
+				doc = SimpleNamespace(**stored, get_doc_before_save=lambda: previous)
+				doc.requested_at = text
+				doc.status = "Approved"
+				doc.review_note = "Identity confirmed by phone call."
+				framework = _framework(session_user="reviewer@example.test")
+				framework.db.get_value.side_effect = lambda doctype, name, column: "customer@example.test"
+				with (
+					patch.object(self.recovery, "frappe", framework),
+					patch.object(self.recovery, "_", lambda text, context=None: text),
+				):
+					self.recovery.check_decision(doc)
+				self.assertEqual(doc.reviewed_by, "reviewer@example.test")
+
+	def test_a_different_date_is_still_a_change_in_either_form(self):
+		stored = self.STORED | {"requested_at": datetime(2026, 11, 20, 10, 0)}
+		for text in ("2026-11-22 08:00:00", "2026-11-22T08:00:00"):
+			with self.subTest(text=text), self.assertRaises(PermissionError):
+				self._set_value_through_api(stored, "requested_at", text)
+		open_record = stored | {"status": "Open", "review_note": "", "reviewed_by": None, "reviewed_at": None}
+		for text in ("2026-11-22 08:00:00", "2026-11-22T08:00:00"):
+			with self.subTest(open_text=text), self.assertRaises(PermissionError):
+				self._set_value_through_api(open_record, "requested_at", text)
 
 	def test_new_record_cannot_arrive_already_reviewed(self):
 		framework = _framework()
