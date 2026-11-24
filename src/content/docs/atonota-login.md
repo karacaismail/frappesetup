@@ -155,7 +155,23 @@ Bu kurallar önceden ele geçirmeyi önler. Önceden ele geçirme, başkasının
 
 Parolası olmayan kullanıcı bu yolla bağ kuramaz. Bu kişi önce hesabına parola ekler. Bu kısıtlama bilinçlidir.
 
-Kuruluş şirket girişini zorunlu kılabilir. O zaman kullanıcı sosyal platformla giremez. Bu kural bir role bağlıdır. Rolü veren üyelik kodu henüz yazılmadı. Kuruluşların kendi giriş sağlayıcılarını açan kod da henüz yoktur. Bu kuralların gereksinimi G-160'tır.
+Kuruluş şirket girişini zorunlu kılabilir. O zaman kullanıcı sosyal platformla giremez. Bu kural bir role bağlıdır. Rolü veren üyelik kodu henüz yazılmadı. Bu kuralların gereksinimi G-160'tır.
+
+### Şirket giriş sağlayıcısı
+
+Şirket giriş sağlayıcısı, kuruluşun kendi giriş sistemidir. Bu sağlayıcı da e-postanın doğrulandığını bildirmelidir. Bildirmeyen sağlayıcı önceden ele geçirmeye açıktır.
+
+DevOps sorumlusu `atonota-login apply` komutunu çalıştırır. Komut her şirket sağlayıcısını denetler. Komut şu durumlarda hata verir:
+
+- Sağlayıcı e-postaya denetimsiz güvenir.
+- Sağlayıcıda e-posta kuralı yoktur. Onaylı istisna kaydı da yoktur.
+- İstisna kaydının süresi geçmiştir.
+
+Komut sağlayıcıyı kapatmaz. Sağlayıcıyı kapatma kararını DevOps sorumlusu verir.
+
+İstisna kaydı Frappe'de durur. Kaydı bir kişi ister. Başka bir kişi kaydı onaylar. Ajan kaydı onaylayamaz. Onaylanan kayıt değişmez ve silinmez. Değişiklik için yeni bir kayıt açılır.
+
+Sosyal platform istisna alamaz. Kayıttaki alan adı kuruluşa ait olmalıdır. Herkese açık e-posta servisleri kabul edilmez. Örneğin `gmail.com` kabul edilmez. Alan adını DNS'te sorgulayan kod henüz yoktur. Bu kod yazılana kadar kayıt yalnız kanıt alanını zorunlu tutar.
 
 ## Kullanıcı yolculukları
 
@@ -299,7 +315,7 @@ Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundak
 | G-157 | Sürüyor | Giriş ekranı, e-posta ve hata sayfalarındaki ad ekranda denenmedi. |
 | G-158 | Sürüyor | DNS kaydı ve canlı adres denemesi dış iştir. |
 | G-159 | Sürüyor | Gerçek platform hesapları açılmadı. Facebook ve X kapalıdır. |
-| G-160 | Sürüyor | Kurumsal giriş sağlayıcısı ve rolü veren üyelik kodu yoktur. Üyelik kanıtı şimdilik masaüstü rolünden okunur. Masaüstü rolü, Frappe yönetim ekranını açan roldür. Kuruluş üyelik kaydı gelince kanıt o kayda bağlanır. |
+| G-160 | Sürüyor | İstisna kaydı ve `apply` denetimi PR 27 ile yayımlandı. Yerel testler geçti. Bu iş canlıda denenmedi. DNS sorgusu ve rolü veren üyelik kodu yoktur. Üyelik kanıtı şimdilik masaüstü rolünden okunur. Masaüstü rolü, Frappe yönetim ekranını açan roldür. |
 | G-161 | Sürüyor | İşlem kararı Frappe ucuna bağlandı. Uç yerel testlerden geçti. Uç canlı sunucuda denenmedi. |
 | G-162 | Sürüyor | Bağlantı tek kullanımlıktır. Aynı yanıt ve ekranda onay denenmedi. |
 | G-163 | Sürüyor | İkinci adım vardır. Kurtarma, cihaz ve çıkış kapsamı yoktur. |
@@ -310,11 +326,12 @@ Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundak
 
 ## Kaynak
 
-Bu sayfa dört kaynağa dayanır:
+Bu sayfa beş kaynağa dayanır:
 
 - Proje sahibinin AtonotA Login kararları, 23 Kasım 2026 Pazartesi günü.
 - Backend proje kaydındaki O-51 ve O-56 kararları ve ürün klasörünün belgesi.
-- Backend dalındaki `e7130aaa` ve `6730160f` birleşmeleri. Birinci birleşme işlem kararını Frappe'ye bağladı. İkinci birleşme bildirim ucunu ekledi. Birleşmeler henüz yayımlanmadı.
+- Backend dalındaki `e7130aaa` ve `6730160f` birleşmeleri. Birinci birleşme işlem kararını Frappe'ye bağladı. İkinci birleşme bildirim ucunu ekledi. İki birleşme PR 25 ile yayımlandı.
+- Backend dalındaki `43f13477` birleşmesi. Bu birleşme şirket sağlayıcısının istisna kaydını ekledi. Birleşme PR 27 ile yayımlandı.
 - "Kurumsal kimlik ve erişim" analizi, 23 Kasım 2026 Pazartesi günü. Proje sahibi bu analizi yeterli buldu.
 
 Analiz başka ürünlerin belgelerinden alıntılar ve görseller içerir. Bu içerik depoya kopyalanmadı. Sayfa analizi kendi sözleriyle özetler.
