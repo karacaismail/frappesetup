@@ -158,7 +158,7 @@ class RealmFileTest(unittest.TestCase):
     def test_identity_sync_has_least_privilege(self):
         # Contract 26a274c: identity-sync writes users (invites) and organizations (membership).
         # Minimum set verified in Keycloak 26.8.2 (docs/kararlar/0003-keycloak-eklentileri.md).
-        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"}
+        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations", "view-identity-providers"}
         mappers = self.realm["clientScopeMappings"]["realm-management"]
         self.assertEqual(set(mappers[0]["roles"]), beklenen)
         account = [u for u in self.realm["users"] if u.get("serviceAccountClientId") == "identity-sync"][0]

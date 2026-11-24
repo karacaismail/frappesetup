@@ -160,7 +160,8 @@ ADMIN_SCOPE = "admin-api kc-admin-api"
 # Roles the identity-sync service account carries (docs/sozlesmeler.md, section 2). They reach only
 # a token requested with ADMIN_SCOPE. `manage-clients` is not among them.
 # Ending a session needs manage-users (Keycloak: RealmAdminResource.deleteSession).
-ADMIN_ROLE_PATHS = ("/users", "/organizations", "/sessions")
+# Reading the sign-in platforms needs view-identity-providers (AJA-459). `manage-identity-providers` is not given.
+ADMIN_ROLE_PATHS = ("/users", "/organizations", "/sessions", "/identity-provider/instances")
 
 
 class FakeKeycloak(FakeServer):
@@ -178,7 +179,12 @@ class FakeKeycloak(FakeServer):
         self.organizations: dict[str, dict[str, object]] = {}
         self.logged_out: list[str] = []
         self.sessions: dict[str, list[str]] = {}
+        # Sign-in platforms (identity providers), linked accounts and stored credentials (AJA-459).
+        self.identity_providers: list[dict[str, object]] = []
+        self.federated: dict[str, list[dict[str, object]]] = {}
+        self.credentials: dict[str, list[dict[str, object]]] = {}
         self.on("POST", f"/realms/{ISSUER_REALM}/protocol/openid-connect/token", self._token)
+        self.on("GET", f"/admin/realms/{ISSUER_REALM}/identity-provider/instances", self._identity_providers)
         self.on("GET", f"/admin/realms/{ISSUER_REALM}/users/count", lambda _r: (200, len(self.users)))
 
     @property
@@ -208,11 +214,75 @@ class FakeKeycloak(FakeServer):
         self.on("POST", f"{self.admin}/users/{subject}/logout", lambda _r: self._logout(subject))
         self.on("DELETE", f"{self.admin}/users/{subject}", lambda _r: self._delete_user(subject))
         self.on("GET", f"{self.admin}/users/{subject}/sessions", lambda _r: self._sessions(subject))
+        self.on("GET", f"{self.admin}/users/{subject}/federated-identity", lambda _r: self._user_rows(subject, self.federated))
+        self.on("GET", f"{self.admin}/users/{subject}/credentials", lambda _r: self._user_rows(subject, self.credentials))
         self.on(
             "GET",
             f"{self.admin}/organizations/members/{subject}/organizations",
             lambda _r: (200, self.memberships.get(subject, [])),
         )
+
+    def add_identity_provider(
+        self,
+        alias: str,
+        *,
+        display_name: str | None = None,
+        enabled: bool = True,
+        hide_on_login: bool = False,
+        secret: str | None = "**********",
+        organization_id: str | None = None,
+    ) -> dict[str, object]:
+        """Add a sign-in platform in the shape of the Keycloak 26 Admin API.
+
+        Keycloak masks a stored client secret as `**********`. `secret=None` leaves the secret out.
+        """
+        config: dict[str, object] = {"clientId": f"{alias}-client-id", "syncMode": "IMPORT"}
+        if secret is not None:
+            config["clientSecret"] = secret
+        row: dict[str, object] = {
+            "alias": alias,
+            "internalId": f"idp-{alias}",
+            "providerId": alias,
+            "enabled": enabled,
+            "hideOnLogin": hide_on_login,
+            "linkOnly": False,
+            "trustEmail": False,
+            "config": config,
+        }
+        if display_name is not None:
+            row["displayName"] = display_name
+        if organization_id is not None:
+            row["organizationId"] = organization_id
+        self.identity_providers.append(row)
+        return row
+
+    def link_account(self, subject: str, alias: str, user_name: str) -> None:
+        """Link an outside account to the user. Keycloak returns the outside user name too."""
+        self.federated.setdefault(subject, []).append(
+            {"identityProvider": alias, "userId": f"outside-{alias}-id", "userName": user_name}
+        )
+
+    def add_credential(self, subject: str, kind: str, label: str = "") -> None:
+        """Store a credential. Keycloak returns its id and its data too."""
+        self.credentials.setdefault(subject, []).append(
+            {
+                "id": f"credential-{kind}-{len(self.credentials.get(subject, []))}",
+                "type": kind,
+                "userLabel": label,
+                "createdDate": 1_795_000_000_000,
+                "credentialData": '{"hashIterations":5,"algorithm":"argon2"}',
+                "priority": 10,
+            }
+        )
+
+    def _identity_providers(self, req: Recorded) -> Reply:
+        first, size = int(req.query.get("first", ["0"])[0]), int(req.query.get("max", ["100"])[0])
+        return 200, self.identity_providers[first : first + size]
+
+    def _user_rows(self, subject: str, rows: dict[str, list[dict[str, object]]]) -> Reply:
+        if subject not in self.users:
+            return 404, {"error": "User not found"}
+        return 200, rows.get(subject, [])
 
     def add_session(self, subject: str, session_id: str) -> None:
         """Give the user an active session. Keycloak lists it and can delete it."""
