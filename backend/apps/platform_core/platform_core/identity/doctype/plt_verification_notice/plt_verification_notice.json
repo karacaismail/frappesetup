@@ -46,6 +46,7 @@
    "reqd": 1
   },
   {
+   "description": "The result the provider sent: approved, rejected or review. It decides only if the attempt is the newest one.",
    "fieldname": "outcome",
    "fieldtype": "Select",
    "in_list_view": 1,
