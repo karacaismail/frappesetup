@@ -138,25 +138,28 @@ Email address of the account to recover.,Kurtarılacak hesabın e-posta adresi.,
 The request was received. The answer does not show whether an account exists.,İstek alındı. Yanıt hesabın var olup olmadığını göstermez.,press_tr.openapi
 The request had extra fields.,İstekte fazladan alan vardı.,press_tr.openapi
 Recovery request limit reached.,Kurtarma isteği sınırına ulaşıldı.,press_tr.openapi
-Enter a price with at most two decimal places.,En çok iki ondalık basamağı olan bir fiyat yazın.
-Create a new plan to change its price.,Fiyatı değiştirmek için yeni bir plan açın.
-You cannot change the price start date.,Fiyatın başlangıç tarihini değiştiremezsiniz.
-You can enable the plan when its price starts.,Fiyat başladığında planı açabilirsiniz.
-Set a Turkish lira price for this paid plan.,Bu ücretli planın Türk lirası fiyatını belirleyin.
-Enter valid plan names.,Geçerli plan adları yazın.
-Enter a valid price start date.,Geçerli bir fiyat başlangıç tarihi yazın.
-Choose a start date at least 30 days from today.,Bugünden en az 30 gün sonrasını seçin.
-Enter a USD equivalent for a paid plan. Use zero for both prices on a free plan.,Ücretli planın dolar karşılığını yazın. Ücretsiz planın iki fiyatını da sıfır yazın.
-Enter a price that differs from the current price.,Şu anki fiyattan farklı bir fiyat yazın.
-Site plan price change,Site planı fiyat değişikliği
-Site Plan Price Change,Site Planı Fiyat Değişikliği
-The new plan price is {0} TRY from {1}.,Yeni planın fiyatı {1} günü {0} Türk lirası olur.
-Price (TRY),Fiyat (Türk lirası)
-Price Start Date,Fiyat Başlangıç Tarihi
-Plan price in Turkish lira.,Planın Türk lirası fiyatı.
-First date when the revised price can be enabled.,Yeni fiyatın başlayabileceği ilk tarih.
-You can assign the plan when its price starts.,Fiyat başladığında aboneyi bu plana geçirebilirsiniz.
-Add an email address for each subscriber team before changing the price.,Fiyatı değiştirmeden önce her abone ekibine e-posta adresi ekleyin.
-Previous Plan,Önceki Plan
-You cannot change the previous plan.,Önceki planı değiştiremezsiniz.
-Site plans only support Turkish lira.,Site planlarında yalnız Türk lirası kullanabilirsiniz.
+Enter a price with at most two decimal places.,En çok iki ondalık basamaklı bir fiyat yazın.,press_tr
+Create a new plan to change its price.,Fiyatı değiştirmek için yeni bir plan açın.,press_tr
+You cannot change the previous plan.,Önceki planı değiştiremezsiniz.,press_tr
+You cannot change the price start date.,Fiyatın başlangıç tarihini değiştiremezsiniz.,press_tr
+You can enable the plan when its price starts.,Fiyat başladığında planı açabilirsiniz.,press_tr
+You can assign the plan when its price starts.,Fiyat başladığında aboneyi bu plana geçirebilirsiniz.,press_tr
+Enter valid plan names.,Geçerli plan adları yazın.,press_tr
+The Enterprise plan has no price.,Kurumsal planın fiyatı yoktur.,press_tr
+Enter a valid price start date.,Geçerli bir fiyat başlangıç tarihi yazın.,press_tr
+Choose a start date at least 30 days from today.,Bugünden en az 30 gün sonrasını seçin.,press_tr
+A paid plan needs a US dollar price above zero.,Ücretli planın dolar fiyatı sıfırdan büyük olmalı.,press_tr
+Enter a price that differs from the current price.,Şu anki fiyattan farklı bir fiyat yazın.,press_tr
+Add an email address for each subscriber team before changing the price.,Fiyatı değiştirmeden önce her abone ekibine e-posta adresi ekleyin.,press_tr
+Site plan price change,Site planı fiyat değişikliği,press_tr
+The new monthly plan price is {0} US dollars from {1}.,{1} gününden başlayarak planın aylık fiyatı {0} dolar olur.,press_tr
+The {0} plan has missing limits: {1}.,{0} planının sınırları eksik: {1}.,press_tr
+Contact us to open an Enterprise plan.,Kurumsal plan için bize ulaşın.,press_tr
+Site plans only support Turkish lira.,Site planlarında yalnız Türk lirası kullanabilirsiniz.,press_tr
+Set a Turkish lira price for this paid plan.,Bu ücretli planın Türk lirası fiyatını belirleyin.,press_tr
+Price Start Date,Fiyat Başlangıç Tarihi,press_tr
+First date when the revised price can be enabled.,Yeni fiyatın başlayabileceği ilk tarih.,press_tr
+Previous Plan,Önceki Plan,press_tr
+Price (TRY),Fiyat (Türk lirası),press_tr
+Plan price in Turkish lira.,Planın Türk lirası fiyatı.,press_tr
+Site Plan Price Change,Site Planı Fiyat Değişikliği,press_tr

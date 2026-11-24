@@ -288,23 +288,24 @@ doc_events = {
 	"Site": {
 		"validate": "press_tr.backup_keys.validate_site_keys",
 		"on_update": "press_tr.setup_wizard.start_setup_wizard",
+		# G-9: Press sets a trial end date only for SaaS sites. press_tr sets it for our trial.
+		"before_insert": "press_tr.plans.set_trial_end_date",
 	},
 	"Site Plan": {
 		"validate": "press_tr.pricing.reject_price_edit",
 		"on_update": "press_tr.pricing.move_subscriptions_on_activation",
 	},
-	"Subscription": {"validate": "press_tr.pricing.reject_early_subscription"},
+	"Subscription": {
+		"validate": ["press_tr.pricing.reject_early_subscription", "press_tr.plans.reject_operator_plan"]
+	},
 }
 extend_doctype_class = {
 	"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"],
 	"Site Plan": ["press_tr.pricing.SitePlanPricing"],
 }
 
-override_whitelisted_methods = {
-	"press.api.site.get_site_plans": "press_tr.pricing.get_panel_plans",
-}
-
-after_install = "press_tr.pricing_schema.sync_pricing_fields"
-after_migrate.append("press_tr.pricing_schema.sync_pricing_fields")
+# G-9: the plan fields and the plan set. These steps run after the G-8 cleanup.
+after_install = ["press_tr.pricing_schema.sync_pricing_fields", "press_tr.plans.sync_plans"]
+after_migrate.extend(after_install)
 
 ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session"]
