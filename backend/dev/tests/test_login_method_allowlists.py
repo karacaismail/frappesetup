@@ -19,6 +19,10 @@ The allow lists are these:
 `EXPECTED` names the caller of each method. A new whitelisted method that is not in `EXPECTED`
 fails the test, so its author must decide the caller and the list. A guest flag that does not
 match the caller fails too, so no method gets guest access by accident.
+
+Every guest method (`allow_guest=True`) also needs a `rate_limit` decorator (AJA-487). The
+whole `platform_core/api` folder is scanned for this, so a new file there is checked too.
+`RATE_LIMIT_EXCEPTIONS` names the few methods that are limited in another way.
 """
 
 import ast
@@ -103,13 +107,25 @@ PENDING = {
 
 # Where AtonotA Login methods live. A new file in these places is scanned too.
 SCANNED = (
-    PLATFORM / "api/__init__.py",
-    PLATFORM / "api/auth.py",
-    PLATFORM / "api/atonota_login.py",
-    PLATFORM / "api/identity.py",
+    *sorted((PLATFORM / "api").rglob("*.py")),
     *sorted((PLATFORM / "identity").rglob("*.py")),
     *sorted(PRESS.rglob("*.py")),
 )
+
+# Modules in `platform_core/api` that hold no sign-in method. Their methods skip the caller
+# checks above, but their guest methods still need a rate limit. A new file is not on this
+# list, so its methods must be named in EXPECTED.
+NOT_LOGIN_MODULES = frozenset(
+    f"platform_core.api.{name}"
+    for name in ("access", "ai", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
+)
+
+# Guest methods without a `rate_limit` decorator, each with its reason.
+RATE_LIMIT_EXCEPTIONS = {
+    # The contract does not limit a verified logout notice from Keycloak. A rejected notice is
+    # limited inside the method, under the `press_tr.rejected_logout` namespace.
+    "press_tr.api.keycloak_backchannel_logout": "verified notice is not limited",
+}
 
 
 def module_name(path: Path) -> str:
@@ -131,26 +147,59 @@ def whitelist_call(decorator: ast.expr) -> ast.Call | None:
     return None
 
 
-def whitelisted_methods() -> dict[str, bool]:
-    """Full method name and its `allow_guest` value, for every whitelisted function."""
+def is_guest(call: ast.Call) -> bool:
+    return any(
+        keyword.arg == "allow_guest" and isinstance(keyword.value, ast.Constant) and keyword.value.value
+        for keyword in call.keywords
+    )
+
+
+def has_rate_limit(function: ast.FunctionDef) -> bool:
+    """True when one decorator is `rate_limit`, called or bare, by name or as an attribute."""
+    for decorator in function.decorator_list:
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        name = target.attr if isinstance(target, ast.Attribute) else getattr(target, "id", None)
+        if name == "rate_limit":
+            return True
+    return False
+
+
+def scan(source: str, module: str) -> dict[str, tuple[bool, bool]]:
+    """Full method name, its `allow_guest` value and its rate limit, per whitelisted function."""
+    found = {}
+    for node in ast.parse(source).body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for decorator in node.decorator_list:
+            call = whitelist_call(decorator)
+            if call is not None:
+                found[f"{module}.{node.name}"] = (is_guest(call), has_rate_limit(node))
+    return found
+
+
+def scanned_methods() -> dict[str, tuple[bool, bool]]:
     found = {}
     for path in SCANNED:
-        if is_test_file(path):
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in tree.body:
-            if not isinstance(node, ast.FunctionDef):
-                continue
-            for decorator in node.decorator_list:
-                call = whitelist_call(decorator)
-                if call is None:
-                    continue
-                guest = any(
-                    keyword.arg == "allow_guest" and isinstance(keyword.value, ast.Constant) and keyword.value.value
-                    for keyword in call.keywords
-                )
-                found[f"{module_name(path)}.{node.name}"] = guest
+        if not is_test_file(path):
+            found.update(scan(path.read_text(encoding="utf-8"), module_name(path)))
     return found
+
+
+def whitelisted_methods() -> dict[str, bool]:
+    """Full method name and its `allow_guest` value, for every whitelisted sign-in function."""
+    return {
+        method: guest
+        for method, (guest, _limited) in scanned_methods().items()
+        if method.rpartition(".")[0] not in NOT_LOGIN_MODULES
+    }
+
+
+def unlimited_guest_methods(methods: dict[str, tuple[bool, bool]]) -> list[str]:
+    return sorted(
+        method
+        for method, (guest, limited) in methods.items()
+        if guest and not limited and method not in RATE_LIMIT_EXCEPTIONS
+    )
 
 
 def assigned(path: Path, name: str):
@@ -305,6 +354,21 @@ class LoginMethodAllowListTests(unittest.TestCase):
                 self.assertIn(path, relayed)
 
 
+class GuestRateLimitTests(unittest.TestCase):
+    def test_every_guest_method_has_a_rate_limit(self):
+        self.assertEqual(
+            unlimited_guest_methods(scanned_methods()),
+            [],
+            "Add @rate_limit to each guest method, or name it in RATE_LIMIT_EXCEPTIONS with a reason.",
+        )
+
+    def test_every_exception_is_a_guest_method_without_a_limit(self):
+        methods = scanned_methods()
+        for method in RATE_LIMIT_EXCEPTIONS:
+            with self.subTest(method=method):
+                self.assertEqual(methods.get(method), (True, False), "Remove the stale exception.")
+
+
 class ScannerSelfTests(unittest.TestCase):
     """The scanner must find methods, or every check above would pass on an empty set."""
 
@@ -314,6 +378,23 @@ class ScannerSelfTests(unittest.TestCase):
         self.assertIs(methods["platform_core.api.auth.logout"], False)
         self.assertIs(methods["press_tr.api.keycloak_backchannel_logout"], True)
         self.assertIs(methods["press_tr.api.identity.list_identities"], False)
+
+    def test_a_guest_method_without_a_rate_limit_is_found(self):
+        source = (
+            "@frappe.whitelist(allow_guest=True)\n@rate_limit(limit=5, seconds=60)\ndef limited(): pass\n"
+            "@frappe.whitelist(allow_guest=True)\n@frappe.rate_limiter.rate_limit\ndef attribute(): pass\n"
+            "@frappe.whitelist(allow_guest=True)\n@rate_limit_namespace('x')\ndef namespace_only(): pass\n"
+            "@frappe.whitelist(allow_guest=True)\ndef open_door(): pass\n"
+            "@frappe.whitelist()\ndef signed_in(): pass\n"
+        )
+        self.assertEqual(
+            unlimited_guest_methods(scan(source, "sample")), ["sample.namespace_only", "sample.open_door"]
+        )
+
+    def test_the_whole_api_folder_is_scanned(self):
+        api = PLATFORM / "api"
+        self.assertEqual({path for path in SCANNED if path.parent == api}, set(api.glob("*.py")))
+        self.assertIn("platform_core.api.ai.mcp", scanned_methods())
 
     def test_lists_are_read(self):
         self.assertIn("platform_core.api.auth.logout", website_user_methods())
