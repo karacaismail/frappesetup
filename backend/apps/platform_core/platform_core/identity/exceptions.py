@@ -88,3 +88,28 @@ class IdentityInternalError(frappe.ValidationError):
 
 	http_status_code = 500
 	skip_error_log = True
+
+
+class IdentityLinkMissing(frappe.PermissionError):
+	"""The session has no Keycloak subject that matches the identity link of the signed-in user (AJA-459).
+
+	The site then sends no request to identity-sync. The message names no person."""
+
+	http_status_code = 403
+
+
+class LinkedAccountsForbidden(frappe.PermissionError):
+	"""identity-sync refused the read. The person is unknown or belongs to another tenant (AJA-459).
+
+	Both cases give the same answer, so the reply does not tell whether a person exists."""
+
+	http_status_code = 403
+
+
+class IdentityServiceUnavailable(frappe.ValidationError):
+	"""identity-sync or Keycloak did not answer, or the answer was not usable (AJA-459).
+
+	The message carries no secret, no token and no internal address."""
+
+	http_status_code = 503
+	skip_error_log = True

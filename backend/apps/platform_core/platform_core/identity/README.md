@@ -59,6 +59,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `mcp_oauth_resource` | Dış MCP erişiminde | MCP ucunun tam HTTPS adresi. |
 | `mcp_oauth_client_ids` | Dış MCP erişiminde | İzin verilen açık Keycloak istemcilerinin kimlik listesi. |
 | `mcp_oauth_introspection_secret` | Dış MCP erişiminde | Keycloak belirtecini denetleyen istemcinin sırrı. Yalnız site ayarında saklanır. |
+| `mobile_identity_sync_url` | AtonotA Login okumasında | identity-sync kök adresi. Adres HTTPS olmalıdır. Telefon oturumu kapatma da bu adresi kullanır. |
 | `identity_brand_name` | Evet | Düğme metni bundan üretilir, örneğin `AtonotA Login` |
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `identity_keycloak_only` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |
