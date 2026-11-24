@@ -373,7 +373,8 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
     4. `press_tr.api.auth.keycloak_callback` Keycloak'tan dönüşü karşılar.
     5. `press_tr.api.keycloak_backchannel_logout` Keycloak'ın oturum kapatma bildirimini alır. Bildirim imzalıdır. Keycloak bu bildirimi genel adresten gönderir.
     6. `press_tr.api.account.request_deletion` silme isteğini alır.
-  - Üç API yolu `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
+    7. `press_tr.api.account.request_recovery` hesap kurtarma isteğini alır (G-163). Bu yol 24 Kasım 2026 Salı günü eklendi. Gerekçe şudur. Anahtarını kaybeden kişi giriş yapamaz ve Tailscale ağında değildir. Yol kapalı kalırsa kurtarma akışı başlayamaz. Yöntem yalnız POST kabul eder. Bir adresten saatte en çok 5 istek gelebilir. Yöntem yalnız e-posta adresi alır ve her adrese aynı yanıtı verir. Yöntem yalnız bir inceleme kaydı açar. Anahtar değiştirmez, oturum açmaz, bağlantı göndermez.
+  - API yolları `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
   - Öteki bütün yollar yalnız Tailscale adreslerinden açılır. Örneğin `/app`, `/desk`, `/dashboard` ve `/api/resource/` böyledir. Tailscale adresleri `100.64.0.0/10` ve `fd7a:115c:a1e0::/48` aralıklarıdır. Başka istek 404 alır.
   - Yerel ağ aralıkları özel sayılmaz. Gerekçe şudur. Docker, IPv6 ile gelen genel isteği `172.16.0.0/12` içinden bir adresle gösterebilir.
   - Tailscale dışından gelen istekte iki ek ret vardır. Birincisi `cmd` sorgu alanıdır. Frappe 16 `cmd` alanını yoldan önce işler. Bu alan açık bir yoldan her yönteme ulaşırdı. İkincisi ham yoldaki `..`, `//`, `%2e`, `%2f` ve `%5c` dizileridir.
