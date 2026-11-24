@@ -14,7 +14,7 @@ import json
 import frappe
 from frappe.query_builder import Table
 
-from platform_core.access import files
+from platform_core.access import files, hooks
 from platform_core.access.tests.base import (
 	DOCTYPE,
 	EMPLOYEE_1,
@@ -22,6 +22,10 @@ from platform_core.access.tests.base import (
 	HR,
 	MANAGER_1,
 	MANAGER_2,
+	ROLE_EMPLOYEE,
+	ROLE_HR,
+	ROLE_MANAGER,
+	RULE_DOCTYPE,
 	AccessRuleTestCase,
 )
 
@@ -182,8 +186,8 @@ def file_text(name: str) -> bytes:
 	return f"g121 attachment of {name}".encode()
 
 
-class TestFiles(SurfaceMatrixTestCase):
-	"""A private attachment follows the decision on the record it is attached to."""
+class FileSurfaceTestCase(SurfaceMatrixTestCase):
+	"""Each record of the class has one private attachment."""
 
 	@classmethod
 	def setUpClass(cls):
@@ -213,6 +217,10 @@ class TestFiles(SurfaceMatrixTestCase):
 		# Committed on purpose: other connections must see this.
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		super().tearDownClass()
+
+
+class TestFiles(FileSurfaceTestCase):
+	"""A private attachment follows the decision on the record it is attached to."""
 
 	def test_file_record_follows_the_record_decision(self):
 		for user, owners in EXPECTED_VISIBLE.items():
@@ -277,6 +285,66 @@ class TestFiles(SurfaceMatrixTestCase):
 
 		self.assertEqual(response.status_code, 403)
 		self.assertNotIn(self.files[self.records[MANAGER_1]][1], response.get_data(as_text=True))
+
+
+class TestFileRuleOnTheFileList(FileSurfaceTestCase):
+	"""A rule written on the File type and the rule of the record apply together on the file list (AJA-565)."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		# The File rule hides the attachment of the own record of EMPLOYEE_1. The record rule
+		# alone would list it to EMPLOYEE_1, MANAGER_1 and HR.
+		cls.hidden_record = cls.records[EMPLOYEE_1]
+		hidden_file = cls.files[cls.hidden_record][0]
+		for role in (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR):
+			frappe.get_doc(
+				{
+					"doctype": RULE_DOCTYPE,
+					"title": f"Dosya kurali {role}",
+					"document_type": "File",
+					"is_active": 1,
+					"role": role,
+					"scope": "all",
+					"filters": json.dumps([["name", "!=", hidden_file]]),
+					"allow_read": 1,
+					"priority": 40,
+				}
+			).insert()
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+	def expected(self, owners) -> set[str]:
+		return self.names_of(owners) - {self.hidden_record}
+
+	def test_file_list_condition_applies_the_file_rule_and_the_record_rule(self):
+		table = frappe.qb.DocType("File")
+		for user, owners in EXPECTED_VISIBLE.items():
+			with self.subTest(user=user):
+				query = (
+					frappe.qb.from_(table)
+					.select(table.attached_to_name)
+					.where(table.attached_to_doctype == DOCTYPE)
+					.where(hooks.query_conditions(user, "File"))
+				)
+				self.assertEqual({row[0] for row in query.run()}, self.expected(owners))
+
+	def test_file_list_over_http_leaves_out_the_file_the_file_rule_hides(self):
+		for user in (EMPLOYEE_1, MANAGER_1, HR):
+			with self.subTest(user=user):
+				client = self.login(user)
+				response = self.rest_list(
+					client,
+					doctype="File",
+					fields=("name", "attached_to_name"),
+					filters=[["attached_to_doctype", "=", DOCTYPE]],
+				)
+
+				self.assertEqual(response.status_code, 200)
+				self.assertEqual(
+					{row["attached_to_name"] for row in response.json["data"]},
+					self.expected(EXPECTED_VISIBLE[user]),
+				)
 
 
 class TestDataImportExport(SurfaceMatrixTestCase):
