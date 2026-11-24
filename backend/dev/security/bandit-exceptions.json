@@ -3261,5 +3261,23 @@
     "reason": "Runs the repository's own osv-setup script with bash and no shell string. The arguments are fixed test values, PATH points curl at a fake that writes only inside a temporary folder.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_agent_patches.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to apply the Agent patch to a local Agent checkout with git.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_agent_patches.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "e631ad65757f6ddf75b862341cd880c41713629b55c69402d55ffa063b13130d",
+    "reason": "Test runs git from its absolute path with no shell. Arguments are fixed subcommands, the repository patch file and temporary folders. It runs only when AGENT_SOURCE is set.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
   }
 ]
