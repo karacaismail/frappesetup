@@ -112,6 +112,7 @@ class FixtureCleanupTest(unittest.TestCase):
 		frappe = ModuleType("frappe")
 		frappe.get_app_path = get_app_path
 		frappe.db = self.db
+		self.db.exists = lambda doctype, name: name in self.records.get(doctype, {})
 		frappe.get_all = self.db.get_all
 		frappe.conf = SimpleNamespace(get=self.conf.get)
 		frappe.throw = self.fail_with
@@ -194,6 +195,24 @@ class FixtureCleanupTest(unittest.TestCase):
 		# Cloud Region has no enabled field; the record is kept and never written.
 		self.assertEqual(set(self.records["Cloud Region"]), {"used-region", "unused-region"})
 		self.assertNotIn("Cloud Region", self.db.writes)
+
+	def test_unknown_cluster_name_is_rejected_before_any_cluster_changes(self):
+		# A typo would match every Cluster with "not in" and close them all.
+		self.conf["press_tr_enabled_clusters"] = ["used", "typo-cluster"]
+		with self.assertRaises(ValueError):
+			self.cleanup()
+		self.assertTrue(all(row["public"] == 1 for row in self.records["Cluster"].values()))
+		self.assertTrue(all(row["enabled"] == 1 for row in self.records["Server Plan"].values()))
+
+	def test_paying_user_since_must_be_a_whole_number(self):
+		table = {
+			tier: {"amount": 1.0, "last_invoice_amount": 0.0, "paying_user_since": 1} for tier in PRESS_TIERS
+		}
+		table["Growth"]["paying_user_since"] = 1.5
+		self.conf["press_tr_team_tiers"] = table
+		with self.assertRaises(ValueError):
+			self.cleanup()
+		self.assertNotIn("Team Tier", self.db.writes)
 
 	def test_server_plans_and_clusters_stay_unchanged_without_a_region_list(self):
 		self.cleanup()
