@@ -12,20 +12,11 @@ def sync_pricing_fields():
 		{
 			"Site Plan": [
 				{
-					"fieldname": "price_try",
-					"fieldtype": "Currency",
-					"label": "Price (TRY)",
-					"options": "TRY",
-					"precision": "2",
-					"insert_after": "price_usd",
-					"description": "Plan price in Turkish lira.",
-				},
-				{
 					"fieldname": "price_effective_date",
 					"fieldtype": "Date",
 					"label": "Price Start Date",
 					"read_only": 1,
-					"insert_after": "price_try",
+					"insert_after": "price_usd",
 					"description": "First date when the revised price can be enabled.",
 				},
 				{

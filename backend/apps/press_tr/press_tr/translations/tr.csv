@@ -155,11 +155,7 @@ Site plan price change,Site planı fiyat değişikliği,press_tr
 The new monthly plan price is {0} US dollars from {1}.,{1} gününden başlayarak planın aylık fiyatı {0} dolar olur.,press_tr
 The {0} plan has missing limits: {1}.,{0} planının sınırları eksik: {1}.,press_tr
 Contact us to open an Enterprise plan.,Kurumsal plan için bize ulaşın.,press_tr
-Site plans only support Turkish lira.,Site planlarında yalnız Türk lirası kullanabilirsiniz.,press_tr
-Set a Turkish lira price for this paid plan.,Bu ücretli planın Türk lirası fiyatını belirleyin.,press_tr
 Price Start Date,Fiyat Başlangıç Tarihi,press_tr
 First date when the revised price can be enabled.,Yeni fiyatın başlayabileceği ilk tarih.,press_tr
 Previous Plan,Önceki Plan,press_tr
-Price (TRY),Fiyat (Türk lirası),press_tr
-Plan price in Turkish lira.,Planın Türk lirası fiyatı.,press_tr
 Site Plan Price Change,Site Planı Fiyat Değişikliği,press_tr

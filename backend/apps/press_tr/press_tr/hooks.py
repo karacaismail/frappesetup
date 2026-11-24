@@ -299,10 +299,7 @@ doc_events = {
 		"validate": ["press_tr.pricing.reject_early_subscription", "press_tr.plans.reject_operator_plan"]
 	},
 }
-extend_doctype_class = {
-	"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"],
-	"Site Plan": ["press_tr.pricing.SitePlanPricing"],
-}
+extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
 
 # G-9: the plan fields and the plan set. These steps run after the G-8 cleanup.
 after_install = ["press_tr.pricing_schema.sync_pricing_fields", "press_tr.plans.sync_plans"]

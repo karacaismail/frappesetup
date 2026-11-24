@@ -16,7 +16,7 @@ from press.press.doctype.communication_info.communication_info import get_commun
 
 from press_tr.plans import OPERATOR_ROLE, plan_names
 
-PRICE_FIELDS = ("price_try", "price_usd", "price_inr")
+PRICE_FIELDS = ("price_usd", "price_inr")
 PRICE_PATTERN = re.compile(r"[0-9]{1,12}(?:\.[0-9]{1,2})?")
 NOTICE_TYPE = "Site Plan Price Change"
 NOTICE_DAYS = 30
@@ -172,11 +172,3 @@ def notify_team(team, plan, successor, subject, message, recipients):
 		now=True,
 	)
 
-
-class SitePlanPricing:
-	def get_price_per_day(self, currency):
-		if currency != "TRY":
-			frappe.throw(frappe._("Site plans only support Turkish lira.", context="press_tr"))
-		if self.price_usd and not self.price_try:
-			frappe.throw(frappe._("Set a Turkish lira price for this paid plan.", context="press_tr"))
-		return frappe.utils.rounded((self.price_try or 0) / self.period, 2)

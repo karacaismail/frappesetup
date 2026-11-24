@@ -53,6 +53,22 @@ def plan_names(*, self_service=None, trial=None):
 	]
 
 
+def public_plans():
+	"""The plan list for the panel, in US dollars. The Enterprise plan shows a contact message."""
+	return [
+		{
+			"name": plan["name"],
+			"title": plan["title"],
+			"currency": CURRENCY,
+			"price_usd": plan["price_usd"],
+			"self_service": plan["self_service"],
+			"contact_us": plan["price_usd"] is None,
+			"trial_days": TRIAL_DAYS if plan["trial"] else None,
+		}
+		for plan in PLANS
+	]
+
+
 def missing_limits(plan):
 	return [field for field in LIMIT_FIELDS if plan["limits"].get(field) is None]
 
