@@ -10,4 +10,6 @@ class TestInstallation(IntegrationTestCase):
 
 	def test_module_definitions(self):
 		modules = set(frappe.get_all("Module Def", filters={"app_name": "platform_core"}, pluck="name"))
-		self.assertEqual(modules, {"Identity", "Shell", "AI", "Model Gateway", "Mobile", "Access", "Reseller"})
+		self.assertEqual(
+			modules, {"Identity", "Shell", "AI", "Model Gateway", "Mobile", "Access", "Reseller"}
+		)
