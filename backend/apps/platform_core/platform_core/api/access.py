@@ -82,5 +82,5 @@ def list_permission_logs(
 	"""
 	unknown = sorted(set(frappe.form_dict) - {"for_doctype", "for_document", "start", "page_length", "cmd"})
 	if unknown:
-		frappe.throw(_("Unknown field: {0}").format(", ".join(unknown)), permission_log.InvalidInput)
+		frappe.throw(_("Unknown query field: {0}").format(", ".join(unknown)), permission_log.InvalidInput)
 	return permission_log.list_permission_logs(for_doctype, for_document, start, page_length)

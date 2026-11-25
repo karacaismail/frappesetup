@@ -16,6 +16,7 @@ from frappe.utils.password import update_password
 
 from platform_core.access import tenant_admin
 from platform_core.access.tests.base import PASSWORD
+from platform_core.setup import panel_roles
 
 API = "/api/method/platform_core.api.access."
 HOLDER = "pl.yonetici@example.test"
@@ -53,7 +54,9 @@ class TestPermissionLog(IntegrationTestCase):
 		super().setUpClass()
 		cls.site = frappe.local.site
 		frappe.set_user("Administrator")
-		tenant_admin.ensure_role()
+		# The setup step makes the role. The second step gives its permission rows (AJA-899).
+		panel_roles.ensure()
+		tenant_admin.ensure_permissions()
 		if not frappe.db.exists("Role", PLAIN_ROLE):
 			frappe.get_doc(doctype="Role", role_name=PLAIN_ROLE, desk_access=0).insert()
 		_user(HOLDER, [tenant_admin.ROLE])
