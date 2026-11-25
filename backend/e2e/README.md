@@ -22,7 +22,7 @@ Hesap listesi de bu dosyadadır.
 | Hesap | Nerede | Ne için |
 | --- | --- | --- |
 | `inceleme-panel@example.test` | Keycloak `platform` realm'i ve kiracı | Headless paneli inceler. Kiracıda “Employee” ve “HR User” rolleri vardır. Bir örnek çalışan kaydına bağlıdır. |
-| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Kiracıda “System Manager” rolü vardır. |
+| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Hesap kiracıda “Website User” türündedir. Tek rolü “Tenant Admin” rolüdür. |
 | `inceleme-yerel-yonetici` | Keycloak `master` realm'i | Keycloak yönetim konsolunu açar. “admin” rolü vardır. |
 | `inceleme-press@example.test` | Keycloak `platform` realm'i ve Press | Press kullanıcısı olarak girer. |
 
@@ -31,6 +31,11 @@ Keycloak yönetim konsolu `http://identity.localhost:<PANE_PORT>/admin/` adresin
 
 Komut önce yığının adreslerini denetler.
 Adres `localhost` ya da `*.localhost` değilse komut durur.
+
+Komut sonra kiracıdaki rolleri denetler.
+Kiracıda “Tenant Admin” rolü yoksa komut bir hata verir ve durur.
+Komut o zaman hiçbir hesabı değiştirmez.
+Komut yönetici hesabını başka bir rolle açmaz.
 
 `platform` realm'inin parola kuralı en az 12 karakter ister.
 Bu kural üretim kuralıdır ve realm dosyasında değişmez.

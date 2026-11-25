@@ -1131,7 +1131,8 @@ def review_accounts(compose, environment):
 
     tenant_accounts = [
         {**linked(account), "first_name": account["first_name"], "last_name": account["last_name"],
-         "tenant_roles": account["tenant_roles"], "employee": bool(account.get("employee"))}
+         "tenant_roles": account["tenant_roles"], "employee": bool(account.get("employee")),
+         **({"user_type": account["user_type"]} if account.get("user_type") else {})}
         for account in accounts if account.get("tenant_roles")
     ]
     press_accounts = [linked(account) for account in accounts if account.get("press")]
