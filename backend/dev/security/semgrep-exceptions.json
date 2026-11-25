@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "07bb275c72d77ed56146bd1b21ff11ff6c488af13c38596d66d981d9756e7565",
+      "sha256": "5d0a3b59b13f12327dd9c56ddd26faaf887bf355550a42e4027cab6a94ad3e25",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -284,6 +284,12 @@
           "path": "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
           "line": 384,
           "reason": "Saves the chunk plan from prepare_job, a queue step that no endpoint whitelists (G-156). Page and chunk counts are capped by site settings before any row is written. Chunk text is cleared after each attempt and when the job finishes."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/setup/role_profiles.py",
+          "line": 61,
+          "reason": "Inserts a missing panel Role Profile from the app's own setup/role_profile.json during after_install and after_migrate only (G-62, G-168, G-169, G-170, AJA-857). No endpoint whitelists it and the caller passes no data. The profiles hold only the four plain panel roles, never System Manager or Administrator. The borrowed install flag is restored in a finally block."
         }
       ],
       "files": [
@@ -300,7 +306,8 @@
         "backend/apps/platform_core/platform_core/hooks.py",
         "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
         "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
-        "backend/apps/platform_core/platform_core/model_gateway/large_file.py"
+        "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
+        "backend/apps/platform_core/platform_core/setup/role_profiles.py"
       ]
     }
   ]
