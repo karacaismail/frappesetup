@@ -585,6 +585,8 @@ class SiteCheck(unittest.TestCase):
         # developer_mode=1 or mobile_allow_development_http=1 opens plain HTTP paths (review 1).
         fixed = settings.site_fixed_values(SETTINGS)
         self.assertEqual(fixed.get("developer_mode"), "0")
+        self.assertEqual(fixed.get("server_script_enabled"), "0")
+        self.assertEqual(fixed.get("allow_tests"), "0")
         self.assertEqual(fixed.get("mobile_allow_development_http"), "0")
 
     def test_site_value_that_differs_from_its_fixed_value_is_refused(self):
@@ -621,9 +623,34 @@ class SiteCheck(unittest.TestCase):
                            common={"developer_mode": 1})
         self.assertEqual(found[self.SITE]["differs"], ["developer_mode", "mobile_allow_development_http"])
         self.assertEqual(self.probe({"developer_mode": 0})[self.SITE]["differs"], [])
-        self.assertEqual(self.probe({"developer_mode": "0"})[self.SITE]["differs"], [])
+        self.assertEqual(self.probe({"developer_mode": "0"})[self.SITE]["differs"], ["developer_mode"])
         self.assertEqual(self.probe({"developer_mode": False})[self.SITE]["differs"], [])
         self.assertEqual(self.probe({"developer_mode": True})[self.SITE]["differs"], ["developer_mode"])
+
+    def test_development_switches_stop_release_when_enabled(self):
+        for key in ("developer_mode", "server_script_enabled", "allow_tests"):
+            for site_config, common in (({key: True}, {}), ({}, {key: 1})):
+                with self.subTest(key=key, site_config=site_config, common=common):
+                    report = self.probe(site_config, common)[self.SITE]
+                    self.assertEqual(report["differs"], [key])
+                    problems = settings.check_sites(
+                        SETTINGS, {self.SITE: self.complete(differs=report["differs"])}, [self.SITE]
+                    )
+                    self.assertEqual(problems, [f"site {self.SITE}, site_config.json: {key} (must be 0)"])
+
+    def test_server_script_flag_is_not_masked_by_site_override_or_string_zero(self):
+        for bench_value in (True, "0"):
+            with self.subTest(bench_value=bench_value):
+                report = self.probe({"server_script_enabled": 0}, {"server_script_enabled": bench_value})
+                self.assertEqual(report[self.SITE]["differs"], ["server_script_enabled"])
+        report = self.probe({"server_script_enabled": False}, {"server_script_enabled": 0})
+        self.assertEqual(report[self.SITE]["differs"], [])
+
+    def test_allow_tests_requires_numeric_zero_or_false(self):
+        self.assertEqual(self.probe({"allow_tests": "0"})[self.SITE]["differs"], ["allow_tests"])
+        for value in (0, False):
+            with self.subTest(value=value):
+                self.assertEqual(self.probe({"allow_tests": value})[self.SITE]["differs"], [])
 
     def test_press_site_list_is_not_checked_until_the_press_image_exists(self):
         # E-2: no Press image, so no Press site to probe. The list waits; this test says so.

@@ -521,7 +521,9 @@ Jenkins sırları görmez. Bu yüzden denetimi sunucudaki `remote/apply` betiği
 4. Betik yeni kiracı imajıyla her sitenin `site_config.json` dosyasını okur. Bunu `remote/site-probe.py` yapar.
 5. Bir site ayarı eksikse ya da `[sabit]` değerden farklıysa betik durur. Eski sürüm durdurulmaz ve çalışmaya devam eder.
 
-Site ayarlarında iki `[sabit]` değer vardır: `developer_mode` ve `mobile_allow_development_http`. İkisi de üretimde yazılmaz ya da 0 olur. Değer 1 olursa bazı yollar HTTP adresi kabul eder.
+Üretimde dört ayar kapalı kalır. Bunlar `developer_mode`, `mobile_allow_development_http`, `server_script_enabled` ve `allow_tests` ayarlarıdır. Ayarları hiç eklemeyin veya sayı olarak `0` yazın. Sunucu betikleri için bu kural ortak bench ayarına da uygulanır. Ortak bench ayarı, aynı kurulumu paylaşan siteleri etkiler. Frappe bazı denetimlerde metin olarak yazılan `"0"` değerini açık sayar.
+
+Kiracı uygulaması, geliştirme kipi kapalıyken sistem konsolu isteklerini reddeder. Test izni kapalıyken uygulama test modüllerine giden istekleri reddeder.
 
 Site denetimi imajın giriş betiğini çalıştırmaz. Giriş betiği ortak birimdeki `assets` bağını yeniden kurar. Eski sürüm o birimi kullanır.
 
