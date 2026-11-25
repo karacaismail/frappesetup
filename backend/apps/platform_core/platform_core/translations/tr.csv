@@ -861,3 +861,4 @@ Only the approval endpoint fills the approval fields.,Onay alanlarını yalnız 
 An exception record cannot be deleted. Open a revocation record instead.,İstisna kaydı silinmez. Bunun yerine bir kapanış kaydı açın.,platform_core.identity
 Only a grant record waiting for approval can be approved.,Yalnız onay bekleyen izin kaydı onaylanabilir.,platform_core.identity
 This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.identity
+Connected App,Bağlı Uygulamalar,
