@@ -12,6 +12,8 @@ COPY --chown=frappe:frappe apps/platform_core /home/frappe/frappe-bench/apps/pla
 COPY --chown=frappe:frappe apps/hrms_tr /home/frappe/frappe-bench/apps/hrms_tr
 COPY --chown=frappe:frappe dev /workspace/dev
 COPY --chown=frappe:frappe libs/oidc_verify /workspace/libs/oidc_verify
+# AtonotA Login decision code (G-161). Installed as a package; Frappe imports it, nothing is copied into the app.
+COPY --chown=frappe:frappe identity/atonota_login /workspace/identity/atonota_login
 # Colima cannot bind-mount this checkout. The shell tests read their contract from this copy.
 COPY --chown=frappe:frappe contracts/platform_core-shell.openapi.yaml /workspace/contracts/platform_core-shell.openapi.yaml
 COPY --chown=frappe:frappe contracts/platform_core-ai.openapi.yaml contracts/platform_core-identity.openapi.yaml contracts/platform_core-access.openapi.yaml /home/frappe/frappe-bench/contracts/
@@ -19,6 +21,7 @@ COPY --chown=frappe:frappe contracts/platform_core-model-gateway.openapi.yaml /h
 # Ruff matches the version supplied by bench new-app. No Git hooks are installed.
 RUN uv pip install --python env/bin/python --no-deps -e apps/platform_core \
     && uv pip install --python env/bin/python --no-deps /workspace/libs/oidc_verify \
+    && uv pip install --python env/bin/python --no-deps /workspace/identity/atonota_login \
     && uv pip install --python env/bin/python ruff==0.14.10 -r /workspace/dev/requirements-contract-tests.txt \
     && uv pip install --python env/bin/python --no-deps -e apps/hrms_tr \
     && printf '\nplatform_core\nhrms_tr\n' >> sites/apps.txt

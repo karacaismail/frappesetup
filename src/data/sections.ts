@@ -82,6 +82,11 @@ export const SECTIONS: Record<string, SectionMeta> = {
     icon: 'key',
     summary: 'Bağımsız giriş ürünü: Keycloak ile Frappe iş bölümü, giriş yolu, platformlar ve ücretli kullanım.',
   },
+  'atonota-login-tanitim': {
+    group: 'Teslim',
+    icon: 'key',
+    summary: 'AtonotA Login tanıtım taslağı: değer önerileri, gereksinim bağları, biten ve yakında gelen özellikler.',
+  },
   'acik-kararlar': { group: 'Teslim', icon: 'alert', summary: 'Açık kararlar, riskler ve dış bağımlılıklar.' },
   izlenebilirlik: {
     group: 'Teslim',

@@ -65,7 +65,7 @@ class ServiceTokenTest(unittest.TestCase):
         body = jwt_payload(request_body["access_token"])
         roles = set(body["resource_access"]["realm-management"]["roles"])
         # Contract 26a274c: user and organization write roles, nothing realm-wide.
-        self.assertTrue({"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"} <= roles, roles)
+        self.assertTrue({"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations", "view-identity-providers"} <= roles, roles)
         self.assertFalse({"manage-realm", "manage-clients", "realm-admin", "impersonation"} & roles, roles)
         self.assertIn("realm-management", audiences(body))
         self.assertIn(f"{get_environment_value('KC_PUBLIC_URL')}/admin/realms/platform", audiences(body))

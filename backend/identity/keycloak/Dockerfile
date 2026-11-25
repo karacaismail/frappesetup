@@ -18,8 +18,10 @@ ARG MAGICLINK_COMMIT=7b4ee949a39a7ee953987162479ae1da2c57c3cb
 ADD --checksum=sha256:fbcf7ec1ce2343d60c79ccdc4bb287e0ecb62b9f82eab181599c27faa8611792 \
     https://github.com/cloudflightio/keycloak-magic-link/archive/${MAGICLINK_COMMIT}.tar.gz /tmp/magiclink.tar.gz
 WORKDIR /build
-RUN tar -xzf /tmp/magiclink.tar.gz --strip-components=1 \
-    && cd keycloak-magic-link \
+RUN tar -xzf /tmp/magiclink.tar.gz --strip-components=1
+# G-162: our changed files go over the pinned source (magic-link-fork/NOTICE). The archive stays pinned.
+COPY magic-link-fork/src/ /build/keycloak-magic-link/src/
+RUN cd keycloak-magic-link \
     && mvn -q -B -DskipTests -Dkeycloak.version=${KEYCLOAK_VERSION} package \
     && cp target/keycloak-magic-link-*.jar /build/keycloak-magic-link.jar
 

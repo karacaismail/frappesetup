@@ -38,6 +38,7 @@ MANAGEMENT_ROLES = {
     "manage-users",
     "view-organizations",
     "manage-organizations",
+    "view-identity-providers",  # AJA-459: the sign-in platform list; manage-identity-providers is not given
     "query-groups",  # Keycloak composite of view-users
     "query-organizations",  # Keycloak composite of view-organizations
 }

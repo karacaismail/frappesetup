@@ -73,6 +73,11 @@ services:
 
   tenant-web:
     <<: *tenant
+    # --forwarded-allow-ips: nginx runs in the frontend container and sends X-Forwarded-Proto.
+    # Without the option gunicorn keeps http and Frappe writes the sid cookie without Secure
+    # (G-13). Other containers on the same networks also reach this port. The boundary is that the
+    # service publishes no port and Caddy drops the client's X-Forwarded-Proto: it has no
+    # trusted_proxies (tests/test_panel_session.py).
     command:
       - env/bin/gunicorn
       - --chdir=/home/frappe/frappe-bench/sites
@@ -83,6 +88,7 @@ services:
       - --worker-tmp-dir=/dev/shm
       - --timeout=120
       - --preload
+      - --forwarded-allow-ips=*
       - frappe.app:application
     healthcheck:
       test:
@@ -206,6 +212,11 @@ services:
   press-web:
     <<: *press
     profiles: [press]
+    # --forwarded-allow-ips: nginx runs in the frontend container and sends X-Forwarded-Proto.
+    # Without the option gunicorn keeps http and Frappe writes the sid cookie without Secure
+    # (G-13). Other containers on the same networks also reach this port. The boundary is that the
+    # service publishes no port and Caddy drops the client's X-Forwarded-Proto: it has no
+    # trusted_proxies (tests/test_panel_session.py).
     command:
       - env/bin/gunicorn
       - --chdir=/home/frappe/frappe-bench/sites
@@ -216,6 +227,7 @@ services:
       - --worker-tmp-dir=/dev/shm
       - --timeout=120
       - --preload
+      - --forwarded-allow-ips=*
       - frappe.app:application
     healthcheck:
       test:
