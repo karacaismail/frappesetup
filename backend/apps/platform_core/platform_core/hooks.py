@@ -14,6 +14,8 @@ before_request = [
 	"platform_core.identity.login_policy.before_request",
 	"platform_core.identity.session_policy.before_request",
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
+	# G-53: users without the Platform Operator role go from /app and /desk to the panel.
+	"platform_core.config.desk_policy.before_request",
 ]
 on_session_creation = ["platform_core.identity.session_policy.on_session_creation"]
 # Keep the idle clock across site cache clears. Frappe matches prefixes.
@@ -60,6 +62,8 @@ after_install = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
+	# G-53: Desk notices off, the panel is the home page.
+	"platform_core.config.desk_policy.apply",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
@@ -67,12 +71,14 @@ after_migrate = [
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 	"platform_core.config.turkey_setup.apply",
+	"platform_core.config.desk_policy.apply",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
-fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
+# G-53: the Platform Operator role keeps the Desk open.
+fixtures = [{"dt": "Role", "filters": [["name", "in", ["PLT AI Manager", "Platform Operator"]]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
