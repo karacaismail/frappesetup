@@ -1,0 +1,27 @@
+{
+  "requirement": "G-50",
+  "note": "Starting values. Tune them with load measurements (G-149).",
+  "release_group": {
+    "min_gunicorn_workers": 2,
+    "max_gunicorn_workers": 8,
+    "min_background_workers": 2,
+    "max_background_workers": 6,
+    "gunicorn_threads_per_worker": 2,
+    "use_rq_workerpool": 1,
+    "merge_default_and_short_rq_queues": 1
+  },
+  "gunicorn_worker_class": "gthread",
+  "bench": {
+    "auto_scale_workers": 1
+  },
+  "common_site_config": {
+    "scheduler_tick_interval": 60,
+    "workers": {
+      "long": {"timeout": 3000},
+      "reports": {}
+    }
+  },
+  "system_settings": {
+    "enable_scheduler": 1
+  }
+}
