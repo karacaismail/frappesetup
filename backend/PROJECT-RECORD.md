@@ -416,6 +416,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Gönderim adımları [devir notundadır](docs/handoff/press-upstream-proposal.md).
   - Bu karar önce O-55 numarasını taşıyordu. O-55 ve O-56 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-57 oldu.
 
+- **O-62. Press TR test paketi Press çekirdek dosyalarını karşılaştırır.**
+  - Test, yerel koşudan önce ve sonra dosyaları karşılaştırır.
+  - Test, dosya eklenirse, silinirse veya değişirse başarısız olur.
+  - Test, kurulumda uygulanmış uyum yamalarını ilk ölçüme dahil eder.
+  - Eklerin listesi ve test adımları [devir notundadır](docs/handoff/press-tr-extension-test.md).
+  - Bu karar önce O-54 numarasını taşıyordu. O-54 ile O-61 arasındaki numaralar başka kararlara verildi. Karar 25 Kasım 2026 Çarşamba günü O-62 oldu.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
