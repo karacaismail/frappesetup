@@ -22,7 +22,10 @@ Hesap listesi de bu dosyadadır.
 | Hesap | Nerede | Ne için |
 | --- | --- | --- |
 | `inceleme-panel@example.test` | Keycloak `platform` realm'i ve kiracı | Headless paneli inceler. Kiracıda “Employee” ve “HR User” rolleri vardır. Bir örnek çalışan kaydına bağlıdır. |
-| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Hesap kiracıda “Website User” türündedir. Tek rolü “Tenant Admin” rolüdür. |
+| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Hesap kiracıda “Website User” türündedir. Tek rolü “Tenant Admin” rolüdür. Rolü “Tenant Admin” Role Profile kaydı verir. |
+| `inceleme-yonetici-yardimci@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracı yöneticisine yardım eder. Hesap kiracıda “Website User” türündedir. Tek rolü “Tenant Admin Assistant” rolüdür. Rolü aynı adlı Role Profile kaydı verir. |
+| `inceleme-bayi@example.test` | Keycloak `platform` realm'i ve kiracı | Bayiyi yönetir. Hesap kiracıda “Website User” türündedir. Tek rolü “Reseller Admin” rolüdür. Rolü aynı adlı Role Profile kaydı verir. |
+| `inceleme-bayi-yardimci@example.test` | Keycloak `platform` realm'i ve kiracı | Bayi yöneticisine yardım eder. Hesap kiracıda “Website User” türündedir. Tek rolü “Reseller Assistant” rolüdür. Rolü aynı adlı Role Profile kaydı verir. |
 | `inceleme-yerel-yonetici` | Keycloak `master` realm'i | Keycloak yönetim konsolunu açar. “admin” rolü vardır. |
 | `inceleme-press@example.test` | Keycloak `platform` realm'i ve Press | Press kullanıcısı olarak girer. |
 
@@ -36,6 +39,33 @@ Komut sonra kiracıdaki rolleri denetler.
 Kiracıda “Tenant Admin” rolü yoksa komut bir hata verir ve durur.
 Komut o zaman hiçbir hesabı değiştirmez.
 Komut yönetici hesabını başka bir rolle açmaz.
+
+Dört panel rolü vardır.
+Her rolün bir deneme hesabı vardır.
+Rolü hesaba Role Profile kaydı verir.
+Hiçbir deneme hesabında “System Manager” rolü yoktur.
+Dosyaya bu rol yazılırsa komut durur.
+Önceki bir koşu bu rolü verdiyse komut rolü geri alır.
+Kiracıda bir rol ya da Role Profile kaydı yoksa komut durur.
+Komut o zaman hiçbir hesabı değiştirmez.
+
+Dosyada iki örnek bayi vardır.
+Her bayinin bir örnek müşterisi vardır.
+Komut her bağ için bir “Reseller Customer Link” kaydı açar.
+Bu kayıt bayi kiracısını müşteri kiracısına bağlar.
+Birinci bayi yığının kiracısıdır: `tenant1.localhost`.
+Bayi hesapları bu kiracıda oturum açar.
+İkinci bayi `bayi-iki.example.test` adını taşır.
+İkinci bayi yalnız bağ kaydında durur.
+Yığında ikinci bayinin sitesi yoktur.
+Bu kayıt bir şeyi göstermek için vardır.
+Birinci bayi ikinci bayinin müşterisini görmez.
+Müşteri adları ve adresleri örnektir.
+Adresler `.example.test` ile biter.
+Kiracıda “Reseller Customer Link” türü yoksa komut durur.
+
+Komutu iki kez çalıştırabilirsiniz.
+İkinci koşu aynı kayıtları bulur ve hata vermez.
 
 `platform` realm'inin parola kuralı en az 12 karakter ister.
 Bu kural üretim kuralıdır ve realm dosyasında değişmez.
