@@ -3363,6 +3363,51 @@
   },
   {
     "rule": "B404",
+    "file": "backend/dev/tests/test_config_layers.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for the config audit command-line test.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_config_layers.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "4ff2442aef40878afc2de2e7fe077e075c54c07c2c0d98db51d77a15627418e9",
+    "reason": "Test runs its own Python on a fixed audit script with a temporary directory.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/verify_config_layers_bench.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for the disposable bench verification script.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/verify_config_layers_bench.py",
+    "code": "return subprocess.check_output([\"bench\", *args], text=True)",
+    "statementSha256": "44ea437c97f9b038f874e75037d0bd583874a8722cce2a34e3cdf0b1c8ef6a27",
+    "reason": "Fixed bench command with argument list and no shell, run only in a disposable container.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/tests/verify_config_layers_bench.py",
+    "code": "return subprocess.check_output([\"bench\", *args], text=True)",
+    "statementSha256": "44ea437c97f9b038f874e75037d0bd583874a8722cce2a34e3cdf0b1c8ef6a27",
+    "reason": "The disposable bench container supplies bench on PATH.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
     "file": "backend/dev/tests/test_source_ledger.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
