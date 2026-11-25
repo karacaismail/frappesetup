@@ -30,7 +30,7 @@
    "pr": 54,
    "commit": "877cfb18"
   },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. 25 Kasım 2026 Çarşamba günü PR 49 yayını okundu. Yayın commit'i d3e8e891 commit'idir. G-155 Bitti oldu. Kanıt c9725c79 birleşmesi ve iki test dosyasıdır. Testler yerel Frappe yığınında geçti. G-40 ve G-41 Sürüyor durumundadır. Kod ve testler 52c05bff birleşmesindedir. Gerçek Frappe sitesi isteyen testler koşmadı. Canlıda denenmeyen dağıtım işi de Sürüyor kalır. Yayındaki üç işin gereksinim bağı bulunamadı. Bunlar ef5e0a5c, ab55d7c5 ve 116a5f6e birleşmeleridir. Bu işler için kayıt yazılmadı. Aynı gün PR 54 yayını okundu. Yayın commit'i 877cfb18 commit'idir. Kaynak ff22c889 birleşmesidir. G-38 Sürüyor oldu. Kod 63b67808 birleşmesindedir. Gerçek bench'te bench show-config kanıtı yoktur. G-50 Sürüyor oldu. Kod 360a0c99 birleşmesindedir. Beş canlı adım yapılmadı. O-55 IPv6 notu 1db5a37a birleşmesindedir. G-163 Sürüyor kalır. Canlı deneme listesi 8d54750d birleşmesindedir. Bu işin gereksinim kaydı yoktur. PR 38 ve PR 52 site işleri 42211a43 ve ff22c889 birleşmeleridir. Bu işlerin gereksinim bağı bulunamadı. Bu işler için kayıt yazılmadı. G-49 Sürüyor oldu. Kod 8c80e673 commit'indedir. Test backend/apps/press_tr/tests/test_backup_keys.py dosyasıdır. Bu bilgi ayrı bir pano denetiminden gelir.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-11 Press erişim izinleri 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 2c21c9f5 birleşmesi ve test_press_access.py dosyasıdır. Testleri 3a918f8b commit'i ekledi. Gerçek Frappe denemesinde 8 testin 8'i geçti. Birleşme PR 42 ile yayımlandı ama canlıda denenmedi. G-13 Sürüyor kalır. Kod kanıtı 9f128360 commit'i ve test_panel_session.py dosyasıdır. Bu kanıt fed71b33 birleşmesiyle PR 43 üzerinden main dalına yayımlandı. Canlı madde açıktır: panel alan adında oturum çerezi ve anlık olay denenmedi. Bu denemeyi DevOps sorumlusu yapacak. G-81 kimlik eşitleme 24 Kasım 2026 Salı günü Bitti oldu. Kanıt b9c07e62 birleşmesi ve test_g81_closure.py dosyasıdır. Kanıt notunu 763dfab4 commit'i ekledi. Yerel ortamda kimlik eşitlemede 6 testin 6'sı geçti. Java eklentisinde 40 testin 40'ı geçti. Birleşme PR 44 ile yayımlandı ama canlıda denenmedi. G-104 İK yetki sözleşmesi 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 4abc0cb3 birleşmesi ve test_permission_matrix.py dosyasıdır. Yetki tablosu notunu 96509586 commit'i ekledi. Gerçek Frappe denemesinde İK yetki testlerinde 8 testin 8'i geçti. Yetki tablosunda 7 testin 7'si geçti. Birleşme PR 45 ile yayımlandı ama canlıda denenmedi. 25 Kasım 2026 Çarşamba günü PR 49 yayını okundu. Yayın commit'i d3e8e891 commit'idir. G-155 Bitti oldu. Kanıt c9725c79 birleşmesi ve iki test dosyasıdır. Testler yerel Frappe yığınında geçti. G-40 ve G-41 Sürüyor durumundadır. Kod ve testler 52c05bff birleşmesindedir. Gerçek Frappe sitesi isteyen testler koşmadı. Canlıda denenmeyen dağıtım işi de Sürüyor kalır. Yayındaki üç işin gereksinim bağı bulunamadı. Bunlar ef5e0a5c, ab55d7c5 ve 116a5f6e birleşmeleridir. Bu işler için kayıt yazılmadı. Aynı gün PR 54 yayını okundu. Yayın commit'i 877cfb18 commit'idir. Kaynak ff22c889 birleşmesidir. G-38 Sürüyor oldu. Kod 63b67808 birleşmesindedir. Gerçek bench'te bench show-config kanıtı yoktur. G-50 Sürüyor oldu. Kod 360a0c99 birleşmesindedir. Beş canlı adım yapılmadı. O-55 IPv6 notu 1db5a37a birleşmesindedir. G-163 Sürüyor kalır. Canlı deneme listesi 8d54750d birleşmesindedir. Bu işin gereksinim kaydı yoktur. PR 38 ve PR 52 site işleri 42211a43 ve ff22c889 birleşmeleridir. Bu işlerin gereksinim bağı bulunamadı. Bu işler için kayıt yazılmadı. G-49 Sürüyor oldu. Kod 8c80e673 commit'indedir. Test backend/apps/press_tr/tests/test_backup_keys.py dosyasıdır. Bu bilgi ayrı bir pano denetiminden gelir.",
   "reviewed": [
    "G-155",
    "G-156",
@@ -287,8 +287,18 @@
   },
   "G-11": {
    "epic": "press-ext",
-   "status": "in-progress",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "2c21c9f5",
+    "release": {
+     "pr": 42,
+     "commit": "34dbdaeb"
+    },
+    "tests": [
+     "backend/apps/press_tr/tests/test_press_access.py"
+    ]
+   }
   },
   "G-12": {
    "epic": "identity",
@@ -724,8 +734,18 @@
   },
   "G-81": {
    "epic": "identity",
-   "status": "in-progress",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "b9c07e62",
+    "release": {
+     "pr": 44,
+     "commit": "1c326c33"
+    },
+    "tests": [
+     "backend/identity/identity_sync/tests/test_g81_closure.py"
+    ]
+   }
   },
   "G-82": {
    "epic": "ai",
@@ -849,8 +869,18 @@
   },
   "G-104": {
    "epic": "app-framework",
-   "status": "in-progress",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "4abc0cb3",
+    "release": {
+     "pr": 45,
+     "commit": "e4bce744"
+    },
+    "tests": [
+     "backend/apps/hrms_tr/hrms_tr/tests/test_permission_matrix.py"
+    ]
+   }
   },
   "G-105": {
    "epic": "app-framework",
