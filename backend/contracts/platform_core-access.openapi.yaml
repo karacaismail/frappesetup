@@ -400,6 +400,71 @@ paths:
         "417":
           description: The document type is a child table.
 
+  /platform_core.api.access.list_permission_logs:
+    get:
+      tags: [role-permissions]
+      operationId: listPermissionLogs
+      summary: Returns a page of Permission Log rows, the newest first (G-62, G-98).
+      description: |
+        Frappe writes a Permission Log row when a role profile, the roles of a user
+        or a permission row changes. The endpoint reads these rows. It changes no record.
+
+        Only the “System Manager” and “Tenant Admin” roles call this endpoint.
+        The endpoint is on the shell's allow-list (`website_user_allowed_methods`).
+        Every other caller gets 403. The document route of “Permission Log” stays closed
+        to the “Tenant Admin” role.
+        An unknown query field gets 400.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: for_doctype
+          in: query
+          required: false
+          description: Only rows of this document type. For example `User` or `Role Profile`.
+          schema: {type: string, maxLength: 140}
+        - name: for_document
+          in: query
+          required: false
+          description: Only rows of this record.
+          schema: {type: string, maxLength: 140}
+        - name: start
+          in: query
+          required: false
+          description: The number of rows to skip.
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: page_length
+          in: query
+          required: false
+          description: The number of rows in the page.
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200":
+          description: A page of rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [logs, start, page_length, has_more]
+                    properties:
+                      logs:
+                        type: array
+                        items: {$ref: "#/components/schemas/PermissionLogRow"}
+                      start: {type: integer}
+                      page_length: {type: integer}
+                      has_more:
+                        type: boolean
+                        description: True when a next page exists.
+        "400":
+          description: A query field is unknown, or a number is out of range.
+        "401":
+          $ref: "#/components/responses/SessionExpired"
+        "403":
+          description: A guest request, or the caller has neither of the two manager roles.
+
   /platform_core.api.access.set_role_permission:
     post:
       tags: [role-permissions]
@@ -954,6 +1019,22 @@ components:
       description: The Frappe session cookie. A POST request also needs the `X-Frappe-CSRF-Token` header.
 
   schemas:
+    PermissionLogRow:
+      type: object
+      additionalProperties: false
+      required: [name, changed_at, changed_by, for_doctype, for_document, reference_type, reference, status, changes]
+      properties:
+        name: {type: string}
+        changed_at: {type: string, description: The time of the change in the site's time zone.}
+        changed_by: {type: [string, "null"], description: The user who made the change.}
+        for_doctype: {type: string, description: The document type the change is about.}
+        for_document: {type: string, description: The record the change is about.}
+        reference_type: {type: [string, "null"], description: The type of the changed record, if it differs.}
+        reference: {type: [string, "null"], description: The changed record, if it differs.}
+        status: {type: string, enum: [Added, Updated, Removed]}
+        changes:
+          type: object
+          description: The changed fields, as `from` and `to` values.
     RolePermissionRow:
       type: object
       description: A permission row. Each right is 0 or 1.

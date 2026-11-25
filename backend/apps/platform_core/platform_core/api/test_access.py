@@ -117,3 +117,27 @@ class TestAccessEndpoints(AccessRuleTestCase):
 
 		self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+
+	# --- G-98: the Permission Log page. The holder's own tests are in `access/tests/test_permission_log.py`. ---
+
+	def test_list_permission_logs_guest_denied(self):
+		response = self.api(self.anonymous(), "GET", "list_permission_logs", query={"for_doctype": DOCTYPE})
+
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("message", response.json)
+
+	def test_list_permission_logs_foreign_data_denied(self):
+		"""An employee reads no log row, not even the rows of its own record."""
+		client = self.login(EMPLOYEE_1)
+
+		for query in (
+			{},
+			{"for_doctype": DOCTYPE},
+			{"for_doctype": DOCTYPE, "for_document": self.records[EMPLOYEE_1]},
+			{"for_doctype": DOCTYPE, "for_document": self.records[EMPLOYEE_2]},
+		):
+			with self.subTest(query=query):
+				response = self.api(client, "GET", "list_permission_logs", query=query)
+
+				self.assertEqual(response.status_code, 403)
+				self.assertNotIn("message", response.json)

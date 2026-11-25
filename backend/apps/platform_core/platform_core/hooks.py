@@ -174,6 +174,10 @@ website_user_allowed_methods = [
 	"platform_core.api.reseller.list_customers",
 	"platform_core.api.reseller.customer_status",
 	"platform_core.api.reseller.request_customer",
+	# G-98: the panel's user management. The endpoints refuse everyone but the two manager roles.
+	"platform_core.api.access.list_permission_logs",
+	"platform_core.api.identity.set_user_role_profiles",
+	"platform_core.api.identity.invite_user",
 	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
