@@ -1,6 +1,6 @@
 # G-50 işçi, zamanlayıcı ve kuyruk ayarları
 
-Bu not canlı adımları anlatır. Adımları Hüseyin Cengiz uygular.
+Bu not canlı adımları anlatır. Adımları kıdemli DevOps sorumlusu uygular.
 Adımlar önce yetkili deneme ortamında denenir.
 
 ## Kaynaklar
