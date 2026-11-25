@@ -6,9 +6,11 @@ order: 28
 
 AtonotA Login bir giriş ürünüdür. Kullanıcı uygulamaya bu ürünle girer. Ürünün adı tam olarak "AtonotA Login" yazılır. Ad büyük A ile başlar ve büyük A ile biter.
 
-Ürünün kararlarını proje sahibi 23 Kasım 2026 Pazartesi günü verdi. Kararlar kesindir. Sitedeki karar kaydı K-61'dir. Ürünün geliştirilmesi MVP sonrasıdır. MVP, ilk kullanılabilir sürüm demektir. Bu yüzden ürün P7 fazındadır.
+Ürünün kararlarını proje sahibi 23 Kasım 2026 Pazartesi günü verdi. Kararlar kesindir. Sitedeki karar kaydı K-61'dir. Ürün P7 fazındadır.
 
-Bu sayfa bir tasarım çerçevesidir. Ürün henüz kurulmadı. Sayfadaki kurallar gereksinimdir. Çalışan bir sistemin özelliği değildir.
+Proje sahibi aynı gün ürünün geliştirilmesini başlattı. Backend kaydında bu karar O-56'dır. Ürünün ilk kodu yazıldı. Kod yerel testlerden geçti ve PR 23 ile yayımlandı. Ürün canlıda değildir. Bu yüzden sayfadaki kurallar hâlâ gereksinimdir. Çalışan bir sistemin özelliği değildir.
+
+Bugünkü durum sayfanın sonundaki [Bugünkü durum](#bugünkü-durum) bölümündedir.
 
 ## Ürün nedir?
 
@@ -56,6 +58,8 @@ Frappe her işlemde üç soru sorar:
 3. Güncel kanıt ne diyor?
 
 Bilinmeyen zorunlu koşul işlemi açmaz. Bu kuralın gereksinimi G-161'dir.
+
+İşlem kararının çekirdeği yazıldı. Çekirdek her işlemde en az bir zorunlu kontrol ister. Kontrolü olmayan işlem reddedilir. Bitiş zamanı olmayan kanıt geçerli sayılmaz. Çekirdek artık Frappe'ye bağlıdır. İşlem kararı için Frappe'de iki uç vardır. Birinci uç, bir işlemin şimdi yapılıp yapılamayacağını söyler. İkinci uç ücretli plan açar. Kanıtı sunucu kendi kayıtlarından toplar. Tarayıcıdan gelen kanıt ve roller okunmaz. Uçlar yerel testlerden geçti. Uçlar canlı sunucuda denenmedi.
 
 ## Giriş yolu ve adresler
 
@@ -113,14 +117,61 @@ Kullanıcı birçok platformla oturum açabilir. Örnekler şunlardır: Google, 
 
 Platform listesi veriyle gelir. Kodda sabit liste olmaz. Bu kural şöyle çalışır:
 
-1. Her platform Keycloak'ta bir kimlik sağlayıcı kaydıdır.
-2. Kayıtlar sürümlü bir veri dosyasından yüklenir.
-3. Giriş ekranı düğmeleri bu kayıtlardan çizer.
-4. Yeni platform için yalnız yeni kayıt eklenir. Kod değişmez.
+1. Her platform bir veri dosyasıdır. Dosya ürün klasöründe durur.
+2. Bir komut bu dosyalardan Keycloak'ın kimlik sağlayıcı kayıtlarını üretir.
+3. Bir test, kayıtların veri dosyalarıyla aynı kaldığını denetler.
+4. Giriş ekranı düğmeleri bu kayıtlardan çizer.
+5. Yeni platform için yalnız yeni dosya eklenir. Kod değişmez.
 
-Platformun gizli anahtarı veri dosyasına yazılmaz. Anahtar sır deposundan gelir. Dönüş adresi platformun panelinde tam adres olarak kayıtlıdır. Bu kuralların gereksinimi G-159'dur.
+Beş platformun kaydı hazırdır:
 
-Dış hesap e-postayla bağlanmaz. Bağ, platformun adı ve değişmeyen kullanıcı numarasıyla kurulur. Kuruluş şirket girişini zorunlu kıldıysa sosyal giriş bu kuralı aşamaz. Bu kuralların gereksinimi G-160'tır.
+| Platform | Kayıt durumu |
+| --- | --- |
+| Google | Açılabilir |
+| Apple | Açılabilir |
+| LinkedIn | Açılabilir |
+| Facebook | Kapalı |
+| X | Kapalı |
+
+Facebook ve X, e-postanın doğrulandığını Keycloak'a bildirmez. Bu yüzden iki kayıt kapalıdır. Önce ek bir denetim yazılır. Sonra kayıtlar açılır.
+
+Platformun gizli anahtarı veri dosyasına yazılmaz. Dosya yalnız ortam değişkeninin adını yazar. Bütün değişkenleri dolu olan platform açılır. Bir değişken boşsa platform kapalı kalır. O zaman düğmesi giriş ekranında görünmez.
+
+Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını ya da PKCE'yi kapatan kayıt reddedilir. Platform adresleri https kullanır. Dönüş adresi platformun panelinde tam adres olarak kayıtlıdır. Bu kuralların gereksinimi G-159'dur.
+
+Gerçek platform hesapları henüz açılmadı. Bu iş dış iştir. DevOps sorumlusu her platformun kendi panelinde bir istemci açar. Ajan bu işi yapmaz.
+
+## Dış hesap bağlama
+
+Dış hesap e-postayla bağlanmaz. Bağ, platformun adı ve değişmeyen kullanıcı numarasıyla kurulur. Kural Keycloak'ta ayrı bir giriş akışıyla uygulanır:
+
+1. Platform e-postanın doğrulandığını bildirmezse giriş reddedilir. Hesap açılmaz.
+2. Aynı e-postalı hesap yoksa yeni hesap açılır. Kullanıcı e-posta adresini kendisi yazamaz.
+3. Aynı e-postalı hesap varsa Keycloak kullanıcıya sorar. Kullanıcı bağlamayı onaylar.
+4. Sonra kullanıcı var olan hesabın parolasıyla yeniden oturum açar.
+5. E-posta eşleşmesi tek başına bağ kurmaz. E-postaya gelen bağlantı da bağ kurmaz.
+
+Bu kurallar önceden ele geçirmeyi önler. Önceden ele geçirme, başkasının e-postasıyla o kişiden önce hesap açmaktır.
+
+Parolası olmayan kullanıcı bu yolla bağ kuramaz. Bu kişi önce hesabına parola ekler. Bu kısıtlama bilinçlidir.
+
+Kuruluş şirket girişini zorunlu kılabilir. O zaman kullanıcı sosyal platformla giremez. Bu kural bir role bağlıdır. Rolü veren üyelik kodu henüz yazılmadı. Bu kuralların gereksinimi G-160'tır.
+
+### Şirket giriş sağlayıcısı
+
+Şirket giriş sağlayıcısı, kuruluşun kendi giriş sistemidir. Bu sağlayıcı da e-postanın doğrulandığını bildirmelidir. Bildirmeyen sağlayıcı önceden ele geçirmeye açıktır.
+
+DevOps sorumlusu `atonota-login apply` komutunu çalıştırır. Komut her şirket sağlayıcısını denetler. Komut şu durumlarda hata verir:
+
+- Sağlayıcı e-postaya denetimsiz güvenir.
+- Sağlayıcıda e-posta kuralı yoktur. Onaylı istisna kaydı da yoktur.
+- İstisna kaydının süresi geçmiştir.
+
+Komut sağlayıcıyı kapatmaz. Sağlayıcıyı kapatma kararını DevOps sorumlusu verir.
+
+İstisna kaydı Frappe'de durur. Kaydı bir kişi ister. Başka bir kişi kaydı onaylar. Ajan kaydı onaylayamaz. Onaylanan kayıt değişmez ve silinmez. Değişiklik için yeni bir kayıt açılır.
+
+Sosyal platform istisna alamaz. Kayıttaki alan adı kuruluşa ait olmalıdır. Herkese açık e-posta servisleri kabul edilmez. Örneğin `gmail.com` kabul edilmez. Alan adını DNS'te sorgulayan kod henüz yoktur. Bu kod yazılana kadar kayıt yalnız kanıt alanını zorunlu tutar.
 
 ## Kullanıcı yolculukları
 
@@ -163,7 +214,7 @@ Sunucu tarafında iş şöyle bölünür:
 - İş kuralı yalnız Keycloak belirtecindeki eski role bırakılmaz. Sunucu her korunan istekte yeniden denetler.
 - Her kaydın değişmeyen bir kimliği ve kuruluş kapsamı vardır.
 - Ham belge ve yüz verisi karar kaydına kopyalanmaz.
-- Dış sağlayıcının bildirimi imza denetiminden geçer. Sonra kalıcı gelen kutusuna yazılır. Aynı bildirim iki kez işlenmez (G-164).
+- Dış sağlayıcının bildirimi imza denetiminden geçer. Sonra kalıcı gelen kutusuna yazılır. Aynı bildirim iki kez işlenmez (G-164). Gelen kutusu artık Frappe'ye bağlıdır. Bildirimi Frappe'deki `verification_notice` ucu alır. Doğrulama sağlayıcısı seçilmedi. Bu yüzden uç şimdilik her bildirimi geri çevirir. Doğrulamayı başlatan kod da henüz yoktur.
 
 Analiz Frappe'de on kayıt türü önerir. Kayıt türleri şunlardır:
 
@@ -180,11 +231,11 @@ Analiz Frappe'de on kayıt türü önerir. Kayıt türleri şunlardır:
 
 Bu kayıtlar henüz yoktur. Adları kurulumda kesinleşir.
 
-Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcısı seçilmedi. Değer boşken ilgili zorunlu işlem açılmaz (G-167).
+Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcısı seçilmedi. Değer boşken ilgili zorunlu işlem açılmaz. Sonuç "yapılandırma gerekiyor" olur (G-167). Bu kurallar ürün klasöründe bir veri dosyasındadır. Her kuralın sahibi dosyada yazılıdır. Kural boşsa Frappe bir görev açar. Görev "System Manager" rolüne açılır. Kural sahibinin adı görevin metnindedir.
 
 ## Tanıtım sayfası
 
-Ürünün bir tanıtım sayfası olur. Sayfa bu işte yapılmadı. Sayfanın içeriği ve kuralları aşağıdadır (G-165).
+Ürünün bir tanıtım sayfası olur (G-165). Sayfanın taslağı [AtonotA Login tanıtımı](/frappesetup/atonota-login-tanitim/) sayfasındadır. Ürün sahibi taslağı henüz onaylamadı. Sayfanın kuralları aşağıdadır.
 
 Sayfa şu değer önerilerini anlatır. Her öneri, yeteneği kurulunca tanıtım sayfasına girer:
 
@@ -209,7 +260,7 @@ Sayfanın kuralları şunlardır:
 
 Müşteri ürünü ücret karşılığında alıp kullanabilir. Plan, fiyat ve ölçü birimi açık karardır. Bu kararlar ürün sahibinindir. Bu sayfa fiyat yazmaz.
 
-Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapısı kurulmaz. Fiyat kararı kapanmadan ücretli plan açılmaz (G-166).
+Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapısı kurulmaz. Fiyat kararı kapanmadan ücretli plan açılmaz (G-166). Fiyat kuralının değeri bu yüzden boştur. İşlem kararı ücretli planı açmaz.
 
 ## Lisans
 
@@ -222,18 +273,20 @@ Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapı
 
 Keycloak'ın kodu ürüne kopyalanmaz ve değiştirilmez. Ürün Keycloak'ın eklenti yollarını kullanır. Bu kuralın gereksinimi G-157'dir.
 
+Ürün klasörü kendi MIT lisans dosyasını taşır. Keycloak ve eklentileri ayrı bir listede durur. Bu liste Apache-2.0 lisanslı parçaları adlandırır. Bir olay eklentisi Apache-2.0 lisanslı bir çataldır. Bu eklenti kendi lisansını korur.
+
 ## Faz kararı
 
 Ürün yeni P7 fazına bağlandı. P7, P1 ve P2 bitince açılır.
 
 Kararın gerekçesi şudur:
 
-- Ürünün geliştirilmesi MVP sonrasıdır. Var olan fazlar platformun kendi işlerini taşır.
+- Var olan fazlar platformun kendi işlerini taşır.
 - Ürün Keycloak girişine dayanır. Keycloak girişi P1'de kurulur.
 - Ürün ücretlidir. Tahsilat P2'de kurulur.
 - Ürün ayrı satılır. Bu yüzden kendi çıkış ölçütü olmalıdır.
 
-MVP'de yalnız bu kararla çelişen yerler düzeltilir. Örneğin eski `id.` adresi `api.login.atonota.net` oldu.
+Önce MVP'de yalnız çelişen yerler düzeltildi. Örneğin eski `id.` adresi `api.login.atonota.net` oldu. Proje sahibi sonra ürünün geliştirilmesini başlattı (O-56). Ürün P7 fazında kalır.
 
 ## Gereksinimler
 
@@ -253,11 +306,32 @@ MVP'de yalnız bu kararla çelişen yerler düzeltilir. Örneğin eski `id.` adr
 | G-166 | Ücretli kullanım |
 | G-167 | Değer bekleyen kurallar |
 
+## Bugünkü durum
+
+Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundaki durumlarla aynıdır. Yalnız G-157 "Bitti" durumundadır. Bu kalemin testi yalnız yerel yığında geçti. Öteki kalemlerin yerel testleri geçti. Ama her birinde kalan bir iş vardır.
+
+| Kimlik | Durum | Kalan iş |
+| --- | --- | --- |
+| G-157 | Bitti | Kanıt `test_product_boundary.py` ve `brand.spec.ts` dosyalarıdır. Ad canlı sunucuda denenmedi. |
+| G-158 | Sürüyor | DNS kaydı ve canlı adres denemesi dış iştir. |
+| G-159 | Sürüyor | Gerçek platform hesapları açılmadı. Facebook ve X kapalıdır. |
+| G-160 | Sürüyor | İstisna kaydı ve `apply` denetimi PR 27 ile yayımlandı. Yerel testler geçti. Bu iş canlıda denenmedi. DNS sorgusu ve rolü veren üyelik kodu yoktur. Üyelik kanıtı şimdilik masaüstü rolünden okunur. Masaüstü rolü, Frappe yönetim ekranını açan roldür. |
+| G-161 | Sürüyor | İşlem kararı Frappe ucuna bağlandı. Uç yerel testlerden geçti. Uç canlı sunucuda denenmedi. |
+| G-162 | Sürüyor | Bağlantı tek kullanımlıktır. Aynı yanıt ve ekranda onay denenmedi. |
+| G-163 | Sürüyor | İkinci adım vardır. Kurtarma, cihaz ve çıkış kapsamı yoktur. |
+| G-164 | Sürüyor | Bildirim ucu Frappe'de vardır. Uç yerel testlerden geçti. Sağlayıcı seçilmediği için uç her bildirimi geri çevirir. Doğrulamayı başlatan kod yoktur. Uç canlı sunucuda denenmedi. |
+| G-165 | Sürüyor | [Tanıtım sayfası](/frappesetup/atonota-login-tanitim/) yazıldı. Ürün sahibi metni onaylamadı. |
+| G-166 | Sürüyor | Fiyat kararı açıktır. Frappe'deki kapı `open_paid_plan` ucudur. Fiyat kuralı boş olduğu için kapı kapalıdır. |
+| G-167 | Sürüyor | Kural boşsa Frappe bir görev açar. Görev "System Manager" rolüne açılır. Kural sahibinin adı görevin metnindedir. Bu kod `decision_api.py` dosyasındadır. Kod canlı sunucuda denenmedi. Kural sahipleri değerleri henüz girmedi. |
+
 ## Kaynak
 
-Bu sayfa iki kaynağa dayanır:
+Bu sayfa beş kaynağa dayanır:
 
 - Proje sahibinin AtonotA Login kararları, 23 Kasım 2026 Pazartesi günü.
+- Backend proje kaydındaki O-51 ve O-56 kararları ve ürün klasörünün belgesi.
+- Backend dalındaki `e7130aaa` ve `6730160f` birleşmeleri. Birinci birleşme işlem kararını Frappe'ye bağladı. İkinci birleşme bildirim ucunu ekledi. İki birleşme PR 25 ile yayımlandı.
+- Backend dalındaki `43f13477` birleşmesi. Bu birleşme şirket sağlayıcısının istisna kaydını ekledi. Birleşme PR 27 ile yayımlandı.
 - "Kurumsal kimlik ve erişim" analizi, 23 Kasım 2026 Pazartesi günü. Proje sahibi bu analizi yeterli buldu.
 
 Analiz başka ürünlerin belgelerinden alıntılar ve görseller içerir. Bu içerik depoya kopyalanmadı. Sayfa analizi kendi sözleriyle özetler.

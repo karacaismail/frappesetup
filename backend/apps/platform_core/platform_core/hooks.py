@@ -9,6 +9,8 @@ app_license = "mit"
 # Other tasks append to the same list keys; do not replace them.
 before_login = ["platform_core.identity.login_policy.before_login"]
 before_request = [
+	# G-40: refuse System Console and test endpoints first, unless the site opts in.
+	"platform_core.development_access.guard_development_endpoints",
 	"platform_core.identity.login_policy.before_request",
 	"platform_core.identity.session_policy.before_request",
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
@@ -64,7 +66,11 @@ after_migrate = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
+	"platform_core.config.turkey_setup.apply",
 ]
+
+# G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
+setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
 fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
@@ -87,6 +93,9 @@ ai_write_closed_doctypes = [
 website_user_allowed_methods = [
 	"platform_core.api.auth.logout",
 	"platform_core.api.auth.get_csrf_token",
+	# AtonotA Login reads (AJA-459). The server takes the person from the session, never from the request.
+	"platform_core.api.auth.list_login_providers",
+	"platform_core.api.auth.list_linked_accounts",
 	"platform_core.api.shell.get_bootstrap",
 	"platform_core.api.collection.group_summary",
 	"platform_core.api.meta.get_doctype",

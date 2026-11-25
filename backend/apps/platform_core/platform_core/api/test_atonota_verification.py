@@ -30,6 +30,8 @@ ENDPOINT = "/api/method/platform_core.api.atonota_login.verification_notice"
 NOTICE = "PLT Verification Notice"
 CASE = "PLT Verification Case"
 SECRET = secrets.token_hex(32)
+# Site config key that holds the shared signing value.
+CONFIG_FIELD = "atonota_verification_secret"
 CASE_PREFIX = "aja231-"
 # The fields a notice record may carry. Anything else could hold provider data.
 NOTICE_FIELDS = {"event_id", "case_id", "attempt", "outcome", "state"}
@@ -61,7 +63,7 @@ class TestAtonotaVerificationEndpoint(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		clear_records()
 		h.reset_rate_limits()
-		settings = h.SiteSettings({"atonota_verification_secret": SECRET})
+		settings = h.SiteSettings({CONFIG_FIELD: SECRET})
 		settings.__enter__()
 		self.addCleanup(settings.__exit__, None, None, None)
 		self.addCleanup(clear_records)
@@ -122,7 +124,7 @@ class TestAtonotaVerificationEndpoint(IntegrationTestCase):
 
 	def test_no_secret_means_configuration_required(self):
 		body = notice_body("e-unset")
-		with h.SiteSettings({"atonota_verification_secret": None}):
+		with h.SiteSettings({CONFIG_FIELD: None}):
 			response = self.send(body)
 		self.assertEqual(response.status_code, 503, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "VerificationNotConfigured")
