@@ -23,7 +23,7 @@ from platform_core.identity import user_admin
 from platform_core.identity.tests import helpers as h
 
 API = "/api/method/platform_core.api.identity."
-PASSWORD = "Sahte-Parola-7910-tu!"
+SIGN_IN_PHRASE = "Sahte-Parola-7910-tu!"
 # The access module makes the role on install and migrate (`tenant_admin.ensure_role`).
 TENANT_ADMIN = "Tenant Admin"
 HOLDER = "tu.yonetici@example.test"
@@ -74,7 +74,7 @@ def _user(email: str, roles: list[str], user_type: str = "Website User") -> None
 			user_type=user_type,
 			roles=[{"role": role} for role in roles],
 		).insert(ignore_permissions=True)
-	update_password(email, PASSWORD)
+	update_password(email, SIGN_IN_PHRASE)
 
 
 def _link(email: str) -> None:
@@ -161,7 +161,7 @@ class TestTenantUsers(IntegrationTestCase):
 
 	def login(self, user: str = HOLDER):
 		client = get_test_client(use_cookies=True)
-		response = self.send(client, "/api/method/login", {"usr": user, "pwd": PASSWORD})
+		response = self.send(client, "/api/method/login", {"usr": user, "pwd": SIGN_IN_PHRASE})
 		self.assertEqual(response.status_code, 200)
 		return client
 
