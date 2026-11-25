@@ -12,7 +12,7 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, now_datetime
 
-from platform_core.ai.tests.base import DOCTYPE, MANAGER, AiTestCase
+from platform_core.ai.tests.base import DOCTYPE, MANAGER, AiTestCase, answer_text
 
 
 class Gateway:
@@ -224,6 +224,7 @@ class TestUsageSelection(PurgeRequests, AiTestCase):
 
 
 # The one text a caller gets for each way a delete can stop (contract, `purge_logs`).
+# The source texts are English. A test compares the translation the manager gets (`answer_text`).
 TEXTS = {
 	403: "You do not have permission for this action.",
 	"purge_failed": "The delete failed and was rolled back. Nothing was deleted.",
@@ -279,18 +280,18 @@ class TestDeleteErrorAnswers(PurgeRequests, AiTestCase):
 			response = self.delete_with(
 				frappe.PermissionError(f"no access to {self.MARKER}"), details=details
 			)
-			self.assert_fixed(response, 403, TEXTS[403])
+			self.assert_fixed(response, 403, answer_text(TEXTS[403], MANAGER))
 
 	def test_unexpected_error_becomes_the_fixed_417(self):
 		for details in (True, False):
 			response = self.delete_with(RuntimeError(self.MARKER), details=details)
-			self.assert_fixed(response, 417, TEXTS["purge_failed"])
+			self.assert_fixed(response, 417, answer_text(TEXTS["purge_failed"], MANAGER))
 			self.assertEqual(self.last_log(tool="purge_logs", decision="denied").deny_reason, "purge_failed")
 
 	def test_validation_error_becomes_the_fixed_preview_answer(self):
 		for details in (True, False):
 			response = self.delete_with(frappe.ValidationError(self.MARKER), details=details)
-			self.assert_fixed(response, 417, TEXTS["preview_required"])
+			self.assert_fixed(response, 417, answer_text(TEXTS["preview_required"], MANAGER))
 
 	def test_missing_token_gets_the_fixed_text_when_details_are_hidden(self):
 		manager = self.login(MANAGER)
@@ -299,7 +300,7 @@ class TestDeleteErrorAnswers(PurgeRequests, AiTestCase):
 			response = self.post(manager, dry_run=False)
 
 		self.assertEqual(response.status_code, 417)
-		self.assertIn(TEXTS["preview_required"], response.get_data(as_text=True))
+		self.assertIn(answer_text(TEXTS["preview_required"], MANAGER), response.get_data(as_text=True))
 
 	def test_developer_mode_error_record_gets_nothing_of_the_selection(self):
 		"""In developer mode Frappe writes an error record with the values of local variables.
