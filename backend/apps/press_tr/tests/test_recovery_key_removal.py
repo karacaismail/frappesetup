@@ -219,6 +219,13 @@ class RemoveRecoveredKeysTest(unittest.TestCase):
 		self.assertIsNone(doc.removal_error)
 		doc.save.assert_called_once_with()
 
+	def test_approval_time_is_read_in_the_system_time_zone(self):
+		# Frappe stores 09:00 Istanbul time without the zone. In UTC that is 06:00.
+		self.framework.utils.get_system_timezone.return_value = "Europe/Istanbul"
+		with patch.object(self.module, "frappe", self.framework):
+			seconds = self.module.approved_at_seconds(datetime(2026, 11, 21, 9, 0, 0))
+		self.assertEqual(seconds, int((datetime(2026, 11, 21, 6, 0, 0) - datetime(1970, 1, 1)).total_seconds()))
+
 	def test_failed_removal_keeps_the_record_open_with_the_error(self):
 		from press_tr.press_identity.deletion import KeyRemovalFailed
 
@@ -314,13 +321,15 @@ class KeyRemovalRequestTest(unittest.TestCase):
 		self.reply.raw.read.return_value = json.dumps({"status": "done", "removed": 2}).encode()
 		self.requests.post.side_effect = [self.token, self.reply]
 		self.link = SimpleNamespace(issuer="https://login.example.test/realms/platform", subject="sub-1")
+		self.verify = Mock()
+		self.framework.PermissionError = PermissionError
 
 	def _send(self):
 		with (
 			patch.object(self.deletion, "frappe", self.framework),
 			patch.object(self.deletion, "requests", self.requests),
 			patch.object(self.deletion, "server_endpoint", lambda name: f"https://login.example.test/{name}"),
-			patch.object(self.deletion, "verify", Mock()),
+			patch.object(self.deletion, "verify", self.verify),
 			patch.dict("sys.modules", {"oidc_verify": Mock()}),
 		):
 			return self.deletion.send_key_removal_request(self.link, "a1b2c3d4e5", 1_795_000_000)
@@ -369,6 +378,15 @@ class KeyRemovalRequestTest(unittest.TestCase):
 				self.setUp()
 				self.reply.raw.read.return_value = body
 				self.assertEqual(self._code(), "upstream_failed")
+
+	def test_rejected_service_token_is_an_upstream_failure(self):
+		# The real check throws PermissionError for a bad token. The record must still get a code.
+		self.verify = Mock(side_effect=PermissionError)
+		self.assertEqual(self._code(), "upstream_failed")
+
+	def test_unavailable_keycloak_keys_are_an_upstream_failure(self):
+		self.verify = Mock(side_effect=self.deletion.ServiceUnavailable())
+		self.assertEqual(self._code(), "upstream_failed")
 
 	def test_late_reply_is_unknown(self):
 		self.requests.post.side_effect = [self.token, self.deletion.requests.ReadTimeout()]

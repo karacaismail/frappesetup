@@ -149,9 +149,8 @@ def send_key_removal_request(link, review_id: str, approved_at: int) -> int:
 		raise KeyRemovalFailed("not_configured")
 	try:
 		token = service_token(service_secret)
-	except ServiceUnavailable:
-		raise KeyRemovalFailed("not_configured") from None
-	except BadGateway:
+	except (BadGateway, ServiceUnavailable, frappe.PermissionError):
+		# Keycloak refused or could not check the service token. Only missing settings are not_configured.
 		raise KeyRemovalFailed("upstream_failed") from None
 	try:
 		response = requests.post(
