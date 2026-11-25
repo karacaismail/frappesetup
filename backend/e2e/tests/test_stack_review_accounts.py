@@ -331,7 +331,8 @@ class FakeUser:
             setattr(self, key, value)
 
     def append(self, field, row):
-        assert field == "roles"
+        if field != "roles":
+            raise AssertionError(field)
         self.roles.append(Row(row["role"]))
 
     def add_roles(self, *roles):
