@@ -14,7 +14,8 @@ Every holder is a "Website User". No role and no profile holds "System Manager".
 
 Two kinds of tests use this file:
 
-1. Fixture tests read `fixtures/*.json` and `hooks.py` only. They run without Frappe:
+1. Fixture tests read `fixtures/role.json`, `setup/role_profile.json` and `hooks.py` only.
+   They run without Frappe:
    `python3 -I -m unittest discover -s backend/apps/platform_core/platform_core/access/tests
    -t backend/apps/platform_core -p 'test_role_*.py'`
 2. HTTP tests send requests through the WSGI application of Frappe (D-6). They run with
@@ -54,6 +55,11 @@ except ImportError:  # The fixture tests also run without Frappe.
 APP_DIR = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = APP_DIR / "fixtures"
 HOOKS_FILE = APP_DIR / "hooks.py"
+# AJA-857: the profiles are not fixtures. Frappe loads every file of `fixtures/` on each migrate
+# and rewrites the record. A Role Profile write leaves a document lock. The install step reads
+# this file and inserts only the missing profiles.
+PROFILE_FILE = APP_DIR / "setup" / "role_profile.json"
+PROFILE_SEED = "platform_core.setup.role_profiles.ensure_role_profiles"
 
 TENANT_ADMIN = "Tenant Admin"
 TENANT_ADMIN_ASSISTANT = "Tenant Admin Assistant"
@@ -89,16 +95,26 @@ def load_fixture(name: str) -> list[dict]:
 	return json.loads(path.read_text(encoding="utf-8"))
 
 
-def hook_fixtures() -> list:
-	"""The literal value of `fixtures` in `hooks.py`. The last assignment wins, as in Python."""
+def load_profiles() -> list[dict]:
+	if not PROFILE_FILE.exists():
+		return []
+	return json.loads(PROFILE_FILE.read_text(encoding="utf-8"))
+
+
+def hook_value(key: str) -> list:
+	"""The literal value of `key` in `hooks.py`. The last assignment wins, as in Python."""
 	tree = ast.parse(HOOKS_FILE.read_text(encoding="utf-8"))
 	value = []
 	for node in tree.body:
 		if isinstance(node, ast.Assign) and any(
-			isinstance(target, ast.Name) and target.id == "fixtures" for target in node.targets
+			isinstance(target, ast.Name) and target.id == key for target in node.targets
 		):
 			value = ast.literal_eval(node.value)
 	return value
+
+
+def hook_fixtures() -> list:
+	return hook_value("fixtures")
 
 
 def filter_matches(filters, name: str) -> bool:
@@ -143,7 +159,7 @@ class RoleFixtureContract:
 		return next((row for row in load_fixture("role.json") if row.get("name") == self.ROLE), None)
 
 	def profile_record(self) -> dict | None:
-		return next((row for row in load_fixture("role_profile.json") if row.get("name") == self.ROLE), None)
+		return next((row for row in load_profiles() if row.get("name") == self.ROLE), None)
 
 	def test_role_is_a_fixture_without_desk_access(self):
 		record = self.role_record()
@@ -153,27 +169,31 @@ class RoleFixtureContract:
 		self.assertEqual(record.get("desk_access"), 0)
 		self.assertTrue(hook_exports("Role", self.ROLE), f"hooks.py fixtures do not export {self.ROLE!r}")
 
-	def test_role_profile_is_a_fixture_with_only_its_own_role(self):
+	def test_role_profile_is_seeded_with_only_its_own_role(self):
 		record = self.profile_record()
-		self.assertIsNotNone(record, f"fixtures/role_profile.json has no {self.ROLE!r} profile")
+		self.assertIsNotNone(record, f"setup/role_profile.json has no {self.ROLE!r} profile")
 		self.assertEqual(record.get("role_profile"), self.ROLE)
 		self.assertEqual([row.get("role") for row in record.get("roles", [])], [self.ROLE])
-		self.assertTrue(
+		# The install step writes the profile on install and on migrate. No fixture rewrites it.
+		for hook in ("after_install", "after_migrate"):
+			self.assertIn(PROFILE_SEED, hook_value(hook), f"hooks.py {hook} does not seed the profiles")
+		self.assertFalse(
 			hook_exports("Role Profile", self.ROLE),
-			f"hooks.py fixtures do not export the {self.ROLE!r} profile",
+			f"hooks.py fixtures still export the {self.ROLE!r} profile",
 		)
+		self.assertFalse((FIXTURES_DIR / "role_profile.json").exists(), "fixtures/ still holds the profiles")
 
 	def test_no_system_manager_in_the_role_or_the_profile(self):
 		record = self.profile_record()
 		# A missing profile must not pass as a profile without “System Manager”.
-		self.assertIsNotNone(record, f"fixtures/role_profile.json has no {self.ROLE!r} profile")
+		self.assertIsNotNone(record, f"setup/role_profile.json has no {self.ROLE!r} profile")
 		self.assertIsNotNone(self.role_record(), f"fixtures/role.json has no {self.ROLE!r} role")
 		roles = {row.get("role") for row in record.get("roles", [])}
 		for protected in PROTECTED_ROLES:
 			self.assertNotIn(protected, roles)
 		self.assertNotIn(self.ROLE, PROTECTED_ROLES)
 		# No panel profile may hold a protected role, not only this one.
-		for profile in load_fixture("role_profile.json"):
+		for profile in load_profiles():
 			if profile.get("name") in PANEL_ROLES:
 				held = {row.get("role") for row in profile.get("roles", [])}
 				self.assertFalse(held & set(PROTECTED_ROLES), profile.get("name"))
