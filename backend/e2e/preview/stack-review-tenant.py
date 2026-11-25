@@ -1,12 +1,17 @@
 """Give the local review accounts their tenant roles. Runs in the stack's tenant-web container.
 
-Input on stdin: issuer and accounts (email, subject, first_name, last_name, tenant_roles, employee,
-and an optional user_type).
+Input on stdin: issuer, accounts (email, subject, first_name, last_name, tenant_roles, employee,
+an optional user_type and an optional role_profile) and the sample reseller_links.
 Creates or updates each Frappe user, links it to its Keycloak identity as the first sign-in would,
 adds the listed roles and, for an employee account, one synthetic Employee record.
 An account with user_type "Website User" keeps only its listed roles (G-53). An earlier run gave
 the tenant administrator "System Manager"; this run takes that role away again.
-Every listed role must already exist on the tenant. A missing role stops the run before any change.
+An account with a role_profile gets that Role Profile, and the profile gives its role (G-168,
+G-169, G-170). The four panel role accounts work this way. None of them holds "System Manager".
+Each sample reseller link becomes one "Reseller Customer Link" row, found by its customer tenant.
+A second run finds the same rows and changes nothing.
+Every listed role and profile must already exist on the tenant, and so must the link type.
+A missing one stops the run before any change.
 Output on stdout: the users it prepared. No password reaches the tenant: sign-in goes through Keycloak.
 """
 
@@ -20,6 +25,8 @@ from frappe.utils import add_days, today
 SITE = "tenant1.localhost"
 COMPANY = "Review Synthetic"
 LINK = "PLT Identity Link"
+RESELLER_LINK = "Reseller Customer Link"
+RESELLER_FIELDS = ("reseller_tenant", "customer_name", "site_status")
 
 
 def insert(doctype, **fields):
@@ -48,6 +55,8 @@ def ensure_user(issuer, account):
         user.flags.no_welcome_mail = True
     user.update({"first_name": account["first_name"], "last_name": account["last_name"], "enabled": 1})
     website = account.get("user_type") == "Website User"
+    if account.get("role_profile"):
+        user.set("role_profiles", [{"role_profile": account["role_profile"]}])
     if website:
         wanted = account["tenant_roles"]
         user.roles[:] = [row for row in user.roles if row.role in wanted]
@@ -82,17 +91,41 @@ def ensure_user(issuer, account):
     return email
 
 
-def require_roles(accounts):
-    """Stop before any change when a listed role is not on the tenant. No other role stands in."""
+def require_roles(accounts, links):
+    """Stop before any change when a listed role, profile or the link type is not on the tenant.
+    No other role stands in."""
     missing = sorted(
         {role for account in accounts for role in account["tenant_roles"] if not frappe.db.exists("Role", role)}
+        | {
+            account["role_profile"]
+            for account in accounts
+            if account.get("role_profile") and not frappe.db.exists("Role Profile", account["role_profile"])
+        }
     )
+    if links and not frappe.db.exists("DocType", RESELLER_LINK):
+        missing.append(RESELLER_LINK)
     if missing:
         raise SystemExit(
-            "These tenant roles do not exist on " + SITE + ": " + ", ".join(missing) + ". "
-            "Migrate the tenant so its apps create them (platform_core creates Tenant Admin), "
+            "These do not exist on " + SITE + ": " + ", ".join(missing) + ". "
+            "Migrate the tenant so its apps create them (platform_core creates the panel roles, "
+            "their role profiles and the Reseller Customer Link type), "
             "then run review-accounts again. No account was changed."
         )
+
+
+def ensure_reseller_link(link):
+    """One row per sample customer. The row is updated only when the file says something else."""
+    wanted = {field: link[field] for field in RESELLER_FIELDS}
+    row = frappe.db.get_value(
+        RESELLER_LINK, {"customer_tenant": link["customer_tenant"]}, ["name", *RESELLER_FIELDS], as_dict=True
+    )
+    if row is None:
+        frappe.get_doc(
+            {"doctype": RESELLER_LINK, "customer_tenant": link["customer_tenant"], **wanted}
+        ).insert()
+    elif any(row[field] != value for field, value in wanted.items()):
+        frappe.db.set_value(RESELLER_LINK, row["name"], wanted)
+    return link["customer_tenant"]
 
 
 def main():
@@ -102,12 +135,14 @@ def main():
     try:
         frappe.connect()
         frappe.set_user("Administrator")
-        require_roles(payload["accounts"])
+        links = payload.get("reseller_links", [])
+        require_roles(payload["accounts"], links)
         users = [ensure_user(payload["issuer"], account) for account in payload["accounts"]]
+        customers = [ensure_reseller_link(link) for link in links]
         frappe.db.commit()
     finally:
         frappe.destroy()
-    print(json.dumps({"users": users}))
+    print(json.dumps({"users": users, "reseller_customers": customers}))
 
 
 if __name__ == "__main__":
