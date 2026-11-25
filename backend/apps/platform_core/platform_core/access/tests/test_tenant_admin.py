@@ -1,0 +1,431 @@
+"""G-62: the “Tenant Admin” role manages roles and permissions of its own site (AJA-802).
+
+The holder is a Website User, as the panel's users are. The holder manages roles, role profiles,
+permission rows, user permissions and access rules. The holder can neither give nor change the
+“System Manager” and “Administrator” roles.
+
+A tenant is its own Frappe site. A session and the role live on one site only, so the holder
+works only in its own tenant.
+"""
+
+import json
+from urllib.parse import quote
+
+import frappe
+from frappe.tests import IntegrationTestCase
+from frappe.tests.test_api import make_request
+from frappe.utils import get_test_client
+from frappe.utils.password import update_password
+
+from platform_core.access import tenant_admin
+
+PASSWORD = "Sahte-Parola-802-ta!"
+HOLDER = "ta.yonetici@example.test"
+PLAIN = "ta.uye@example.test"
+SYSTEM_MANAGER_USER = "ta.sistem@example.test"
+CUSTOM_ROLE = "TA Deneme Rol"
+OTHER_ROLE = "TA Ikinci Rol"
+PROFILE = "TA Deneme Profil"
+# A type without stored permission rows of its own, so the copy of the standard rows can be seen.
+PERMISSION_TYPE = "Note"
+RULE_TYPE = "ToDo"
+PROTECTED = ("System Manager", "Administrator")
+
+
+def _user(email: str, roles: list[str]) -> None:
+	if frappe.db.exists("User", email):
+		doc = frappe.get_doc("User", email)
+		doc.set("roles", [{"role": role} for role in roles])
+		doc.save(ignore_permissions=True)
+	else:
+		frappe.get_doc(
+			doctype="User",
+			email=email,
+			first_name=email.split("@")[0],
+			send_welcome_email=0,
+			roles=[{"role": role} for role in roles],
+		).insert(ignore_permissions=True)
+	update_password(email, PASSWORD)
+
+
+class TestTenantAdmin(IntegrationTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		tenant_admin.ensure_role()
+		for role in (CUSTOM_ROLE, OTHER_ROLE):
+			if not frappe.db.exists("Role", role):
+				frappe.get_doc(doctype="Role", role_name=role, desk_access=0).insert()
+		_user(HOLDER, [tenant_admin.ROLE])
+		_user(PLAIN, [CUSTOM_ROLE])
+		_user(SYSTEM_MANAGER_USER, ["System Manager"])
+		frappe.db.commit()  # nosemgrep: frappe-test-commit
+
+	@classmethod
+	def tearDownClass(cls):
+		frappe.set_user("Administrator")
+		cls.clean()
+		frappe.db.commit()  # nosemgrep: frappe-test-commit
+		super().tearDownClass()
+
+	@staticmethod
+	def clean():
+		frappe.db.delete("PLT Access Rule", {"role": ("in", [CUSTOM_ROLE, OTHER_ROLE, *PROTECTED])})
+		frappe.db.delete("PLT Access Rule", {"title": ("like", "TA %")})
+		frappe.db.delete("User Permission", {"user": ("in", [PLAIN, SYSTEM_MANAGER_USER])})
+		if frappe.db.exists("Role Profile", PROFILE):
+			frappe.delete_doc("Role Profile", PROFILE, ignore_permissions=True, force=True)
+		frappe.db.delete("Custom DocPerm", {"parent": PERMISSION_TYPE})
+		frappe.db.delete("Custom DocPerm", {"role": ("in", [CUSTOM_ROLE, OTHER_ROLE])})
+		frappe.db.delete("Role", {"name": "TA Yeni Rol"})
+		frappe.clear_cache()
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		self.clean()
+		frappe.db.commit()  # nosemgrep: frappe-test-commit
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		self.clean()
+		frappe.db.commit()  # nosemgrep: frappe-test-commit
+		super().tearDown()
+
+	# --- request helpers ---
+
+	def send(self, client, method: str, path: str, *, body=None, query=None):
+		headers = {"Accept": "application/json"}
+		kwargs = {"path": path, "method": method, "headers": headers}
+		if body is not None:
+			headers["Content-Type"] = "application/json"
+			kwargs["data"] = json.dumps(body)
+		if query:
+			kwargs["query_string"] = query
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
+		try:
+			return make_request(client.open, args=(), kwargs=kwargs, site=self.site)
+		finally:
+			frappe.db.rollback()
+
+	def login(self, user: str = HOLDER):
+		client = get_test_client(use_cookies=True)
+		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": PASSWORD})
+		self.assertEqual(response.status_code, 200)
+		return client
+
+	def resource(self, client, method: str, doctype: str, name: str | None = None, body=None, query=None):
+		path = "/api/resource/" + quote(doctype)
+		if name is not None:
+			path += "/" + quote(name)
+		return self.send(client, method, path, body=body, query=query)
+
+	def custom_row(self, role: str, parent: str = PERMISSION_TYPE) -> str | None:
+		return frappe.db.get_value("Custom DocPerm", {"parent": parent, "role": role, "permlevel": 0})
+
+	# --- installation ---
+
+	def test_role_is_set_up_on_install_and_migrate(self):
+		self.assertIn("platform_core.access.tenant_admin.ensure_role", frappe.get_hooks("after_install"))
+		self.assertIn("platform_core.access.tenant_admin.ensure_role", frappe.get_hooks("after_migrate"))
+		self.assertTrue(frappe.db.exists("Role", tenant_admin.ROLE))
+		# The panel's users stay Website Users. A desk role would make them System Users.
+		self.assertEqual(frappe.db.get_value("Role", tenant_admin.ROLE, "desk_access"), 0)
+
+	def test_role_gets_its_permission_rows_once(self):
+		tenant_admin.ensure_role()
+		tenant_admin.ensure_role()
+		for doctype, ptypes in tenant_admin.GRANTS.items():
+			rows = frappe.get_all(
+				"Custom DocPerm",
+				filters={"parent": doctype, "role": tenant_admin.ROLE, "permlevel": 0, "if_owner": 0},
+				fields=["name", *ptypes],
+			)
+			self.assertEqual(len(rows), 1, doctype)
+			for ptype in ptypes:
+				self.assertEqual(rows[0][ptype], 1, (doctype, ptype))
+			# The standard rows of the type were copied, so the other roles keep their permission.
+			self.assertTrue(
+				frappe.db.exists("Custom DocPerm", {"parent": doctype, "role": "System Manager"}), doctype
+			)
+		self.assertEqual(frappe.db.get_value("User", HOLDER, "user_type"), "Website User")
+
+	# --- read endpoints ---
+
+	def test_holder_reads_role_and_permission_endpoints(self):
+		client = self.login()
+		for doctype in ("Role", "Role Profile", "Custom DocPerm", "User Permission", "PLT Access Rule"):
+			response = self.resource(client, "GET", doctype, query={"limit_page_length": 5})
+			self.assertEqual(response.status_code, 200, (doctype, response.data[:300]))
+		roles = self.resource(client, "GET", "Role", query={"limit_page_length": 0})
+		self.assertIn("System Manager", {row["name"] for row in roles.json["data"]})
+
+	def test_plain_website_user_cannot_read_role_endpoints(self):
+		client = self.login(PLAIN)
+		for doctype in ("Role", "Role Profile", "Custom DocPerm", "User Permission", "PLT Access Rule"):
+			response = self.resource(client, "GET", doctype)
+			self.assertEqual(response.status_code, 403, doctype)
+
+	# --- Role ---
+
+	def test_holder_creates_and_changes_an_ordinary_role(self):
+		client = self.login()
+		created = self.resource(client, "POST", "Role", body={"role_name": "TA Yeni Rol", "desk_access": 0})
+		changed = self.resource(client, "PUT", "Role", "TA Yeni Rol", body={"two_factor_auth": 1})
+
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		self.assertEqual(changed.status_code, 200, changed.data[:300])
+
+	def test_holder_cannot_change_or_delete_a_protected_role(self):
+		client = self.login()
+		for role in PROTECTED:
+			changed = self.resource(client, "PUT", "Role", role, body={"two_factor_auth": 1})
+			deleted = self.resource(client, "DELETE", "Role", role)
+			self.assertEqual(changed.status_code, 403, role)
+			self.assertEqual(deleted.status_code, 403, role)
+			self.assertTrue(frappe.db.exists("Role", role))
+		self.assertEqual(frappe.db.get_value("Role", "System Manager", "two_factor_auth"), 0)
+
+	def test_holder_cannot_give_a_role_desk_access(self):
+		"""Desk access would make the role's users System Users and lift the panel's method list."""
+		response = self.resource(self.login(), "PUT", "Role", CUSTOM_ROLE, body={"desk_access": 1})
+
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(frappe.db.get_value("Role", CUSTOM_ROLE, "desk_access"), 0)
+
+	# --- Role Profile ---
+
+	def test_holder_manages_a_role_profile_of_ordinary_roles(self):
+		client = self.login()
+		body = {"role_profile": PROFILE, "roles": [{"role": CUSTOM_ROLE}]}
+		created = self.resource(client, "POST", "Role Profile", body=body)
+		changed = self.resource(
+			client, "PUT", "Role Profile", PROFILE, body={"roles": [{"role": CUSTOM_ROLE}, {"role": OTHER_ROLE}]}
+		)
+
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		self.assertEqual(changed.status_code, 200, changed.data[:300])
+
+	def test_holder_cannot_put_a_protected_role_in_a_role_profile(self):
+		client = self.login()
+		for role in PROTECTED:
+			body = {"role_profile": PROFILE, "roles": [{"role": role}]}
+			response = self.resource(client, "POST", "Role Profile", body=body)
+			self.assertEqual(response.status_code, 403, role)
+			self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
+
+	def test_holder_cannot_change_a_role_profile_that_holds_a_protected_role(self):
+		frappe.get_doc(
+			doctype="Role Profile", role_profile=PROFILE, roles=[{"role": "System Manager"}]
+		).insert(ignore_permissions=True)
+		client = self.login()
+
+		changed = self.resource(client, "PUT", "Role Profile", PROFILE, body={"roles": [{"role": CUSTOM_ROLE}]})
+		deleted = self.resource(client, "DELETE", "Role Profile", PROFILE)
+
+		self.assertEqual(changed.status_code, 403)
+		self.assertEqual(deleted.status_code, 403)
+		self.assertEqual(
+			frappe.get_all("Has Role", filters={"parent": PROFILE, "parenttype": "Role Profile"}, pluck="role"),
+			["System Manager"],
+		)
+
+	# --- Custom DocPerm (the stored permission rows of a type) ---
+
+	def test_holder_adds_a_permission_row_and_the_standard_rows_are_kept(self):
+		standard = set(frappe.get_all("DocPerm", filters={"parent": PERMISSION_TYPE}, pluck="role"))
+		body = {"parent": PERMISSION_TYPE, "role": CUSTOM_ROLE, "permlevel": 0, "read": 1}
+
+		response = self.resource(self.login(), "POST", "Custom DocPerm", body=body)
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		stored = set(frappe.get_all("Custom DocPerm", filters={"parent": PERMISSION_TYPE}, pluck="role"))
+		self.assertEqual(stored, standard | {CUSTOM_ROLE})
+
+	def test_holder_changes_and_deletes_a_permission_row_of_an_ordinary_role(self):
+		client = self.login()
+		self.resource(
+			client, "POST", "Custom DocPerm", body={"parent": PERMISSION_TYPE, "role": CUSTOM_ROLE, "read": 1}
+		)
+		name = self.custom_row(CUSTOM_ROLE)
+
+		changed = self.resource(client, "PUT", "Custom DocPerm", name, body={"write": 1})
+		deleted = self.resource(client, "DELETE", "Custom DocPerm", name)
+
+		self.assertEqual(changed.status_code, 200, changed.data[:300])
+		self.assertIn(deleted.status_code, (200, 202))
+		self.assertIsNone(self.custom_row(CUSTOM_ROLE))
+
+	def test_holder_cannot_give_a_protected_role_a_permission_row(self):
+		client = self.login()
+		for role in PROTECTED:
+			body = {"parent": PERMISSION_TYPE, "role": role, "permlevel": 1, "read": 1}
+			response = self.resource(client, "POST", "Custom DocPerm", body=body)
+			self.assertEqual(response.status_code, 403, role)
+			self.assertFalse(
+				frappe.db.exists("Custom DocPerm", {"parent": PERMISSION_TYPE, "role": role, "permlevel": 1})
+			)
+
+	def test_holder_cannot_change_or_delete_a_permission_row_of_a_protected_role(self):
+		frappe.permissions.setup_custom_perms(PERMISSION_TYPE)
+		name = self.custom_row("System Manager")
+		self.assertTrue(name)
+		client = self.login()
+
+		changed = self.resource(client, "PUT", "Custom DocPerm", name, body={"read": 0})
+		moved = self.resource(client, "PUT", "Custom DocPerm", name, body={"role": CUSTOM_ROLE})
+		deleted = self.resource(client, "DELETE", "Custom DocPerm", name)
+
+		self.assertEqual(changed.status_code, 403)
+		self.assertEqual(moved.status_code, 403)
+		self.assertEqual(deleted.status_code, 403)
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", name, ["role", "read"]), ("System Manager", 1))
+
+	def test_holder_cannot_move_an_ordinary_row_to_a_protected_role(self):
+		client = self.login()
+		self.resource(
+			client, "POST", "Custom DocPerm", body={"parent": PERMISSION_TYPE, "role": CUSTOM_ROLE, "read": 1}
+		)
+		name = self.custom_row(CUSTOM_ROLE)
+
+		response = self.resource(client, "PUT", "Custom DocPerm", name, body={"role": "Administrator"})
+
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", name, "role"), CUSTOM_ROLE)
+
+	def test_holder_cannot_widen_the_permission_management_types(self):
+		"""Rows of the role and permission types would let the holder widen its own power."""
+		client = self.login()
+		for parent in ("Role", "Custom DocPerm", "User Permission", "PLT Access Rule", "Has Role"):
+			body = {"parent": parent, "role": CUSTOM_ROLE, "read": 1, "write": 1}
+			response = self.resource(client, "POST", "Custom DocPerm", body=body)
+			self.assertEqual(response.status_code, 403, parent)
+			self.assertIsNone(self.custom_row(CUSTOM_ROLE, parent), parent)
+
+	# --- User Permission ---
+
+	def test_holder_manages_a_user_permission_of_an_ordinary_user(self):
+		client = self.login()
+		body = {"user": PLAIN, "allow": "Role", "for_value": CUSTOM_ROLE}
+
+		created = self.resource(client, "POST", "User Permission", body=body)
+		name = frappe.db.get_value("User Permission", {"user": PLAIN})
+		deleted = self.resource(client, "DELETE", "User Permission", name)
+
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		self.assertIn(deleted.status_code, (200, 202))
+
+	def test_holder_cannot_narrow_a_system_manager(self):
+		body = {"user": SYSTEM_MANAGER_USER, "allow": "Role", "for_value": CUSTOM_ROLE}
+
+		response = self.resource(self.login(), "POST", "User Permission", body=body)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertFalse(frappe.db.exists("User Permission", {"user": SYSTEM_MANAGER_USER}))
+
+	# --- Access Rule ---
+
+	def rule(self, role: str) -> dict:
+		return {
+			"title": f"TA {role}",
+			"is_active": 0,
+			"document_type": RULE_TYPE,
+			"role": role,
+			"scope": "all",
+			"allow_read": 1,
+		}
+
+	def test_holder_manages_an_access_rule_of_an_ordinary_role(self):
+		client = self.login()
+		created = self.resource(client, "POST", "PLT Access Rule", body=self.rule(CUSTOM_ROLE))
+		name = frappe.db.get_value("PLT Access Rule", {"role": CUSTOM_ROLE})
+		changed = self.resource(client, "PUT", "PLT Access Rule", name, body={"allow_write": 1})
+
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		self.assertEqual(changed.status_code, 200, changed.data[:300])
+
+	def test_holder_cannot_write_an_access_rule_for_a_protected_role(self):
+		client = self.login()
+		for role in PROTECTED:
+			response = self.resource(client, "POST", "PLT Access Rule", body=self.rule(role))
+			self.assertEqual(response.status_code, 403, role)
+			self.assertFalse(frappe.db.exists("PLT Access Rule", {"role": role}))
+
+	def test_holder_cannot_change_an_access_rule_of_a_protected_role(self):
+		doc = frappe.get_doc(doctype="PLT Access Rule", **self.rule("System Manager")).insert()
+		client = self.login()
+
+		changed = self.resource(client, "PUT", "PLT Access Rule", doc.name, body={"role": CUSTOM_ROLE})
+		deleted = self.resource(client, "DELETE", "PLT Access Rule", doc.name)
+
+		self.assertEqual(changed.status_code, 403)
+		self.assertEqual(deleted.status_code, 403)
+		self.assertEqual(frappe.db.get_value("PLT Access Rule", doc.name, "role"), "System Manager")
+
+	# --- giving a role to a user ---
+
+	def test_holder_cannot_give_a_protected_role_to_a_user(self):
+		"""The holder has no write permission on users. The guard holds on every other path too."""
+		response = self.resource(
+			self.login(), "PUT", "User", PLAIN, body={"roles": [{"role": "System Manager"}]}
+		)
+		self.assertEqual(response.status_code, 403)
+
+		frappe.set_user(HOLDER)
+		for role in PROTECTED:
+			doc = frappe.get_doc("User", PLAIN)
+			doc.append("roles", {"role": role})
+			with self.assertRaises(frappe.PermissionError):
+				doc.save(ignore_permissions=True)
+		doc = frappe.get_doc("User", SYSTEM_MANAGER_USER)
+		doc.set("roles", [{"role": CUSTOM_ROLE}])
+		with self.assertRaises(frappe.PermissionError):
+			doc.save(ignore_permissions=True)
+		frappe.set_user("Administrator")
+		self.assertNotIn("System Manager", frappe.get_roles(PLAIN))
+
+	def test_system_manager_still_gives_a_protected_role(self):
+		frappe.set_user(SYSTEM_MANAGER_USER)
+		doc = frappe.get_doc("User", PLAIN)
+		doc.append("roles", {"role": "System Manager"})
+		doc.save(ignore_permissions=True)
+
+		self.assertIn("System Manager", frappe.get_roles(PLAIN))
+
+	# --- explain_permission ---
+
+	def test_holder_gets_the_explanation(self):
+		response = self.send(
+			self.login(),
+			"GET",
+			"/api/method/platform_core.api.access.explain_permission",
+			query={"doctype": "User", "name": HOLDER, "ptype": "read"},
+		)
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		message = response.json["message"]
+		self.assertEqual(message["user"], HOLDER)
+		self.assertTrue(message["allowed"])
+
+	def test_plain_website_user_does_not_get_the_explanation(self):
+		response = self.send(
+			self.login(PLAIN),
+			"GET",
+			"/api/method/platform_core.api.access.explain_permission",
+			query={"doctype": "User", "name": PLAIN, "ptype": "read"},
+		)
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_holder_does_not_explain_another_users_permission(self):
+		response = self.send(
+			self.login(),
+			"GET",
+			"/api/method/platform_core.api.access.explain_permission",
+			query={"doctype": "User", "name": PLAIN, "user": SYSTEM_MANAGER_USER},
+		)
+
+		self.assertEqual(response.status_code, 403)
