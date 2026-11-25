@@ -125,6 +125,13 @@
       "test": "dev/press/test_unpatched_runtime.py::UnpatchedRuntimeTest.test_dependencies_are_consistent",
       "removal_condition": "Yeni Press sürümünün bağımlılıkları Frappe 16 ile birlikte kurulmalıdır. Yamasız tam kurulumda uv pip check başarılı olmalıdır.",
       "upstream": "docs/press-python314-upstream.md#öneri-4-tam-bağımlılık-çözümünü-doğrulayın"
+    },
+    {
+      "source": "deploy/images/press-patches/0006-queue-setup-wizard.patch",
+      "owner": "press-tr",
+      "test": "apps/press_tr/tests/test_site_setup.py::TestSiteActivationPatch.test_active_site_sends_setup_wizard_to_the_agent_once",
+      "removal_condition": "Press yeni site etkin olunca kurulum sihirbazını kendisi çağırmalıdır. Ya da Press bu durum değişiminde Site kancalarını çalıştırmalıdır. Yamasız imajda site etkin olunca sahte Agent tek Complete Setup Wizard işi almalıdır.",
+      "upstream": "docs/press-python314-upstream.md#öneri-6-yeni-site-etkin-olunca-kurulum-sihirbazını-çağırın"
     }
   ]
 }

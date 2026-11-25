@@ -197,6 +197,28 @@ Paket yoksa Press yine açılır. Telegram mesajı gönderilmez ve hata kaydı y
 Bakımcılar uzun vadede bakımı süren bir Telegram istemcisine geçmelidir.
 Örneğin Telegram Bot API'si doğrudan HTTP ile çağrılabilir.
 
+## Öneri 6: Yeni site etkin olunca kurulum sihirbazını çağırın
+
+Bu öneri 25 Kasım 2026 Çarşamba günü G-42 işinde eklendi.
+Press, yeni sitenin durumunu `process_new_site_job_update` içinde yazar.
+Press bu durumu `frappe.db.set_value` ile yazar.
+Bu yüzden `Site` kancaları çalışmaz.
+Press siteyi `Site("Site", ...)` ile kurar.
+Bu yüzden `press_tr` uygulamasının `SetupSite` sınıfı da devreye girmez.
+
+Üretim imajındaki `0006-queue-setup-wizard.patch` yaması bu boşluğu kapatır.
+
+1. Press yeni durumu yazınca yama `queue_setup_wizard` işlevini çağırır.
+2. Durum “Active” değilse işlev durur.
+3. İşlev siteyi `frappe.get_doc("Site", ...)` ile açar.
+4. Sihirbaz bittiyse işlev durur. `press_tr` kurulu değilse de durur.
+5. İşlev `complete_setup_wizard(args)` yöntemini kuyruğa atar. Kuyruk işi kayıt kesinleşince çalışır.
+6. `SetupSite` aynı site için ikinci Agent işini açmaz.
+
+Press bakımcıları bu adımı Press'in kendi akışına ekleyebilir.
+Ya da Press bu durum değişiminde `Site` kancalarını çalıştırabilir.
+Öneri henüz Press'e gönderilmedi.
+
 ## Geçici yama kaydı
 
 [Yama kaydı](../dev/press/patch-registry.json) geliştirme ve üretim yamalarını listeler.
