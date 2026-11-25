@@ -9,6 +9,8 @@ import frappe
 from frappe import _
 
 REVIEW_DOCTYPE = "PTR Recovery Review"
+# AJA-421: only a named person with this role decides. System Manager alone is not enough.
+REVIEWER_ROLE = "Recovery Reviewer"
 OPEN = "Open"
 DECISIONS = ("Approved", "Rejected")
 MAX_EMAIL_LENGTH = 254
@@ -75,6 +77,33 @@ def _changed(doc, previous, fields):
 	return [field for field in fields if _value(doc, field) != _value(previous, field)]
 
 
+def require_reviewer(doc) -> str:
+	"""Return the session user if they may decide this recovery review, else raise PermissionError.
+
+	DocType permissions can be widened by a System Manager in Role Permissions Manager,
+	so the decision step checks the role itself.
+	"""
+	reviewer = frappe.session.user
+	if reviewer in ("Guest", "Administrator"):
+		# Administrator gets every role and is a shared account, so the reviewer would not be named.
+		frappe.throw(
+			_("A named recovery reviewer must make this decision.", context="press_tr"),
+			frappe.PermissionError,
+		)
+	if REVIEWER_ROLE not in frappe.get_roles(reviewer):
+		frappe.throw(
+			_("Only a Recovery Reviewer can decide a recovery request.", context="press_tr"),
+			frappe.PermissionError,
+		)
+	owner = frappe.db.get_value("PTR Identity Link", doc.identity_link, "user")
+	if reviewer == owner:
+		frappe.throw(
+			_("The account owner cannot review their own recovery request.", context="press_tr"),
+			frappe.PermissionError,
+		)
+	return reviewer
+
+
 def check_decision(doc) -> None:
 	# Frappe applies read_only only in the desk form. This check also guards API writes.
 	previous = doc.get_doc_before_save()
@@ -96,13 +125,7 @@ def check_decision(doc) -> None:
 		return
 	if doc.status not in DECISIONS:
 		frappe.throw(_("Choose Approved or Rejected.", context="press_tr"), frappe.PermissionError)
-	reviewer = frappe.session.user
-	owner = frappe.db.get_value("PTR Identity Link", doc.identity_link, "user")
-	if reviewer in ("Guest", owner):
-		frappe.throw(
-			_("The account owner cannot review their own recovery request.", context="press_tr"),
-			frappe.PermissionError,
-		)
+	reviewer = require_reviewer(doc)
 	if not (doc.review_note or "").strip():
 		frappe.throw(_("Write a review note before you decide.", context="press_tr"), frappe.PermissionError)
 	doc.reviewed_by = reviewer

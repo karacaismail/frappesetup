@@ -494,7 +494,9 @@ class ReviewerRoleGrantTest(unittest.TestCase):
 		self.accounts = accounts
 
 	def _user(self, before, after):
-		previous = None if before is None else SimpleNamespace(roles=[SimpleNamespace(role=r) for r in before])
+		previous = (
+			None if before is None else SimpleNamespace(roles=[SimpleNamespace(role=r) for r in before])
+		)
 		return SimpleNamespace(
 			name="operator@example.test",
 			roles=[SimpleNamespace(role=role) for role in after],
