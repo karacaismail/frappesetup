@@ -68,6 +68,7 @@ Proje sahibinin kararı açıktır: sihirli bağlantı ve Apple ile giriş MVP'y
 
 - Eklentinin kendi hedefi Keycloak 26.1.4'tür. 26.8.2 ile derlendi ve canlı testleri geçti. Keycloak yükseltmesinde yeniden derlenir ve sınanır.
 - Eklenti bir yıldır değişmedi. Güvenlik düzeltmesi gerekirse çatal alınır. Bu karar o zaman yeniden açılır.
+- G-162 bu kararı 24 Kasım 2026 Salı günü yeniden açtı. Çatal kararı aşağıdaki G-162 bölümündedir.
 - Giriş ve e-posta şablonları eklentinin jar dosyasından gelir. Türkçe metinler kimlik-tema işinin `atonota` temasında verilir.
 
 ### identity-sync rolleri (sözleşme 26a274c)
@@ -116,6 +117,155 @@ Bu karar verilene kadar olay eklentisi kurulmadı. Durum raporu `blocked` olarak
 ### Sosyal girişte ikinci adım (O6)
 
 Google ve Apple sağlayıcıları `postBrokerLoginFlowAlias` olarak `atonota-post-broker` akışını kullanır. Akış, kullanıcının kurulu TOTP ya da güvenlik anahtarını ister. Gerçek sosyal giriş denenmedi, çünkü sağlayıcı anahtarı yok. Akışın bağlı olduğu canlı testle gösterildi.
+
+## G-162 düzeltmesi: tasarım kararı (24 Kasım 2026 Salı günü, B Takımı mimarı)
+
+Testçi iki eksik buldu. Testler `backend/identity/keycloak/tests/test_magic_link.py` dosyasındadır. İki test bilerek düşer.
+
+1. Var olan adreste yanıt daha geç gelir. Ölçülen fark yaklaşık 4 ile 5 ms'dir.
+2. Gönderim sınırı yoktur. 8 istek 8 e-posta gönderdi.
+
+PO kararları şunlardır:
+
+- Aynı adrese 15 dakikada en çok 3 e-posta gider.
+- Sınır aşılınca sistem e-posta göndermez. Kişi yine "E-postanızı kontrol edin." yanıtını görür.
+- Var olan ve olmayan adreste yanıt süresi aynı olur. E-posta gönderimi yanıtı geciktirmez.
+- K-38 yolu değişmez. `cloudflightio/keycloak-magic-link` eklentisi kalır. Phase Two eklentisi kullanılmaz.
+
+### Sorunun kaynağı
+
+Sorun eklentinin `action()` yöntemindedir. Dosya `AbstractMagicLinkAuthenticator.java` şeklindedir. Kaynak sabit commit `7b4ee949` ile okundu.
+
+- Kullanıcı varsa yöntem anahtar üretir. Sonra `MAGIC_LINK_SESSION` tablosuna kayıt yazar.
+- Sonra e-postayı aynı istekte gönderir. Yanıt e-posta gidene kadar bekler.
+- Kullanıcı yoksa yöntem yalnız bilgi sayfasını gösterir.
+- Sayım yapan bir yer yoktur.
+- E-posta gönderilemezse yöntem 500 hatası döner. Bu hata da hesabın var olduğunu gösterir.
+
+### İki yolun karşılaştırması
+
+| Ölçüt | 1. yol: eklentinin çatalı ve yaması | 2. yol: eklentinin önünde ayrı Keycloak adımı |
+| --- | --- | --- |
+| Süre eşitliği | Sağlar. Kayıt ve gönderim istekten çıkar. | Sağlamaz. Gönderim eklentinin `action()` yöntemindedir. Önceki adım bu yönteme dokunamaz. |
+| Sıklık sınırı | Sağlar. Sayım gönderimden hemen önce yapılır. | Zor. E-posta formu eklentinin adımına gönderilir. Önceki adım adresi görmez. |
+| Adım kimliği | `magiclink` kalır. Realm akışı değişmez. | Yeni adım gerekir. Eklentiyi alt sınıfla sarmak da yeni kimlik ister. Var olan dosya testi `magiclink` kimliğini arar. |
+| K-38 ve lisans | Aynı eklenti, Apache-2.0. Not çatalı zaten öngörür. | Aynı eklenti kalır. Ama sorun çözülmez. |
+| Bakım | Değişen dosyalar bizdedir. Keycloak yükseltmesinde yeniden sınanır. | Ek adımın bakımı bizdedir. |
+
+### Karar
+
+1. yol seçildi. Eklenti sabit commit ve SHA-256 özetiyle indirilmeye devam eder. Derleme aşaması indirilen kaynağın üstüne bizim değişen dosyalarımızı kopyalar. Sonra Maven derler.
+
+Gerekçeler şunlardır:
+
+- Süre farkı eklentinin içindeki eşzamanlı gönderimden gelir. Bu farkı yalnız eklentinin içinde değişiklik kapatır.
+- Adım kimliği ve realm akışı aynı kalır. Var olan testler değişmeden geçer.
+- Arşiv sabit kalır. Değişiklik küçük ve okunur kalır. `test_extension_is_built_from_pinned_source_with_checksum` testi geçmeye devam eder.
+- Maven imajında `patch` ve `git` araçları yoktur. 24 Kasım 2026 Salı günü imaj denetlendi. Bu yüzden yama dosyası yerine değişen dosyaların tam kopyası kullanılır. Ek paket kurulmaz.
+
+### Sayacın yeri
+
+Sayaç Keycloak'ın kendi `SingleUseObjectProvider` önbelleğinde tutulur. Bu arayüz Keycloak 26.8.2'de vardır. Arayüz `keycloak-server-spi` jar dosyasındadır. `putIfAbsent(anahtar, saniye)` yöntemi tek adımda çalışır.
+
+Sayım şöyle çalışır:
+
+1. Sistem adres için 3 yuva anahtarı kurar. Anahtar biçimi `magiclink-send:<realm kimliği>:<adres özeti>:<1, 2 ya da 3>` olur.
+2. Adres özeti, küçük harfe çevrilmiş adresin SHA-256 özetidir. Önbellekte açık adres durmaz.
+3. Sistem yuvaları sırayla `putIfAbsent(yuva, 900)` ile dener.
+4. Bir yuva boşsa sistem yuvayı alır ve e-postayı gönderir.
+5. Üç yuva doluysa sistem e-posta göndermez. Kişi yine aynı yanıtı görür.
+6. Her yuva alındıktan 900 saniye sonra kendiliğinden boşalır.
+
+Bu yöntem kayan bir süre penceresi kurar. Herhangi bir 15 dakikada aynı adrese en çok 3 e-posta gider. Aynı anda gelen 8 istek de en çok 3 e-posta gönderir.
+
+Sayı ve süre realm dosyasından okunur. Ayarlar `atonota-magic-link` yapılandırmasına eklenir:
+
+- `magiclink.send.limit` değeri `3` olur.
+- `magiclink.send.window.seconds` değeri `900` olur.
+
+Başka yerler elendi:
+
+- Veritabanı tablosu elendi. Liquibase değişikliği ister. Eski satırları silmek için zamanlı iş gerekir.
+- Önündeki ters vekil sunucu elendi. Ters vekil adresi görmez. Yalnız IP adresine göre sayar.
+- Keycloak'ın kaba kuvvet koruması elendi. Bu koruma yanlış girişleri sayar. Gönderilen e-postaları saymaz.
+
+Sınırlar şunlardır:
+
+- Keycloak yeniden başlarsa tek düğümde sayaç sıfırlanır. Bu kabul edildi.
+- Kümede bu önbellek düğümler arasında paylaşılır. Bunu Keycloak'ın önbellek ayarı sağlar. Çok düğümlü kurulumda sınır yeniden sınanır.
+- Yuva gönderimden önce alınır. E-posta gönderilemezse yuva yine dolu sayılır. Bu, kötüye kullanıma karşı güvenli taraftır.
+
+### Yanıt süresini eşitleme yolu
+
+E-posta arka planda gönderilir. İstek iki adreste de aynı işi yapar.
+
+İstek sırasında yapılan işler şunlardır:
+
+1. Sistem adresi arar. Bu arama iki durumda da yapılır.
+2. Sistem anahtarı ve bağlantı kimliğini üretir. Bunu kullanıcı yoksa da yapar.
+3. Sistem bağlantı kimliğini giriş oturumuna yazar. Bunu da iki durumda yapar.
+4. Kullanıcı varsa sistem kullanıcıyı giriş oturumuna bağlar.
+5. Sistem bir arka plan işi kuyruğa koyar. Bunu iki durumda da yapar.
+6. Sistem bilgi sayfasını gösterir.
+
+Arka plan işi `KeycloakModelUtils.runJobInTransaction` ile kendi oturumunda çalışır. İş, `ExecutorsProvider.getExecutor("atonota-magic-link")` havuzunda çalışır. İş, isteğin kaydı bittikten sonra kuyruğa girer. Bunun için `session.getTransactionManager().enlistAfterCompletion` kullanılır.
+
+Arka plan işi şunları yapar:
+
+1. Kullanıcı yoksa iş hiçbir şey yapmaz ve biter.
+2. İş kullanıcıyı kimliğiyle yeniden okur. Realm'i oturuma koyar.
+3. İş sayaçta yuva arar. Yuva yoksa e-posta göndermeden biter.
+4. İş `MAGIC_LINK_SESSION` kaydını yazar. Kayıt e-postadan önce yazılır. Böylece bağlantı kayıttan önce gelemez.
+5. İş e-postayı gönderir.
+6. Gönderim başarısız olursa iş yalnız uyarı yazar. Uyarıda bağlantı ve anahtar yoktur. Kişi farkı görmez.
+
+Bu yolla iki adreste yanıt aynı işi yapar. Veritabanı kaydı ve e-posta yanıt süresine girmez. 500 hatası da kalkar.
+
+### Testlerle ilişki
+
+- `SEND_LIMIT` 3 olarak kalır. `TIMING_TOLERANCE_SECONDS` 0,002 saniye olarak kalır. Eşikler gevşetilmez.
+- Testler aynı adrese 15 dakikada 3'ten çok bağlantı ister. Örneğin süre testi tek adrese 15 istek gönderir. Bu yüzden canlı test sınıfı sınırı kendi süresince geçici olarak yükseltir. Bu, var olan `test_expired_link_is_refused` testindeki yöntemle yapılır. Test bitince eski ayar geri yazılır.
+- Sıklık testi kendi adresini kullanır. Bu adres başka testte kullanılmaz. Test başında sınır realm dosyasındaki değere döner.
+- Sıklık testi güçlenir. Test 8 istekte tam 3 e-posta bekler. Sıfır e-posta da hata sayılır.
+- Yeni dosya testi realm dosyasında 3 ve 900 değerlerini denetler.
+- Yeni dosya testi Dockerfile'ın değişen dosyaları kopyaladığını denetler.
+
+### Geliştiricinin değiştireceği dosyalar
+
+1. `backend/identity/keycloak/magic-link-fork/src/main/java/io/cloudflight/keycloak/magiclink/authenticators/AbstractMagicLinkAuthenticator.java` dosyası yeni açılır. Bu dosya sabit commit'teki dosyanın değişen kopyasıdır. `action()` ve `sendLink()` yöntemleri değişir. Dosyanın başına değişiklik notu yazılır.
+2. `backend/identity/keycloak/magic-link-fork/src/main/java/io/cloudflight/keycloak/magiclink/sending/MagicLinkSendLimiter.java` dosyası yeni açılır. Bu sınıf yuva sayımını yapar.
+3. `backend/identity/keycloak/magic-link-fork/NOTICE` dosyası yeni açılır. Dosya değişen dosyaları ve tarihi yazar. Apache-2.0 lisansının 4. maddesi bunu ister.
+4. `backend/identity/keycloak/Dockerfile` dosyasında `magiclink-build` aşaması değişir. Arşiv açıldıktan sonra `COPY magic-link-fork/ ...` satırı gelir. Sonra Maven derler. Arşivin adresi ve özeti değişmez.
+5. `backend/identity/keycloak/.dockerignore` dosyasına `!magic-link-fork/` ve `!magic-link-fork/**` satırları eklenir. Bu satırlar olmazsa yeni klasör derlemeye girmez.
+6. `backend/identity/keycloak/realm/platform-realm.json` dosyasında `atonota-magic-link` ayarına iki değer eklenir.
+7. `backend/identity/keycloak/realm/dev-users/platform-users-0.json` dosyasına sıklık testi için yeni bir örnek kullanıcı eklenir.
+8. `backend/identity/keycloak/tests/test_magic_link.py` dosyasında yukarıdaki test değişiklikleri yapılır. Eşikler ve var olan doğrulamalar gevşetilmez.
+9. `backend/docs/decisions/0003-keycloak-extensions.md` dosyasına iş bitince kanıt yazılır. Kanıt, geçen testlerin adı ve commit kimliğidir.
+
+### Kabul
+
+- `bin/kc-dev.sh test` komutu bütün testleri geçer. İki düşen test de geçer.
+- Komut şöyle çalıştırılır: `PANE_PORT=<boş port> COMPOSE_PROJECT_NAME=<ayrı ad> bin/kc-dev.sh test`.
+- Gerçek SMTP ile süre denenmedi. Yerel ortam Mailpit kullanır. Gerçek SMTP ile de farkın yanıt süresine girmemesi beklenir. Bunun nedeni gönderimin arka planda olmasıdır.
+
+### Uygulama ve kanıt (24 Kasım 2026 Salı günü, AJA-373)
+
+Claude 02 ajanı tasarımı `pc/g162-rate-limit` dalında uyguladı. Düşen testler `5c3236b4` commit'indedir. Kod, bu bölümü taşıyan commit'tedir.
+
+Tasarımdan iki sapma var:
+
+1. Onuncu bir dosya değişti. Dosya `AbstractMagicLinkAuthenticatorFactory.java` şeklindedir. Keycloak, tanımlanmamış ayarı yönetim arayüzünde yıldızla gizler. Gizli değer geri yazılınca eski değer kalır. Bu yüzden iki ayar fabrikada tanımlandı. Ayarlar yönetim konsolunda da görünür.
+2. Sıklık testi örnek kullanıcı dosyasını kullanmaz. Test her koşuda yeni bir adres açar. Koşu bitince adresi siler. Sabit adresin yuvaları 15 dakika dolu kalır. Testler bu sürede yeniden koşarsa sabit adrese e-posta gitmez. Bu yüzden `platform-users-0.json` dosyası değişmedi.
+
+E-posta gönderimi, yuva sayımı ve kayıt arka plan işindedir. Her yuva kendi işleminde denenir. Böylece JPA deposu da aynı anda gelen iki isteğin birini reddeder.
+
+Canlı kanıt yerel Keycloak 26.8.2 ve Mailpit ile alındı:
+
+- `bin/kc-dev.sh test -p test_magic_link.py` komutu 19 testi geçti. Yeni testler `test_send_rate_is_limited_per_address`, `test_existing_and_unknown_address_take_the_same_time`, `test_send_limit_is_three_mails_in_fifteen_minutes` ve `test_image_builds_the_fork_files_over_the_pinned_source` şeklindedir.
+- `bin/kc-dev.sh test` komutu 244 testi koştu. Hepsi geçti. 20 test ortam eksikliği yüzünden atlandı. Eksikler `PROD_KC_URL` ve ayrı MCP realm'idir.
+- `bin/kc-dev.sh prod-check` komutu 8 testi geçti.
+
+Testte bilinen bir sınır var. `fresh_totp_code` kullanılan kodları yalnız bir koşu içinde hatırlar. İki koşu 30 saniye içinde art arda yapılırsa `test_link_does_not_skip_totp` düşebilir. Bu davranış bu işten önce de vardı.
 
 ## Kurulum
 

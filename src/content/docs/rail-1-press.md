@@ -28,8 +28,8 @@ sequenceDiagram
         IY-->>PT: callback → ThreedsPayment, Iyzico Stored Card
         PT->>PR: Team.payment_mode='Card', default_payment_provider='iyzico'
     end
-    P->>PT: install_app(confirm=false) → önizleme (fiyat, KDV, site)
-    K->>P: Onayla
+    P->>PT: install_app → öneri ve önizleme (fiyat, KDV, site)
+    K->>P: Ayrı insan onayı (onay ucu)
     P->>PR: press.api.site.install_app(site, app, plan)
     PR->>PR: Site Active kontrolü, status=Pending
     PR->>AG: Agent Job "Install App on Site"
@@ -42,7 +42,7 @@ sequenceDiagram
     S->>PR: get_subscription_info(sk_hrms_tr) → özellik kapıları
 ```
 
-Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; yinelenen callback, kayıp iş sonucu ve ödeme alınıp kurulumun başarısız olduğu durumların telafisi G-125'tedir. Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden `confirm` bayrağıyla çağırır (G-27).
+Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; yinelenen callback, kayıp iş sonucu ve ödeme alınıp kurulumun başarısız olduğu durumların telafisi G-125'tedir. Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden çağırır. Yazan araç işi yapmaz, yalnız öneri açar. İnsan öneriyi ayrı bir onay ucundan onaylar. Modelde onay aracı ve `confirm` alanı yoktur (G-27, [Rail 5](/frappesetup/rail-5-ai/)).
 
 ## 2. Plan ve tier modeli (G-9, G-10, G-25)
 
@@ -103,7 +103,7 @@ Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha
 
 | Bileşen | Press doctype / ayar | Sahip |
 | --- | --- | --- |
-| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); MVP'de Press `press.atonota.net` adresindedir. Press müşteri paneli için `panel.atonota.net` adı MVP sonrası hedeftir, backend ad haritasında yoktur. `allow_cors` yok (G-119) | DevOps sorumlusu |
+| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); MVP'de Press `press.atonota.net` adresindedir. Press müşteri paneli için `panel.atonota.net` adı MVP sonrası hedeftir, backend ad haritasında yoktur. Backend MVP'de bu adı açmaz (`ortamlar.md` madde 4). `allow_cors` yok (G-119) | DevOps sorumlusu |
 | n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | DevOps sorumlusu |
 | f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | DevOps sorumlusu |
 | m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | DevOps sorumlusu |

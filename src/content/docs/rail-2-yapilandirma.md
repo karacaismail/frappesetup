@@ -30,7 +30,7 @@ Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`
 
 ## Origin, CSRF ve oturum (G-45, G-119)
 
-- Kiracı SPA'sı kendi sitesinden (`<kiracı>.app.<marka>.com.tr/panel` veya özel alan adı) aynı origin'le çalışır; panel host'u Press sitesinin kendi alan adıdır. Bu yüzden `allow_cors` hiçbir sitede tanımlanmaz; `"*"` asla kullanılmaz (Frappe origin'i kimlik bilgisiyle yansıtır, doğrulandı).
+- Kiracı SPA'sı kendi sitesinden (`<kiracı>.app.atonota.net/panel` veya özel alan adı) aynı origin'le çalışır; panel host'u Press sitesinin kendi alan adıdır. Bu yüzden `allow_cors` hiçbir sitede tanımlanmaz; `"*"` asla kullanılmaz (Frappe origin'i kimlik bilgisiyle yansıtır, doğrulandı).
 - Oturum çerezi host'a bağlıdır (Domain özniteliği yok, Secure, HttpOnly, SameSite=Lax); SPA istekleri `X-Frappe-CSRF-Token` taşır.
 - CSRF token yalnızca www/desk render'ında üretildiği için (doğrulandı) SPA kabuğu platform\_core `www/<panel>.py` sayfasından servis edilir ve `context.csrf_token` enjekte edilir.
 - Kabul: giriş sonrası csrf\_token dolu; tokensiz PATCH 400, tokenli 200.

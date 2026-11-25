@@ -2,6 +2,10 @@
  "audit": {
   "date": "2026-11-23",
   "commit": "36afb874",
+  "release": {
+   "pr": 18,
+   "commit": "1d3e6344"
+  },
   "note": "MVP durum denetimi. Denetim P0 ile P4 arasındaki MUST kalemlerini okudu. Bitti kalemleri yalnız yerel yığında testle geçti. G-155 ile G-167 arasındaki kalemler denetimden sonra eklendi.",
   "addedAfter": [
    "G-155",
@@ -22,33 +26,57 @@
    "G-170"
   ]
  },
+ "update": {
+  "date": "2026-11-24",
+  "commit": "065bf90c",
+  "release": {
+   "pr": 27,
+   "commit": "ec669626"
+  },
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı.",
+  "reviewed": [
+   "G-155",
+   "G-156",
+   "G-157",
+   "G-158",
+   "G-159",
+   "G-160",
+   "G-161",
+   "G-162",
+   "G-163",
+   "G-164",
+   "G-165",
+   "G-166",
+   "G-167"
+  ]
+ },
  "statuses": [
   {
    "id": "done",
    "label": "Bitti",
-   "rule": "Denetim kodu ve testi buldu. Test yerel yığında geçti. Kanıt commit ve test dosyasıdır."
+   "rule": "Kod ve testi var. Test yalnız yerel yığında geçti. Kanıt commit ve test dosyasıdır."
   },
   {
    "id": "in-progress",
    "label": "Sürüyor",
-   "rule": "Denetim işin bir kısmını buldu. Denetimdeki durum \"kısmen\" idi."
+   "rule": "İşin bir kısmının kodu var. Kodu olup testi olmayan iş de burada kalır. Kabulü canlı sunucu isteyen iş, canlıda denenene kadar burada kalır."
   },
   {
    "id": "not-started",
    "label": "Başlamadı",
-   "rule": "Denetim depoda bu işin kodunu bulamadı."
+   "rule": "Denetim ve güncelleme depoda bu işin kodunu bulamadı."
   },
   {
    "id": "unverified",
    "label": "Doğrulanmadı",
-   "rule": "Denetim bu kalemi okumadı. Bunun üç nedeni olabilir. Kalem SHOULD ya da MAY olabilir. Kalem P5 ya da sonraki bir fazda olabilir. Kalem denetimden sonra eklenmiş olabilir."
+   "rule": "Denetim ve güncelleme bu kalemi okumadı. Bunun üç nedeni olabilir. Kalem SHOULD ya da MAY olabilir. Kalem P5 ya da sonraki bir fazda olabilir. Kalem denetimden sonra eklenmiş olabilir."
   }
  ],
  "levels": [
   {
    "id": "poc",
    "label": "PoC",
-   "rule": "Başlığında \"prototip\" geçen P1 kalemleri PoC olur. Bu kalemler staging denemesidir.",
+   "rule": "Başlığında \"prototip\" geçen P1 kalemleri PoC olur. Bu kalemler beta ortamı denemesidir.",
    "ids": [
     "G-129",
     "SA-40"
@@ -232,7 +260,7 @@
   },
   "G-5": {
    "epic": "resilience",
-   "status": "not-started",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-6": {
@@ -271,6 +299,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/press_tr/tests/test_auth_http.py",
      "backend/apps/press_tr/tests/test_authorization_code.py"
@@ -414,7 +446,7 @@
   },
   "G-40": {
    "epic": "security",
-   "status": "not-started",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-41": {
@@ -438,6 +470,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_login_policy.py",
      "backend/apps/platform_core/platform_core/identity/tests/test_provider_setup.py",
@@ -451,6 +487,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/shell/test_panel_template.py",
      "backend/apps/platform_core/platform_core/access/tests/test_http_contract.py"
@@ -518,6 +558,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_provisioning.py",
      "backend/identity/identity_sync/tests/test_mapping.py"
@@ -530,6 +574,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_sign_out.py"
     ]
@@ -546,6 +594,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/access/tests/test_record_rule.py",
      "backend/apps/platform_core/platform_core/access/tests/test_hierarchy.py"
@@ -558,6 +610,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/access/tests/test_field_level.py"
     ]
@@ -649,6 +705,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/identity/keycloak/tests/test_second_factor.py",
      "backend/identity/keycloak/tests/test_session_lifetimes.py"
@@ -696,6 +756,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/ai/tests/test_approval.py"
     ]
@@ -838,7 +902,7 @@
   },
   "G-114": {
    "epic": "resilience",
-   "status": "not-started",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-115": {
@@ -872,6 +936,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/identity/tests/test_sign_in.py"
     ]
@@ -1018,6 +1086,10 @@
    "level": "mvp",
    "evidence": {
     "commit": "36afb874",
+    "release": {
+     "pr": 18,
+     "commit": "1d3e6344"
+    },
     "tests": [
      "backend/apps/platform_core/platform_core/ai/tests/test_identity.py"
     ]
@@ -1275,67 +1347,78 @@
   },
   "G-155": {
    "epic": "ai",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-156": {
    "epic": "ai",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-157": {
    "epic": "login-product",
-   "status": "unverified",
-   "level": "post-mvp"
+   "status": "done",
+   "level": "post-mvp",
+   "evidence": {
+    "commit": "18a9fff8",
+    "release": {
+     "pr": 23,
+     "commit": "22e70ad7"
+    },
+    "tests": [
+     "backend/identity/atonota_login/tests/test_product_boundary.py",
+     "backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts"
+    ]
+   }
   },
   "G-158": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-159": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-160": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "enterprise"
   },
   "G-161": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-162": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-163": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-164": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-165": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-166": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-167": {
    "epic": "login-product",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "post-mvp"
   },
   "G-168": {

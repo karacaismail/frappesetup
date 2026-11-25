@@ -7,11 +7,14 @@ import AxeBuilder from '@axe-core/playwright';
 const require = createRequire(import.meta.url);
 const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
   require('../src/data/requirements.json');
+type Release = { pr: number; commit: string } | null;
 const board: {
+  update: { date: string; commit: string; release: Release; note: string };
+  audit: { commit: string; release: Release; note: string };
   epics: { id: string; title: string }[];
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
-  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string } }>;
+  items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; release: Release } }>;
 } = require('../src/data/task-board.json');
 const phaseList: { id: string; title: string }[] = require('../src/data/phases.json');
 
@@ -33,7 +36,7 @@ const DOC_SLUGS = readdirSync(new URL('../src/content/docs/', import.meta.url))
   .map((f) => f.replace(/\.md$/, ''))
   .sort();
 const ALL_PAGES = ['', ...DOC_SLUGS.map((slug) => `${slug}/`)];
-const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/'];
+const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/', 'atonota-login-tanitim/'];
 // AI grubundaki sayfa sayısı bölüm üst verisinden türer: yeni AI sayfası eklendiğinde test kendiliğinden uyar.
 const AI_NAV_COUNT = (
   readFileSync(new URL('../src/data/sections.ts', import.meta.url), 'utf8').match(/group: 'AI'/g) ?? []
@@ -1088,8 +1091,16 @@ test.describe('task board', () => {
       await expect(done.locator('.task-status')).toHaveText(statusLabel('done'));
       await expect(done.locator('.task-status')).toBeVisible();
       await expect(done).toContainText(/Kanıt:/);
-      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu açıkça söyler.
-      await expect(done).toContainText(`Denetim commit'i ${board.items[doneIds[0]].evidence!.commit}.`);
+      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu ve commit'in dalını açıkça söyler.
+      const ev = board.items[doneIds[0]].evidence!;
+      await expect(done).toContainText(`Denetim commit'i ${ev.commit} backend dalındadır.`);
+      // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+      if (ev.release) {
+        const link = done.getByRole('link', { name: `PR #${ev.release.pr} ile yayımlandı` });
+        await expect(link).toHaveAttribute('href', `https://github.com/karacaismail/frappesetup/pull/${ev.release.pr}`);
+      } else {
+        await expect(done).toContainText('Henüz yayımlanmadı.');
+      }
       // Pano başlığı ile markdown kuralları başlığı aynı adı taşımaz (ekran okuyucu başlık listesi).
       const h2 = (await page.locator('main h2').allTextContents()).map((t) => t.trim());
       expect(h2.filter((t, i) => h2.indexOf(t) !== i), 'tekrarlanan h2').toEqual([]);
@@ -1097,6 +1108,41 @@ test.describe('task board', () => {
       await noHorizontalOverflow(page);
     });
   }
+
+  test('the board says when and at which commit the statuses were updated', async ({ page }) => {
+    // Okur durumun hangi güne ve hangi commit'e göre yazıldığını panonun kurallar bölümünde görür.
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const stamp = page.getByTestId('task-board-updated');
+    const day = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: 'UTC' })
+      .formatToParts(new Date(`${board.update.date}T00:00:00Z`))
+      .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+    await expect(stamp).toContainText(
+      `Durumlar ${day.day} ${day.month} ${day.year} ${day.weekday} günü backend dalındaki ${board.update.commit} commit'ine göre güncellendi.`,
+    );
+    await expect(stamp).toBeVisible();
+    const audit = page.locator('.task-rules > p').nth(1);
+    await expect(audit).toContainText(`Denetim backend dalındaki ${board.audit.commit} commit'inde yapıldı.`);
+    // İki commit aynı biçimde görünür (inceleme 1, K-3).
+    await expect(stamp.locator('code')).toHaveText(board.update.commit);
+    await expect(audit.locator('code')).toHaveText(board.audit.commit);
+    // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+    for (const [where, rel] of [[stamp, board.update.release], [audit, board.audit.release]] as const) {
+      if (rel) {
+        await expect(where.getByRole('link', { name: `PR #${rel.pr} ile yayımlandı` })).toHaveAttribute(
+          'href',
+          `https://github.com/karacaismail/frappesetup/pull/${rel.pr}`,
+        );
+      } else {
+        await expect(where).toContainText('Bu commit henüz yayımlanmadı.');
+      }
+    }
+    // Cümleler arasında boşluk kalır: derleme metni bitişik yazarsa "güncellendi.Güncelleme" tek sözcük olur.
+    const lead = (rel: Release) => (rel ? `PR #${rel.pr} ile yayımlandı.` : 'henüz yayımlanmadı.');
+    await expect(stamp).toContainText(`${lead(board.update.release)} ${board.update.note}`);
+    await expect(audit).toContainText(`${lead(board.audit.release)} ${board.audit.note}`);
+    await noHorizontalOverflow(page);
+  });
 
   test('status, level and epic filters are toggle groups with exact counts', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
@@ -1489,6 +1535,71 @@ test.describe('content', () => {
       await wrap.click({ position: { x: 10, y: 10 } });
       expect(await wrap.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// G-165 tanıtım sayfası: değer önerisi gereksinime bağlıdır, fiyat yazmaz, ölçüm satıcısına istek gitmez,
+// durum tabloları görev panosuyla aynıdır.
+test.describe('AtonotA Login landing page', () => {
+  const PATH = 'atonota-login-tanitim/';
+  const reqIds = new Set(requirements.map((r) => r.id));
+
+  test('loading the page sends no request outside the site origin', async ({ page, baseURL }) => {
+    const origin = new URL(baseURL!).origin;
+    const outside: string[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (!url.startsWith('data:') && !url.startsWith('blob:') && new URL(url).origin !== origin) outside.push(url);
+    });
+    await page.goto(PATH, { waitUntil: 'networkidle' });
+    await waitForHydration(page);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForLoadState('networkidle');
+    expect(outside, 'ölçüm satıcısına ya da başka bir origin\'e istek').toEqual([]);
+  });
+
+  test('every value proposition names an existing requirement and no price is written', async ({ page }) => {
+    await page.goto(PATH);
+    const items = await page.evaluate(() => {
+      const h = [...document.querySelectorAll('.prose h2')].find((el) => el.textContent?.includes('Değer önerileri'));
+      let el = h?.nextElementSibling ?? null;
+      while (el && el.tagName !== 'OL' && el.tagName !== 'H2') el = el.nextElementSibling;
+      return el?.tagName === 'OL' ? [...el.querySelectorAll(':scope > li')].map((li) => li.textContent ?? '') : [];
+    });
+    expect(items.length, 'değer önerisi listesi').toBeGreaterThan(0);
+    for (const text of items) {
+      const ids = text.match(/\bG-\d+\b/g) ?? [];
+      expect(ids.length, `gereksinim kimliği yok: ${text}`).toBeGreaterThan(0);
+      for (const id of ids) expect(reqIds.has(id), `${id} gereksinim listesinde yok`).toBe(true);
+    }
+    const body = (await page.locator('.prose').textContent()) ?? '';
+    expect(body).not.toMatch(/[₺$€£]|\b(TL|TRY|USD|EUR)\b|\d\s*(lira|dolar|avro)\b|\/\s*ay\b/i);
+  });
+
+  test('status tables match the task board', async ({ page }) => {
+    await page.goto(PATH);
+    const tables = await page.evaluate(() => {
+      const out: Record<string, string[]> = {};
+      for (const h of document.querySelectorAll('.prose h3')) {
+        let el = h.nextElementSibling;
+        while (el && !el.querySelector('table') && !/^H[23]$/.test(el.tagName)) el = el.nextElementSibling;
+        const rows = el?.querySelectorAll('tbody tr') ?? [];
+        out[(h.textContent ?? '').replace('#', '').trim()] = [...rows].map((r) => r.children[1]?.textContent?.trim() ?? '');
+      }
+      return out;
+    });
+    const status = (id: string) => board.items[id]?.status;
+    const done = tables['Bitti'] ?? [];
+    const ongoing = tables['Kodu yazıldı, iş sürüyor'] ?? [];
+    const soon = tables['Yakında'] ?? [];
+    expect(done.length * ongoing.length * soon.length, 'üç durum tablosu').toBeGreaterThan(0);
+    for (const id of done) expect(status(id), `${id} "Bitti" tablosunda`).toBe('done');
+    for (const id of [...ongoing, ...soon]) expect(status(id), `${id} panoda bitti, "Bitti" tablosuna taşınmalı`).not.toBe('done');
+    const boardDone = Object.entries(board.items)
+      .filter(([, it]) => it.epic === 'login-product' && it.status === 'done')
+      .map(([id]) => id);
+    expect([...new Set(done)].sort(), 'panoda biten her ürün kalemi "Bitti" tablosundadır').toEqual(boardDone.sort());
   });
 });
 

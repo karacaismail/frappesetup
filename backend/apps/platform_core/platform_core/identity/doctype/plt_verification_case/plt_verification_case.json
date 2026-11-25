@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-24 02:00:00.000000",
+ "description": "One external verification case (G-164): its newest attempt number and the decision of that attempt. Attempts are numbered 1, 2, 3 without gaps. The server writes these records; no role writes them by hand.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "case_id",
+  "latest_attempt",
+  "decided_attempt",
+  "outcome"
+ ],
+ "fields": [
+  {
+   "description": "The case id that the provider's notices refer to. It is unique, so each case has one record.",
+   "fieldname": "case_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Case ID",
+   "length": 140,
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "The newest attempt. Only this attempt can decide.",
+   "fieldname": "latest_attempt",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Latest Attempt",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The attempt that gave the stored outcome. 0 means no outcome yet.",
+   "fieldname": "decided_attempt",
+   "fieldtype": "Int",
+   "label": "Decided Attempt",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Outcome of the decided attempt. The case is pending when the decided attempt is not the latest one.",
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Outcome",
+   "options": "\napproved\nrejected\nreview",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-24 02:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Identity",
+ "name": "PLT Verification Case",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "search_fields": "case_id",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "case_id",
+ "track_changes": 0
+}

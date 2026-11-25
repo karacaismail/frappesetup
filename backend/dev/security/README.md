@@ -20,7 +20,7 @@ Bir adım başarısız olursa komut hata koduyla çıkar.
 
 Press kilidi taraması için OSV-Scanner 2.7.1 ve açık veritabanı gerekir. İkisini `backend/dev/security/osv-setup` betiği indirir. Bu betik ağ ister. Kapının kendisi ağ istemez. Dosyalar `~/.cache/frappesetup-osv` klasörüne iner. Veritabanı yedi günden eskiyse kapı düşer. Bu yüzden betiği en az haftada bir çalıştırın. Araç bulunamazsa da kapı düşer.
 
-OSV istisnası `osv-exceptions.toml` dosyasına girer. OSV-Scanner `owner` anahtarını kabul etmez. Bu yüzden sahip, gerekçenin başına yazılır. Örnek: `reason = "Owner: press-tr. ..."`.
+OSV istisnası `osv-exceptions.toml` dosyasına girer. Press imajının kilidi için ayrı bir dosya vardır. Adı `osv-exceptions-press.toml` olur. Bu dosyadaki istisna öteki kilitlere uygulanmaz. OSV-Scanner `owner` anahtarını kabul etmez. Bu yüzden sahip, gerekçenin başına yazılır. Örnek: `reason = "Owner: press-tr. ..."`.
 Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
 Tarama, Git geçmişini kapsamaz.
 Gitleaks sonucu gösterirken gizli değerleri örter.

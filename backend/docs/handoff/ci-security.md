@@ -10,6 +10,13 @@ CI sistemi değişiklikleri birleştirmeden önce denetimleri çalıştırır.
 | Yerel yanıtın güvenlik başlığı ve pasif ZAP taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/dast-scan --ci "http://kiraci1.localhost:$((PANE_PORT + 1))"` |
 | Son taramaların raporu | Depo kökü | `backend/dev/bin/release-report` |
 
+DevOps sorumlusu `backend/dev/tests` testlerini CI sistemine ekler.
+Test komutu depo kökünde çalışır.
+
+```sh
+python3 -I -m unittest discover -s backend/dev/tests
+```
+
 ## Hazırlık
 
 GitHub checkout adımında `fetch-depth: 0` kullanın.
@@ -25,6 +32,34 @@ Factory profilinde yeni imaj derlemeyin ve yeni site açmayın.
 Dosyanın SHA-256 özeti `fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8` olmalı.
 Dosyayı çalıştırılabilir yapın ve PATH üzerine `osv-scanner` adıyla koyun.
 Yerelde `backend/dev/security/osv-setup` aynı dosyayı özetiyle indirir. Betik veritabanlarını da indirir.
+Araç özetleri `tool-versions.env` dosyasındadır. `osv-setup` ve `scans.py` aynı özetleri kullanır.
+`scans.py` PATH'teki aracı da bu özetle karşılaştırır. Özet tutmazsa araç kullanılmaz.
+
+### Jenkins'te OSV hazırlığı
+
+`backend.Jenkinsfile` dosyasında `Security tools` aşaması vardır. Bu aşama `Gates` aşamasından hemen önce çalışır.
+
+1. Aşama `backend/dev/security/osv-setup --if-stale` komutunu çalıştırır.
+2. Araç yoksa ya da özeti tutmazsa komut aracı indirir. Komut aracın özetini denetler.
+3. Veritabanı dosyası yoksa komut onu indirir.
+4. Veritabanı dosyası altı gün ya da daha eskiyse komut onu yeniden indirir.
+5. Daha yeni dosyaya komut dokunmaz.
+6. Sonra `Gates` aşaması `security-audit` kapısını çalıştırır.
+
+Tarama yedi günden eski veritabanını reddeder. Bir günlük pay, yedinci güne yakın dosyanın kapıyı düşürmesini önler.
+Zamanlanmış iş kurmayın. Yenilemeyi her derleme kendisi yapar.
+Jenkins ajanında `curl` olmalıdır. Ajan `github.com` ve `osv-vulnerabilities.storage.googleapis.com` adreslerine HTTPS ile ulaşmalıdır.
+İndirme düşerse aşama düşer. Kapı eski veritabanıyla geçmez.
+Bu davranışı `backend/dev/tests/test_osv_setup.py` ve `backend/deploy/tests/test_jenkins_side.py` sınar.
+
+Veritabanı dosyalarının yayımlanmış özeti yoktur. Komut bu dosyaları özetsiz indirir. Bağlantı HTTPS'tir ve kaynak OSV'nin kendi deposudur. Bu yol kabul edildi.
+
+### OSV istisnaları
+
+Genel istisnalar `backend/dev/security/osv-exceptions.toml` dosyasındadır.
+Press imajının kilidi için ayrı bir dosya vardır. Adı `osv-exceptions-press.toml` olur.
+Press dosyasındaki istisna yalnız Press kilidinin taramasında kullanılır. Örneğin `wcmatch` istisnası öteki kilitlerde geçerli değildir.
+Başka bir kilit `wcmatch` alırsa açık raporlanır. Bunu `test_scans.py` sınar.
 `security-audit` kapısı Press kilidini tarar. Kapı aracı ve veritabanını bulamazsa düşer.
 Komut aracı bulamazsa OSV adımını `not_run` olarak kaydeder.
 Bu durumda `security-full`, yerelde ve CI kipinde 1 ile çıkar.

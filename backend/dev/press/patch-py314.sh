@@ -10,9 +10,16 @@ fi
 cd /home/frappe/benches/frappe-bench
 SP=env/lib/python3.14/site-packages
 
+# patch-id: standard-imghdr
+# patch-id: standard-pipes
+# patch-id: standard-crypt
+# patch-id: standard-cgi
 # Stdlib modules removed in Python 3.13 (imghdr is used by python-telegram-bot 13.15).
 uv pip install -q --python env/bin/python standard-imghdr standard-pipes standard-crypt standard-cgi
 
+# patch-id: ansible-six
+# patch-id: telegram-six
+# patch-id: stripe-six
 # Vendored six < 1.16 only implements find_module(), removed from importlib in Python 3.12, so
 # `six.moves` cannot be imported. Swap in the bench's six 1.17 (same API, adds find_spec).
 for f in "$SP/ansible/module_utils/six/__init__.py" \
@@ -23,6 +30,7 @@ for f in "$SP/ansible/module_utils/six/__init__.py" \
 done
 mkdir -p logs
 
+# patch-id: ansible-collection-loader
 # ansible-base 2.10 installs a path-hook finder without find_spec(); once installed it breaks every
 # later import in the process on Python 3.12+. Skip installing it (UI-only: no collections/plays).
 L="$SP/ansible/plugins/loader.py"
@@ -30,6 +38,7 @@ L="$SP/ansible/plugins/loader.py"
 grep -q "press-local: skip collection finder" "$L" || sed -i \
 	's/^    finder = _AnsibleCollectionFinder(C.config.get_config_value/    return  # press-local: skip collection finder (Python 3.12+)\n&/' "$L"
 
+# patch-id: deploy-candidate-typed-dict
 # press: TypedDict keyword-argument syntax was removed in Python 3.13. Use the dict form.
 C=apps/press/press/press/doctype/deploy_candidate/cache_utils.py
 env/bin/python - "$C" <<'PY'
@@ -42,6 +51,7 @@ if old:
 	open(p, "w").write(s.replace(old.group(0), new))
 PY
 
+# patch-id: product-trial-telemetry
 # Frappe v16 removed PostHog telemetry (frappe.utils.telemetry.init_telemetry). Press only uses it
 # to send product-trial analytics events; fall back to a no-op so the doctype module imports.
 P=apps/press/press/saas/doctype/product_trial_request/product_trial_request.py

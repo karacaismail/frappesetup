@@ -17,7 +17,7 @@ Yayın: **https://karacaismail.github.io/frappesetup/**
 
 ```
 src/
-  content/docs/            29 bölüm (frontmatter: title, nav, order)
+  content/docs/            30 bölüm (frontmatter: title, nav, order)
   data/requirements.json   gereksinimlerin tek kaynağı (id, title, detail, rail, priority, phase, source, owner)
   data/phases.json         P0–P7 faz hedefi, çıkış ölçütü, sahip, önkoşul (`after`)
   data/sections.ts         bölüm grubu, ikon, özet

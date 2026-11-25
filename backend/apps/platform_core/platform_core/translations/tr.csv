@@ -865,3 +865,22 @@ Enter the customer name. It can have at most {0} characters.,Müşteri adını y
 Enter a valid contact e-mail address.,Geçerli bir iletişim e-postası yazın.,
 The customer request does not exist.,Bu müşteri isteği yok.,
 Only a pending customer request can be approved.,Yalnız bekleyen müşteri isteği onaylanır.,
+No verification provider is configured.,Doğrulama sağlayıcısı ayarlanmadı.,platform_core.identity
+The notice signature is not valid.,Bildirimin imzası geçerli değil.,platform_core.identity
+The notice fields are not valid.,Bildirimin alanları geçerli değil.,platform_core.identity
+Sign in to continue.,Devam etmek için oturum açın.,platform_core.identity
+The action field must be a non-empty text of at most 140 characters.,İşlem alanı boş olmayan ve en çok 140 karakterlik bir metin olmalıdır.,platform_core.identity
+The action {0} is not allowed now ({1}).,{0} işlemine şu an izin yok ({1}).,platform_core.identity
+A final step cannot run inside a transaction with pending writes.,Bekleyen yazma varken son adım çalışamaz.,platform_core.identity
+The action {0} is not allowed now ({1}: {2}).,{0} işlemine şu an izin yok ({1}: {2}).,platform_core.identity
+Paid plans are not available yet.,Ücretli planlar henüz açık değil.,platform_core.identity
+The corporate provider exception breaks the rule {0}.,Kurumsal sağlayıcı istisnası {0} kuralını bozuyor.,platform_core.identity
+The first record of a provider and organisation supersedes no record.,Sağlayıcı ve kuruluşun ilk kaydı başka bir kaydın yerine geçmez.,platform_core.identity
+This record must supersede the current record {0}.,Bu kayıt geçerli {0} kaydının yerine geçmelidir.,platform_core.identity
+Only a current grant can be revoked.,Yalnız geçerli izin kaydı kapatılabilir.,platform_core.identity
+The provider {0} already has an exception for another organisation.,{0} sağlayıcısının başka bir kuruluş için istisnası var.,platform_core.identity
+Only the approval endpoint fills the approval fields.,Onay alanlarını yalnız onay ucu doldurur.,platform_core.identity
+"An approved exception record cannot change. Open a new record that supersedes it.",Onaylı istisna kaydı değişmez. Bu kaydın yerine geçen yeni bir kayıt açın.,platform_core.identity
+An exception record cannot be deleted. Open a revocation record instead.,İstisna kaydı silinmez. Bunun yerine bir kapanış kaydı açın.,platform_core.identity
+Only a grant record waiting for approval can be approved.,Yalnız onay bekleyen izin kaydı onaylanabilir.,platform_core.identity
+This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.identity

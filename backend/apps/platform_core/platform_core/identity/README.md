@@ -1,6 +1,6 @@
 # Kimlik modülü
 
-Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belirtecini doğrular. identity-sync için kullanıcı uçlarını verir. Sahibi platform-core-kimlik işidir. Uçların sözleşmesi `backend/contracts/platform_core-kimlik.openapi.yaml` dosyasındadır.
+Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belirtecini doğrular. identity-sync için kullanıcı uçlarını verir. Sahibi platform-core-kimlik işidir. Uçların sözleşmesi `backend/contracts/platform_core-identity.openapi.yaml` dosyasındadır.
 
 ## Dosyalar
 
@@ -22,6 +22,9 @@ Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis be
 | `safe_errors.py` | Kimlik, giriş ve çıkış uçlarında hata kaydına yalnız güvenli alanları yazar. |
 | `exceptions.py` | Uçların hata sınıfları. Sınıf adı yanıtta `exc_type` olur. |
 | `api.py` | Telefon belirtecini doğrulayan açık işlevler. |
+| `atonota/verification_api.py` | Dış doğrulama bildirimini alır. İmzayı ham gövdede denetler. İşlemeyi kuyruğa verir (G-164). |
+| `doctype/plt_verification_notice/` | Dış doğrulama bildirimi. Sağlayıcının olay numarası tekildir. Ham belge ve yüz verisi tutulmaz. |
+| `doctype/plt_verification_case/` | Doğrulama vakası. En yeni denemeyi ve o denemenin sonucunu tutar. |
 | `doctype/platform_identity_link/` | Kimlik bağı kaydı. `issuer` ve `subject` çifti tekildir. |
 | `doctype/platform_identity_deletion/` | Silme kaydı. Ham kimliği değil, `(iss, sub)` çiftinin özetini tutar. |
 | `../www/login.py`, `../www/login.html` | Kiracının `/login` sayfası. |
@@ -60,6 +63,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `identity_keycloak_only` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |
 | `identity_service_azp` | Hayır | Servis belirtecinde izinli `azp` listesi. Varsayılan `["identity-sync"]` |
+| `atonota_verification_secret` | Hayır | Dış doğrulama bildiriminin imza sırrı. En az 32 bayt olur. Yalnız site ayarında saklanır. Yoksa bildirim 503 alır. |
 | `kimlik_mobil_azp` | Hayır | Telefon belirtecinde izinli `azp` listesi. Varsayılan `["mobile"]` |
 | `kimlik_deletion_hmac_key` | Evet | Silme kaydındaki özetin gizli anahtarı. Yoksa kimlik değiştiren uçlar 503 döner. |
 | `mcp_oauth_enabled` | Hayır | Dış MCP erişimi başlangıçta kapalıdır. Açmak için `true` veya `1` yazın. |
@@ -82,7 +86,7 @@ Sunucu, istemci sırrını yalnız `site_config.json` dosyasından okur.
 Site ayarlarını yazdıktan sonra şu komut “Social Login Key” kaydını kurar:
 
 ```bash
-bench --site <site> execute platform_core.kimlik.provider_setup.ensure_social_login_key
+bench --site <site> execute platform_core.identity.provider_setup.ensure_social_login_key
 ```
 
 Aynı iş HTTP ile de yapılır. Uç `platform_core.api.auth.setup_keycloak_login` olur. Yalnız System Manager çağırır.

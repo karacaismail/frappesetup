@@ -7,6 +7,9 @@
 !libs/
 !libs/oidc_verify/
 !libs/oidc_verify/**
+!identity/
+!identity/atonota_login/
+!identity/atonota_login/**
 !contracts/
 !contracts/platform_core-access.openapi.yaml
 !contracts/platform_core-ai.openapi.yaml

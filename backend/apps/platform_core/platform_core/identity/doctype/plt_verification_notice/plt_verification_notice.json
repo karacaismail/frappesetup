@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-24 02:00:00.000000",
+ "description": "One verification result notice from the external provider (G-164). Only the decision fields are kept. Document images and face data never reach this record. The server writes these records; no role writes them by hand.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "event_id",
+  "case_id",
+  "attempt",
+  "outcome",
+  "state"
+ ],
+ "fields": [
+  {
+   "description": "The provider's event id. It is unique, so the same notice is stored once.",
+   "fieldname": "event_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Event ID",
+   "length": 140,
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "The verification case the notice is about.",
+   "fieldname": "case_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Case ID",
+   "length": 140,
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The attempt number of the case. Only the newest attempt can decide.",
+   "fieldname": "attempt",
+   "fieldtype": "Int",
+   "label": "Attempt",
+   "non_negative": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "The result the provider sent: approved, rejected or review. It decides only if the attempt is the newest one.",
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Outcome",
+   "options": "approved\nrejected\nreview",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "pending",
+   "description": "pending: waiting for the queue job. The other values say what the job did.",
+   "fieldname": "state",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "State",
+   "options": "pending\napplied\nstale\nfinal-kept\nunknown-attempt",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-24 02:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Identity",
+ "name": "PLT Verification Notice",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "search_fields": "case_id,event_id",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "event_id",
+ "track_changes": 0
+}

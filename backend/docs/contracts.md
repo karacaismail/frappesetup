@@ -43,13 +43,15 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | `site-tenant1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
-| `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | Yok |
+| `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `account-console` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | Realm dosyasındaki Keycloak hesap sayfaları | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
 - Keycloak hesap ekranı kendi belirtecini kullanır. Bu belirtecin hedefi `account` olur.
 - `account-console` yalnız kullanıcıya verilmiş hesap rollerini taşır. İstemci yönetim rolü alamaz.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
+- `mobile-app` istemcisi de çıkış bildirimi alır. Bu sayede telefon oturumu hemen kapanır. Telefon erişim anahtarının süresini beklemez (G-163).
+- Keycloak bir istemciye tek çıkış adresi verir. Bu adres `site-tenant1` sitesidir. Yeni kiracının telefon oturumu bu bildirimi almaz. O oturum en çok 300 saniye daha açık kalır.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
 - Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. Kiracının iki istemcisi içinde `aud-identity-sync` kapsamını yalnız servis istemcisi isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
 - `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.
@@ -569,7 +571,7 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 #### Kullanım günlüğü temizliğinin modül arayüzü
 
-- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False, names=None)` olur.
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gateway.api.purge_usage_logs(*, dry_run=False, names=None)` olur.
 - İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
 - Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
 - `dry_run=True` iken işlev hiçbir kaydı silmez. `{"eligible": <sayı>, "deleted": 0, "names": [...]}` döner. `names` bu çalıştırmada silinecek kayıtların adlarıdır, en çok 500 tanedir.

@@ -110,6 +110,9 @@ ai_write_closed_doctypes = [
 	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
 	"Reseller Customer Link",
 	"Reseller Customer Request",
+	# G-164: verification notices and cases change only through the signed provider notice and its queue job.
+	"PLT Verification Notice",
+	"PLT Verification Case",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
@@ -151,6 +154,9 @@ website_user_allowed_methods = [
 	"platform_core.api.reseller.list_customers",
 	"platform_core.api.reseller.customer_status",
 	"platform_core.api.reseller.request_customer",
+	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
+	"platform_core.api.atonota_login.evaluate",
+	"platform_core.api.atonota_login.open_paid_plan",
 ]
 
 
