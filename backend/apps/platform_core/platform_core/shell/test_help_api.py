@@ -74,28 +74,28 @@ class TestFieldHelp(IntegrationTestCase):
 	def test_readable_field_returns_the_tenant_topic(self):
 		record = self.add_topic(OPEN_FIELD)
 		frappe.set_user(USER)
-		result = get_field_help(DOCTYPE, OPEN_FIELD, USER, "en")
-		self.assertEqual(result["source"], "tenant")
-		self.assertEqual(result["topic"], record.name)
-		self.assertEqual(result["content"], f"Tenant help for {OPEN_FIELD}.")
+		answer = get_field_help(DOCTYPE, OPEN_FIELD, USER, "en")
+		self.assertEqual(answer["source"], "tenant")
+		self.assertEqual(answer["topic"], record.name)
+		self.assertEqual(answer["content"], f"Tenant help for {OPEN_FIELD}.")
 
 	def test_readable_field_falls_back_to_its_description(self):
 		frappe.set_user(USER)
-		result = get_field_help(DOCTYPE, OPEN_FIELD, USER, "en")
-		self.assertEqual(result["source"], "description")
-		self.assertEqual(result["content"], f"Description of {OPEN_FIELD}.")
+		answer = get_field_help(DOCTYPE, OPEN_FIELD, USER, "en")
+		self.assertEqual(answer["source"], "description")
+		self.assertEqual(answer["content"], f"Description of {OPEN_FIELD}.")
 
 	def test_field_at_an_unreadable_level_returns_no_help(self):
 		self.add_topic(CLOSED_FIELD)
 		frappe.set_user(USER)
-		result = get_field_help(DOCTYPE, CLOSED_FIELD, USER, "en")
-		self.assertEqual(result["source"], "unavailable")
-		self.assertIsNone(result["content"])
+		answer = get_field_help(DOCTYPE, CLOSED_FIELD, USER, "en")
+		self.assertEqual(answer["source"], "unavailable")
+		self.assertIsNone(answer["content"])
 
 	def test_unknown_field_looks_like_an_unreadable_field(self):
 		frappe.set_user(USER)
-		result = get_field_help(DOCTYPE, "no_such_field", USER, "en")
-		self.assertEqual(result["source"], "unavailable")
+		answer = get_field_help(DOCTYPE, "no_such_field", USER, "en")
+		self.assertEqual(answer["source"], "unavailable")
 
 	def test_coverage_report_is_for_the_system_manager(self):
 		frappe.set_user(USER)
@@ -106,6 +106,13 @@ class TestFieldHelp(IntegrationTestCase):
 		self.add_topic(OPEN_FIELD)
 		report = get_help_coverage("frappe")
 		self.assertGreater(report["total"], 0)
-		self.assertNotIn(
-			{"doctype": DOCTYPE, "fieldname": OPEN_FIELD, "is_custom": True}, report["missing"]
-		)
+		self.assertNotIn({"doctype": DOCTYPE, "fieldname": OPEN_FIELD, "is_custom": True}, report["missing"])
+
+
+class TestHelpHooks(IntegrationTestCase):
+	def test_website_users_reach_field_help_but_not_the_coverage_report(self):
+		allowed = frappe.get_hooks("website_user_allowed_methods")
+		self.assertIn("platform_core.api.help.get_field_help", allowed)
+		self.assertNotIn("platform_core.api.help.get_help_coverage", allowed)
+		for name in ("get_field_help", "get_help_coverage"):
+			self.assertIn(frappe.get_attr(f"platform_core.api.help.{name}"), frappe.whitelisted, name)
