@@ -48,14 +48,16 @@ LEVEL_GRANTS = {("Role Profile", 1): ("read", "write")}
 # Types of these applications hold scripts, sign-in, tokens, settings and the platform's own
 # records. Their permission rows are written by a System Manager only.
 CLOSED_APPS = frozenset({"frappe", "platform_core"})
+# Only the platform operator gives a reseller role (G-169).
+RESELLER_ROLES = frozenset({"Reseller Admin", "Reseller Assistant"})
 # The holder cannot change these roles, give them to anyone or give them permission rows.
-CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE}
+CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE} | RESELLER_ROLES
 
 
-def ensure_role() -> None:
-	"""Creates the role and its permission rows. Runs after install and after every migrate."""
+def ensure_permissions() -> None:
+	"""Gives the role its permission rows. Runs after the setup step. Without the role it does nothing."""
 	if not frappe.db.exists("Role", ROLE):
-		frappe.get_doc(doctype="Role", role_name=ROLE, desk_access=0).insert(ignore_permissions=True)
+		return
 	grants = {(doctype, 0): ptypes for doctype, ptypes in GRANTS.items()} | LEVEL_GRANTS
 	for (doctype, level), ptypes in grants.items():
 		if not frappe.db.exists("DocType", doctype):

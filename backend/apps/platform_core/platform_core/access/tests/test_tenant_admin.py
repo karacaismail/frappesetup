@@ -8,7 +8,10 @@ A tenant is its own Frappe site. A session and the role live on one site only, s
 works only in its own tenant.
 """
 
+import inspect
 import json
+from pathlib import Path
+from unittest.mock import patch
 from urllib.parse import quote
 
 import frappe
@@ -33,6 +36,7 @@ DESK_ROLE = "TA Masa Rol"
 CUSTOM_TYPE = "TA Ozel Tur"
 RULE_TYPE = "ToDo"
 PROTECTED = ("System Manager", "Administrator")
+RESELLER_ROLES = ("Reseller Admin", "Reseller Assistant")
 
 
 def _user(email: str, roles: list[str]) -> None:
@@ -59,7 +63,7 @@ class TestTenantAdmin(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		# An interrupted run can leave a profile link behind. The users are saved below.
 		cls.clean()
-		tenant_admin.ensure_role()
+		tenant_admin.ensure_permissions()
 		for role in (CUSTOM_ROLE, OTHER_ROLE):
 			if not frappe.db.exists("Role", role):
 				frappe.get_doc(doctype="Role", role_name=role, desk_access=0).insert()
@@ -152,15 +156,51 @@ class TestTenantAdmin(IntegrationTestCase):
 	# --- installation ---
 
 	def test_role_is_set_up_on_install_and_migrate(self):
-		self.assertIn("platform_core.access.tenant_admin.ensure_role", frappe.get_hooks("after_install"))
-		self.assertIn("platform_core.access.tenant_admin.ensure_role", frappe.get_hooks("after_migrate"))
+		# AJA-899: the setup step opens the role when it is missing. The permission rows follow.
+		setup = "platform_core.setup.panel_roles.ensure"
+		hook = "platform_core.access.tenant_admin.ensure_permissions"
+		for name in ("after_install", "after_migrate"):
+			hooks = frappe.get_hooks(name)
+			self.assertIn(setup, hooks, name)
+			self.assertIn(hook, hooks, name)
+			self.assertLess(hooks.index(setup), hooks.index(hook), name)
 		self.assertTrue(frappe.db.exists("Role", tenant_admin.ROLE))
 		# The panel's users stay Website Users. A desk role would make them System Users.
 		self.assertEqual(frappe.db.get_value("Role", tenant_admin.ROLE, "desk_access"), 0)
 
+	def test_role_is_defined_only_in_the_setup_step(self):
+		# One definition: `setup/role.json`. Neither a fixture nor this module opens the role.
+		self.assertFalse(hasattr(tenant_admin, "ensure_role"))
+		self.assertNotIn('doctype="Role"', inspect.getsource(tenant_admin))
+		fixture = Path(frappe.get_app_path("platform_core", "fixtures", "role.json"))
+		fixture_rows = json.loads(fixture.read_text()) if fixture.exists() else []
+		self.assertNotIn(tenant_admin.ROLE, {row["name"] for row in fixture_rows})
+		setup = Path(frappe.get_app_path("platform_core", "setup", "role.json"))
+		rows = [row for row in json.loads(setup.read_text()) if row["name"] == tenant_admin.ROLE]
+		self.assertEqual(len(rows), 1)
+		self.assertEqual(rows[0]["desk_access"], 0)
+
+	def test_permission_rows_wait_for_the_role(self):
+		# Without the role the function writes nothing.
+		exists = frappe.db.exists
+
+		def no_role(doctype, *args, **kwargs):
+			if doctype == "Role":
+				return None
+			return exists(doctype, *args, **kwargs)
+
+		with (
+			patch.object(frappe.db, "exists", side_effect=no_role),
+			patch.object(tenant_admin, "add_permission") as add,
+			patch.object(tenant_admin, "setup_custom_perms") as copy,
+		):
+			tenant_admin.ensure_permissions()
+		add.assert_not_called()
+		copy.assert_not_called()
+
 	def test_role_gets_its_permission_rows_once(self):
-		tenant_admin.ensure_role()
-		tenant_admin.ensure_role()
+		tenant_admin.ensure_permissions()
+		tenant_admin.ensure_permissions()
 		for doctype, ptypes in tenant_admin.GRANTS.items():
 			rows = frappe.get_all(
 				"Custom DocPerm",
@@ -564,6 +604,23 @@ class TestTenantAdmin(IntegrationTestCase):
 				doc.save(ignore_permissions=True)
 		frappe.set_user("Administrator")
 		self.assertEqual(frappe.get_roles(PLAIN).count(DESK_ROLE), 0)
+
+	def test_holder_cannot_give_a_reseller_role(self):
+		"""G-169: only the platform operator gives a reseller role (AJA-900)."""
+		for role in RESELLER_ROLES:
+			self.assertTrue(frappe.db.exists("Role", role), role)
+			self.assertFalse(tenant_admin.grantable_role(role), role)
+			frappe.set_user(HOLDER)
+			doc = frappe.get_doc("User", PLAIN)
+			doc.append("roles", {"role": role})
+			with self.assertRaises(frappe.PermissionError):
+				doc.save(ignore_permissions=True)
+			profile = frappe.get_doc(doctype="Role Profile", role_profile=PROFILE, roles=[{"role": role}])
+			with self.assertRaises(frappe.PermissionError):
+				profile.insert(ignore_permissions=True)
+			frappe.set_user("Administrator")
+			self.assertNotIn(role, frappe.get_roles(PLAIN))
+			self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
 
 	def test_holder_cannot_change_or_delete_its_own_role(self):
 		client = self.login()

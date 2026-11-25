@@ -916,3 +916,26 @@ role_profiles must be a list of role profile names.,role_profiles alanı rol pro
 {0} must be a name.,{0} alanı bir ad olmalıdır.,
 {0} must be a text of at most {1} characters.,{0} alanı en çok {1} karakterlik bir metin olmalıdır.,
 {0} must be a whole number in range.,{0} alanı izin verilen aralıkta bir tam sayı olmalıdır.,
+Reseller Customer Link,Bayi Müşteri Bağı,
+Reseller Customer Request,Bayi Müşteri İsteği,
+Platform Operator,Platform Operatörü,
+Reseller Tenant,Bayi kiracısı,
+Customer Tenant,Müşteri kiracısı,
+Customer Name,Müşteri adı,
+Site Status,Site durumu,Reseller Customer Link
+Pending,Bekliyor,Reseller Customer Link
+Active,Etkin,Reseller Customer Link
+Suspended,Durduruldu,Reseller Customer Link
+Contact Email,İletişim e-postası,
+Status,Durum,Reseller Customer Request
+Pending,Bekliyor,Reseller Customer Request
+Approved,Onaylandı,Reseller Customer Request
+Requested By,İsteyen,
+Approved By,Onaylayan,
+Approved On,Onay zamanı,
+You are not permitted to do this.,Bu işi yapma izniniz yok.,
+You are not permitted to see this customer.,Bu müşteriyi görme izniniz yok.,
+Enter the customer name. It can have at most {0} characters.,Müşteri adını yazın. Ad en çok {0} karakter olabilir.,
+Enter a valid contact e-mail address.,Geçerli bir iletişim e-postası yazın.,
+The customer request does not exist.,Bu müşteri isteği yok.,
+Only a pending customer request can be approved.,Yalnız bekleyen müşteri isteği onaylanır.,

@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "6872fca4aa05a58ded05ac976f66bda28851c242ff63506349a48cfe631ed9ad",
+      "sha256": "f1d8971068b9be8de7998a47b69f7b98d8254cb1f9209b26e32a41f290fc0ae9",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -186,31 +186,25 @@
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 58,
-          "reason": "Creates the “Tenant Admin” role from ensure_role, an after_install and after_migrate hook that no endpoint whitelists (G-62). The role is made with desk access off."
-        },
-        {
-          "rule": "frappe-ignore-permissions",
-          "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 349,
+          "line": 351,
           "reason": "Saves the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on save and refuses protected roles, standard roles and closed types."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 351,
+          "line": 353,
           "reason": "Inserts the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs before insert and refuses protected roles, standard roles and closed types."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 368,
+          "line": 370,
           "reason": "Deletes the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on trash."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 397,
+          "line": 399,
           "reason": "Saves the users of a Role Profile that guard_role_profile allowed to hold only plain roles (G-62). Administrator and users with any role that is not plain are skipped. guard_user still runs on each save."
         },
         {
@@ -274,6 +268,54 @@
           "reason": "Refuses unknown fields, then delegates to user_admin.invite_user, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-98). The organization comes from site config, and identity-sync checks it is the caller's own. A run needs the digest of its preview. A per-user rate_limit of 20 requests in 600 seconds stops invitation floods (AJA-890)."
         },
         {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/reseller.py",
+          "line": 11,
+          "reason": "Calls customers.require, which refuses everyone without Reseller Admin or Reseller Assistant with 403 before any read."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/reseller.py",
+          "line": 17,
+          "reason": "Calls customers.require for the two reseller roles; the lookup is filtered by the serving reseller site, other customers get 403."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/reseller.py",
+          "line": 23,
+          "reason": "Calls customers.require, which allows only Reseller Admin; name and e-mail are validated server side."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/reseller.py",
+          "line": 29,
+          "reason": "Calls customers.require, which allows only Platform Operator; the endpoint is not on the Website User method list."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/api/test_reseller.py",
+          "line": 52,
+          "reason": "Test setup inserts the test reseller user; test code is not served."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/api/test_reseller.py",
+          "line": 55,
+          "reason": "Test setup inserts the own and foreign customer links; test code is not served."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/api/test_reseller.py",
+          "line": 80,
+          "reason": "Test cleanup deletes the test reseller user; test code is not served."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/api/test_reseller.py",
+          "line": 116,
+          "reason": "Test helper inserts a foreign reseller request; test code is not served."
+        },
+        {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
           "line": 108,
@@ -308,6 +350,36 @@
           "path": "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
           "line": 384,
           "reason": "Saves the chunk plan from prepare_job, a queue step that no endpoint whitelists (G-156). Page and chunk counts are capped by site settings before any row is written. Chunk text is cleared after each attempt and when the job finishes."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/reseller/customers.py",
+          "line": 33,
+          "reason": "Runs after the reseller role check and is filtered by the serving reseller site; returns only the link fields."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/reseller/customers.py",
+          "line": 78,
+          "reason": "Runs after the Reseller Admin check; reseller site, status and requester are set by the server, not the caller."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/reseller/customers.py",
+          "line": 99,
+          "reason": "Runs after the Platform Operator check; only a pending request moves to Approved, with a row lock."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/setup/panel_roles.py",
+          "line": 42,
+          "reason": "Install and migrate step, not a request path; inserts only a missing panel role from the bundled role.json."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/setup/panel_roles.py",
+          "line": 65,
+          "reason": "Install and migrate step, not a request path; inserts only a missing profile from the bundled role_profile.json."
         }
       ],
       "files": [
@@ -323,11 +395,15 @@
         "backend/apps/platform_core/platform_core/api/access.py",
         "backend/apps/platform_core/platform_core/api/atonota_login.py",
         "backend/apps/platform_core/platform_core/api/identity.py",
+        "backend/apps/platform_core/platform_core/api/reseller.py",
+        "backend/apps/platform_core/platform_core/api/test_reseller.py",
         "backend/apps/platform_core/platform_core/hooks.py",
         "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
         "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
         "backend/apps/platform_core/platform_core/identity/user_admin.py",
-        "backend/apps/platform_core/platform_core/model_gateway/large_file.py"
+        "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
+        "backend/apps/platform_core/platform_core/reseller/customers.py",
+        "backend/apps/platform_core/platform_core/setup/panel_roles.py"
       ]
     }
   ]

@@ -16,6 +16,7 @@
 !contracts/platform_core-ai.openapi.yaml
 !contracts/platform_core-identity.openapi.yaml
 !contracts/platform_core-model-gateway.openapi.yaml
+!contracts/platform_core-reseller.openapi.yaml
 !contracts/platform_core-shell.openapi.yaml
 **/.git
 **/.env*
