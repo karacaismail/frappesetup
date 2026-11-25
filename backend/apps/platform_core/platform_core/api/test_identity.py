@@ -1,11 +1,17 @@
-"""Exercise the reconciliation endpoint over Frappe RPC (contract section 7)."""
+"""Exercise the identity endpoints over Frappe RPC.
+
+The reconciliation and identity-sync endpoints follow contract section 7. The user management
+endpoints of the panel (G-98) have their behavior tests in `identity/tests/test_user_admin.py`.
+"""
 
 from unittest.mock import patch
 
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
+from frappe.utils import get_test_client
 
 from platform_core.identity.tests import helpers as h
+from platform_core.identity.tests import test_user_admin as ua
 
 ENDPOINT = "/api/method/platform_core.api.identity.list_identities"
 DISABLED_USER = "reconciliation.disabled@example.test"
@@ -127,3 +133,48 @@ class TestListIdentities(FrappeAPITestCase):
 
 	def test_anonymize_user_foreign_data_denied(self):
 		self._assert_mutation_denied("anonymize_user", claims={"aud": "other-tenant"})
+
+
+class TestUserAdminEndpoints(ua.TenantUsersCase):
+	"""G-98: the two endpoints of the panel refuse a guest and data outside the tenant (AJA-890)."""
+
+	def guest(self):
+		return get_test_client(use_cookies=True)
+
+	def test_set_user_role_profiles_guest_denied(self):
+		response = self.assign(self.guest(), ua.MEMBER, [ua.PROFILE])
+
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("message", response.json)
+		self.assertNotIn(ua.PLAIN_ROLE, frappe.get_roles(ua.MEMBER))
+
+	def test_set_user_role_profiles_foreign_data_denied(self):
+		"""A user of another tenant is not changed. A plain user changes nobody, not even itself."""
+		for client, user in ((self.login(), ua.STRANGER), (self.login(ua.MEMBER), ua.MEMBER)):
+			with self.subTest(user=user):
+				response = self.assign(client, user, [ua.PROFILE])
+
+				self.assertEqual(response.status_code, 403)
+				self.assertNotIn("message", response.json)
+				self.assertNotIn(ua.PLAIN_ROLE, frappe.get_roles(user))
+
+	def test_invite_user_guest_denied(self):
+		fake = self.serve(ua.FakeIdentitySync())
+
+		response = self.invite(self.guest(), dry_run=True)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("message", response.json)
+		self.assertEqual(fake.calls, [])
+
+	def test_invite_user_foreign_data_denied(self):
+		"""Nobody invites into another organization. A plain user invites nobody."""
+		fake = self.serve(ua.FakeIdentitySync())
+
+		other_organization = self.invite(self.login(), dry_run=True, organization_id="org-other")
+		plain_user = self.invite(self.login(ua.MEMBER), dry_run=True)
+
+		self.assertEqual(other_organization.status_code, 400)
+		self.assertEqual(plain_user.status_code, 403)
+		self.assertNotIn("message", plain_user.json)
+		self.assertEqual(fake.calls, [])

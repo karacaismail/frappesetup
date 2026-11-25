@@ -45,6 +45,8 @@ EXPECTED = {
 	"list_role_permissions": (403, 403, 403, 403, 200),
 	"set_role_permission": (403, 403, 403, 403, 200),
 	"remove_role_permission": (403, 403, 403, 403, 200),
+	# G-98: the “Tenant Admin” role also gets 200. Its tests are in `test_permission_log.py`.
+	"list_permission_logs": (403, 403, 403, 403, 200),
 	"search_link": (403, 200, 403, 200, 200),
 	"search_link, custom function": (403, 403, 403, 403, 403),
 	"search_widget": (403, 403, 403, 200, 200),
@@ -139,6 +141,7 @@ class TestEntryMatrix(AccessRuleTestCase):
 				# A role no caller below uses, so the later rows of the table keep their access.
 				{"body": {"doctype": DOCTYPE, "role": ROLE_NO_RULE}},
 			),
+			"list_permission_logs": ("GET", ACCESS + "list_permission_logs", {"query": {"page_length": 5}}),
 			"search_link": ("POST", SEARCH_LINK, {"body": search}),
 			"search_link, custom function": ("POST", SEARCH_LINK, {"body": {**search, **custom}}),
 			"search_widget": ("POST", SEARCH_WIDGET, {"body": search}),

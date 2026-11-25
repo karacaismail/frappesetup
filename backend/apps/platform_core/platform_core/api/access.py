@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.permissions import is_system_user
 
-from platform_core.access import explain, field_level, tenant_admin
+from platform_core.access import explain, field_level, permission_log, tenant_admin
 
 
 @frappe.whitelist(methods=["GET"])
@@ -70,3 +70,17 @@ def set_role_permission(
 def remove_role_permission(doctype: str, role: str, permlevel: int = 0, if_owner: int = 0) -> dict:
 	"""Deletes the permission row of a role on a type (G-62). Same callers as `set_role_permission`."""
 	return tenant_admin.remove_role_permission(doctype, role, permlevel, if_owner)
+
+
+@frappe.whitelist(methods=["GET"])
+def list_permission_logs(
+	for_doctype: object = None, for_document: object = None, start: object = 0, page_length: object = None
+) -> dict:
+	"""A page of Permission Log rows, the newest first (G-62, G-98).
+
+	“System Manager” and “Tenant Admin” only. Unknown query fields are refused.
+	"""
+	unknown = sorted(set(frappe.form_dict) - {"for_doctype", "for_document", "start", "page_length", "cmd"})
+	if unknown:
+		frappe.throw(_("Unknown field: {0}").format(", ".join(unknown)), permission_log.InvalidInput)
+	return permission_log.list_permission_logs(for_doctype, for_document, start, page_length)
