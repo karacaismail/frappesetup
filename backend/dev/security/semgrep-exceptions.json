@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "e3f1f9f0f3a97582bc8158351e183977d2ff0908df7aad83a8a776486a028acb",
+      "sha256": "07bb275c72d77ed56146bd1b21ff11ff6c488af13c38596d66d981d9756e7565",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -184,16 +184,64 @@
           "reason": "Checks DocType select permission and rejects custom queries on governed types before link validation."
         },
         {
-          "rule": "frappe-missing-permission",
-          "path": "backend/apps/platform_core/platform_core/api/access.py",
-          "line": 12,
-          "reason": "Checks DocType read permission before explaining access and restricts other-user requests to managers."
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
+          "line": 58,
+          "reason": "Creates the “Tenant Admin” role from ensure_role, an after_install and after_migrate hook that no endpoint whitelists (G-62). The role is made with desk access off."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
+          "line": 349,
+          "reason": "Saves the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on save and refuses protected roles, standard roles and closed types."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
+          "line": 351,
+          "reason": "Inserts the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs before insert and refuses protected roles, standard roles and closed types."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
+          "line": 368,
+          "reason": "Deletes the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on trash."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
+          "line": 397,
+          "reason": "Saves the users of a Role Profile that guard_role_profile allowed to hold only plain roles (G-62). Administrator and users with any role that is not plain are skipped. guard_user still runs on each save."
         },
         {
           "rule": "frappe-missing-permission",
           "path": "backend/apps/platform_core/platform_core/api/access.py",
-          "line": 20,
+          "line": 13,
+          "reason": "Lets only a System User or a “Tenant Admin” call it and checks DocType read permission (G-62). explain() refuses another user's explanation unless the caller is a System Manager."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 26,
           "reason": "Checks DocType read permission before returning the session user’s access summary."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 50,
+          "reason": "Delegates to tenant_admin.list_role_permissions, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-62)."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 56,
+          "reason": "Delegates to tenant_admin.set_role_permission, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-62)."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 69,
+          "reason": "Delegates to tenant_admin.remove_role_permission, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-62)."
         },
         {
           "rule": "frappe-missing-permission",
@@ -246,6 +294,7 @@
         "backend/apps/platform_core/platform_core/access/reports.py",
         "backend/apps/platform_core/platform_core/access/rules.py",
         "backend/apps/platform_core/platform_core/access/subject.py",
+        "backend/apps/platform_core/platform_core/access/tenant_admin.py",
         "backend/apps/platform_core/platform_core/api/access.py",
         "backend/apps/platform_core/platform_core/api/atonota_login.py",
         "backend/apps/platform_core/platform_core/hooks.py",
