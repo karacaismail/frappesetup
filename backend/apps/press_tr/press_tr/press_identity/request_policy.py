@@ -57,7 +57,12 @@ LOCAL_IDENTITY_METHODS = (
 	"press.api.marketplace.login_via_token",
 )
 API_PREFIXES = ("/api/method/", "/api/v1/method/", "/api/v2/method/")
-ADMIN_METHOD = "press_tr.api.maintenance.cleanup_expired_sessions"
+# Desk methods for a System Manager. They answer only on Tailscale.
+ADMIN_METHOD = (
+	"press_tr.api.maintenance.cleanup_expired_sessions",
+	# AJA-420: a reviewer removes the old keys after an approved recovery.
+	"press_tr.api.account.remove_recovered_keys",
+)
 ACCOUNT_METHOD = "press_tr.api.account.request_deletion"
 
 
@@ -193,7 +198,7 @@ def before_request():
 	routes = {prefix + name for prefix in API_PREFIXES for name in GUEST_METHODS}
 	routes.update(
 		f"/api/method/{name}"
-		for name in (*SERVICE_PARAMETERS, *MACHINE_METHODS, ADMIN_METHOD, ACCOUNT_METHOD)
+		for name in (*SERVICE_PARAMETERS, *MACHINE_METHODS, *ADMIN_METHOD, ACCOUNT_METHOD)
 	)
 	if path in routes and path not in ALLOWED_PATHS:
 		ALLOWED_PATHS.append(path)

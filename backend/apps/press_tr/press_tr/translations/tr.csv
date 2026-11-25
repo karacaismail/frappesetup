@@ -117,7 +117,6 @@ Records an account recovery request. Email access alone never recovers an accoun
 Identity Link,Kimlik bağı,PTR Recovery Review
 Verified identity whose account recovery was requested.,Kurtarma isteği bu doğrulanmış kimliğe aittir.,PTR Recovery Review
 Status,Durum,PTR Recovery Review
-Open until a reviewer approves or rejects the request. Approved and Rejected are final.,İnceleyici karar verene kadar istek açık kalır. Onaylandı ve Reddedildi kesin kararlardır.,PTR Recovery Review
 Requested At,İstek zamanı,PTR Recovery Review
 Time the recovery request was received.,Kurtarma isteğinin geldiği zaman.,PTR Recovery Review
 Review Note,İnceleme notu,PTR Recovery Review
@@ -138,3 +137,21 @@ Email address of the account to recover.,Kurtarılacak hesabın e-posta adresi.,
 The request was received. The answer does not show whether an account exists.,İstek alındı. Yanıt hesabın var olup olmadığını göstermez.,press_tr.openapi
 The request had extra fields.,İstekte fazladan alan vardı.,press_tr.openapi
 Recovery request limit reached.,Kurtarma isteği sınırına ulaşıldı.,press_tr.openapi
+"Open until a reviewer approves or rejects the request. Rejected is final. After approval, the key removal step sets Removal Failed or Completed. Completed is final.",İnceleyici karar verene kadar istek açık kalır. Reddedildi kesin karardır. Onaydan sonra anahtar silme adımı durumu Silme Başarısız ya da Tamamlandı yapar. Tamamlandı kesin durumdur.,PTR Recovery Review
+Removal Attempted At,Son silme denemesi,PTR Recovery Review
+Time of the last attempt to remove the old keys.,Eski anahtarları silmek için yapılan son denemenin zamanı.,PTR Recovery Review
+Removal Error,Silme hatası,PTR Recovery Review
+"Short code of the last removal error: not_configured, upstream_failed or unknown. It never holds personal data.","Son silme hatasının kısa kodu. Kod not_configured, upstream_failed ya da unknown olur. Bu alana kişisel bilgi yazılmaz.",PTR Recovery Review
+Completed At,Tamamlanma zamanı,PTR Recovery Review
+Time when the old keys were removed and the sessions ended.,Eski anahtarların silindiği ve oturumların kapandığı zaman.,PTR Recovery Review
+Remove Old Keys,Eski anahtarları sil,PTR Recovery Review
+Remove every passkey and security key that was set up before the approval? The user's sessions end too.,Onaydan önce kurulan bütün geçiş anahtarları ve güvenlik anahtarları silinsin mi? Kullanıcının oturumları da kapanır.,PTR Recovery Review
+Choose a recovery review.,Bir kurtarma incelemesi seçin.,press_tr
+You cannot remove keys for this recovery review.,Bu kurtarma incelemesi için anahtar silemezsiniz.,press_tr
+The account owner cannot remove keys for their own recovery request.,Hesap sahibi kendi kurtarma isteği için anahtar silemez.,press_tr
+Keys are removed only after a recovery review is approved.,Anahtarlar yalnız kurtarma incelemesi onaylandıktan sonra silinir.,press_tr
+Remove the old keys after an approved recovery.,Onaylı kurtarmadan sonra eski anahtarları siler.,press_tr.openapi
+"A person with write permission on the recovery review, who is not the account owner, starts this from the desk form. Press asks identity-sync to remove the passkeys and security keys set up before the approval and to end the user's sessions. A Completed record does not call the service again. A failed call sets Removal Failed with a short error code.","Kurtarma incelemesinde yazma izni olan ve hesap sahibi olmayan kişi bu işi Desk formundan başlatır. Press, identity-sync servisinden iki iş ister. Servis onaydan önce kurulan geçiş anahtarlarını ve güvenlik anahtarlarını siler. Sonra kullanıcının oturumlarını kapatır. Tamamlandı durumundaki kayıt servisi yeniden çağırmaz. Başarısız çağrı kaydı Silme Başarısız yapar ve kısa bir hata kodu yazar.",press_tr.openapi
+Name of the approved recovery review record.,Onaylı kurtarma inceleme kaydının adı.,press_tr.openapi
+The state after the call. A failed call also returns the short error code.,Çağrıdan sonraki durum. Başarısız çağrı kısa hata kodunu da döner.,press_tr.openapi
+"The caller has no write permission, owns the account, uses a token or the review is not approved.","Çağıranın yazma izni yoktur, hesap sahibidir, belirteç kullanır ya da inceleme onaylı değildir.",press_tr.openapi

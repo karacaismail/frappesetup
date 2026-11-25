@@ -408,6 +408,47 @@ paths:
           description: Keycloak or Identity Sync did not accept the service request.
         "503":
           description: The account deletion service or Keycloak verification keys are unavailable.
+  /api/method/press_tr.api.account.remove_recovered_keys:
+    post:
+      operationId: removeRecoveredKeys
+      summary: Remove the old keys after an approved recovery.
+      description: A person with write permission on the recovery review, who is not the account owner, starts this from the desk form. Press asks identity-sync to remove the passkeys and security keys set up before the approval and to end the user's sessions. A Completed record does not call the service again. A failed call sets Removal Failed with a short error code.
+      security:
+        - deskSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [review]
+              properties:
+                review:
+                  type: string
+                  description: Name of the approved recovery review record.
+      responses:
+        "200":
+          description: The state after the call. A failed call also returns the short error code.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [status]
+                    additionalProperties: false
+                    properties:
+                      status:
+                        type: string
+                        enum: [Completed, Removal Failed]
+                      error:
+                        type: string
+                        enum: [not_configured, upstream_failed, unknown]
+        "403":
+          description: The caller has no write permission, owns the account, uses a token or the review is not approved.
   /api/method/press_tr.api.maintenance.cleanup_expired_sessions:
     post:
       operationId: cleanupExpiredPressSessions

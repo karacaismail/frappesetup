@@ -3,6 +3,9 @@
 A recovery request only opens a review record. It never changes Keycloak credentials,
 sends a sign-in link or creates a session. A reviewer who is not the account owner
 approves or rejects the record with a note. A lost key is replaced only after approval.
+
+After approval, the key removal step in `recovery_keys` removes the old keys (AJA-420). That step
+alone moves the record to Removal Failed or Completed. A desk form or API write cannot.
 """
 
 import frappe
@@ -10,7 +13,14 @@ from frappe import _
 
 REVIEW_DOCTYPE = "PTR Recovery Review"
 OPEN = "Open"
-DECISIONS = ("Approved", "Rejected")
+APPROVED = "Approved"
+DECISIONS = (APPROVED, "Rejected")
+# AJA-420: after approval, the key removal step moves the record on. Only that step writes these.
+REMOVAL_FAILED = "Removal Failed"
+COMPLETED = "Completed"
+REMOVAL_STATES = (REMOVAL_FAILED, COMPLETED)
+REMOVAL_STEPS = {APPROVED: REMOVAL_STATES, REMOVAL_FAILED: REMOVAL_STATES}
+FINAL = ("Rejected", COMPLETED)
 MAX_EMAIL_LENGTH = 254
 
 
@@ -48,12 +58,15 @@ def open_review(email: str) -> None:
 	).insert(ignore_permissions=True)
 
 
-FIELDS = ("identity_link", "status", "requested_at", "review_note", "reviewed_by", "reviewed_at")
+REVIEW_FIELDS = ("identity_link", "requested_at", "review_note", "reviewed_by", "reviewed_at")
+# Only the key removal step writes these (AJA-420).
+REMOVAL_FIELDS = ("removal_attempted_at", "removal_error", "completed_at")
+FIELDS = ("status", *REVIEW_FIELDS, *REMOVAL_FIELDS)
 # Only the decision step writes these. An API write cannot set them on an open record.
-FIXED_WHILE_OPEN = ("identity_link", "requested_at", "reviewed_by", "reviewed_at")
+FIXED_WHILE_OPEN = ("identity_link", "requested_at", "reviewed_by", "reviewed_at", *REMOVAL_FIELDS)
 
 
-DATETIME_FIELDS = ("requested_at", "reviewed_at")
+DATETIME_FIELDS = ("requested_at", "reviewed_at", "removal_attempted_at", "completed_at")
 
 
 def _value(record, field):
@@ -75,14 +88,23 @@ def _changed(doc, previous, fields):
 	return [field for field in fields if _value(doc, field) != _value(previous, field)]
 
 
+def _check_key_removal(doc, previous) -> None:
+	# The removal step may only change the state and its own fields. The decision stays as it was.
+	if doc.status not in REMOVAL_STEPS.get(previous.status, ()) or _changed(doc, previous, REVIEW_FIELDS):
+		frappe.throw(_("A recovery review decision is final.", context="press_tr"), frappe.PermissionError)
+
+
 def check_decision(doc) -> None:
 	# Frappe applies read_only only in the desk form. This check also guards API writes.
 	previous = doc.get_doc_before_save()
 	if previous is None:
-		if doc.status != OPEN or _value(doc, "reviewed_by") or _value(doc, "reviewed_at"):
+		if doc.status != OPEN or any(_value(doc, field) for field in ("reviewed_by", "reviewed_at", *REMOVAL_FIELDS)):
 			frappe.throw(_("A recovery review starts open.", context="press_tr"), frappe.PermissionError)
 		return
-	if previous.status in DECISIONS:
+	if previous.status != OPEN:
+		if previous.status not in FINAL and getattr(getattr(doc, "flags", None), "key_removal", False):
+			_check_key_removal(doc, previous)
+			return
 		if _changed(doc, previous, FIELDS):
 			frappe.throw(
 				_("A recovery review decision is final.", context="press_tr"), frappe.PermissionError

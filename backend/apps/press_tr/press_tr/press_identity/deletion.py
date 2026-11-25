@@ -20,9 +20,24 @@ DEFAULT_DELETION_TIMEOUT = 45
 MAX_DELETION_TIMEOUT = 90
 DELETION_CONNECT_TIMEOUT = 10
 MAX_DELETION_RESPONSE_BYTES = 8 * 1024 * 1024
+KEY_REMOVAL_TIMEOUT = 30
+MAX_KEY_REMOVAL_RESPONSE_BYTES = 65536
+# Short codes for the review record. They never carry personal data (AJA-420).
+KEY_REMOVAL_ERRORS = ("not_configured", "upstream_failed", "unknown")
 
 
-def human_identity(*, for_update=False):
+class KeyRemovalFailed(Exception):
+	"""The key removal did not finish. `code` is one of KEY_REMOVAL_ERRORS."""
+
+	def __init__(self, code: str):
+		if code not in KEY_REMOVAL_ERRORS:
+			raise ValueError("unknown key removal error code")
+		super().__init__(code)
+		self.code = code
+
+
+def browser_session() -> None:
+	"""Allow only a person in a Press browser session: no token, no impersonation."""
 	session = frappe.local.session_obj
 	if (
 		not session
@@ -32,6 +47,10 @@ def human_identity(*, for_update=False):
 		or frappe.session.data.get("impersonated_by")
 	):
 		reject()
+
+
+def human_identity(*, for_update=False):
+	browser_session()
 	validate_local_user(frappe.session.user)
 	link = frappe.db.get_value(
 		IDENTITY_LINK,
@@ -96,21 +115,9 @@ def mark_deletion_status(status: str) -> None:
 	)
 
 
-def send_deletion_request(link, authenticated_at: int) -> bool:
+def service_token(service_secret: str) -> str:
+	"""A Keycloak token of the Press service client for identity-sync. Press never gets an admin token."""
 	from oidc_verify import verify_access_token
-
-	service_url = frappe.conf.identity_sync_url
-	service_secret = frappe.conf.press_service_client_secret
-	if not service_url or not service_secret:
-		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
-
-	timeout = frappe.conf.get("press_deletion_request_timeout", DEFAULT_DELETION_TIMEOUT)
-	if type(timeout) not in (int, float) or not 0 < timeout <= MAX_DELETION_TIMEOUT:
-		logging.getLogger("press_tr").warning(
-			"press_deletion_request_timeout must be a positive number no greater than %s seconds.",
-			MAX_DELETION_TIMEOUT,
-		)
-		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
 
 	try:
 		response = requests.post(
@@ -128,6 +135,74 @@ def send_deletion_request(link, authenticated_at: int) -> bool:
 		verify(verify_access_token, token, audience="identity-sync", allowed_azp={"press-service"})
 	except (requests.RequestException, ValueError, AttributeError):
 		raise BadGateway() from None
+	return token
+
+
+def send_key_removal_request(link, review_id: str, approved_at: int) -> int:
+	"""Ask identity-sync to remove the old keys after an approved recovery (AJA-420).
+
+	Returns how many keys the service removed. Every failure raises KeyRemovalFailed with a short code.
+	"""
+	service_url = frappe.conf.identity_sync_url
+	service_secret = frappe.conf.press_service_client_secret
+	if not service_url or not service_secret:
+		raise KeyRemovalFailed("not_configured")
+	try:
+		token = service_token(service_secret)
+	except ServiceUnavailable:
+		raise KeyRemovalFailed("not_configured") from None
+	except BadGateway:
+		raise KeyRemovalFailed("upstream_failed") from None
+	try:
+		response = requests.post(
+			f"{service_url.rstrip('/')}/v1/recovery-key-removals",
+			headers={"Authorization": f"Bearer {token}"},
+			json={"issuer": link.issuer, "subject": link.subject, "review_id": review_id, "approved_at": approved_at},
+			timeout=(DELETION_CONNECT_TIMEOUT, KEY_REMOVAL_TIMEOUT),
+			allow_redirects=False,
+			stream=True,
+		)
+	except requests.ReadTimeout:
+		# The service may still have removed the keys. A new call finds out.
+		raise KeyRemovalFailed("unknown") from None
+	except requests.RequestException:
+		raise KeyRemovalFailed("upstream_failed") from None
+	try:
+		if response.status_code != 200:
+			raise KeyRemovalFailed("upstream_failed")
+		body = response.raw.read(MAX_KEY_REMOVAL_RESPONSE_BYTES + 1, decode_content=True)
+		if len(body) > MAX_KEY_REMOVAL_RESPONSE_BYTES:
+			raise KeyRemovalFailed("upstream_failed")
+		result = json.loads(body)
+		if not isinstance(result, dict) or result.get("status") != "done":
+			raise KeyRemovalFailed("upstream_failed")
+		removed = result.get("removed")
+		if type(removed) is not int or removed < 0:
+			raise KeyRemovalFailed("upstream_failed")
+		return removed
+	except (requests.ReadTimeout, ReadTimeoutError):
+		raise KeyRemovalFailed("unknown") from None
+	except (requests.RequestException, HTTPError, ValueError, AttributeError):
+		raise KeyRemovalFailed("upstream_failed") from None
+	finally:
+		response.close()
+
+
+def send_deletion_request(link, authenticated_at: int) -> bool:
+	service_url = frappe.conf.identity_sync_url
+	service_secret = frappe.conf.press_service_client_secret
+	if not service_url or not service_secret:
+		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
+
+	timeout = frappe.conf.get("press_deletion_request_timeout", DEFAULT_DELETION_TIMEOUT)
+	if type(timeout) not in (int, float) or not 0 < timeout <= MAX_DELETION_TIMEOUT:
+		logging.getLogger("press_tr").warning(
+			"press_deletion_request_timeout must be a positive number no greater than %s seconds.",
+			MAX_DELETION_TIMEOUT,
+		)
+		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
+
+	token = service_token(service_secret)
 
 	try:
 		response = requests.post(

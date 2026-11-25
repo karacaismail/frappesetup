@@ -12,7 +12,10 @@
     "requested_at",
     "review_note",
     "reviewed_by",
-    "reviewed_at"
+    "reviewed_at",
+    "removal_attempted_at",
+    "removal_error",
+    "completed_at"
   ],
   "fields": [
     {
@@ -30,9 +33,9 @@
       "fieldname": "status",
       "label": "Status",
       "fieldtype": "Select",
-      "description": "Open until a reviewer approves or rejects the request. Approved and Rejected are final.",
+      "description": "Open until a reviewer approves or rejects the request. Rejected is final. After approval, the key removal step sets Removal Failed or Completed. Completed is final.",
       "reqd": 1,
-      "options": "Open\nApproved\nRejected",
+      "options": "Open\nApproved\nRejected\nRemoval Failed\nCompleted",
       "default": "Open",
       "in_list_view": 1,
       "search_index": 1
@@ -63,6 +66,27 @@
       "label": "Reviewed At",
       "fieldtype": "Datetime",
       "description": "Time of the decision.",
+      "read_only": 1
+    },
+    {
+      "fieldname": "removal_attempted_at",
+      "label": "Removal Attempted At",
+      "fieldtype": "Datetime",
+      "description": "Time of the last attempt to remove the old keys.",
+      "read_only": 1
+    },
+    {
+      "fieldname": "removal_error",
+      "label": "Removal Error",
+      "fieldtype": "Data",
+      "description": "Short code of the last removal error: not_configured, upstream_failed or unknown. It never holds personal data.",
+      "read_only": 1
+    },
+    {
+      "fieldname": "completed_at",
+      "label": "Completed At",
+      "fieldtype": "Datetime",
+      "description": "Time when the old keys were removed and the sessions ended.",
       "read_only": 1
     }
   ],
