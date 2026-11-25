@@ -1,0 +1,407 @@
+[
+  {
+    "id": "KD-01",
+    "claim": "Frappe Framework MIT",
+    "source": "[frappe LICENSE](https://github.com/frappe/frappe/blob/v16.51.0/LICENSE)",
+    "version": "v16.51.0, `6b450a1`",
+    "method": "Kaynak dosya",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L62"
+  },
+  {
+    "id": "KD-02",
+    "claim": "ERPNext ve HRMS GPL-3.0",
+    "source": "[erpnext](https://github.com/frappe/erpnext/blob/v16.50.0/license.txt), [hrms](https://github.com/frappe/hrms/blob/v16.50.0/license.txt)",
+    "version": "v16.50.0 (`7474d9e`, `7c03769`)",
+    "method": "Kaynak dosya",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L63"
+  },
+  {
+    "id": "KD-03",
+    "claim": "Press, Agent, CRM, Helpdesk AGPL-3.0",
+    "source": "[press](https://github.com/frappe/press/blob/v0.155.3/license.txt)",
+    "version": "press v0.155.3 `8493bf8`; crm v1.86.0; helpdesk v1.30.1",
+    "method": "Kaynak dosya",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L64"
+  },
+  {
+    "id": "KD-04",
+    "claim": "ERPNext destek: v14 31 Ocak 2026'da bitti, v15 2027 sonu, v16 2029 sonu (planlı)",
+    "source": "[Supported Versions](https://github.com/frappe/erpnext/wiki/Supported-Versions/304a17ecd1c1e7d12576dc8c1745dda0d0e57c1c)",
+    "version": "wiki `304a17e`",
+    "method": "Resmi wiki revizyonu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L65"
+  },
+  {
+    "id": "KD-05",
+    "claim": "Press son sürüm ve Frappe aralığı beyanı (`>=15,<17`; v16 çalışması doğrulanmadı)",
+    "source": "[pyproject](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/pyproject.toml#L91-L92)",
+    "version": "v0.155.3, `8493bf8` (etiket commit'i)",
+    "method": "Kaynak dosya",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L66"
+  },
+  {
+    "id": "KD-06",
+    "claim": "`allow_cors` tam eşleşme; `\"*\"` origin'i kimlik bilgisiyle yansıtır",
+    "source": "[app.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/app.py#L319-L353)",
+    "version": "`6b450a1`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L67"
+  },
+  {
+    "id": "KD-07",
+    "claim": "Site `rate_limit` istek süresi toplamını site geneli ölçer",
+    "source": "[rate\\_limiter.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/rate_limiter.py#L48-L97)",
+    "version": "`6b450a1`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L68"
+  },
+  {
+    "id": "KD-08",
+    "claim": "`get_all` izin uygulamaz",
+    "source": "[Database API](https://docs.frappe.io/framework/user/en/api/database)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L69"
+  },
+  {
+    "id": "KD-09",
+    "claim": "`override_whitelisted_methods` rastgele adı eşler",
+    "source": "[handler.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/handler.py#L66-L87)",
+    "version": "`6b450a1`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L70"
+  },
+  {
+    "id": "KD-10",
+    "claim": "Gunicorn `threads` yalnız gthread'i etkiler",
+    "source": "[Gunicorn ayarları](https://gunicorn.org/reference/settings/)",
+    "version": "26.2.2",
+    "method": "Resmi doküman + kod",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L71"
+  },
+  {
+    "id": "KD-11",
+    "claim": "Keycloak son sürüm",
+    "source": "[26.8.0](https://github.com/keycloak/keycloak/releases/tag/26.8.0)",
+    "version": "2026-10-01",
+    "method": "Sürüm notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L72"
+  },
+  {
+    "id": "KD-12",
+    "claim": "CVE-2026-90997 kapsamı (stateless + MySQL/MariaDB)",
+    "source": "[GHSA-xpwp-2pcm-8xq3](https://github.com/keycloak/keycloak/security/advisories/GHSA-xpwp-2pcm-8xq3)",
+    "version": "düzeltme 26.7.4",
+    "method": "Danışmanlık",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L73"
+  },
+  {
+    "id": "KD-13",
+    "claim": "CVE-2026-11800 kapsamı (JWT Authorization Grant)",
+    "source": "[GHSA-j97h-3f8r-mrjr](https://github.com/keycloak/keycloak/security/advisories/GHSA-j97h-3f8r-mrjr)",
+    "version": "düzeltme 26.6.4",
+    "method": "Danışmanlık",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L74"
+  },
+  {
+    "id": "KD-14",
+    "claim": "Ayrı `hostname-admin` Admin REST API'yi engellemez",
+    "source": "[Hostname rehberi](https://www.keycloak.org/server/hostname)",
+    "version": "26.8.0",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L75"
+  },
+  {
+    "id": "KD-15",
+    "claim": "Organizations 26.0'dan beri tam destekli; standart token exchange 26.2'den beri",
+    "source": "[26.0.0](https://www.keycloak.org/2024/10/keycloak-2600-released), [token exchange](https://www.keycloak.org/securing-apps/token-exchange)",
+    "version": "26.0.0, 26.2.0",
+    "method": "Sürüm duyurusu, doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L76"
+  },
+  {
+    "id": "KD-16",
+    "claim": "`@ant-design/x` 2.9.0 eş bağımlılığı `antd ^6.1.1`",
+    "source": "[npm](https://www.npmjs.com/package/@ant-design/x)",
+    "version": "2.9.0",
+    "method": "Paket manifesti",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L77"
+  },
+  {
+    "id": "KD-17",
+    "claim": "Hocuspocus 4.7.0 MIT",
+    "source": "[npm](https://www.npmjs.com/package/@hocuspocus/server)",
+    "version": "4.7.0",
+    "method": "Paket manifesti",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L78"
+  },
+  {
+    "id": "KD-18",
+    "claim": "React 19.3 hidrasyondan önce yazılan girdiyi yeniden oynatmaz",
+    "source": "Bu deponun `node_modules/react-dom` 19.3.0 `initInput` ve regresyon testi",
+    "version": "19.3.0",
+    "method": "Kod okuma + deney",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L79"
+  },
+  {
+    "id": "KD-19",
+    "claim": "WhatsApp önizleme koşulları",
+    "source": "[Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/link-previews/)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L80"
+  },
+  {
+    "id": "KD-20",
+    "claim": "robots ve noindex erişim kontrolü değildir",
+    "source": "[Google](https://developers.google.com/search/docs/crawling-indexing/robots/intro)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L81"
+  },
+  {
+    "id": "KD-21",
+    "claim": "Consent Mode türleri ve geri alma",
+    "source": "[Google](https://developers.google.com/tag-platform/security/guides/consent)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L82"
+  },
+  {
+    "id": "KD-22",
+    "claim": "Çerezlerde açık rıza ölçütleri",
+    "source": "[KVKK Çerez Rehberi](https://www.kvkk.gov.tr/SharedFolderServer/CMSFiles/fb193dbb-b159-4221-8a7b-3addc083d33f.pdf)",
+    "version": "Temmuz 2025",
+    "method": "Resmi rehber",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L83"
+  },
+  {
+    "id": "KD-23",
+    "claim": "Metabase gömme türleri ve lisansı",
+    "source": "[Metabase](https://www.metabase.com/docs/latest/embedding/introduction)",
+    "version": "v0.64",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L84"
+  },
+  {
+    "id": "KD-24",
+    "claim": "Frappe Pulse yalnız `pulse_api_key` ile açılır",
+    "source": "[client.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/utils/telemetry/pulse/client.py#L10-L20)",
+    "version": "`6b450a1`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L85"
+  },
+  {
+    "id": "KD-25",
+    "claim": "Pending Support Access 7 gün sonra saatlik `expire_pending_requests` işiyle düşer",
+    "source": "[hooks.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/hooks.py#L256-L264), [support\\_access.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/press/doctype/support_access/support_access.py#L14)",
+    "version": "v0.155.3, `8493bf8`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L86"
+  },
+  {
+    "id": "KD-26",
+    "claim": "`press.api.client` Support Access'i tanır; başka takımın belgesi yalnız `system_user` ile açılır",
+    "source": "[client.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/api/client.py#L442-L447), [ownership.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/access/ownership.py#L80-L105)",
+    "version": "v0.155.3, `8493bf8`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L87"
+  },
+  {
+    "id": "KD-27",
+    "claim": "Standart token exchange V2: istekte bulunan istemci confidential ve istemcide açık olmalı; subject token'ın `aud` değerinde olmalı, kendi belirtecini değiştiren istemci muaf; `audience` yalnız süzer, `scope` varsayılan olmayan kapsam ekler; değiştirilen erişim belirteci subject token iptalinde iptal olmaz",
+    "source": "[token exchange](https://www.keycloak.org/securing-apps/token-exchange#_standard-token-exchange-details), [StandardTokenExchangeProvider.java](https://github.com/keycloak/keycloak/blob/4246609cf2024c85016d3fb1254c3d2533367c31/services/src/main/java/org/keycloak/protocol/oidc/tokenexchange/StandardTokenExchangeProvider.java#L213-L235)",
+    "version": "26.8.0, `4246609`",
+    "method": "Resmi doküman + kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L88"
+  },
+  {
+    "id": "KD-28",
+    "claim": "Audience mapper'lı varsayılan olmayan kapsam audience'ı yalnız `scope` ile istenince ekler; istemcinin kendisi `aud`'a kendiliğinden girmez",
+    "source": "[Server Admin: hardcoded audience](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_audience_hardcoded)",
+    "version": "26.8.0",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L89"
+  },
+  {
+    "id": "KD-29",
+    "claim": "Client credentials isteği `scope`'u doğrular ve varsayılan kapsamlara istenen varsayılan olmayan kapsamları ekler",
+    "source": "[ClientCredentialsGrantType.java](https://github.com/keycloak/keycloak/blob/4246609cf2024c85016d3fb1254c3d2533367c31/services/src/main/java/org/keycloak/protocol/oidc/grants/ClientCredentialsGrantType.java#L105-L132), [TokenManager.java](https://github.com/keycloak/keycloak/blob/4246609cf2024c85016d3fb1254c3d2533367c31/services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java#L610-L640)",
+    "version": "26.8.0, `4246609`",
+    "method": "Kod okuma",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L90"
+  },
+  {
+    "id": "KD-30",
+    "claim": "Meta Pixel HTTP üst bilgileriyle sayfa konumu, belge ve referrer toplar; belgede geçersiz kılma yolu yok (`dl`/`rl` adları belgede geçmez)",
+    "source": "[Meta Pixel](https://developers.facebook.com/docs/meta-pixel/)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L91"
+  },
+  {
+    "id": "KD-31",
+    "claim": "Meta Pixel `eventID` ile Conversions API `event_id` ve olay adı eşleşirse 48 saat içinde tekilleştirilir",
+    "source": "[Meta](https://developers.facebook.com/docs/marketing-api/conversions-api/deduplicate-pixel-and-server-events)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L92"
+  },
+  {
+    "id": "KD-32",
+    "claim": "GA4 `page_location`, `page_referrer`, `page_title` varsayılanları `document.location`, `document.referrer`, `document.title`; `gtag('set')` ya da `config` ile verilir",
+    "source": "[GA4 config](https://developers.google.com/analytics/devguides/collection/ga4/reference/config#page_referrer)",
+    "version": "Doküman 2026-10-05",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L93"
+  },
+  {
+    "id": "KD-33",
+    "claim": "GA4 aynı `transaction_id`'li satın almaları yalnız web akışında tekilleştirir; kimlik müşteriyi tanıtmaz",
+    "source": "[GA4](https://support.google.com/analytics/answer/12313109)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L94"
+  },
+  {
+    "id": "KD-34",
+    "claim": "GA4 Enhanced Measurement olayları `link_url`, `search_term`, `form_destination` taşır",
+    "source": "[GA4](https://support.google.com/analytics/answer/9216061)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L95"
+  },
+  {
+    "id": "KD-35",
+    "claim": "`Referrer-Policy: strict-origin` aynı origin dahil yalnız origin gönderir; varsayılan `strict-origin-when-cross-origin` aynı origin'de tam adres gönderir; `document.referrer` gezinme isteğinin referrer'ıdır",
+    "source": "[Referrer Policy](https://w3c.github.io/webappsec-referrer-policy/#determine-requests-referrer), [HTML](https://html.spec.whatwg.org/multipage/document-lifecycle.html#initialise-the-document-object), [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy)",
+    "version": "ED 2026-03-20; HTML LS 2026-10-07",
+    "method": "Spesifikasyon + doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L96"
+  },
+  {
+    "id": "KD-36",
+    "claim": "Yandex Metrica `hit` adres, `referer` ve `title` alır; adres verilmezse `window.location.href`",
+    "source": "[hit](https://yandex.com/support/metrica/en/objects/hit.html)",
+    "version": "Güncel doküman",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L97"
+  },
+  {
+    "id": "KD-37",
+    "claim": "Belirteçteki roller istemcinin ve uygulanan kapsamların rol eşlemesiyle sınırlıdır; Audience Resolve belirteçte istemci rolü olan istemciyi `aud`'a ekler",
+    "source": "[role scope](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_role_scope_mappings), [audience resolve](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_audience_resolve)",
+    "version": "26.8.0",
+    "method": "Resmi doküman",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L98"
+  },
+  {
+    "id": "KD-38",
+    "claim": "Kimlik kararları (KM-01..KM-31); kullanıcının notu",
+    "source": "Keycloak + Headless Frappe Kimlik Rehberi ve Yol Haritası, 29 Eylül 2026",
+    "version": "Dosya, 5143 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L99"
+  },
+  {
+    "id": "KD-39",
+    "claim": "AI ekosistemi kararları (AI-01..AI-21); GitHub sayıları gecikmeli",
+    "source": "Frappe AI Ekosistemi, 4 Ekim 2026",
+    "version": "Dosya, 5954 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L100"
+  },
+  {
+    "id": "KD-40",
+    "claim": "Kaizen şartnamesi (KZ-01..KZ-18); uygulanmış sistem değil",
+    "source": "Capability-Agent_Kaizen_Kurulum_Sartnamesi, 12 Eylül 2026",
+    "version": "Dosya, 1722 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L101"
+  },
+  {
+    "id": "KD-41",
+    "claim": "Kaizen paketi; şablonlar, kurallar, kabul testleri; hiçbir dosya bu depoya eklenmedi",
+    "source": "Capability-Agent_Kaizen_Kalite_Paketi",
+    "version": "Zip, 3719 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L102"
+  },
+  {
+    "id": "KD-42",
+    "claim": "Adaptif arayüz kararları (AU-01..AU-30)",
+    "source": "Capability-Adaptive Mobile-First UI Delivery and AI-Driven Cross-Device QA",
+    "version": "Dosya, 8501 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L103"
+  },
+  {
+    "id": "KD-43",
+    "claim": "Adaptif arayüz, yetenek öncelikli teslimat",
+    "source": "Capability-First Adaptive UI 320 CSS px iphone 4 first",
+    "version": "Dosya, 3979 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L104"
+  },
+  {
+    "id": "KD-44",
+    "claim": "Adaptif arayüz, kapsam ve test matrisi, destek seviyeleri",
+    "source": "Capability-First Adaptive UI 320 CSS px iphone 4 first-2",
+    "version": "Dosya, 4196 kelime",
+    "method": "Kullanıcı notu",
+    "verified_on": "2026-10-08",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/e78ba766c816fc0791b24f60df0fa711462804aa/src/content/docs/izlenebilirlik.md#L105"
+  },
+  {
+    "id": "PRESS-PYTHON314",
+    "claim": "Press v0.154.1 sonrası 162 sürüm etiketi ve 269 kaynak görüntüsü tarandı",
+    "source": "https://github.com/frappe/press.git",
+    "version": "v0.154.1 ve sonrası, 714 etiket",
+    "method": "Yerel Git taraması",
+    "verified_on": "2026-11-22",
+    "evidence": "https://github.com/karacaismail/frappesetup/blob/f51fd6538bfb06022d9f75260adf920e0cc91585/backend/docs/evidence/press-python314-versions.json#L2-L7"
+  }
+]

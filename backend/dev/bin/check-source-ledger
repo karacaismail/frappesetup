@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Check the G-128 source ledger against the site ledger and the Press scan.
+
+The check is offline. It compares the repository ledger with the claims
+recorded in the site's source table and in the local Press version scan.
+Every ledger row needs a source, a method, a real verification date and a
+commit-pinned evidence link.
+"""
+
+import datetime
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_LEDGER = ROOT / "backend/docs/evidence/source-ledger.json"
+SITE_LEDGER = ROOT / "src/content/docs/izlenebilirlik.md"
+PRESS_SCAN = ROOT / "backend/docs/evidence/press-python314-versions.json"
+FIELDS = ("id", "claim", "source", "version", "method", "verified_on", "evidence")
+PINNED = re.compile(
+    r"^https://github\.com/[\w.-]+/[\w.-]+/blob/[0-9a-f]{40}/(?P<path>[^#?]+)#L\d+(-L\d+)?$"
+)
+SITE_DATE = re.compile(r"Her satır (\d{4}-\d{2}-\d{2})'de doğrulandı")
+CELL_SPLIT = re.compile(r"(?<!\\)\|")
+
+
+class LedgerError(Exception):
+    pass
+
+
+def site_rows():
+    text = SITE_LEDGER.read_text(encoding="utf-8")
+    section = text.split("## Kaynak defteri", 1)
+    if len(section) != 2:
+        raise LedgerError("site ledger section is missing")
+    date = SITE_DATE.search(section[1])
+    if not date:
+        raise LedgerError("site ledger verification date is missing")
+    rows = {}
+    for line in section[1].splitlines():
+        if not line.startswith("| KD-"):
+            continue
+        cells = [cell.strip() for cell in CELL_SPLIT.split(line.strip().strip("|"))]
+        if len(cells) != 5:
+            raise LedgerError(f"site ledger row has {len(cells)} cells: {cells[0]}")
+        row_id, claim, source, version, method = cells
+        rows[row_id] = {
+            "id": row_id,
+            "claim": claim,
+            "source": source,
+            "version": version,
+            "method": method,
+            "verified_on": date.group(1),
+            "evidence_path": "src/content/docs/izlenebilirlik.md",
+        }
+    if not rows:
+        raise LedgerError("site ledger has no KD rows")
+    return rows
+
+
+def press_row():
+    scan = json.loads(PRESS_SCAN.read_text(encoding="utf-8"))
+    return {
+        "id": "PRESS-PYTHON314",
+        "claim": (
+            f"Press {scan['baseline']} sonrası {scan['later_semver_tag_count']} "
+            f"sürüm etiketi ve {scan['source_snapshot_count']} kaynak görüntüsü tarandı"
+        ),
+        "source": scan["remote"],
+        "version": f"{scan['baseline']} ve sonrası, {scan['published_tag_count']} etiket",
+        "method": "Yerel Git taraması",
+        "verified_on": scan["inspected_at_utc"][:10],
+        "evidence_path": "backend/docs/evidence/press-python314-versions.json",
+    }
+
+
+def expected_rows():
+    rows = site_rows()
+    press = press_row()
+    rows[press["id"]] = press
+    return rows
+
+
+def check_row(row, expected):
+    row_id = row.get("id", "?")
+    for field in FIELDS:
+        value = row.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise LedgerError(f"{row_id}: field '{field}' is empty")
+    try:
+        datetime.date.fromisoformat(row["verified_on"])
+    except ValueError as error:
+        raise LedgerError(f"{row_id}: verified_on is not a real date") from error
+    for field in ("claim", "source", "version", "method", "verified_on"):
+        if row[field] != expected[field]:
+            raise LedgerError(f"{row_id}: field '{field}' differs from the recorded claim")
+    match = PINNED.match(row["evidence"])
+    if not match:
+        raise LedgerError(f"{row_id}: evidence must be a commit-pinned GitHub line link")
+    if match.group("path") != expected["evidence_path"]:
+        raise LedgerError(f"{row_id}: evidence points to the wrong file")
+
+
+def check(ledger_path):
+    rows = json.loads(Path(ledger_path).read_text(encoding="utf-8"))
+    if not isinstance(rows, list):
+        raise LedgerError("ledger must be a JSON list")
+    expected = expected_rows()
+    seen = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise LedgerError("ledger rows must be objects")
+        row_id = row.get("id")
+        if row_id in seen:
+            raise LedgerError(f"{row_id}: duplicate row")
+        if row_id not in expected:
+            raise LedgerError(f"{row_id}: no recorded claim for this row")
+        seen.add(row_id)
+        check_row(row, expected[row_id])
+    missing = sorted(set(expected) - seen)
+    if missing:
+        raise LedgerError(f"missing rows: {', '.join(missing)}")
+    return len(rows)
+
+
+def main(argv):
+    ledger = Path(argv[1]) if len(argv) > 1 else DEFAULT_LEDGER
+    try:
+        count = check(ledger)
+    except (LedgerError, OSError, ValueError, KeyError) as error:
+        print(f"source ledger: {error}", file=sys.stderr)
+        return 1
+    print(f"source ledger: {count} rows match")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
