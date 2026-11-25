@@ -245,10 +245,14 @@ class FakeJob:
 		self.instruction = "Summarize."
 		self.output_limit = 64
 		self.status = "completed"
+		self.source_file = "fixture-file"
 		self.chunks = [
 			SimpleNamespace(
 				name=f"chunk-{index}",
 				chunk_index=index,
+				first_page=index + 1,
+				last_page=index + 1,
+				byte_count=len(f"text {index}"),
 				content=f"text {index}",
 				status=status,
 				failure_code=None,
@@ -287,7 +291,7 @@ class RetryTests(unittest.TestCase):
 				raise policy.Denied(503, "provider_unavailable")
 			return {"text": f"answer {tag.index}"}
 
-		send, _ = self._run(job, provider, large_file.run_job, "job-1")
+		send, _enqueue = self._run(job, provider, large_file.run_job, "job-1")
 		self.assertEqual(send.call_count, 3)
 		self.assertEqual([chunk.status for chunk in job.chunks], ["done", "failed", "done"])
 		self.assertEqual(job.chunks[1].failure_code, "provider_unavailable")
@@ -308,7 +312,7 @@ class RetryTests(unittest.TestCase):
 		self.assertEqual(enqueue.call_args.kwargs["chunk_index"], 1)
 		job.chunks[1].status = "queued"
 
-		send, _ = self._run(
+		send, _enqueue = self._run(
 			job, lambda route, tag, messages, limit: {"text": "answer"}, large_file.run_chunk, "job-1", 1
 		)
 		send.assert_called_once()
@@ -329,6 +333,209 @@ class RetryTests(unittest.TestCase):
 			large_file.retry_chunk("job-1", 0)
 		self.assertEqual(failure.exception.code, "chunk_not_failed")
 		enqueue.assert_not_called()
+
+
+class PreparingJob(FakeJob):
+	"""A job in the preparing step. It records whether chunk rows were written."""
+
+	def __init__(self):
+		super().__init__([])
+		self.status = "preparing"
+		self.failure_code = None
+		self.saved = False
+
+	def append(self, field, values):
+		self.chunks.append(SimpleNamespace(**values))
+
+	def update(self, values):
+		for key, value in values.items():
+			setattr(self, key, value)
+
+	def save(self, **kwargs):
+		self.saved = True
+
+
+def _store_db(job):
+	def set_value(doctype, name, values, *rest, **kwargs):
+		if doctype == large_file.JOB:
+			target = job
+		else:
+			target = next(chunk for chunk in job.chunks if chunk.name == name)
+		for key, value in values.items():
+			setattr(target, key, value)
+
+	db = Mock()
+	db.set_value.side_effect = set_value
+	return db
+
+
+class LimitTests(unittest.TestCase):
+	"""A very large PDF is refused before any chunk row exists (AJA-725, finding 3)."""
+
+	def _prepare(self, pages, conf, context=1100):
+		job = PreparingJob()
+		reader = SimpleNamespace(pages=[FakePage(text) for text in pages])
+		source = SimpleNamespace(get_full_path=lambda: "/fixture/file.pdf")
+		targets = [_target("api-1", "acc-1", _model(context))]
+		with (
+			patch.object(large_file, "_job", return_value=job),
+			patch.object(large_file, "PdfReader", return_value=reader),
+			patch.object(large_file.frappe, "get_doc", return_value=source),
+			patch.object(large_file.frappe, "get_hooks", return_value=[]),
+			patch.object(large_file.frappe, "conf", conf),
+			patch.object(large_file.frappe, "db", _store_db(job)),
+			patch.object(large_file.gateway, "route_targets", return_value=("fixture-route", targets)),
+		):
+			large_file.prepare_job("job-1")
+		return job
+
+	def test_file_with_too_many_pages_is_refused_without_chunk_rows(self):
+		job = self._prepare(["page"] * 4, {"model_gateway_file_max_pages": 3})
+		self.assertEqual((job.status, job.failure_code), ("failed", "file_too_large"))
+		self.assertEqual(job.chunks, [])
+		self.assertFalse(job.saved)
+
+	def test_file_with_too_many_chunks_is_refused_without_chunk_rows(self):
+		job = self._prepare(["a" * 300] * 4, {"model_gateway_file_max_chunks": 1})
+		self.assertEqual((job.status, job.failure_code), ("failed", "file_too_large"))
+		self.assertEqual(job.chunks, [])
+		self.assertFalse(job.saved)
+
+	def test_the_limits_follow_the_site_setting(self):
+		pages = ["a" * 300] * 4
+		allowed = self._prepare(pages, {"model_gateway_file_max_pages": 4, "model_gateway_file_max_chunks": 4})
+		self.assertEqual(allowed.status, "planned")
+		self.assertTrue(allowed.saved)
+		self.assertGreater(len(allowed.chunks), 1)
+		fewer_pages = self._prepare(pages, {"model_gateway_file_max_pages": 3})
+		self.assertEqual(fewer_pages.failure_code, "file_too_large")
+		fewer_chunks = self._prepare(pages, {"model_gateway_file_max_chunks": len(allowed.chunks) - 1})
+		self.assertEqual(fewer_chunks.failure_code, "file_too_large")
+
+	def test_safe_defaults_apply_without_a_setting(self):
+		self.assertEqual(self._prepare(["page"] * large_file.DEFAULT_MAX_PAGES, {}).status, "planned")
+		refused = self._prepare(["page"] * (large_file.DEFAULT_MAX_PAGES + 1), {})
+		self.assertEqual(refused.failure_code, "file_too_large")
+
+	def test_invalid_setting_fails_closed(self):
+		for value in (0, -1, "100", 2.5, True):
+			with self.subTest(value=value):
+				job = self._prepare(["page"], {"model_gateway_file_max_pages": value})
+				self.assertEqual((job.status, job.failure_code), ("failed", "invalid_setting"))
+				self.assertEqual(job.chunks, [])
+
+	def test_planned_chunks_keep_their_byte_count(self):
+		job = self._prepare(["ç" * 10, "b" * 5], {})
+		self.assertEqual([chunk.byte_count for chunk in job.chunks], [len(chunk.content.encode()) for chunk in job.chunks])
+
+
+class TextRetentionTests(unittest.TestCase):
+	"""Chunk text lives only while the job runs (AJA-725, finding 2)."""
+
+	def _run(self, job, provider, function, *args, rebuilt=None):
+		store = {chunk.name: chunk for chunk in job.chunks}
+		with (
+			patch.object(large_file, "_job", return_value=job),
+			patch.object(large_file, "_lock_chunk", side_effect=lambda name: store[name]),
+			patch.object(large_file, "_source_texts", return_value=rebuilt or []) as source,
+			patch.object(large_file.frappe, "db", _store_db(job)),
+			patch.object(large_file.frappe, "enqueue"),
+			patch.object(large_file.frappe, "log_error") as log_error,
+			patch.object(large_file.gateway, "complete_chunk", side_effect=provider) as send,
+		):
+			function(*args)
+		return send, log_error, source
+
+	def _texts(self, job):
+		return [chunk.content for chunk in job.chunks]
+
+	def test_no_chunk_text_remains_after_a_successful_job(self):
+		job = FakeJob(["queued", "queued", "queued"])
+		self._run(job, lambda route, tag, messages, limit: {"text": "answer"}, large_file.run_job, "job-1")
+		self.assertEqual(job.status, "completed")
+		self.assertEqual(self._texts(job), [None, None, None])
+		self.assertEqual([chunk.byte_count for chunk in job.chunks], [6, 6, 6])
+		self.assertEqual([chunk.result for chunk in job.chunks], ["answer"] * 3)
+
+	def test_no_chunk_text_remains_after_a_failed_job(self):
+		job = FakeJob(["queued", "queued", "queued"])
+
+		def provider(route, tag, messages, limit):
+			if tag.index == 1:
+				raise policy.Denied(503, "provider_unavailable")
+			return {"text": "answer"}
+
+		self._run(job, provider, large_file.run_job, "job-1")
+		self.assertEqual(job.status, "failed")
+		self.assertEqual(self._texts(job), [None, None, None])
+
+	def test_a_finished_job_clears_text_its_chunks_still_hold(self):
+		job = FakeJob(["done", "failed", "queued"])
+		self._run(job, lambda route, tag, messages, limit: {"text": "answer"}, large_file.run_job, "job-1")
+		self.assertEqual(self._texts(job), [None, None, None])
+
+	def test_text_of_a_running_job_stays_until_its_chunk_is_answered(self):
+		job = FakeJob(["queued", "queued"])
+		seen = []
+
+		def provider(route, tag, messages, limit):
+			seen.append(self._texts(job))
+			return {"text": "answer"}
+
+		self._run(job, provider, large_file.run_job, "job-1")
+		self.assertEqual(seen, [["text 0", "text 1"], [None, "text 1"]])
+
+	def test_chunk_text_is_not_written_to_the_error_log(self):
+		job = FakeJob(["queued"])
+
+		def provider(route, tag, messages, limit):
+			raise RuntimeError(messages[1]["content"])
+
+		_send, log_error, _source = self._run(job, provider, large_file.run_job, "job-1")
+		log_error.assert_called_once()
+		logged = repr(log_error.call_args)
+		self.assertNotIn("text 0", logged)
+		# A message is given, so Frappe does not add a traceback with local variables.
+		self.assertTrue(log_error.call_args.args[1:] or log_error.call_args.kwargs.get("message"))
+		self.assertEqual(self._texts(job), [None])
+
+	def test_retry_rebuilds_the_text_from_the_file_and_does_not_store_it(self):
+		job = FakeJob(["done", "failed"])
+		job.status = "failed"
+		for chunk in job.chunks:
+			chunk.content, chunk.byte_count = None, 600
+		job.chunks[1].status = "queued"
+		targets = [_target("api-1", "acc-1", _model(1100))]
+		with patch.object(large_file.gateway, "route_targets", return_value=("fixture-route", targets)):
+			send, _log, source = self._run(
+				job,
+				lambda route, tag, messages, limit: {"text": "answer"},
+				large_file.run_chunk,
+				"job-1",
+				1,
+				rebuilt=["a" * 600, "b" * 600],
+			)
+		source.assert_called_once_with(job, 2)
+		self.assertEqual(send.call_args.args[2][1]["content"], "b" * 600)
+		self.assertEqual(job.chunks[1].status, "done")
+		self.assertEqual(self._texts(job), [None, None])
+
+	def test_retry_refuses_text_that_no_longer_matches_the_plan(self):
+		job = FakeJob(["done", "queued"])
+		for chunk in job.chunks:
+			chunk.content, chunk.byte_count = None, 600
+		targets = [_target("api-1", "acc-1", _model(1100))]
+		with patch.object(large_file.gateway, "route_targets", return_value=("fixture-route", targets)):
+			send, _log, _source = self._run(
+				job,
+				lambda route, tag, messages, limit: {"text": "answer"},
+				large_file.run_chunk,
+				"job-1",
+				1,
+				rebuilt=["a" * 600, "c" * 500],
+			)
+		send.assert_not_called()
+		self.assertEqual((job.chunks[1].status, job.chunks[1].failure_code), ("failed", "source_changed"))
 
 
 if __name__ == "__main__":
