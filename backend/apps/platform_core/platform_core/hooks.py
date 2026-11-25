@@ -9,6 +9,8 @@ app_license = "mit"
 # Other tasks append to the same list keys; do not replace them.
 before_login = ["platform_core.identity.login_policy.before_login"]
 before_request = [
+	# G-40: refuse System Console and test endpoints first, unless the site opts in.
+	"platform_core.development_access.guard_development_endpoints",
 	"platform_core.identity.login_policy.before_request",
 	"platform_core.identity.session_policy.before_request",
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
@@ -64,7 +66,11 @@ after_migrate = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
+	"platform_core.config.turkey_setup.apply",
 ]
+
+# G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
+setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
 fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
