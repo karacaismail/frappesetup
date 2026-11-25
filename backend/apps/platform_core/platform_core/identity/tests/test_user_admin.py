@@ -40,6 +40,7 @@ BEARER = "fake-service-bearer"
 DIGEST = "a" * 64
 INVITEE = "tu.davetli@example.test"
 PREVIEWS = [{"operation": "create_user", "target": "user", "destructive": False}]
+INVITE_COUNTER = "rl:platform_core.api.identity.invite_user:"
 
 
 class FakeIdentitySync:
@@ -91,7 +92,12 @@ def _profile(name: str, roles: list[str]) -> None:
 		).insert(ignore_permissions=True)
 
 
-class TestTenantUsers(IntegrationTestCase):
+class TenantUsersCase(IntegrationTestCase):
+	"""The people, profiles and request helpers of the G-98 tests. It has no tests of its own.
+
+	`api/test_identity.py` uses it for the endpoint tests that the security gate names.
+	"""
+
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
@@ -133,6 +139,8 @@ class TestTenantUsers(IntegrationTestCase):
 		bearer = patch.object(user_admin, "identity_sync_bearer", return_value=BEARER)
 		bearer.start()
 		self.addCleanup(bearer.stop)
+		# `invite_user` counts requests per user. Each test starts with fresh counters.
+		frappe.cache.delete_keys(INVITE_COUNTER)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -177,6 +185,8 @@ class TestTenantUsers(IntegrationTestCase):
 	def invite(self, client, **body):
 		return self.send(client, API + "invite_user", {"email": INVITEE, **body})
 
+
+class TestTenantUsers(TenantUsersCase):
 	# --- role profile ---
 
 	def test_holder_gives_a_role_profile_to_a_tenant_user(self):
@@ -341,3 +351,23 @@ class TestTenantUsers(IntegrationTestCase):
 		response = self.invite(client, dry_run=True)
 		self.assertEqual(response.status_code, 403, response.data[:500])
 		self.assertEqual(fake.calls, [])
+
+	def test_many_invitations_in_a_short_time_are_stopped_per_user(self):
+		"""Each user may send `INVITE_LIMIT` invitation requests in `INVITE_WINDOW` seconds (AJA-890)."""
+		from platform_core.api import identity
+
+		self.assertGreater(identity.INVITE_LIMIT, 0)
+		self.assertGreater(identity.INVITE_WINDOW, 0)
+		fake = self.serve(FakeIdentitySync())
+		client = self.login()
+		for _attempt in range(identity.INVITE_LIMIT):
+			self.assertEqual(self.invite(client, dry_run=True).status_code, 200)
+		calls = len(fake.calls)
+		response = self.invite(client, dry_run=True)
+		self.assertEqual(response.status_code, 429, response.data[:500])
+		self.assertNotIn("message", response.json)
+		# The stopped request does not reach identity-sync.
+		self.assertEqual(len(fake.calls), calls)
+		# The counter belongs to the user. Another manager of the tenant can still invite.
+		other = self.login(SYSTEM_MANAGER_USER)
+		self.assertEqual(self.invite(other, dry_run=True).status_code, 200)

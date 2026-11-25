@@ -20,6 +20,10 @@ SERVICE = "identity-sync"
 # identity-sync is one client. The limit leaves room for a reconciliation run (G-7, S-GIR-4).
 SERVICE_LIMIT = 300
 SERVICE_WINDOW = 60
+# A manager may send this many invitation requests in the window (AJA-890). A preview and its run
+# are two requests, so this is ten invitations in ten minutes. The counter belongs to the user.
+INVITE_LIMIT = 20
+INVITE_WINDOW = 600
 
 
 def _only(*fields: str) -> None:
@@ -127,6 +131,7 @@ def set_user_role_profiles(user: object = None, role_profiles: object = None) ->
 
 
 @frappe.whitelist(methods=["POST"])
+@rate_limit(limit=INVITE_LIMIT, seconds=INVITE_WINDOW, user_based=True)
 def invite_user(
 	email: object = None,
 	first_name: object = None,
@@ -137,6 +142,7 @@ def invite_user(
 	"""Previews or runs the invitation of a person into this tenant (G-16, G-79, G-98).
 
 	“System Manager” and “Tenant Admin” only. The run needs the digest of its preview.
+	Too many requests of one user in a short time get 429.
 	"""
 	_only("email", "first_name", "last_name", "dry_run", "preview_digest")
 	return user_admin.invite_user(email, first_name, last_name, dry_run, preview_digest)
