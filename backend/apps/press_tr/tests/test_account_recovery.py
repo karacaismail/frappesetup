@@ -310,7 +310,10 @@ class RecoveryRouteTest(unittest.TestCase):
 		fields = {field["fieldname"]: field for field in doc["fields"]}
 		self.assertEqual(doc["name"], "PTR Recovery Review")
 		self.assertEqual(doc["module"], "Press Identity")
-		self.assertEqual(fields["status"]["options"].split("\n"), ["Open", "Approved", "Rejected"])
+		# AJA-420 adds the two key removal states after Approved. Rejected and Completed are final.
+		self.assertEqual(
+			fields["status"]["options"].split("\n"), ["Open", "Approved", "Rejected", "Removal Failed", "Completed"]
+		)
 		self.assertEqual(fields["status"]["default"], "Open")
 		self.assertEqual(fields["identity_link"]["options"], "PTR Identity Link")
 		for name in ("reviewed_by", "reviewed_at", "identity_link", "requested_at"):

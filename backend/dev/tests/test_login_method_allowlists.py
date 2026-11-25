@@ -93,6 +93,8 @@ EXPECTED = {
     "press_tr.api.keycloak_backchannel_logout": GUEST,
     "press_tr.api.account.request_deletion": PANEL,
     "press_tr.api.account.request_recovery": GUEST,
+    # A reviewer removes the old keys after an approved recovery (AJA-420). Desk only.
+    "press_tr.api.account.remove_recovered_keys": ADMIN,
     "press_tr.api.identity.ensure_team": SERVICE,
     "press_tr.api.identity.remove_team_member": SERVICE,
     "press_tr.api.identity.anonymize_user": SERVICE,

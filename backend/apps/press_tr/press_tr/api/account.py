@@ -16,6 +16,7 @@ from press_tr.press_identity.deletion import (
 )
 from press_tr.press_identity.oidc import reject
 from press_tr.press_identity.recovery import open_review
+from press_tr.press_identity.recovery_keys import remove_recovered_keys as remove_recovered_keys_for_review
 
 
 @frappe.whitelist(methods=["POST"])
@@ -56,3 +57,16 @@ def request_recovery(email: str) -> dict[str, bool]:
 		reject()
 	open_review(email)
 	return {"received": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_recovered_keys(review: str) -> dict[str, str]:
+	# A reviewer starts this from the desk form after approval (AJA-420). The step checks the
+	# browser session, the write permission, the account owner and the review state itself.
+	csrf_token = frappe.get_request_header("X-Frappe-CSRF-Token", "")
+	saved_token = frappe.session.data.get("csrf_token")
+	if not csrf_token or not saved_token or not secrets.compare_digest(csrf_token, saved_token):
+		reject()
+	if set(frappe.form_dict) - {"cmd", "review"}:
+		reject()
+	return remove_recovered_keys_for_review(review)
