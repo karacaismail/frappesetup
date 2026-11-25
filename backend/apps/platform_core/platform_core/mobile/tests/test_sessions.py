@@ -201,6 +201,34 @@ class MobileSessionTest(IntegrationTestCase):
 				call.args[0]()
 			self.assertEqual(send.call_count, 2)
 
+	def test_retry_inside_the_window_sends_nothing_when_the_clock_moves(self):
+		"""The retry window holds when a second passes between the two revocations.
+
+		The account cutoff then moves forward. Frappe's set_value adds its own cache
+		callback to after_commit. That callback is not a remote closure.
+		"""
+		from platform_core.api.mobile import _register, _revoke
+		from platform_core.mobile import ai_tools
+
+		_register(self.identity, self.body)
+		with (
+			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
+			patch(
+				"platform_core.mobile.sessions.send_session_revocations",
+				return_value=((self.sid, self.identity.subject),),
+			) as send,
+		):
+			_revoke(self.identity, self.body)
+			for call in list(after_commit.add.call_args_list):
+				call.args[0]()
+			send.assert_called_once_with(((self.sid, self.identity.subject),))
+			after_commit.reset_mock()
+			# One second later the cutoff grows, so record_revocation calls set_value.
+			with patch("platform_core.mobile.lifecycle.time.time", return_value=time.time() + 1):
+				plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
+				self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
+			after_commit.add.assert_not_called()
+
 	def test_legacy_installation_gets_sid_on_explicit_registration(self):
 		from platform_core.api.mobile import _register
 		from platform_core.mobile.store import MobileStore
