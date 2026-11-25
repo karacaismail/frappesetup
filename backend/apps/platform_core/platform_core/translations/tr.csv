@@ -842,6 +842,29 @@ Name of the provider account in this site.,Bu sitedeki sağlayıcı hesabının 
 Connection name,Bağlantı adı,
 Name of this API connection.,Bu API bağlantısının adı.,
 Service address,Hizmet adresi,
+Reseller Customer Link,Bayi Müşteri Bağı,
+Reseller Customer Request,Bayi Müşteri İsteği,
+Platform Operator,Platform Operatörü,
+Reseller Tenant,Bayi kiracısı,
+Customer Tenant,Müşteri kiracısı,
+Customer Name,Müşteri adı,
+Site Status,Site durumu,Reseller Customer Link
+Pending,Bekliyor,Reseller Customer Link
+Active,Etkin,Reseller Customer Link
+Suspended,Durduruldu,Reseller Customer Link
+Contact Email,İletişim e-postası,
+Status,Durum,Reseller Customer Request
+Pending,Bekliyor,Reseller Customer Request
+Approved,Onaylandı,Reseller Customer Request
+Requested By,İsteyen,
+Approved By,Onaylayan,
+Approved On,Onay zamanı,
+You are not permitted to do this.,Bu işi yapma izniniz yok.,
+You are not permitted to see this customer.,Bu müşteriyi görme izniniz yok.,
+Enter the customer name. It can have at most {0} characters.,Müşteri adını yazın. Ad en çok {0} karakter olabilir.,
+Enter a valid contact e-mail address.,Geçerli bir iletişim e-postası yazın.,
+The customer request does not exist.,Bu müşteri isteği yok.,
+Only a pending customer request can be approved.,Yalnız bekleyen müşteri isteği onaylanır.,
 No verification provider is configured.,Doğrulama sağlayıcısı ayarlanmadı.,platform_core.identity
 The notice signature is not valid.,Bildirimin imzası geçerli değil.,platform_core.identity
 The notice fields are not valid.,Bildirimin alanları geçerli değil.,platform_core.identity

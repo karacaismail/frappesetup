@@ -26,6 +26,7 @@
       "oidc_verify"
     ],
     "oidc_verify": [],
+    "platform_core.reseller": [],
     "atonota_login": []
   },
   "public_paths": {
@@ -60,6 +61,9 @@
       "oidc_verify",
       "oidc_verify.api"
     ],
+    "platform_core.reseller": [
+      "platform_core.api.reseller"
+    ],
     "atonota_login": [
       "atonota_login",
       "atonota_login.decision",
@@ -77,6 +81,7 @@
     "platform_core.api.mobile": "platform_core.mobile",
     "platform_core.api.ai": "platform_core.ai",
     "platform_core.api.mcp": "platform_core.ai",
+    "platform_core.api.reseller": "platform_core.reseller",
     "platform_core.api.atonota_login": "platform_core.identity"
   },
   "forbidden_imports": [

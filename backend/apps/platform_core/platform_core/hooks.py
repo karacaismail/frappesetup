@@ -96,6 +96,7 @@ fixtures = [
 					"Tenant Admin Assistant",
 					"Reseller Admin",
 					"Reseller Assistant",
+					"Platform Operator",
 				],
 			]
 		],
@@ -113,6 +114,9 @@ ai_write_closed_doctypes = [
 	"PLT Mobile Installation",
 	"PLT Mobile Account State",
 	"PLT Access Rule",
+	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
+	"Reseller Customer Link",
+	"Reseller Customer Request",
 	# G-164: verification notices and cases change only through the signed provider notice and its queue job.
 	"PLT Verification Notice",
 	"PLT Verification Case",
@@ -166,6 +170,10 @@ website_user_allowed_methods = [
 	"platform_core.api.access.list_role_permissions",
 	"platform_core.api.access.set_role_permission",
 	"platform_core.api.access.remove_role_permission",
+	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.
+	"platform_core.api.reseller.list_customers",
+	"platform_core.api.reseller.customer_status",
+	"platform_core.api.reseller.request_customer",
 	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
