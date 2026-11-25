@@ -23,6 +23,7 @@ from platform_core.access.tests.base import (
 	DOCTYPE,
 	HR,
 	PORTAL,
+	ROLE_NO_RULE,
 	ROLE_PORTAL,
 	AccessRuleTestCase,
 )
@@ -40,6 +41,10 @@ EXPECTED = {
 	"get_access_summary": (403, 200, 403, 200, 200),
 	"set_field_level": (403, 403, 403, 403, 200),
 	"set_level_access": (403, 403, 403, 403, 200),
+	# G-62: the “Tenant Admin” role also gets 200. Its tests are in `test_tenant_admin.py`.
+	"list_role_permissions": (403, 403, 403, 403, 200),
+	"set_role_permission": (403, 403, 403, 403, 200),
+	"remove_role_permission": (403, 403, 403, 403, 200),
 	"search_link": (403, 200, 403, 200, 200),
 	"search_link, custom function": (403, 403, 403, 403, 403),
 	"search_widget": (403, 403, 403, 200, 200),
@@ -117,6 +122,22 @@ class TestEntryMatrix(AccessRuleTestCase):
 						"write": False,
 					}
 				},
+			),
+			"list_role_permissions": (
+				"GET",
+				ACCESS + "list_role_permissions",
+				{"query": {"doctype": DOCTYPE}},
+			),
+			"set_role_permission": (
+				"POST",
+				ACCESS + "set_role_permission",
+				{"body": {"doctype": DOCTYPE, "role": ROLE_PORTAL, "permissions": {"read": True}}},
+			),
+			"remove_role_permission": (
+				"POST",
+				ACCESS + "remove_role_permission",
+				# A role no caller below uses, so the later rows of the table keep their access.
+				{"body": {"doctype": DOCTYPE, "role": ROLE_NO_RULE}},
 			),
 			"search_link": ("POST", SEARCH_LINK, {"body": search}),
 			"search_link, custom function": ("POST", SEARCH_LINK, {"body": {**search, **custom}}),

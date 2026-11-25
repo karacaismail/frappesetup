@@ -18,9 +18,9 @@ from frappe.utils import get_test_client
 from frappe.utils.password import update_password
 
 from platform_core.access import tenant_admin
+from platform_core.access.tests.base import PASSWORD
 
 API = "/api/method/platform_core.api.access."
-PASSWORD = "Sahte-Parola-802-ta!"
 HOLDER = "ta.yonetici@example.test"
 PLAIN = "ta.uye@example.test"
 SYSTEM_MANAGER_USER = "ta.sistem@example.test"

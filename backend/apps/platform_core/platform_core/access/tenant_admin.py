@@ -62,6 +62,7 @@ def ensure_role() -> None:
 		if not frappe.db.exists("Custom DocPerm", row):
 			add_permission(doctype, ROLE, level, ptypes[0])
 		for ptype in ptypes:
+			# Installation reads its own permission row (exception to G-3).
 			if not frappe.db.get_value("Custom DocPerm", row, ptype):
 				update_permission_property(doctype, ROLE, level, ptype, 1, validate=False)
 	frappe.clear_cache()
@@ -252,6 +253,7 @@ def set_role_permission(doctype: str, role: str, permissions: dict, permlevel=0,
 		frappe.throw(_("permissions must name only these rights: {0}").format(", ".join(rights)))
 	values = {right: 1 if permissions[right] else 0 for right in permissions}
 	copy_standard_rows(doctype)
+	# The caller's right was checked by `require_manager` (exception to G-3).
 	name = frappe.db.get_value("Custom DocPerm", key)
 	doc = frappe.get_doc("Custom DocPerm", name) if name else frappe.new_doc("Custom DocPerm")
 	doc.update({**key, **values})
@@ -271,6 +273,7 @@ def remove_role_permission(doctype: str, role: str, permlevel=0, if_owner=0) -> 
 	_require_type(doctype)
 	key = _key(doctype, role, permlevel, if_owner)
 	copy_standard_rows(doctype)
+	# The caller's right was checked by `require_manager` (exception to G-3).
 	name = frappe.db.get_value("Custom DocPerm", key)
 	if not name:
 		frappe.throw(_("The role has no permission row at this level."), frappe.DoesNotExistError)
