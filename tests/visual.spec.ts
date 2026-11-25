@@ -22,7 +22,16 @@ const VIEWPORT_SHOTS = [
   { name: 'home-1366-light', path: '', width: 1366, height: 900, scheme: 'light' as const },
   { name: 'home-320-light', path: '', width: 320, height: 640, scheme: 'light' as const },
   { name: 'kararlar-390-dark', path: 'kararlar/', width: 390, height: 844, scheme: 'dark' as const },
-  { name: 'gereksinimler-1366-light', path: 'gereksinimler/', width: 1366, height: 900, scheme: 'light' as const },
+  // Geniş ekranda tablo, tarayıcı boşta kalınca kartların yerine çizilir (requestIdleCallback, en geç 1,5 sn).
+  // Referansta tablo başlığı vardır; görüntü tablo çizilmeden alınırsa WebKit'te kararsız fark çıkar.
+  {
+    name: 'gereksinimler-1366-light',
+    path: 'gereksinimler/',
+    width: 1366,
+    height: 900,
+    scheme: 'light' as const,
+    ready: '.req-table thead',
+  },
 ];
 
 test.describe('visual regression', () => {
@@ -32,6 +41,7 @@ test.describe('visual regression', () => {
       await page.setViewportSize({ width: shot.width, height: shot.height });
       await page.goto(shot.path);
       await settle(page);
+      if ('ready' in shot) await expect(page.locator(shot.ready)).toBeVisible({ timeout: 10_000 });
       // İçerikle değişen gezgin sonuç listesi maskelenir: test kabuk, süzgeç ve tipografi gerilemelerini yakalar.
       await expect(page).toHaveScreenshot(`${shot.name}.png`, {
         mask: [page.locator('.req-table tbody'), page.locator('.req-cards')],

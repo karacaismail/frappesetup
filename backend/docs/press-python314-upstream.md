@@ -4,6 +4,8 @@
 Press v0.154.1, Python 3.14 ve Frappe 16 ile yamasız açılamadı.
 O-18 borcu açıktır. Mevcut geliştirme yaması kaldırılmadı.
 Bu belge Press bakımcılarına gönderilecek öneridir. Henüz gönderilmedi.
+Üç kaynak önerisinin yama dizisi ve İngilizce PR metni [öneri klasöründedir](upstream/press-python314/).
+Gönderim adımları [devir notundadır](handoff/press-upstream-proposal.md) (O-57).
 
 ## Kaynak ve çalışma ortamı
 

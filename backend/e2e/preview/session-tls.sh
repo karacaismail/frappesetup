@@ -26,7 +26,9 @@ extendedKeyUsage=serverAuth
 CONFIG
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -config "$private/openssl.conf" \
     -keyout "$private/key.pem" -out "$private/certificate.pem" > /dev/null 2>&1
-relay_dir="$(docker_preview exec "$sync" env/bin/python -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-session-tls-"))')"
+# The merge preview image has env/bin/python. The local stack image has python on PATH.
+sync_python="$(docker_preview exec "$sync" sh -c 'if [ -x env/bin/python ]; then echo env/bin/python; else command -v python; fi')"
+relay_dir="$(docker_preview exec "$sync" "$sync_python" -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-session-tls-"))')"
 docker_preview cp "$suite/session_tls.py" "$sync:$relay_dir/relay.py"
 docker_preview cp "$private/certificate.pem" "$sync:$relay_dir/certificate.pem"
 docker_preview cp "$private/key.pem" "$sync:$relay_dir/key.pem"
@@ -36,5 +38,5 @@ docker_preview exec --user root "$sync" chown -R "$uid:$gid" "$relay_dir"
 docker_preview cp "$private/certificate.pem" "$tenant:/usr/local/share/ca-certificates/e2e-identity-sync.crt"
 docker_preview exec --user root "$tenant" chmod 0644 /usr/local/share/ca-certificates/e2e-identity-sync.crt
 docker_preview exec --user root "$tenant" update-ca-certificates > /dev/null
-docker_preview exec -d "$sync" env/bin/python "$relay_dir/relay.py" sessions "$upstream_port"
-docker_preview exec -d "$sync" env/bin/python "$relay_dir/relay.py" keycloak "$keycloak_port"
+docker_preview exec -d "$sync" "$sync_python" "$relay_dir/relay.py" sessions "$upstream_port"
+docker_preview exec -d "$sync" "$sync_python" "$relay_dir/relay.py" keycloak "$keycloak_port"

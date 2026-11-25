@@ -31,8 +31,17 @@ const expected: Record<string, Expectation> = {
   },
   'sign-out-confirm': {
     title: 'Oturumu kapatma',
-    texts: ['Oturumu kapatmak istiyor musunuz?'],
-    buttons: ['Oturumu kapatın'],
+    texts: [
+      'Hangi oturumu kapatmak istiyorsunuz?',
+      'Bu oturum',
+      'Yalnız bu cihazdaki oturum kapanır. Öteki cihazlarda oturum açık kalır.',
+      'Başka bir oturum',
+      'Cihazlar sayfası açılır. Kapatmak istediğiniz cihazın yanındaki “Oturumu kapatın” düğmesine basın. Başka cihazda oturum yoksa sayfada düğme görünmez.',
+      'Bütün cihazlar',
+      'Cihazlar sayfası açılır. Orada “Bütün cihazlarda oturumu kapatın” düğmesine basın. Bu cihazdaki oturum da kapanır. Başka cihazda oturum yoksa düğme görünmez.',
+    ],
+    buttons: ['Bu oturumu kapatın'],
+    links: ['Başka bir oturumu kapatın', 'Bütün cihazlarda oturumu kapatın'],
   },
   'signed-out': {
     title: 'Oturumu kapattınız',

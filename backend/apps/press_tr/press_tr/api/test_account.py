@@ -2,6 +2,7 @@ import re
 from uuid import uuid4
 
 ROUTE = "/api/method/press_tr.api.account.request_deletion"
+RECOVERY_ROUTE = "/api/method/press_tr.api.account.request_recovery"
 
 
 class AccountAccessTests:
@@ -19,3 +20,13 @@ class AccountAccessTests:
 		self.assertEqual(
 			self.exchange("POST", ROUTE, headers, '{"confirm":false,"subject":"other-account"}')[0], 403
 		)
+
+	def test_request_recovery_guest_denied(self):
+		# Guests may ask for recovery, but only with POST.
+		self.assertEqual(self.exchange("GET", f"{RECOVERY_ROUTE}?email=customer@example.test")[0], 403)
+
+	def test_request_recovery_foreign_data_denied(self):
+		# The request accepts only an address. It cannot name another account's identity record.
+		headers = {"Content-Type": "application/json"}
+		body = '{"email":"customer@example.test","identity_link":"other-account"}'
+		self.assertEqual(self.exchange("POST", RECOVERY_ROUTE, headers, body)[0], 403)

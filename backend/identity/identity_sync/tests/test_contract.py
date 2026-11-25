@@ -15,7 +15,7 @@ from identity_sync.auth import reject_all
 from . import fakes
 from .contract_tools import load_yaml, schema_errors
 from .fakes import ORG_ID, REALM_ID, SUBJECT, keycloak_user
-from .test_server import EVENT, EXECUTE_TOKEN, OPERATOR_TOKEN, PREVIEW_TOKEN, ServerCase
+from .test_server import EVENT, EXECUTE_TOKEN, OPERATOR_TOKEN, PREVIEW_TOKEN, ServerCase, fake_verifier
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 CONTRACT = load_yaml((ROOT / "contracts" / "identity_sync.openapi.yaml").read_text(encoding="utf-8"))
@@ -45,7 +45,7 @@ def request_schema(method: str, path: str) -> dict:
 
 class DocumentationTest(unittest.TestCase):
     def test_contract_lists_operations(self) -> None:
-        self.assertEqual(len(operations()), 10)
+        self.assertEqual(len(operations()), 12)
 
     def test_every_operation_is_documented(self) -> None:
         # Every endpoint has a summary, description and destructive-action flag (`docs/sozlesmeler.md`, section 10).
@@ -490,6 +490,48 @@ class SchemaTest(ServerCase):
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
         kc.add_session(SUBJECT, sid)
         kc.on("DELETE", f"{kc.admin}/sessions/{sid}", (500, None))
+        self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 502)
+
+    def test_login_providers(self) -> None:
+        from .test_server import OTHER_SITE_TOKEN, SESSION_TOKEN
+
+        path = "/v1/login-providers"
+        kc = self.stack.keycloak
+        kc.add_identity_provider("google", display_name="Google")
+        kc.add_identity_provider("tenant1-sso", display_name="Tenant One SSO", organization_id=ORG_ID)
+        body = self.assert_response(self.call("GET", path, None, self.bearer(SESSION_TOKEN)), "GET", path, 200)
+        self.assertEqual([row["alias"] for row in body["providers"]], ["google", "tenant1-sso"])
+        self.assert_response(self.call("GET", path, None, self.bearer(PREVIEW_TOKEN)), "GET", path, 403)
+        self.assert_response(self.call("GET", path, None, self.bearer(OTHER_SITE_TOKEN)), "GET", path, 403)
+        self.assert_response(self.call("GET", path), "GET", path, 401)
+        kc.on("GET", f"{kc.admin}/identity-provider/instances", (500, None))
+        # The platform list is kept for a short time. A new server starts with an empty store.
+        self.start_server(fake_verifier)
+        self.assert_response(self.call("GET", path, None, self.bearer(SESSION_TOKEN)), "GET", path, 502)
+
+    def test_linked_accounts(self) -> None:
+        from .test_server import SESSION_TOKEN
+
+        path = "/v1/linked-accounts"
+        kc = self.stack.keycloak
+        kc.add_identity_provider("google", display_name="Google")
+        kc.link_account(SUBJECT, "google", "ayse.ornek@elsewhere.example.test")
+        kc.add_credential(SUBJECT, "password")
+        request = {"subject": SUBJECT}
+
+        self.assert_request(request, "POST", path)
+        body = self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 200)
+        self.assertEqual(body, {"providers": [{"alias": "google", "display_name": "Google", "linked": True}], "local_sign_in_methods": 1})
+        self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 403)
+        stranger = {"subject": "00000000-0000-4000-8000-000000000000"}
+        self.assert_request(stranger, "POST", path)
+        self.assert_response(self.post_json(path, stranger, SESSION_TOKEN), "POST", path, 403)
+        for rejected in ({}, {"subject": "a/b"}, {**request, "user": "x"}):
+            with self.subTest(rejected=rejected):
+                self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
+                self.assert_response(self.post_json(path, rejected, SESSION_TOKEN), "POST", path, 400)
+        self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
+        kc.on("GET", f"{kc.admin}/users/{SUBJECT}/credentials", (500, None))
         self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 502)
 
     def test_account_deletion(self) -> None:
