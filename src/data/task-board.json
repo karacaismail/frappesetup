@@ -16,7 +16,10 @@
    "G-164",
    "G-165",
    "G-166",
-   "G-167"
+   "G-167",
+   "G-168",
+   "G-169",
+   "G-170"
   ]
  },
  "statuses": [
@@ -1334,6 +1337,21 @@
    "epic": "login-product",
    "status": "unverified",
    "level": "post-mvp"
+  },
+  "G-168": {
+   "epic": "access",
+   "status": "unverified",
+   "level": "mvp"
+  },
+  "G-169": {
+   "epic": "access",
+   "status": "unverified",
+   "level": "scale"
+  },
+  "G-170": {
+   "epic": "access",
+   "status": "unverified",
+   "level": "scale"
   }
  }
 }
