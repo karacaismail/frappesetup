@@ -24,13 +24,13 @@
   ]
  },
  "update": {
-  "date": "2026-11-24",
-  "commit": "065bf90c",
+  "date": "2026-11-25",
+  "commit": "52c05bff",
   "release": {
-   "pr": 27,
-   "commit": "ec669626"
+   "pr": 49,
+   "commit": "d3e8e891"
   },
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. 25 Kasım 2026 Çarşamba günü PR 49 yayını okundu. Yayın commit'i d3e8e891 commit'idir. G-155 Bitti oldu. Kanıt c9725c79 birleşmesi ve iki test dosyasıdır. Testler yerel Frappe yığınında geçti. G-40 ve G-41 Sürüyor durumundadır. Kod ve testler 52c05bff birleşmesindedir. Gerçek Frappe sitesi isteyen testler koşmadı. Canlıda denenmeyen dağıtım işi de Sürüyor kalır. Yayındaki üç işin gereksinim bağı bulunamadı. Bunlar ef5e0a5c, ab55d7c5 ve 116a5f6e birleşmeleridir. Bu işler için kayıt yazılmadı.",
   "reviewed": [
    "G-155",
    "G-156",
@@ -448,7 +448,7 @@
   },
   "G-41": {
    "epic": "tenant-config",
-   "status": "not-started",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-42": {
@@ -1344,8 +1344,19 @@
   },
   "G-155": {
    "epic": "ai",
-   "status": "in-progress",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "c9725c79",
+    "release": {
+     "pr": 49,
+     "commit": "d3e8e891"
+    },
+    "tests": [
+     "backend/apps/platform_core/platform_core/model_gateway/tests/test_connections.py",
+     "backend/apps/platform_core/platform_core/api/test_model.py"
+    ]
+   }
   },
   "G-156": {
    "epic": "ai",
