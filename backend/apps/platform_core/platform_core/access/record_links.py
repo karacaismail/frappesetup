@@ -55,8 +55,14 @@ def _target(doctype, name):
 			return None
 
 
+def _allowed(doc, ptype, user):
+	# Frappe adds a denial message to the response. The message would show that the record exists.
+	with _without_messages():
+		return bool(doc) and doc.has_permission(ptype, user=user)
+
+
 def _can_share(doc, user):
-	return doc and doc.has_permission("read", user=user) and doc.has_permission("share", user=user)
+	return _allowed(doc, "read", user) and _allowed(doc, "share", user)
 
 
 def _audit(event, reference_type, reference_name, user):
@@ -116,7 +122,7 @@ def open_link(token):
 		if _gone(link):
 			return _reply(410, status="gone")
 		target = _target(link.target_type, link.target_name)
-		if target and target.has_permission("read", user=frappe.session.user):
+		if _allowed(target, "read", frappe.session.user):
 			return _reply(200, doctype=target.doctype, name=target.name)
 	return _reply(404, status="unavailable")
 
@@ -147,7 +153,7 @@ def request_access(token, doctype, name):
 			return _reply(202, status="received")
 		doctype, name = link.target_type, link.target_name
 	target = _target(doctype, name)
-	if target and not target.has_permission("read", user=user):
+	if target and not _allowed(target, "read", user):
 		key = json.dumps([user, target.doctype, target.name])
 		request_id = sha256(key.encode("utf-8")).hexdigest()
 		# The primary key deduplicates this requester and target atomically across links.

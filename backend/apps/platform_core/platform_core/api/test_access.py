@@ -9,7 +9,14 @@ import secrets
 import frappe
 
 from platform_core.access.record_links import LINK, REQUEST
-from platform_core.access.tests.base import ADMIN, DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, ROLE_EMPLOYEE, AccessRuleTestCase
+from platform_core.access.tests.base import (
+	DOCTYPE,
+	EMPLOYEE_1,
+	EMPLOYEE_2,
+	HR,
+	ROLE_EMPLOYEE,
+	AccessRuleTestCase,
+)
 
 FIELD_BODY = {"doctype": DOCTYPE, "fieldname": "salary_amount", "permlevel": 0}
 LEVEL_BODY = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE, "permlevel": 1, "read": True, "write": True}
@@ -81,6 +88,12 @@ class TestAccessEndpoints(AccessRuleTestCase):
 		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
 
 
+# The record type is governed by the access rule engine. A role without a rule reads nothing,
+# so the System Manager cannot share these records. HR reads every record and has the share
+# permission, so HR is the sharer here.
+SHARER = HR
+
+
 class TestRecordLinks(AccessRuleTestCase):
 	def clean_link(self, link_id):
 		frappe.db.delete("Activity Log", {"reference_doctype": LINK, "reference_name": link_id})
@@ -88,9 +101,13 @@ class TestRecordLinks(AccessRuleTestCase):
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def clean_requests(self, name):
-		requests = frappe.get_all(REQUEST, filters={"target_type": DOCTYPE, "target_name": name}, pluck="name")
+		requests = frappe.get_all(
+			REQUEST, filters={"target_type": DOCTYPE, "target_name": name}, pluck="name"
+		)
 		if requests:
-			frappe.db.delete("Activity Log", {"reference_doctype": REQUEST, "reference_name": ("in", requests)})
+			frappe.db.delete(
+				"Activity Log", {"reference_doctype": REQUEST, "reference_name": ("in", requests)}
+			)
 			frappe.db.delete(REQUEST, {"name": ("in", requests)})
 			frappe.db.commit()  # nosemgrep: frappe-request-commit
 
@@ -99,8 +116,8 @@ class TestRecordLinks(AccessRuleTestCase):
 
 	def test_private_link_uses_the_readers_own_permission(self):
 		name = self.records[EMPLOYEE_2]
-		admin = self.login(ADMIN)
-		response = self.rpc(admin, "create_record_link", doctype=DOCTYPE, name=name)
+		sharer = self.login(SHARER)
+		response = self.rpc(sharer, "create_record_link", doctype=DOCTYPE, name=name)
 		self.assertEqual(response.status_code, 200)
 		link = response.json["message"]
 		self.addCleanup(self.clean_link, link["id"])
@@ -117,8 +134,8 @@ class TestRecordLinks(AccessRuleTestCase):
 		self.assertNotIn(name, denied.get_data(as_text=True))
 
 		self.assertEqual(self.rpc(other, "revoke_record_link", link_id=link["id"]).status_code, 404)
-		self.assertEqual(self.rpc(admin, "revoke_record_link", link_id=link["id"]).status_code, 200)
-		self.assertEqual(self.rpc(admin, "revoke_record_link", link_id=link["id"]).status_code, 200)
+		self.assertEqual(self.rpc(sharer, "revoke_record_link", link_id=link["id"]).status_code, 200)
+		self.assertEqual(self.rpc(sharer, "revoke_record_link", link_id=link["id"]).status_code, 200)
 		self.assertEqual(self.rpc(reader, "open_record_link", token=token).status_code, 410)
 		for event in ("Record link created", "Record link revoked"):
 			self.assertEqual(
@@ -134,13 +151,16 @@ class TestRecordLinks(AccessRuleTestCase):
 		repeat = self.rpc(reader, "request_record_access", doctype=DOCTYPE, name=name)
 
 		self.assertEqual(valid.status_code, 202)
+		self.assertEqual(valid.json, {"message": {"status": "received"}})
 		self.assertEqual(valid.json, missing.json)
 		self.assertEqual(valid.json, repeat.json)
 		filters = {"target_type": DOCTYPE, "target_name": name, "owner": EMPLOYEE_1}
 		self.assertEqual(frappe.db.count(REQUEST, filters), 1)
 		request_id = frappe.db.get_value(REQUEST, filters, "name")
 		self.assertTrue(
-			frappe.db.exists("Activity Log", {"reference_name": request_id, "subject": "Record access requested"})
+			frappe.db.exists(
+				"Activity Log", {"reference_name": request_id, "subject": "Record access requested"}
+			)
 		)
 		self.assertEqual(self.rest_get(reader, name).status_code, 403)
 
@@ -178,29 +198,34 @@ class TestRecordLinks(AccessRuleTestCase):
 		self.assertEqual(image.mimetype, "image/png")
 		self.assertTrue(image.data.startswith(b"\x89PNG\r\n\x1a\n"))
 
-
 	def test_create_record_link_guest_denied(self):
-		result = self.rpc(self.anonymous(), "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2])
+		result = self.rpc(
+			self.anonymous(), "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2]
+		)
 		self.assertEqual(result.status_code, 403)
 
 	def test_create_record_link_foreign_data_denied(self):
 		reader = self.login(EMPLOYEE_1)
 		result = self.rpc(reader, "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2])
+		missing = self.rpc(reader, "create_record_link", doctype=DOCTYPE, name="missing-record")
 		self.assertEqual(result.status_code, 404)
+		self.assertEqual(result.json, {"message": {"status": "unavailable"}})
+		self.assertEqual(result.json, missing.json)
 
 	def test_open_record_link_guest_denied(self):
 		result = self.rpc(self.anonymous(), "open_record_link", token=secrets.token_urlsafe(32))
 		self.assertEqual(result.status_code, 403)
 
 	def test_open_record_link_foreign_data_denied(self):
-		admin = self.login(ADMIN)
-		result = self.rpc(admin, "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2])
+		sharer = self.login(SHARER)
+		result = self.rpc(sharer, "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2])
 		link = result.json["message"]
 		self.addCleanup(self.clean_link, link["id"])
 		reader = self.login(EMPLOYEE_1)
 		denied = self.rpc(reader, "open_record_link", token=link["path"].split("#", 1)[1])
 		missing = self.rpc(reader, "open_record_link", token=secrets.token_urlsafe(32))
 		self.assertEqual(denied.status_code, 404)
+		self.assertEqual(denied.json, {"message": {"status": "unavailable"}})
 		self.assertEqual(denied.json, missing.json)
 
 	def test_revoke_record_link_guest_denied(self):
@@ -208,12 +233,17 @@ class TestRecordLinks(AccessRuleTestCase):
 		self.assertEqual(result.status_code, 403)
 
 	def test_revoke_record_link_foreign_data_denied(self):
-		admin = self.login(ADMIN)
-		result = self.rpc(admin, "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2])
+		sharer = self.login(SHARER)
+		result = self.rpc(sharer, "create_record_link", doctype=DOCTYPE, name=self.records[EMPLOYEE_2])
 		link_id = result.json["message"]["id"]
 		self.addCleanup(self.clean_link, link_id)
-		result = self.rpc(self.login(EMPLOYEE_1), "revoke_record_link", link_id=link_id)
+		reader = self.login(EMPLOYEE_1)
+		result = self.rpc(reader, "revoke_record_link", link_id=link_id)
+		missing = self.rpc(reader, "revoke_record_link", link_id=secrets.token_hex(16))
 		self.assertEqual(result.status_code, 404)
+		self.assertEqual(result.json, {"message": {"status": "unavailable"}})
+		self.assertEqual(result.json, missing.json)
+		self.assertFalse(frappe.db.get_value(LINK, link_id, "revoked_at"))
 
 	def test_request_record_access_guest_denied(self):
 		result = self.rpc(
