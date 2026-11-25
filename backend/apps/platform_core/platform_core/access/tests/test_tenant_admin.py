@@ -36,6 +36,7 @@ DESK_ROLE = "TA Masa Rol"
 CUSTOM_TYPE = "TA Ozel Tur"
 RULE_TYPE = "ToDo"
 PROTECTED = ("System Manager", "Administrator")
+RESELLER_ROLES = ("Reseller Admin", "Reseller Assistant")
 
 
 def _user(email: str, roles: list[str]) -> None:
@@ -603,6 +604,23 @@ class TestTenantAdmin(IntegrationTestCase):
 				doc.save(ignore_permissions=True)
 		frappe.set_user("Administrator")
 		self.assertEqual(frappe.get_roles(PLAIN).count(DESK_ROLE), 0)
+
+	def test_holder_cannot_give_a_reseller_role(self):
+		"""G-169: only the platform operator gives a reseller role (AJA-900)."""
+		for role in RESELLER_ROLES:
+			self.assertTrue(frappe.db.exists("Role", role), role)
+			self.assertFalse(tenant_admin.grantable_role(role), role)
+			frappe.set_user(HOLDER)
+			doc = frappe.get_doc("User", PLAIN)
+			doc.append("roles", {"role": role})
+			with self.assertRaises(frappe.PermissionError):
+				doc.save(ignore_permissions=True)
+			profile = frappe.get_doc(doctype="Role Profile", role_profile=PROFILE, roles=[{"role": role}])
+			with self.assertRaises(frappe.PermissionError):
+				profile.insert(ignore_permissions=True)
+			frappe.set_user("Administrator")
+			self.assertNotIn(role, frappe.get_roles(PLAIN))
+			self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
 
 	def test_holder_cannot_change_or_delete_its_own_role(self):
 		client = self.login()
