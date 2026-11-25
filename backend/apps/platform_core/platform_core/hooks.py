@@ -86,13 +86,22 @@ fixtures = [
 			[
 				"name",
 				"in",
-				["PLT AI Manager", "Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"],
+				[
+					"PLT AI Manager",
+					"Tenant Admin",
+					"Tenant Admin Assistant",
+					"Reseller Admin",
+					"Reseller Assistant",
+					"Platform Operator",
+				],
 			]
 		],
 	},
 	{
 		"dt": "Role Profile",
-		"filters": [["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]],
+		"filters": [
+			["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]
+		],
 	},
 ]
 
@@ -113,6 +122,9 @@ ai_write_closed_doctypes = [
 	# G-156: file jobs and their chunks change only through the large file queue steps.
 	"PLT AI File Job",
 	"PLT AI File Chunk",
+	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
+	"Reseller Customer Link",
+	"Reseller Customer Request",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
@@ -163,6 +175,10 @@ website_user_allowed_methods = [
 	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
+	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.
+	"platform_core.api.reseller.list_customers",
+	"platform_core.api.reseller.customer_status",
+	"platform_core.api.reseller.request_customer",
 ]
 
 

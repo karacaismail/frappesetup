@@ -183,7 +183,7 @@ class RoleFixtureContract:
 
 
 def endpoint_exists(dotted: str) -> bool:
-	module_name, _, attr = dotted.rpartition(".")
+	module_name, _separator, attr = dotted.rpartition(".")
 	try:
 		function = getattr(importlib.import_module(module_name), attr)
 	except (ImportError, AttributeError):
