@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "93e8bf58cb7a07a1c3f513a408baebde76ac181b321ba3f816e3e3ecbf199123",
+      "sha256": "6872fca4aa05a58ded05ac976f66bda28851c242ff63506349a48cfe631ed9ad",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -264,14 +264,14 @@
         {
           "rule": "frappe-missing-permission",
           "path": "backend/apps/platform_core/platform_core/api/identity.py",
-          "line": 119,
+          "line": 123,
           "reason": "Refuses unknown fields, then delegates to user_admin.set_user_role_profiles, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-98). The target must be a Website User linked to this site's issuer."
         },
         {
           "rule": "frappe-missing-permission",
           "path": "backend/apps/platform_core/platform_core/api/identity.py",
-          "line": 129,
-          "reason": "Refuses unknown fields, then delegates to user_admin.invite_user, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-98). The organization comes from site config, and identity-sync checks it is the caller's own. A run needs the digest of its preview."
+          "line": 133,
+          "reason": "Refuses unknown fields, then delegates to user_admin.invite_user, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-98). The organization comes from site config, and identity-sync checks it is the caller's own. A run needs the digest of its preview. A per-user rate_limit of 20 requests in 600 seconds stops invitation floods (AJA-890)."
         },
         {
           "rule": "frappe-ignore-permissions",
