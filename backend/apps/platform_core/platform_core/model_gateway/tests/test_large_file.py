@@ -361,8 +361,8 @@ def _store_db(job):
 			target = job
 		else:
 			target = next(chunk for chunk in job.chunks if chunk.name == name)
-		for key, value in values.items():
-			setattr(target, key, value)
+		for key, new_value in values.items():
+			setattr(target, key, new_value)
 
 	db = Mock()
 	db.set_value.side_effect = set_value
@@ -403,7 +403,9 @@ class LimitTests(unittest.TestCase):
 
 	def test_the_limits_follow_the_site_setting(self):
 		pages = ["a" * 300] * 4
-		allowed = self._prepare(pages, {"model_gateway_file_max_pages": 4, "model_gateway_file_max_chunks": 4})
+		allowed = self._prepare(
+			pages, {"model_gateway_file_max_pages": 4, "model_gateway_file_max_chunks": 4}
+		)
 		self.assertEqual(allowed.status, "planned")
 		self.assertTrue(allowed.saved)
 		self.assertGreater(len(allowed.chunks), 1)
@@ -418,15 +420,17 @@ class LimitTests(unittest.TestCase):
 		self.assertEqual(refused.failure_code, "file_too_large")
 
 	def test_invalid_setting_fails_closed(self):
-		for value in (0, -1, "100", 2.5, True):
-			with self.subTest(value=value):
-				job = self._prepare(["page"], {"model_gateway_file_max_pages": value})
+		for setting in (0, -1, "100", 2.5, True):
+			with self.subTest(setting=setting):
+				job = self._prepare(["page"], {"model_gateway_file_max_pages": setting})
 				self.assertEqual((job.status, job.failure_code), ("failed", "invalid_setting"))
 				self.assertEqual(job.chunks, [])
 
 	def test_planned_chunks_keep_their_byte_count(self):
 		job = self._prepare(["ç" * 10, "b" * 5], {})
-		self.assertEqual([chunk.byte_count for chunk in job.chunks], [len(chunk.content.encode()) for chunk in job.chunks])
+		self.assertEqual(
+			[chunk.byte_count for chunk in job.chunks], [len(chunk.content.encode()) for chunk in job.chunks]
+		)
 
 
 class TextRetentionTests(unittest.TestCase):

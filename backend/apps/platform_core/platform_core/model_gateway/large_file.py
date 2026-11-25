@@ -11,6 +11,7 @@ import json
 from dataclasses import dataclass
 
 import frappe
+from pypdf import PdfReader
 
 from platform_core.model_gateway import gateway, ledger, policy
 from platform_core.model_gateway.policy import Denied
@@ -22,6 +23,10 @@ PAGE_SEPARATOR = "\n"
 # The longest JSON escape of one character is six bytes (\u001f).
 MIN_CHUNK_BYTES = 8
 MAX_INSTRUCTION_BYTES = 16 * 1024
+# Safe defaults. Site settings model_gateway_file_max_pages and model_gateway_file_max_chunks
+# replace them; a missing setting keeps the default, an invalid one stops the job.
+DEFAULT_MAX_PAGES = 1000
+DEFAULT_MAX_CHUNKS = 200
 
 
 @dataclass(frozen=True)
@@ -149,10 +154,25 @@ def _estimate(chunks, targets, instruction, limit):
 	return total, currencies.pop()
 
 
-def plan(pages, targets, instruction, limit):
+def _bytes(text):
+	return len(text.encode("utf-8"))
+
+
+def _setting(key, default):
+	configured = frappe.conf.get(key)
+	if configured is None:
+		return default
+	if type(configured) is not int or configured < 1:
+		raise Denied(503, "invalid_setting")
+	return configured
+
+
+def plan(pages, targets, instruction, limit, max_chunks=None):
 	"""Cut page texts into chunks and estimate their cost without contacting a provider."""
 	active, budget = _budget(instruction, targets, limit)
 	chunks = _chunks(pages, budget)
+	if max_chunks is not None and len(chunks) > max_chunks:
+		raise Denied(413, "file_too_large")
 	cost, currency = _estimate(chunks, active, instruction, limit)
 	return Plan(chunks, cost, currency)
 
@@ -180,6 +200,36 @@ def _require_owner(job):
 		raise frappe.PermissionError
 
 
+def _source_texts(job, count=None):
+	"""Read the page texts of the job file, optionally only the first pages."""
+	path = frappe.get_doc("File", job.source_file).get_full_path()
+	pages = PdfReader(path).pages
+	if len(pages) > _setting("model_gateway_file_max_pages", DEFAULT_MAX_PAGES):
+		raise Denied(413, "file_too_large")
+	if count is not None:
+		pages = pages[:count]
+	return page_texts(pages, _ocr_step(path))
+
+
+def _chunk_text(job, chunk):
+	"""Cut the chunk again from the file. Its stored text is removed after each attempt."""
+	texts = _source_texts(job, chunk.last_page)
+	_route, targets = gateway.route_targets(job.route)
+	_active, budget = _budget(job.instruction, targets, job.output_limit)
+	for candidate in _chunks(texts, budget):
+		if candidate.index == chunk.chunk_index:
+			found = (candidate.first_page + 1, candidate.last_page + 1, _bytes(candidate.text))
+			if found == (chunk.first_page, chunk.last_page, chunk.byte_count):
+				return candidate.text
+			break
+	raise Denied(409, "source_changed")
+
+
+def _log_failure(title, error):
+	# Only the error class is written. A Frappe traceback may hold local variables with chunk text.
+	frappe.log_error(title, type(error).__name__)
+
+
 def _lock_chunk(name):
 	return gateway.lock_row(CHUNK, name, ("name", "status", "content"))
 
@@ -200,7 +250,7 @@ def create_job(route, file, instruction, limit=1024):
 		and 1 <= limit <= policy.MAX_OUTPUT
 	):
 		raise Denied(400, "invalid_request")
-	route, _ = gateway.route_targets(route)
+	route, _targets = gateway.route_targets(route)
 	source = gateway._document("File", file)
 	if not frappe.has_permission("File", "read", doc=source):
 		raise frappe.PermissionError
@@ -233,12 +283,10 @@ def prepare_job(file_job):
 	if job.status != "preparing":
 		return
 	try:
-		from pypdf import PdfReader
-
-		path = frappe.get_doc("File", job.source_file).get_full_path()
-		texts = page_texts(PdfReader(path).pages, _ocr_step(path))
-		_, targets = gateway.route_targets(job.route)
-		result = plan(texts, targets, job.instruction, job.output_limit)
+		texts = _source_texts(job)
+		_route, targets = gateway.route_targets(job.route)
+		max_chunks = _setting("model_gateway_file_max_chunks", DEFAULT_MAX_CHUNKS)
+		result = plan(texts, targets, job.instruction, job.output_limit, max_chunks)
 	except Denied as failure:
 		frappe.db.set_value(JOB, job.name, {"status": "failed", "failure_code": failure.code})
 		_commit()
@@ -247,9 +295,9 @@ def prepare_job(file_job):
 		frappe.db.set_value(JOB, job.name, {"status": "failed", "failure_code": "permission_denied"})
 		_commit()
 		return
-	except Exception:
+	except Exception as error:
 		frappe.db.rollback()
-		frappe.log_error("Large file text step failed")
+		_log_failure("Large file text step failed", error)
 		frappe.db.set_value(JOB, job.name, {"status": "failed", "failure_code": "unreadable_file"})
 		_commit()
 		return
@@ -262,6 +310,7 @@ def prepare_job(file_job):
 				"first_page": chunk.first_page + 1,
 				"last_page": chunk.last_page + 1,
 				"content": chunk.text,
+				"byte_count": _bytes(chunk.text),
 				"status": "planned",
 			},
 		)
@@ -306,31 +355,38 @@ def _send(job, chunk):
 	_commit()
 	tag = gateway.ChunkTag(job.name, chunk.chunk_index)
 	try:
-		result = gateway.complete_chunk(
-			job.route, tag, messages(job.instruction, row.content), job.output_limit
-		)
+		text = row.content or _chunk_text(job, chunk)
+		result = gateway.complete_chunk(job.route, tag, messages(job.instruction, text), job.output_limit)
 	except Denied as failure:
 		values = {"status": "failed", "failure_code": failure.code}
 	except frappe.PermissionError:
 		values = {"status": "failed", "failure_code": "permission_denied"}
-	except Exception:
+	except Exception as error:
 		frappe.db.rollback()
-		frappe.log_error("Large file chunk failed")
+		_log_failure("Large file chunk failed", error)
 		values = {"status": "failed", "failure_code": "internal_error"}
 	else:
 		values = {"status": "done", "failure_code": None, "result": result["text"]}
+	# The text is kept only until the attempt ends. A retry cuts it again from the file.
+	values["content"] = None
 	frappe.db.set_value(CHUNK, row.name, values)
 	_commit()
 
 
 def _settle(name):
-	statuses = [chunk.status for chunk in _job(name).chunks]
+	chunks = _job(name).chunks
+	statuses = [chunk.status for chunk in chunks]
 	if any(status in {"queued", "running"} for status in statuses):
 		status = "running"
 	elif any(status == "failed" for status in statuses):
 		status = "failed"
 	else:
 		status = "completed"
+	if status != "running":
+		# A finished job keeps no chunk text, only order, pages, byte count and state.
+		for chunk in chunks:
+			if chunk.content:
+				frappe.db.set_value(CHUNK, chunk.name, {"content": None})
 	frappe.db.set_value(JOB, name, {"status": status})
 	_commit()
 
@@ -396,6 +452,7 @@ def job_status(file_job):
 				"index": chunk.chunk_index,
 				"first_page": chunk.first_page,
 				"last_page": chunk.last_page,
+				"byte_count": chunk.byte_count,
 				"status": chunk.status,
 				"failure_code": chunk.failure_code,
 			}
