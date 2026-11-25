@@ -343,6 +343,32 @@ test('requirement fragment preserves the reading position on rotation', async ({
   expect(await page.evaluate(() => scrollY)).toBe(0);
 });
 
+test('requirement fragment does not pull the reader back after a late hydration', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // Gezgin JS'i okur sayfanın başına döndükten sonra iner (yavaş cihaz). Gezgin okuru satıra geri çekmemeli.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto('gereksinimler/#req-G-151', { waitUntil: 'domcontentloaded' });
+  // Tarayıcı önce bağlantının satırına kaydırır. Sonra okur sayfanın başına döner.
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  release();
+  await page.waitForFunction(() => !document.querySelector('astro-island[component-url*="RequirementsExplorer"][ssr]'));
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+  });
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  await expect(page.locator('#req-G-151')).not.toBeFocused();
+});
+
 for (const [width, height] of [[1366, 900], [800, 1000], [1024, 1366]]) {
   test(`requirements initial CLS stays within budget at ${width}x${height}`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Layout Instability API Chromium üzerinde ölçülür.');

@@ -245,6 +245,10 @@ function Explorer({ items, meta: board }: Props) {
     if (!hash.startsWith('#req-')) return;
     const row = document.getElementById(hash.slice(1));
     if (!row || getComputedStyle(row).display !== 'table-row') return;
+    // Ada geç bağlanabilir. Okur bu sırada satırdan uzaklaştıysa okurun yeri korunur. Satır ekranda değilse gezgin
+    // kaydırmaz ve odak vermez.
+    const bounds = row.getBoundingClientRect();
+    if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) return;
 
     // Yazı tiplerini ve sayfanın sonraki karede ölçtüğü satır içi kodu bekle.
     let cancelled = false;
@@ -368,8 +372,8 @@ function Explorer({ items, meta: board }: Props) {
         <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
       </div>
       {/* Liste satırlarında Mantine Text yerine sade <p>: aynı görünüm global.css'teki sınıf kurallarından. */}
-      <p className={r.status === DONE ? 'req-card-title is-done' : 'req-card-title'}>{r.title}</p>
-      {showDetail && <p className="req-card-detail">{inlineCode(r.detail)}</p>}
+      <p className={r.status === DONE ? 'req-card-title req-title is-done' : 'req-card-title req-title'}>{r.title}</p>
+      {showDetail && <p className="req-card-detail req-detail">{inlineCode(r.detail)}</p>}
       <div className="req-meta">{meta(r)}</div>
       {evidence(r, 'task-evidence')}
     </li>

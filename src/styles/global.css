@@ -905,6 +905,43 @@ tr[id^="req-"][tabindex="-1"]:focus {
   }
 }
 
+/* Gruplu görünümün kartları liste öğesidir. Tablo satırları da `req-card` sınıfını taşır. Bu yüzden kart kuralları
+   yalnız görev listesinin öğelerinde çalışır. Kart metni tablo satırıyla aynı `req-title` ve `req-detail` kurallarını
+   kullanır. Satırdan uzun kod da aynı betikle kendi kutusunda kayar. */
+.task-list > .req-card,
+.task-list > .req-card > * {
+  min-width: 0;
+}
+.task-list > .req-card {
+  padding: 0.9rem 1rem;
+  border-radius: var(--mantine-radius-md);
+  background: var(--fs-surface-2);
+  display: grid;
+  gap: 0.4rem;
+}
+.task-list .req-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.task-list .req-detail {
+  margin-top: 0;
+}
+.task-list .req-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  color: var(--fs-quiet);
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
+}
+/* Uzun sahip adı gibi öğe satırdan genişse satır genişliğine iner ve sözcük aralarından sarılır (kart taşmaz). */
+.task-list .req-meta > * {
+  min-width: 0;
+}
+
 /* Görev panosu: durum etiketi görünür metindir; simge süstür ve ekran okuyucuya alternatif metinsiz gider. Biten görevin
    başlığı üstü çizilir ama rengi değişmez (karşıtlık açık başlıkla aynı kalır). */
 .task-card-id {

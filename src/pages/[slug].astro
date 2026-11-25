@@ -149,6 +149,18 @@ const embeds = EMBEDS[entry.id] ?? [];
         </>
       )}
     </div>
+    {
+      embeds.length > 0 && (
+        <script is:inline>
+          // Derleme anında üretilen blokları metindeki yer tutucularına ilk çizimden önce taşı. Modül betiği ertelenir;
+          // taşıma onu beklerse alttaki gezgin ilk çizimden sonra kayar (CLS). JS yoksa bloklar başlığın altında kalır.
+          for (const source of document.querySelectorAll('[data-embed-source]')) {
+            const target = document.querySelector(`[data-embed="${source.dataset.embedSource}"]`);
+            if (target) target.replaceWith(source);
+          }
+        </script>
+      )
+    }
 
     <nav class="pager" aria-label="Bölümler arası geçiş">
       {
@@ -179,11 +191,7 @@ const embeds = EMBEDS[entry.id] ?? [];
 </Site>
 
 <script>
-  // 1) Derleme anında üretilen blokları metindeki yer tutucularına taşı (JS yoksa başlığın altında kalır).
-  for (const source of document.querySelectorAll<HTMLElement>('[data-embed-source]')) {
-    const target = document.querySelector(`[data-embed="${source.dataset.embedSource}"]`);
-    if (target) target.replaceWith(source);
-  }
+  // 1) Bloklar yer tutucularına yukarıdaki satır içi betikle, ilk çizimden önce taşınır.
 
   // 2) Başlık bağlantıları: h2/h3 kimliğine kopyalanabilir # bağlantısı.
   for (const h of document.querySelectorAll<HTMLElement>('.prose h2[id], .prose h3[id]')) {
