@@ -610,7 +610,9 @@ Bütün DocType'lar `model_gateway` modülündedir. Her alan açıklama taşır 
 | `AI API` | Hesaba bağlı adres ve kimlik bilgisi | hesap, adres, kimlik türü, gizli anahtar, izinli modeller, dakika sınırları, öncelik, ağırlık, sağlık durumu, açık mı |
 | `AI Model` | Model ve yetenekleri | sağlayıcı, model kimliği, yetenekler, bağlam boyu, birim fiyatlar |
 | `AI Route` | İş türüne göre model sırası | ad, gereken yetenekler, seçme yolu, sıralı model ve API listesi, veri kısıtı |
-| `AI Usage Log` | Her çağrının kaydı | zaman, kullanıcı, yol, sağlayıcı, hesap, API, model, token sayıları, maliyet, süre, sonuç |
+| `AI Usage Log` | Her çağrının kaydı | zaman, kullanıcı, yol, sağlayıcı, hesap, API, model, token sayıları, maliyet, süre, sonuç, dosya işi, parça sırası |
+| `AI File Job` | Büyük dosya işi (G-156) | yol, kaynak dosya, talimat, çıktı sınırı, durum, parça sayısı, tahmini maliyet, parçalar |
+| `AI File Chunk` | Dosya işinin bir parçası | sıra, ilk ve son sayfa, metin, durum, hata kodu, sonuç |
 
 ### Bağdaştırıcılar
 
@@ -644,6 +646,36 @@ Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemc
 
 Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinden döner. Zamanlanmış iş yoktur (O-15).
 
+### Büyük dosya (G-156)
+
+Büyük PDF sağlayıcıya dosya olarak gitmez. İşin adımları şunlardır:
+
+1. Kullanıcı işi `create_file_job` işleviyle açar. Bu adımda sağlayıcı çağrılmaz.
+2. Kuyruk işi PDF metnini sayfa sayfa okur. Metni olmayan sayfa yazı tanıma adımına gider.
+3. Kuyruk işi metni sayfa sınırından parçalara böler. Parça boyunu yolun en küçük bağlam boyu belirler.
+4. Kullanıcı `file_job_status` ile parça sayısını ve tahmini maliyeti görür.
+5. Kullanıcı işi `start_file_job` ile başlatır. Her parça geçitten ayrı istek olarak gider.
+6. Başarısız parçayı kullanıcı `retry_file_chunk` ile tek başına yeniden kuyruğa koyar.
+
+- Tahmini maliyet her parça için yolun en pahalı hedefini sayar. Bir hedefin fiyatı bilinmiyorsa tahmin “bilinmiyor” olur. Para birimleri farklıysa da tahmin “bilinmiyor” olur.
+- Geçit her parçayı maskeler (G-90). Hesabı öncelik, ağırlık, dinlenme süresi, dakika sınırı ve bütçeye göre seçer.
+- Bir hesap 429 dönerse parça o hesabın başka API'sine gitmez. Parça başka bir hesaba gider.
+- Her deneme “AI Usage Log” kaydına dosya işi kimliği ve parça sırasıyla yazılır.
+- Yazı tanıma adımı `model_gateway_ocr` kancasıyla bağlanır. Kanca yoksa taranmış sayfalı iş `ocr_unavailable` koduyla durur.
+- İş kuyruk işidir. Zamanlanmış iş yoktur.
+- Her adımın bir HTTP ucu vardır (D-9). Uçlar aşağıdaki tabloda yazılıdır. Başka kullanıcının işini yalnız yönetici okuyabilir.
+
+Parça metni yalnız iş sürerken tutulur. Bekleyen metin için iki süre sınırı vardır:
+
+1. Bir iş en çok 24 saat “planned” durumunda kalır. Süre dolunca iş “failed” olur. Hata kodu `expired` olur.
+2. Bir parça en çok 1 saat “running” durumunda kalır. Süre dolunca parça “failed” olur. Hata kodu `worker_lost` olur. Sonra işin durumu yeniden hesaplanır.
+3. İki durumda da parçanın metni silinir.
+
+- Süreler saniye cinsinden site ayarından okunur. Ayarlar `model_gateway_file_planned_ttl` ve `model_gateway_file_running_ttl` adını taşır. Varsayılanlar 86400 ve 3600 saniyedir. Geçersiz ayar `invalid_setting` hatası verir.
+- Bu temizliği zamanlanmış iş yapmaz. Temizlik `create_file_job`, `start_file_job`, `retry_file_chunk` ve `file_job_status` işlevlerinin başında çalışır.
+- “System Manager” rolü temizliği `expire_file_jobs` işleviyle elle de başlatabilir. Başka rol bu işlevi çağıramaz.
+- `worker_lost` koduyla düşen parça `retry_file_chunk` ile yeniden denenebilir. Metin dosyadan yeniden kurulur.
+
 ### Güvenlik
 
 - Dış bağlantı (`external`) özel ağ adresine gidemez. Denetim bağlantı anında çözülen adrese yapılır.
@@ -667,3 +699,7 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 | --- | --- | --- | --- |
 | `platform_core.api.model.complete` | POST | İnsan oturumu ya da API anahtarı | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
 | `platform_core.api.model.test_api` | POST | “AI Manager” rolü | Bir API'ye küçük deneme çağrısı yapar. Ücretlidir. |
+| `platform_core.api.model.create_file_job` | POST | İnsan oturumu | Büyük PDF işini açar. Yol ve dosya yetkisi denetlenir. Sağlayıcı çağrılmaz. |
+| `platform_core.api.model.file_job_status` | POST | İşin sahibi ya da yönetici | Parça planını, tahmini maliyeti ve parça durumlarını gösterir. Parça metnini dönmez. |
+| `platform_core.api.model.start_file_job` | POST | İşin sahibi ya da yönetici | Planlanmış işin parçalarını kuyruğa koyar. Her parça ücretli olabilir. |
+| `platform_core.api.model.retry_file_chunk` | POST | İşin sahibi ya da yönetici | Başarısız tek parçayı yeniden kuyruğa koyar. |
