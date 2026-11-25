@@ -14,10 +14,11 @@
     {
       "username": "inceleme-yonetici@example.test",
       "realm": "platform",
-      "purpose": "Tenant administrator review.",
+      "purpose": "Tenant administrator review. G-53 keeps System Manager for the platform operator only, so this account is a Website User whose only role is Tenant Admin.",
       "first_name": "Review",
       "last_name": "Administrator",
-      "tenant_roles": ["System Manager"]
+      "tenant_roles": ["Tenant Admin"],
+      "user_type": "Website User"
     },
     {
       "username": "inceleme-yerel-yonetici",
