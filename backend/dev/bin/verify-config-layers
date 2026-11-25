@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+dev_dir="$(cd "$(dirname "$0")/.." && pwd)"
+image="$(awk '$1 == "FROM" {print $2; exit}' "$dev_dir/Dockerfile.tenant")"
+docker --context colima-factory run --interactive --rm --network none --pull never \
+    --entrypoint env/bin/python "$image" - < "$dev_dir/tests/verify_config_layers_bench.py"
