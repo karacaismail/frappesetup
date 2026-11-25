@@ -77,13 +77,22 @@ fixtures = [
 			[
 				"name",
 				"in",
-				["PLT AI Manager", "Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"],
+				[
+					"PLT AI Manager",
+					"Tenant Admin",
+					"Tenant Admin Assistant",
+					"Reseller Admin",
+					"Reseller Assistant",
+					"Platform Operator",
+				],
 			]
 		],
 	},
 	{
 		"dt": "Role Profile",
-		"filters": [["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]],
+		"filters": [
+			["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]
+		],
 	},
 ]
 
@@ -98,6 +107,9 @@ ai_write_closed_doctypes = [
 	"PLT Mobile Installation",
 	"PLT Mobile Account State",
 	"PLT Access Rule",
+	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
+	"Reseller Customer Link",
+	"Reseller Customer Request",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
@@ -135,6 +147,10 @@ website_user_allowed_methods = [
 	"platform_core.api.mobile_pwa.v1_revoke_installation",
 	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
 	"platform_core.api.access.get_access_summary",
+	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.
+	"platform_core.api.reseller.list_customers",
+	"platform_core.api.reseller.customer_status",
+	"platform_core.api.reseller.request_customer",
 ]
 
 

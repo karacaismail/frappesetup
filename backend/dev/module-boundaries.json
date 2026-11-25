@@ -24,7 +24,8 @@
     "identity_sync": [
       "oidc_verify"
     ],
-    "oidc_verify": []
+    "oidc_verify": [],
+    "platform_core.reseller": []
   },
   "public_paths": {
     "platform_core.identity": [
@@ -55,6 +56,9 @@
     "oidc_verify": [
       "oidc_verify",
       "oidc_verify.api"
+    ],
+    "platform_core.reseller": [
+      "platform_core.api.reseller"
     ]
   },
   "path_owners": {
@@ -67,7 +71,8 @@
     "platform_core.api.access": "platform_core.access",
     "platform_core.api.mobile": "platform_core.mobile",
     "platform_core.api.ai": "platform_core.ai",
-    "platform_core.api.mcp": "platform_core.ai"
+    "platform_core.api.mcp": "platform_core.ai",
+    "platform_core.api.reseller": "platform_core.reseller"
   },
   "forbidden_imports": [
     "openai",
