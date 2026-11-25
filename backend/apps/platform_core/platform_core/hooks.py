@@ -66,7 +66,26 @@ after_migrate = [
 	"platform_core.ai.setup.disable_builtin_mcp",
 ]
 
-fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
+# G-62, G-168, G-169, G-170: the four panel roles and their profiles are fixtures.
+# The roles have no desk access, so their holders stay Website Users.
+# No panel profile holds "System Manager". Permission rows are set elsewhere.
+# The value stays a literal: the fixture tests read it without Frappe.
+fixtures = [
+	{
+		"dt": "Role",
+		"filters": [
+			[
+				"name",
+				"in",
+				["PLT AI Manager", "Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"],
+			]
+		],
+	},
+	{
+		"dt": "Role Profile",
+		"filters": [["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]],
+	},
+]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
