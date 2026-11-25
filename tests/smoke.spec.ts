@@ -369,10 +369,13 @@ test('requirement fragment does not pull the reader back after a late hydration'
   await expect(page.locator('#req-G-151')).not.toBeFocused();
 });
 
-for (const [width, height] of [[1366, 900], [800, 1000], [1024, 1366]]) {
-  test(`requirements initial CLS stays within budget at ${width}x${height}`, async ({ page, browserName }) => {
+for (const [width, height, cpu] of [[1366, 900, 1], [800, 1000, 1], [1024, 1366, 1], [1366, 900, 8]]) {
+  const label = cpu > 1 ? ` with a ${cpu}x slower CPU` : '';
+  test(`requirements initial CLS stays within budget at ${width}x${height}${label}`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Layout Instability API Chromium üzerinde ölçülür.');
     await page.setViewportSize({ width, height });
+    // Yavaş işlemcide tarayıcı uzun HTML'nin ortasında çizer. Yerinden taşınan blok o çizimde gezginin üstünde görünmemeli.
+    if (cpu > 1) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: cpu });
     page.on('console', (msg) => { if (msg.text().startsWith('CLS shift')) console.log(width, msg.text()); });
     await page.addInitScript(() => {
       const root = document.documentElement;

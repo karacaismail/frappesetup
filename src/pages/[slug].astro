@@ -57,6 +57,12 @@ const embeds = EMBEDS[entry.id] ?? [];
   headings={entry.id === 'gereksinimler' ? [] : headings}
 >
   <Fragment slot="head">
+    {embeds.length > 0 && (
+      <script is:inline>
+        // JS varsa taşınacak bloklar yerlerine konana kadar gizlenir. Böylece blok ilk çizimde başka yerde görünmez.
+        document.documentElement.dataset.embedsPending = '';
+      </script>
+    )}
     {entry.id === 'gereksinimler' && (
       <script is:inline>
         if (location.hash.startsWith('#req-')) {
@@ -152,12 +158,14 @@ const embeds = EMBEDS[entry.id] ?? [];
     {
       embeds.length > 0 && (
         <script is:inline>
-          // Derleme anında üretilen blokları metindeki yer tutucularına ilk çizimden önce taşı. Modül betiği ertelenir;
-          // taşıma onu beklerse alttaki gezgin ilk çizimden sonra kayar (CLS). JS yoksa bloklar başlığın altında kalır.
+          // Derleme anında üretilen blokları metindeki yer tutucularına taşı. Bloklar o ana kadar gizlidir (head betiği).
+          // Uzun sayfada tarayıcı bu betikten önce çizebilir; görünür blok o çizimde gezginin üstünde kalır (CLS).
+          // JS yoksa bloklar başlığın altında kalır. Yer tutucusu bulunmayan blok gizlilik kalkınca aynı yerde görünür.
           for (const source of document.querySelectorAll('[data-embed-source]')) {
             const target = document.querySelector(`[data-embed="${source.dataset.embedSource}"]`);
             if (target) target.replaceWith(source);
           }
+          delete document.documentElement.dataset.embedsPending;
         </script>
       )
     }
