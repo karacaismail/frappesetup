@@ -19,9 +19,13 @@ Sihirbaz tamamlandıysa yerel açılış ayarları korur.
 
 Press v0.154.1, durumu doğrudan veritabanına yazar.
 Bu yüzden `Site.on_update` kancası yeni site açılışında çalışmaz.
-Bağlantıyı Press'in yeni siteyi etkinleştiren akışına ekleyin.
-Bu dal, etkin siteyi denetleyen sunucu yöntemini sağlar.
-Gerçek Agent üzerinden otomatik çağrı O-9 sonrasına kalır.
+Üretim imajındaki `0006-queue-setup-wizard.patch` yaması bu açığı kapatır.
+Yama, site “Active” olunca sihirbazı kendiliğinden kuyruğa atar.
+Kuyruk işi kayıt kesinleşince çalışır.
+Sihirbaz bilgileri sitenin ekibinden gelir.
+Şirket adı ekibin fatura adıdır. Fatura adı boşsa ekip sahibinin adı kullanılır.
+Yama sahte Agent ile test edildi. Gerçek Agent ile deneme O-9 sonrasına kalır.
+O zaman yukarıdaki 3. adımı elle yapmayın. Yamanın işi kuyruğa attığını doğrulayın.
 
 Press v0.154.1, Agent sonucu işlenirken deneme talebi kaydını günceller.
 Bu geri çağırma, `Site.setup_wizard_complete` değerini yazmaz.

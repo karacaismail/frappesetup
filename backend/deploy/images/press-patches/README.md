@@ -15,6 +15,7 @@ Derleme yamaları ad sırasıyla uygular. Her yamadan önce `git apply --check` 
 | `0003-request-cookies.patch` | Çerezi Frappe 16'nın istek nesnesinden okur | Öneri 3 |
 | `0004-optional-telegram.patch` | Telegram paketi yoksa da Press'in açılmasını sağlar | Öneri 5 |
 | `0005-dependency-pins.patch` | Bağımlılık sürümlerini Python 3.14 ve Frappe 16'ya uyarlar | Öneri 4 |
+| `0006-queue-setup-wizard.patch` | Site “Active” olunca kurulum sihirbazını kuyruğa atar (G-42) | Öneri 6 |
 
 Öneriler `backend/docs/press-python314-upstream.md` dosyasındadır. Her yamanın başında amacı ve kaldırma koşulu yazılıdır.
 
