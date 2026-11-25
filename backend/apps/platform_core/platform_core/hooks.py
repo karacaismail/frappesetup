@@ -90,7 +90,13 @@ fixtures = [
 			[
 				"name",
 				"in",
-				["PLT AI Manager", "Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"],
+				[
+					"PLT AI Manager",
+					"Tenant Admin",
+					"Tenant Admin Assistant",
+					"Reseller Admin",
+					"Reseller Assistant",
+				],
 			]
 		],
 	},
