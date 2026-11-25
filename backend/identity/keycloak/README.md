@@ -150,6 +150,9 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 - Önceden kurulmuş `platform` alanında `account-console` istemcisini açın. “Client scopes” sekmesinde `roles` kapsamını “Default” olarak ekleyin. “Full scope allowed” ayarı kapalı kalsın.
 
 - Sihirli bağlantıyı `cloudflightio/keycloak-magic-link` eklentisi sağlar. Jar adı `keycloak-magic-link` olur. Eklenti imaj derlemesinde sabit bir commit'ten derlenir. Bağlantı akışın adımıdır. Tıklamadan sonra ikinci adım sorulur. Bağlantı yalnız isteyen tarayıcıda, 300 saniye ve tek kullanım geçerlidir. REST ucu ve çapraz cihaz yolu `conf/keycloak.conf` ayarıyla kapalıdır.
+- Sihirli bağlantıdan sonra kullanıcının sahip olduğu her güçlü anahtar sorulur (G-163). Güçlü anahtar geçiş anahtarı ya da donanım anahtarıdır. Yalnız geçiş anahtarı olan hesap da e-postayla tek başına açılmaz.
+- Parola sıfırlama `atonota-reset-credentials` akışıyla yürür (G-163). E-posta bağlantısı yalnız posta kutusunu kanıtlar. Kullanıcının ikinci adımı varsa yeni paroladan önce bu adım sorulur. Akış TOTP'yi ya da anahtarı silmez ve yenisini kurdurmaz. Keycloak'ın hazır akışı e-postadan sonra yeni TOTP kurduruyordu.
+- İlk anahtar kaydı ile kayıp anahtar değişimi ayrıdır. Anahtarı olmayan kullanıcı ilk anahtarını sihirli bağlantıyla girdikten sonra kaydeder. Anahtarını kaybeden kullanıcı Press'te kurtarma isteği açar. İstek `PTR Recovery Review` kaydı olur. Hesap sahibi olmayan bir inceleyici kaydı onaylar ya da reddeder.
 - Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Jar adı `apple-identity-provider` olur. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.
 
 ## İmaj çekme hatası

@@ -54,6 +54,20 @@ class RealmFileTest(unittest.TestCase):
                 self.assertNotIn("mobile", client.get("defaultClientScopes", []))
                 self.assertNotIn("mobile", client.get("optionalClientScopes", []))
 
+    def test_mobile_app_sessions_end_through_back_channel_logout(self):
+        # G-163 sentence 12: "sign out all devices" must close the phone session at once.
+        # Keycloak notifies only clients that have a back-channel logout address. Without it the
+        # phone keeps its access token for up to 300 seconds. The notice goes to the tenant site,
+        # the audience of the phone token. It carries the session id (sid) of the phone.
+        attributes = self.clients["mobile-app"]["attributes"]
+        self.assertEqual(
+            attributes.get("backchannel.logout.url"),
+            "${ATONOTA_SITE_TENANT1_URL}/api/method/platform_core.api.keycloak_backchannel_logout",
+        )
+        self.assertEqual(attributes.get("backchannel.logout.session.required"), "true")
+        self.assertEqual(attributes.get("backchannel.logout.revoke.offline.tokens"), "false")
+        self.assertFalse(self.clients["mobile-app"]["frontchannelLogout"])
+
     def test_browser_headers_deny_framing_and_restrict_document_actions(self):
         headers = self.realm["browserSecurityHeaders"]
         self.assertEqual(headers["xFrameOptions"], "DENY")
@@ -158,7 +172,7 @@ class RealmFileTest(unittest.TestCase):
     def test_identity_sync_has_least_privilege(self):
         # Contract 26a274c: identity-sync writes users (invites) and organizations (membership).
         # Minimum set verified in Keycloak 26.8.2 (docs/kararlar/0003-keycloak-eklentileri.md).
-        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"}
+        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations", "view-identity-providers"}
         mappers = self.realm["clientScopeMappings"]["realm-management"]
         self.assertEqual(set(mappers[0]["roles"]), beklenen)
         account = [u for u in self.realm["users"] if u.get("serviceAccountClientId") == "identity-sync"][0]
