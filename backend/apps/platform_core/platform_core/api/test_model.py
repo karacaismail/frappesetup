@@ -954,7 +954,7 @@ class TestModelHTTP(unittest.TestCase):
 				"content": self._blank_pdf(),
 				"is_private": 1,
 			}
-		).insert(ignore_permissions=True)
+		).insert()
 		job = frappe.get_doc(
 			{
 				"doctype": "PLT AI File Job",
@@ -968,15 +968,15 @@ class TestModelHTTP(unittest.TestCase):
 					{"chunk_index": 0, "first_page": 1, "last_page": 1, "byte_count": 8, "status": "failed"}
 				],
 			}
-		).insert(ignore_permissions=True)
+		).insert()
 		frappe.db.set_value("PLT AI File Job", job.name, "owner", owner, update_modified=False)
 		frappe.db.commit()
 		self.addCleanup(self._delete_file_job, job.name, source.name)
 		return job.name, source.name
 
 	def _delete_file_job(self, job, source):
-		frappe.delete_doc("PLT AI File Job", job, force=True, ignore_permissions=True)
-		frappe.delete_doc("File", source, force=True, ignore_permissions=True)
+		frappe.delete_doc("PLT AI File Job", job, force=True)
+		frappe.delete_doc("File", source, force=True)
 		frappe.db.commit()
 
 	def _file_job_request(self, actor, endpoint, payload):
@@ -991,42 +991,70 @@ class TestModelHTTP(unittest.TestCase):
 		plan = self._file_job_request("manager", "file_job_status", {"file_job": job}).json()["message"]
 		self.assertEqual((plan["status"], plan["chunk_count"]), ("planned", 1))
 
-	def test_file_job_owner_reads_the_plan_and_other_users_cannot(self):
+	def _assert_file_job_denied(self, actors, endpoint, payload):
+		for actor in actors:
+			with self.subTest(actor=actor, endpoint=endpoint):
+				response = self._file_job_request(actor, endpoint, payload)
+				self.assertEqual(response.status_code, 403)
+				self.assertEqual(response.json().get("exc_type"), "PermissionError")
+				self.assertNotIn("Summarize the fixture file.", response.text)
+		frappe.db.rollback()
+
+	def _assert_job_unchanged(self, job):
+		self.assertEqual(frappe.db.get_value("PLT AI File Job", job, "status"), "planned")
+		self.assertEqual(frappe.db.get_value("PLT AI File Chunk", {"parent": job}, "status"), "failed")
+
+	def _create_payload(self, source):
+		return {"route": self.fixture["role_route"], "file": source, "instruction": "Summarize.", "limit": 12}
+
+	def test_create_file_job_guest_denied(self):
+		_job, source = self._file_job(self.fixture["users"]["manager"])
+		self._assert_file_job_denied(("guest",), "create_file_job", self._create_payload(source))
+		self.assertEqual(frappe.db.count("PLT AI File Job", {"source_file": source}), 1)
+
+	def test_create_file_job_foreign_data_denied(self):
+		_job, source = self._file_job(self.fixture["users"]["manager"])
+		# The regular user lacks the route role. The authorized caller holds the role
+		# but cannot read the private file of another user.
+		self._assert_file_job_denied(
+			("regular", "desk_no_gateway_role", "authorized"), "create_file_job", self._create_payload(source)
+		)
+		self.assertEqual(frappe.db.count("PLT AI File Job", {"source_file": source}), 1)
+
+	def test_file_job_status_guest_denied(self):
+		job, _source = self._file_job(self.fixture["users"]["authorized"])
+		self._assert_file_job_denied(("guest",), "file_job_status", {"file_job": job})
+
+	def test_file_job_status_foreign_data_denied(self):
 		job, _source = self._file_job(self.fixture["users"]["authorized"])
 		self.assertEqual(
 			self._file_job_request("authorized", "file_job_status", {"file_job": job}).status_code, 200
 		)
-		for actor in ("guest", "regular", "desk_no_gateway_role"):
-			for endpoint, payload in (
-				("file_job_status", {"file_job": job}),
-				("start_file_job", {"file_job": job}),
-				("retry_file_chunk", {"file_job": job, "chunk_index": 0}),
-			):
-				with self.subTest(actor=actor, endpoint=endpoint):
-					response = self._file_job_request(actor, endpoint, payload)
-					self.assertEqual(response.status_code, 403)
-					self.assertEqual(response.json().get("exc_type"), "PermissionError")
-		frappe.db.rollback()
-		self.assertEqual(frappe.db.get_value("PLT AI File Job", job, "status"), "planned")
-		self.assertEqual(frappe.db.get_value("PLT AI File Chunk", {"parent": job}, "status"), "failed")
+		self._assert_file_job_denied(
+			("regular", "desk_no_gateway_role"), "file_job_status", {"file_job": job}
+		)
 
-	def test_unauthorized_users_cannot_create_a_file_job(self):
-		_job, source = self._file_job(self.fixture["users"]["manager"])
-		payload = {
-			"route": self.fixture["role_route"],
-			"file": source,
-			"instruction": "Summarize.",
-			"limit": 12,
-		}
-		# The guest is not signed in, the regular user lacks the route role,
-		# and the authorized caller cannot read the private file of another user.
-		for actor in ("guest", "regular", "desk_no_gateway_role", "authorized"):
-			with self.subTest(actor=actor):
-				response = self._file_job_request(actor, "create_file_job", payload)
-				self.assertEqual(response.status_code, 403)
-				self.assertEqual(response.json().get("exc_type"), "PermissionError")
-		frappe.db.rollback()
-		self.assertEqual(frappe.db.count("PLT AI File Job", {"source_file": source}), 1)
+	def test_start_file_job_guest_denied(self):
+		job, _source = self._file_job(self.fixture["users"]["authorized"])
+		self._assert_file_job_denied(("guest",), "start_file_job", {"file_job": job})
+		self._assert_job_unchanged(job)
+
+	def test_start_file_job_foreign_data_denied(self):
+		job, _source = self._file_job(self.fixture["users"]["authorized"])
+		self._assert_file_job_denied(("regular", "desk_no_gateway_role"), "start_file_job", {"file_job": job})
+		self._assert_job_unchanged(job)
+
+	def test_retry_file_chunk_guest_denied(self):
+		job, _source = self._file_job(self.fixture["users"]["authorized"])
+		self._assert_file_job_denied(("guest",), "retry_file_chunk", {"file_job": job, "chunk_index": 0})
+		self._assert_job_unchanged(job)
+
+	def test_retry_file_chunk_foreign_data_denied(self):
+		job, _source = self._file_job(self.fixture["users"]["authorized"])
+		self._assert_file_job_denied(
+			("regular", "desk_no_gateway_role"), "retry_file_chunk", {"file_job": job, "chunk_index": 0}
+		)
+		self._assert_job_unchanged(job)
 
 	def test_file_job_start_and_retry_report_the_job_state(self):
 		job, _source = self._file_job(self.fixture["users"]["manager"], status="preparing")
