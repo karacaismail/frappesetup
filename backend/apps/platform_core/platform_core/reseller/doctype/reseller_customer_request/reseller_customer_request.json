@@ -1,0 +1,116 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-25 18:00:00.000000",
+ "description": "A request of a reseller for a new customer tenant. The Reseller Admin sends it through the request_customer endpoint. Only a Platform Operator approves it. Approval does not create a site.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "reseller_tenant",
+  "customer_name",
+  "contact_email",
+  "status",
+  "requested_by",
+  "approved_by",
+  "approved_on"
+ ],
+ "fields": [
+  {
+   "description": "Site name of the reseller tenant that sent the request. The endpoint fills it from the serving site.",
+   "fieldname": "reseller_tenant",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Reseller Tenant",
+   "length": 140,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Name of the new customer company.",
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Name",
+   "length": 140,
+   "reqd": 1
+  },
+  {
+   "description": "E-mail address of the contact person at the customer.",
+   "fieldname": "contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email",
+   "length": 140,
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "default": "Pending",
+   "description": "Pending: waits for the Platform Operator. Approved: the Platform Operator approved it.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nApproved",
+   "read_only": 1
+  },
+  {
+   "description": "The reseller user who sent the request.",
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "The Platform Operator who approved the request.",
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "Date and time of the approval.",
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-25 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Reseller",
+ "name": "Reseller Customer Request",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Platform Operator",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "search_fields": "customer_name,reseller_tenant",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "track_changes": 1
+}

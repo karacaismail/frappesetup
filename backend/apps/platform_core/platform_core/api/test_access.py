@@ -8,6 +8,7 @@ import frappe
 from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, ROLE_EMPLOYEE, AccessRuleTestCase
 
 FIELD_BODY = {"doctype": DOCTYPE, "fieldname": "salary_amount", "permlevel": 0}
+ROW_BODY = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE, "permissions": {"read": True}}
 LEVEL_BODY = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE, "permlevel": 1, "read": True, "write": True}
 
 
@@ -75,3 +76,68 @@ class TestAccessEndpoints(AccessRuleTestCase):
 
 		self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+
+	# --- G-62: role permission rows. The holder's own tests are in `access/tests/test_tenant_admin.py`. ---
+
+	def test_list_role_permissions_guest_denied(self):
+		response = self.api(self.anonymous(), "GET", "list_role_permissions", query={"doctype": DOCTYPE})
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_list_role_permissions_foreign_data_denied(self):
+		"""An employee has neither the “System Manager” nor the “Tenant Admin” role."""
+		response = self.api(
+			self.login(EMPLOYEE_1), "GET", "list_role_permissions", query={"doctype": DOCTYPE}
+		)
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_set_role_permission_guest_denied(self):
+		response = self.api(self.anonymous(), "POST", "set_role_permission", body=ROW_BODY)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+
+	def test_set_role_permission_foreign_data_denied(self):
+		response = self.api(self.login(EMPLOYEE_1), "POST", "set_role_permission", body=ROW_BODY)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+
+	def test_remove_role_permission_guest_denied(self):
+		body = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE}
+		response = self.api(self.anonymous(), "POST", "remove_role_permission", body=body)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+
+	def test_remove_role_permission_foreign_data_denied(self):
+		body = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE}
+		response = self.api(self.login(EMPLOYEE_1), "POST", "remove_role_permission", body=body)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": DOCTYPE}))
+
+	# --- G-98: the Permission Log page. The holder's own tests are in `access/tests/test_permission_log.py`. ---
+
+	def test_list_permission_logs_guest_denied(self):
+		response = self.api(self.anonymous(), "GET", "list_permission_logs", query={"for_doctype": DOCTYPE})
+
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("message", response.json)
+
+	def test_list_permission_logs_foreign_data_denied(self):
+		"""An employee reads no log row, not even the rows of its own record."""
+		client = self.login(EMPLOYEE_1)
+
+		for query in (
+			{},
+			{"for_doctype": DOCTYPE},
+			{"for_doctype": DOCTYPE, "for_document": self.records[EMPLOYEE_1]},
+			{"for_doctype": DOCTYPE, "for_document": self.records[EMPLOYEE_2]},
+		):
+			with self.subTest(query=query):
+				response = self.api(client, "GET", "list_permission_logs", query=query)
+
+				self.assertEqual(response.status_code, 403)
+				self.assertNotIn("message", response.json)

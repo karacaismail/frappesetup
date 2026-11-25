@@ -83,6 +83,15 @@ EXPECTED = {
     "platform_core.api.identity.set_enabled": SERVICE,
     "platform_core.api.identity.change_email": SERVICE,
     "platform_core.api.identity.anonymize_user": SERVICE,
+    # The tenant admin panel invites users and assigns Role Profiles (G-98, AJA-791).
+    "platform_core.api.identity.invite_user": PANEL,
+    "platform_core.api.identity.set_user_role_profiles": PANEL,
+    # Reseller endpoints (G-169, G-170). The reseller panel lists, reads and requests customers.
+    "platform_core.api.reseller.list_customers": PANEL,
+    "platform_core.api.reseller.customer_status": PANEL,
+    "platform_core.api.reseller.request_customer": PANEL,
+    # Only the Platform Operator approves a request, in Desk. It is not on the panel list.
+    "platform_core.api.reseller.approve_customer_request": ADMIN,
     # Corporate provider exceptions. System Manager only.
     "platform_core.identity.enterprise_membership.approve_exception": ADMIN,
     "platform_core.identity.enterprise_membership.revoke_exception": ADMIN,

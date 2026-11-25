@@ -15,7 +15,7 @@ from press_tr.press_identity.deletion import (
 	send_deletion_request,
 )
 from press_tr.press_identity.oidc import reject
-from press_tr.press_identity.recovery import open_review
+from press_tr.press_identity.recovery import request_review
 
 
 @frappe.whitelist(methods=["POST"])
@@ -50,9 +50,10 @@ def request_deletion(confirm: bool = False) -> dict[str, str | bool]:
 @rate_limit_namespace("press_tr.api.account.request_recovery")
 @rate_limit(limit=5, seconds=3600)
 def request_recovery(email: str) -> dict[str, bool]:
-	# Email access alone never recovers an account. The request only opens a review record,
-	# and the answer is the same for every address so it does not reveal who has an account.
+	# Email access alone never recovers an account. The request only queues a review record.
+	# The answer and the work are the same for every address, so neither the body nor the
+	# answer time reveals who has an account.
 	if set(frappe.form_dict) - {"cmd", "email"} or not isinstance(email, str):
 		reject()
-	open_review(email)
+	request_review(email)
 	return {"received": True}

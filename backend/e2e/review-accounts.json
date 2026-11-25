@@ -8,16 +8,59 @@
       "purpose": "Headless panel review at http://localhost:5180 as a tenant employee with HR roles.",
       "first_name": "Review",
       "last_name": "Panel",
-      "tenant_roles": ["Employee", "HR User"],
+      "tenant_roles": [
+        "Employee",
+        "HR User"
+      ],
       "employee": true
     },
     {
       "username": "inceleme-yonetici@example.test",
       "realm": "platform",
-      "purpose": "Tenant administrator review.",
+      "purpose": "Tenant administrator review. G-53 keeps System Manager for the platform operator only, so this account is a Website User whose only role is Tenant Admin, given by the Tenant Admin role profile.",
       "first_name": "Review",
       "last_name": "Administrator",
-      "tenant_roles": ["System Manager"]
+      "tenant_roles": [
+        "Tenant Admin"
+      ],
+      "user_type": "Website User",
+      "role_profile": "Tenant Admin"
+    },
+    {
+      "username": "inceleme-yonetici-yardimci@example.test",
+      "realm": "platform",
+      "purpose": "Tenant administrator assistant review (G-168). A Website User whose only role comes from its role profile; no System Manager.",
+      "first_name": "Review",
+      "last_name": "Administrator Assistant",
+      "tenant_roles": [
+        "Tenant Admin Assistant"
+      ],
+      "user_type": "Website User",
+      "role_profile": "Tenant Admin Assistant"
+    },
+    {
+      "username": "inceleme-bayi@example.test",
+      "realm": "platform",
+      "purpose": "Reseller administrator review (G-169). The stack's tenant site is the reseller tenant. A Website User whose only role comes from its role profile; no System Manager.",
+      "first_name": "Review",
+      "last_name": "Reseller",
+      "tenant_roles": [
+        "Reseller Admin"
+      ],
+      "user_type": "Website User",
+      "role_profile": "Reseller Admin"
+    },
+    {
+      "username": "inceleme-bayi-yardimci@example.test",
+      "realm": "platform",
+      "purpose": "Reseller assistant review (G-170). The stack's tenant site is the reseller tenant. A Website User whose only role comes from its role profile; no System Manager.",
+      "first_name": "Review",
+      "last_name": "Reseller Assistant",
+      "tenant_roles": [
+        "Reseller Assistant"
+      ],
+      "user_type": "Website User",
+      "role_profile": "Reseller Assistant"
     },
     {
       "username": "inceleme-yerel-yonetici",
@@ -25,7 +68,9 @@
       "purpose": "Keycloak administration console of the local stack.",
       "first_name": "Review",
       "last_name": "Keycloak",
-      "master_roles": ["admin"]
+      "master_roles": [
+        "admin"
+      ]
     },
     {
       "username": "inceleme-press@example.test",
@@ -35,5 +80,20 @@
       "last_name": "Press",
       "press": true
     }
-  ]
+  ],
+  "reseller_links": [
+    {
+      "reseller_tenant": "tenant1.localhost",
+      "customer_tenant": "musteri-bir.example.test",
+      "customer_name": "Örnek Müşteri Bir",
+      "site_status": "Active"
+    },
+    {
+      "reseller_tenant": "bayi-iki.example.test",
+      "customer_tenant": "musteri-iki.example.test",
+      "customer_name": "Örnek Müşteri İki",
+      "site_status": "Pending"
+    }
+  ],
+  "reseller_links_note": "Two sample resellers with one sample customer each, kept as Reseller Customer Link rows on the stack's tenant site. tenant1.localhost is the reseller the reseller review accounts sign in to. bayi-iki.example.test is a second reseller recorded only as link data, so the review can see that one reseller never lists the customer of another."
 }

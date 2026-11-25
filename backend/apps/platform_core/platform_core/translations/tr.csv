@@ -861,7 +861,81 @@ Only the approval endpoint fills the approval fields.,Onay alanlarını yalnız 
 An exception record cannot be deleted. Open a revocation record instead.,İstisna kaydı silinmez. Bunun yerine bir kapanış kaydı açın.,platform_core.identity
 Only a grant record waiting for approval can be approved.,Yalnız onay bekleyen izin kaydı onaylanabilir.,platform_core.identity
 This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.identity
+You cannot open this exception record.,Bu istisna kaydını açamazsınız.,platform_core.identity
 The sign-in service is not available. Try again later.,Giriş hizmeti şu anda çalışmıyor. Biraz sonra yeniden deneyin.,platform_core.identity
 This sign-in information cannot be read on this site.,Bu giriş bilgisi bu sitede okunamaz.,platform_core.identity
 This endpoint takes no parameters.,Bu işlem ek bilgi almaz.,platform_core.identity
 This session is not linked to an AtonotA Login account.,Bu oturum bir AtonotA Login hesabına bağlı değil.,platform_core.identity
+PLT AI File Job,Yapay Zekâ Dosya İşi,
+PLT AI File Chunk,Yapay Zekâ Dosya Parçası,
+Route,Yol,PLT AI File Job
+Source File,Kaynak Dosya,PLT AI File Job
+Instruction,Talimat,PLT AI File Job
+Output Limit,Çıktı Sınırı,PLT AI File Job
+Status,Durum,PLT AI File Job
+Failure Code,Hata Kodu,PLT AI File Job
+Chunk Count,Parça Sayısı,PLT AI File Job
+Estimate Known,Tahmin Biliniyor,PLT AI File Job
+Estimated Cost,Tahmini Maliyet,PLT AI File Job
+Currency,Para Birimi,PLT AI File Job
+Chunks,Parçalar,PLT AI File Job
+Chunk Index,Parça Sırası,PLT AI File Chunk
+First Page,İlk Sayfa,PLT AI File Chunk
+Last Page,Son Sayfa,PLT AI File Chunk
+Content,İçerik,PLT AI File Chunk
+Status,Durum,PLT AI File Chunk
+Failure Code,Hata Kodu,PLT AI File Chunk
+Result,Sonuç,PLT AI File Chunk
+File Job,Dosya İşi,PLT AI Usage Log
+Chunk Index,Parça Sırası,PLT AI Usage Log
+No permission to explain permissions.,İzinleri açıklama yetkiniz yok.,
+Not permitted,İzin verilmedi,
+Only a System Manager can give or change the System Manager and Administrator roles.,System Manager ve Administrator rollerini yalnız System Manager verebilir ve değiştirebilir.,
+Only a System Manager can give a role desk access.,Bir role masa erişimini yalnız System Manager verebilir.,
+Only a System Manager can change the permissions of {0}.,{0} izinlerini yalnız System Manager değiştirebilir.,
+No permission to manage role permissions.,Rol izinlerini yönetme yetkiniz yok.,
+Child tables take the permissions of their parent type.,Alt tablolar üst kayıt türünün izinlerini kullanır.,
+permlevel and if_owner must be whole numbers.,permlevel ve if_owner tam sayı olmalıdır.,
+permlevel must be from 0 to 9 and if_owner must be 0 or 1.,permlevel 0 ile 9 arasında olmalıdır. if_owner 0 ya da 1 olmalıdır.,
+permissions must name only these rights: {0},permissions yalnız şu hakları içermelidir: {0},
+The role has no permission row at this level.,Rolün bu düzeyde izin satırı yok.,
+Only a System Manager can give or change the role {0}.,{0} rolünü yalnız System Manager verebilir ve değiştirebilir.,
+A run needs the preview_digest of its preview.,Yürütme isteği önizlemenin preview_digest değerini taşımalıdır.,
+No permission to manage users.,Kullanıcıları yönetme izniniz yok.,
+Only a System Manager can give the role {0}.,{0} rolünü yalnız System Manager verebilir.,
+Role profile {0} not found.,{0} rol profili bulunamadı.,
+The invitation changed after the preview. Preview it again.,Davet önizlemeden sonra değişti. Daveti yeniden önizleyin.,
+The invitation service is not available. Try again later.,Davet hizmeti şu an çalışmıyor. Daha sonra yeniden deneyin.,
+The invitation service refused the invitation fields.,Davet hizmeti davet alanlarını kabul etmedi.,
+This e-mail belongs to a desk user and cannot be invited.,Bu e-posta bir masaüstü kullanıcısına ait. Bu adrese davet gönderilemez.,
+This site cannot invite into this organization.,Bu site bu kuruluşa davet gönderemez.,
+This user is not a user of this tenant.,Bu kullanıcı bu kiracının kullanıcısı değil.,
+dry_run must be true or false.,dry_run değeri true ya da false olmalıdır.,
+email must be an e-mail address.,email alanı bir e-posta adresi olmalıdır.,
+role_profiles must be a list of role profile names.,role_profiles alanı rol profili adlarından oluşan bir liste olmalıdır.,
+{0} must be a name.,{0} alanı bir ad olmalıdır.,
+{0} must be a text of at most {1} characters.,{0} alanı en çok {1} karakterlik bir metin olmalıdır.,
+{0} must be a whole number in range.,{0} alanı izin verilen aralıkta bir tam sayı olmalıdır.,
+Reseller Customer Link,Bayi Müşteri Bağı,
+Reseller Customer Request,Bayi Müşteri İsteği,
+Platform Operator,Platform Operatörü,
+Reseller Tenant,Bayi kiracısı,
+Customer Tenant,Müşteri kiracısı,
+Customer Name,Müşteri adı,
+Site Status,Site durumu,Reseller Customer Link
+Pending,Bekliyor,Reseller Customer Link
+Active,Etkin,Reseller Customer Link
+Suspended,Durduruldu,Reseller Customer Link
+Contact Email,İletişim e-postası,
+Status,Durum,Reseller Customer Request
+Pending,Bekliyor,Reseller Customer Request
+Approved,Onaylandı,Reseller Customer Request
+Requested By,İsteyen,
+Approved By,Onaylayan,
+Approved On,Onay zamanı,
+You are not permitted to do this.,Bu işi yapma izniniz yok.,
+You are not permitted to see this customer.,Bu müşteriyi görme izniniz yok.,
+Enter the customer name. It can have at most {0} characters.,Müşteri adını yazın. Ad en çok {0} karakter olabilir.,
+Enter a valid contact e-mail address.,Geçerli bir iletişim e-postası yazın.,
+The customer request does not exist.,Bu müşteri isteği yok.,
+Only a pending customer request can be approved.,Yalnız bekleyen müşteri isteği onaylanır.,

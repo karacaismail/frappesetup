@@ -60,6 +60,10 @@ after_install = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
+	# G-62, G-168, G-169, G-170: the panel roles and profiles, only the missing ones (AJA-899).
+	"platform_core.setup.panel_roles.ensure",
+	# G-62: the permission rows of the "Tenant Admin" role.
+	"platform_core.access.tenant_admin.ensure_permissions",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
@@ -67,11 +71,15 @@ after_migrate = [
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 	"platform_core.config.turkey_setup.apply",
+	"platform_core.setup.panel_roles.ensure",
+	"platform_core.access.tenant_admin.ensure_permissions",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
+# The panel roles and profiles are not fixtures: Frappe rewrites every fixture on each migrate,
+# and a Role Profile write leaves a lock (AJA-857). `platform_core.setup.panel_roles` opens them.
 fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
@@ -88,6 +96,12 @@ ai_write_closed_doctypes = [
 	# G-164: verification notices and cases change only through the signed provider notice and its queue job.
 	"PLT Verification Notice",
 	"PLT Verification Case",
+	# G-156: file jobs and their chunks change only through the large file queue steps.
+	"PLT AI File Job",
+	"PLT AI File Chunk",
+	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
+	"Reseller Customer Link",
+	"Reseller Customer Request",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
@@ -126,11 +140,26 @@ website_user_allowed_methods = [
 	"platform_core.api.mobile_pwa.v1_register",
 	"platform_core.api.mobile_pwa.v1_revoke",
 	"platform_core.api.mobile_pwa.v1_revoke_installation",
-	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
+	# The user's own rule scopes.
 	"platform_core.api.access.get_access_summary",
+	# G-62: the endpoint itself refuses a Website User without the “Tenant Admin” role.
+	# Rule detail goes only to a System Manager.
+	"platform_core.api.access.explain_permission",
+	# G-62: the role permission rows. The endpoints refuse everyone but the two manager roles.
+	"platform_core.api.access.list_role_permissions",
+	"platform_core.api.access.set_role_permission",
+	"platform_core.api.access.remove_role_permission",
+	# G-98: the panel's user management. The endpoints refuse everyone but the two manager roles.
+	"platform_core.api.access.list_permission_logs",
+	"platform_core.api.identity.set_user_role_profiles",
+	"platform_core.api.identity.invite_user",
 	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
+	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.
+	"platform_core.api.reseller.list_customers",
+	"platform_core.api.reseller.customer_status",
+	"platform_core.api.reseller.request_customer",
 ]
 
 
@@ -146,6 +175,8 @@ clear_cache = ["platform_core.shell.cache.clear_cache"]
 
 doc_events = {
 	"User": {
+		# G-62: only a System Manager gives or takes the two protected roles.
+		"validate": ["platform_core.access.tenant_admin.guard_user"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
 			"platform_core.shell.cache.invalidate_permissions",
@@ -153,8 +184,12 @@ doc_events = {
 		],
 	},
 	"Role": {
+		# Before Frappe's own validate: disabling a role deletes its user rows there.
+		"before_validate": ["platform_core.access.tenant_admin.guard_role"],
+		"before_rename": ["platform_core.access.tenant_admin.guard_role"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
+			"platform_core.access.tenant_admin.guard_role",
 			"platform_core.shell.cache.invalidate_permissions",
 			"platform_core.access.rules.clear_cache",
 		],
@@ -162,16 +197,29 @@ doc_events = {
 		"after_rename": ["platform_core.access.rules.clear_cache"],
 	},
 	"Role Profile": {
+		"validate": ["platform_core.access.tenant_admin.guard_role_profile"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_role_profile",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"User Permission": {
+		"validate": ["platform_core.access.tenant_admin.guard_user_permission"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_user_permission",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"Custom DocPerm": {
+		"before_insert": ["platform_core.access.tenant_admin.guard_custom_docperm"],
+		"validate": ["platform_core.access.tenant_admin.guard_custom_docperm"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_custom_docperm",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"DocType": {
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
@@ -191,8 +239,12 @@ doc_events = {
 	},
 	# This DocType is installed with the access-rule module. Keep shell validators fresh after rule changes.
 	"PLT Access Rule": {
+		"validate": ["platform_core.access.tenant_admin.guard_access_rule"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_access_rule",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"DocShare": {
 		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
@@ -275,6 +327,8 @@ extend_doctype_class = {
 	"Prepared Report": ["platform_core.access.reports.GuardedPreparedReport"],
 	"Auto Email Report": ["platform_core.access.reports.GuardedAutoEmailReport"],
 	"File": ["platform_core.access.reports.GuardedFile"],
+	# G-62: a “Tenant Admin” profile change reaches its users.
+	"Role Profile": ["platform_core.access.tenant_admin.GuardedRoleProfile"],
 }
 # A Prepared Report queued before a rule existed is refused when its job starts.
 before_job = ["platform_core.access.reports.refuse_prepared_report_job"]

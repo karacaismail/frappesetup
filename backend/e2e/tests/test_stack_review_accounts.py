@@ -25,6 +25,15 @@ LOCAL = {
 }
 
 
+PANEL_ROLES = {
+    "inceleme-yonetici@example.test": "Tenant Admin",
+    "inceleme-yonetici-yardimci@example.test": "Tenant Admin Assistant",
+    "inceleme-bayi@example.test": "Reseller Admin",
+    "inceleme-bayi-yardimci@example.test": "Reseller Assistant",
+}
+TENANT_ACCOUNTS = ["inceleme-panel@example.test", *PANEL_ROLES]
+
+
 def stack():
     return runpy.run_path(str(STACK))
 
@@ -34,7 +43,7 @@ def completed(payload):
 
 
 class ReviewAccountListTest(unittest.TestCase):
-    def test_the_file_names_the_four_review_accounts_with_one_shared_password(self):
+    def test_the_file_names_the_review_accounts_with_one_shared_password(self):
         data = json.loads(ACCOUNTS.read_text())
         self.assertIn("local review", data["note"].lower())
         self.assertIsInstance(data["password"], str)
@@ -42,6 +51,9 @@ class ReviewAccountListTest(unittest.TestCase):
         self.assertEqual(set(accounts), {
             "inceleme-panel@example.test",
             "inceleme-yonetici@example.test",
+            "inceleme-yonetici-yardimci@example.test",
+            "inceleme-bayi@example.test",
+            "inceleme-bayi-yardimci@example.test",
             "inceleme-yerel-yonetici",
             "inceleme-press@example.test",
         })
@@ -49,7 +61,10 @@ class ReviewAccountListTest(unittest.TestCase):
         self.assertEqual(set(accounts["inceleme-panel@example.test"]["tenant_roles"]), {"Employee", "HR User"})
         self.assertTrue(accounts["inceleme-panel@example.test"]["employee"])
         self.assertEqual(accounts["inceleme-yonetici@example.test"]["realm"], "platform")
-        self.assertEqual(accounts["inceleme-yonetici@example.test"]["tenant_roles"], ["System Manager"])
+        self.assertEqual(accounts["inceleme-yonetici@example.test"]["tenant_roles"], ["Tenant Admin"])
+        self.assertEqual(accounts["inceleme-yonetici@example.test"]["user_type"], "Website User")
+        # G-53: only the panel administrator account changes. The others keep their shape.
+        self.assertNotIn("user_type", accounts["inceleme-panel@example.test"])
         self.assertEqual(accounts["inceleme-yerel-yonetici"]["realm"], "master")
         self.assertEqual(accounts["inceleme-yerel-yonetici"]["master_roles"], ["admin"])
         self.assertEqual(accounts["inceleme-press@example.test"]["realm"], "platform")
@@ -65,6 +80,70 @@ class ReviewAccountListTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "example.test"):
                 load(ACCOUNTS)
 
+    def test_the_four_panel_roles_have_one_website_user_account_each_with_its_role_profile(self):
+        # G-62, G-168, G-169, G-170: one review account per panel role.
+        accounts = json.loads(ACCOUNTS.read_text())["accounts"]
+        panel = {account["role_profile"]: account for account in accounts if account.get("role_profile")}
+        self.assertEqual(set(panel), set(PANEL_ROLES.values()))
+        for username, role in PANEL_ROLES.items():
+            with self.subTest(username=username):
+                account = panel[role]
+                self.assertEqual(account["username"], username)
+                self.assertEqual(account["realm"], "platform")
+                self.assertEqual(account["user_type"], "Website User")
+                self.assertEqual(account["tenant_roles"], [role])
+
+    def test_no_review_account_holds_system_manager(self):
+        for account in json.loads(ACCOUNTS.read_text())["accounts"]:
+            with self.subTest(username=account["username"]):
+                self.assertNotIn("System Manager", account.get("tenant_roles", []))
+                self.assertNotEqual(account.get("role_profile"), "System Manager")
+
+    def test_the_loader_refuses_system_manager_on_any_account(self):
+        load = stack()["load_review_accounts"]
+        for field, value in (("tenant_roles", ["Tenant Admin", "System Manager"]), ("role_profile", "System Manager")):
+            with self.subTest(field=field):
+                broken = json.loads(ACCOUNTS.read_text())
+                broken["accounts"][1][field] = value
+                with patch.object(Path, "read_text", return_value=json.dumps(broken)):
+                    with self.assertRaisesRegex(ValueError, "System Manager"):
+                        load(ACCOUNTS)
+
+    def test_two_resellers_each_have_only_their_own_sample_customer(self):
+        links = json.loads(ACCOUNTS.read_text())["reseller_links"]
+        resellers = {link["reseller_tenant"] for link in links}
+        self.assertEqual(len(resellers), 2)
+        # The reseller review accounts sign in on the stack's tenant site.
+        self.assertIn("tenant1.localhost", resellers)
+        customers = [link["customer_tenant"] for link in links]
+        self.assertEqual(len(customers), len(set(customers)))
+        for reseller in resellers:
+            with self.subTest(reseller=reseller):
+                self.assertEqual(len([link for link in links if link["reseller_tenant"] == reseller]), 1)
+        for link in links:
+            with self.subTest(customer=link["customer_tenant"]):
+                self.assertRegex(link["customer_tenant"], r"^[a-z0-9-]+\.example\.test$")
+                self.assertTrue(link["customer_name"].startswith("Örnek"))
+                self.assertIn(link["site_status"], {"Pending", "Active", "Suspended"})
+                self.assertNotIn(link["customer_tenant"], resellers)
+
+    def test_the_loader_refuses_a_customer_outside_example_test_or_linked_twice(self):
+        load = stack()["load_review_accounts"]
+        cases = {
+            "real address": lambda links: links[0].update(customer_tenant="musteri.example.com"),
+            "linked twice": lambda links: links[1].update(customer_tenant=links[0]["customer_tenant"]),
+            "no name": lambda links: links[0].update(customer_name=""),
+            "unknown status": lambda links: links[0].update(site_status="Deleted"),
+            "real reseller": lambda links: links[1].update(reseller_tenant="bayi.example.com"),
+        }
+        for name, change in cases.items():
+            with self.subTest(case=name):
+                broken = json.loads(ACCOUNTS.read_text())
+                change(broken["reseller_links"])
+                with patch.object(Path, "read_text", return_value=json.dumps(broken)):
+                    with self.assertRaisesRegex(ValueError, "reseller"):
+                        load(ACCOUNTS)
+
     def test_the_password_lives_only_in_the_accounts_file(self):
         password = json.loads(ACCOUNTS.read_text())["password"]
         for path in (STACK, *sorted((E2E / "preview").glob("stack-review-*.py"))):
@@ -79,6 +158,22 @@ class ReviewAccountListTest(unittest.TestCase):
         self.assertIn("inceleme-panel@example.test", first)
         self.assertIn("backend/e2e/review-accounts.json", first)
         self.assertNotIn(password, readme)
+
+    def test_the_readme_describes_the_tenant_administrator_with_the_tenant_admin_role(self):
+        row = next(line for line in (E2E / "README.md").read_text().splitlines()
+                   if line.startswith("| `inceleme-yonetici@example.test`"))
+        self.assertIn("“Tenant Admin”", row)
+        self.assertIn("“Website User”", row)
+        self.assertNotIn("System Manager", row)
+
+    def test_the_readme_describes_each_panel_role_account(self):
+        lines = (E2E / "README.md").read_text().splitlines()
+        for username, role in PANEL_ROLES.items():
+            with self.subTest(username=username):
+                row = next(line for line in lines if line.startswith(f"| `{username}`"))
+                self.assertIn(f"“{role}”", row)
+                self.assertIn("“Website User”", row)
+                self.assertNotIn("System Manager", row)
 
     def test_the_accounts_file_is_the_only_file_with_the_password(self):
         password = json.loads(ACCOUNTS.read_text())["password"]
@@ -139,11 +234,10 @@ class ReviewAccountsFlowTest(unittest.TestCase):
         password = json.loads(ACCOUNTS.read_text())["password"]
         replies = [
             completed({"subjects": {
-                "inceleme-panel@example.test": "sub-panel",
-                "inceleme-yonetici@example.test": "sub-admin",
+                **{email: "sub-" + email for email in TENANT_ACCOUNTS},
                 "inceleme-press@example.test": "sub-press",
             }}),
-            completed({"users": ["inceleme-panel@example.test", "inceleme-yonetici@example.test"]}),
+            completed({"users": TENANT_ACCOUNTS}),
             completed({"users": ["inceleme-press@example.test"]}),
         ]
         run = Mock(side_effect=replies)
@@ -162,9 +256,15 @@ class ReviewAccountsFlowTest(unittest.TestCase):
         self.assertEqual(tenant["issuer"], LOCAL["KC_PUBLIC_URL"] + "/realms/platform")
         self.assertEqual(
             {account["email"]: account["subject"] for account in tenant["accounts"]},
-            {"inceleme-panel@example.test": "sub-panel", "inceleme-yonetici@example.test": "sub-admin"},
+            {email: "sub-" + email for email in TENANT_ACCOUNTS},
         )
         self.assertNotIn("password", json.dumps(tenant))
+        types = {account["email"]: account.get("user_type") for account in tenant["accounts"]}
+        self.assertEqual(types, {"inceleme-panel@example.test": None,
+                                 **{email: "Website User" for email in PANEL_ROLES}})
+        profiles = {account["email"]: account.get("role_profile") for account in tenant["accounts"]}
+        self.assertEqual(profiles, {"inceleme-panel@example.test": None, **PANEL_ROLES})
+        self.assertEqual(tenant["reseller_links"], json.loads(ACCOUNTS.read_text())["reseller_links"])
         press = json.loads(run.call_args_list[2].kwargs["input"])
         self.assertEqual(press["accounts"], [{"email": "inceleme-press@example.test", "subject": "sub-press"}])
         self.assertNotIn(password, json.dumps(summary))
@@ -254,11 +354,9 @@ class KeycloakScriptTest(unittest.TestCase):
         result = self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
         self.assertEqual(keycloak.policies["platform"], policy)
         platform_sets = [rule for realm, rule in keycloak.passwords if realm == "platform"]
-        self.assertEqual(len(platform_sets), 3)
+        self.assertEqual(len(platform_sets), 6)
         self.assertTrue(all("length(8)" in rule for rule in platform_sets))
-        self.assertEqual(set(result["subjects"]), {
-            "inceleme-panel@example.test", "inceleme-yonetici@example.test", "inceleme-press@example.test",
-        })
+        self.assertEqual(set(result["subjects"]), {*TENANT_ACCOUNTS, "inceleme-press@example.test"})
         self.assertIn(("POST", "/admin/realms/master/users/id-inceleme-yerel-yonetici/role-mappings/realm"),
                       keycloak.calls)
         self.assertNotIn(self.data["password"], json.dumps(result))
@@ -293,6 +391,275 @@ class KeycloakScriptTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.script["apply"](self.payload(), caller_factory=lambda *_: failing)
         self.assertEqual(keycloak.policies["platform"], policy)
+
+
+TENANT_SCRIPT = E2E / "preview" / "stack-review-tenant.py"
+ISSUER = "http://identity.localhost:6700/realms/platform"
+
+
+class Row:
+    def __init__(self, role):
+        self.role = role
+
+
+class FakeUser:
+    """The parts of a Frappe User document that the tenant review script uses."""
+
+    def __init__(self, tenant, email=None, user_type="System User", roles=()):
+        self.tenant = tenant
+        self.email = email
+        self.user_type = user_type
+        self.roles = [Row(role) for role in roles]
+        self.role_profiles = []
+        self.flags = Mock()
+
+    def set(self, field, rows):
+        if field != "role_profiles":
+            raise AssertionError(field)
+        self.role_profiles = [row["role_profile"] for row in rows]
+
+    def update(self, values):
+        for key, value in values.items():
+            setattr(self, key, value)
+
+    def append(self, field, row):
+        if field != "roles":
+            raise AssertionError(field)
+        self.roles.append(Row(row["role"]))
+
+    def add_roles(self, *roles):
+        self.roles.extend(Row(role) for role in roles)
+        self.save()
+
+    def save(self):
+        self.tenant.users[self.email] = self
+        self.tenant.saves.append(self.email)
+
+
+class FakeTenant:
+    """A tenant site with a role list and users, standing in for the `frappe` module."""
+
+    def __init__(self, roles, profiles=(), link_type=True):
+        self.role_names = set(roles)
+        self.profile_names = set(profiles)
+        self.link_type = link_type
+        self.users = {}
+        self.saves = []
+        self.links = []
+        # Reseller Customer Link rows by customer tenant, and the inserts and updates made.
+        self.reseller_links = {}
+        self.link_writes = []
+
+    def insert_link(self, fields):
+        doc = Mock()
+        doc.insert.side_effect = lambda: (
+            self.reseller_links.__setitem__(fields["customer_tenant"], dict(fields)),
+            self.link_writes.append(("insert", fields["customer_tenant"])),
+        )
+        return doc
+
+    def exists(self, doctype, name):
+        if doctype == "Role":
+            return name in self.role_names
+        if doctype == "Role Profile":
+            return name in self.profile_names
+        if doctype == "User":
+            return name in self.users
+        if doctype == "DocType":
+            return self.link_type and name == "Reseller Customer Link"
+        raise AssertionError(f"Unexpected exists({doctype!r}, {name!r})")
+
+    def get_value(self, doctype, filters, fields=None, **kwargs):
+        if doctype == "Reseller Customer Link":
+            row = self.reseller_links.get(filters["customer_tenant"])
+            if row is None:
+                return None
+            return {"name": "link-" + row["customer_tenant"], **row}
+        return None
+
+    def set_value(self, doctype, name, values):
+        if doctype != "Reseller Customer Link":
+            raise AssertionError(doctype)
+        customer = name.removeprefix("link-")
+        self.reseller_links[customer].update(values)
+        self.link_writes.append(("update", customer))
+
+    def modules(self):
+        tenant = self
+        frappe = Mock(name="frappe")
+        frappe.db.exists.side_effect = tenant.exists
+        frappe.db.get_value.side_effect = tenant.get_value
+        frappe.db.set_value.side_effect = tenant.set_value
+        frappe.get_doc.side_effect = lambda doctype, name=None: (
+            tenant.insert_link(doctype) if isinstance(doctype, dict) else tenant.users[name]
+        )
+        frappe.new_doc.side_effect = lambda doctype: FakeUser(tenant)
+        frappe.get_roles.side_effect = lambda email: [row.role for row in tenant.users[email].roles]
+        sign_in = Mock()
+        sign_in.create_link.side_effect = lambda issuer, subject, email: tenant.links.append(email)
+        identity = Mock(sign_in=sign_in)
+        return {
+            "frappe": frappe,
+            "frappe.utils": Mock(),
+            "platform_core": Mock(identity=identity),
+            "platform_core.identity": identity,
+            "platform_core.identity.sign_in": sign_in,
+        }
+
+
+def administrator(roles=("Tenant Admin",)):
+    return {
+        "email": "inceleme-yonetici@example.test", "subject": "sub-admin", "first_name": "Review",
+        "last_name": "Administrator", "tenant_roles": list(roles), "employee": False,
+        "user_type": "Website User",
+    }
+
+
+def panel_account(email, role):
+    return {
+        "email": email, "subject": "sub-" + email, "first_name": "Review", "last_name": "Panel Role",
+        "tenant_roles": [role], "employee": False, "user_type": "Website User", "role_profile": role,
+    }
+
+
+ALL_ROLES = {*PANEL_ROLES.values(), "System Manager"}
+ALL_PROFILES = set(PANEL_ROLES.values())
+
+
+class TenantScriptTest(unittest.TestCase):
+    """G-53: the tenant administrator is a Website User whose only role is “Tenant Admin”."""
+
+    def run_script(self, tenant, accounts, links=None):
+        modules = tenant.modules()
+        stdin = Mock()
+        payload = {"issuer": ISSUER, "accounts": accounts}
+        if links is not None:
+            payload["reseller_links"] = links
+        with patch.dict("sys.modules", modules), patch("os.chdir"), \
+                patch("json.load", return_value=payload), \
+                patch("sys.stdin", stdin), patch("builtins.print"):
+            runpy.run_path(str(TENANT_SCRIPT))["main"]()
+        return modules["frappe"]
+
+    def test_a_new_administrator_is_a_website_user_with_only_the_tenant_admin_role(self):
+        tenant = FakeTenant({"Tenant Admin", "System Manager"})
+        self.run_script(tenant, [administrator()])
+        user = tenant.users["inceleme-yonetici@example.test"]
+        self.assertEqual(user.user_type, "Website User")
+        self.assertEqual([row.role for row in user.roles], ["Tenant Admin"])
+
+    def test_an_existing_system_manager_administrator_becomes_a_website_user(self):
+        tenant = FakeTenant({"Tenant Admin", "System Manager"})
+        tenant.users["inceleme-yonetici@example.test"] = FakeUser(
+            tenant, "inceleme-yonetici@example.test", "System User", ("System Manager",)
+        )
+        self.run_script(tenant, [administrator()])
+        user = tenant.users["inceleme-yonetici@example.test"]
+        self.assertEqual(user.user_type, "Website User")
+        self.assertEqual([row.role for row in user.roles], ["Tenant Admin"])
+
+    def test_a_missing_tenant_admin_role_stops_with_a_clear_error_and_changes_nobody(self):
+        tenant = FakeTenant({"System Manager"})
+        with self.assertRaises(SystemExit) as stopped:
+            self.run_script(tenant, [administrator()])
+        self.assertIn("Tenant Admin", str(stopped.exception.code))
+        self.assertEqual(tenant.saves, [])
+        self.assertEqual(tenant.users, {})
+
+    def test_an_account_without_a_user_type_keeps_its_roles_and_type(self):
+        tenant = FakeTenant({"Employee", "HR User", "Blogger"})
+        tenant.users["inceleme-panel@example.test"] = FakeUser(
+            tenant, "inceleme-panel@example.test", "System User", ("Blogger",)
+        )
+        panel = {
+            "email": "inceleme-panel@example.test", "subject": "sub-panel", "first_name": "Review",
+            "last_name": "Panel", "tenant_roles": ["Employee", "HR User"], "employee": False,
+        }
+        self.run_script(tenant, [panel])
+        user = tenant.users["inceleme-panel@example.test"]
+        self.assertEqual(user.user_type, "System User")
+        self.assertEqual({row.role for row in user.roles}, {"Blogger", "Employee", "HR User"})
+
+
+
+def sample_links():
+    return [dict(link) for link in json.loads(ACCOUNTS.read_text())["reseller_links"]]
+
+
+class PanelRoleAccountsTest(unittest.TestCase):
+    """G-168, G-169, G-170: four panel role accounts and two resellers with one customer each."""
+
+    run_script = TenantScriptTest.run_script
+
+    def accounts(self):
+        return [panel_account(email, role) for email, role in PANEL_ROLES.items()]
+
+    def test_each_account_is_a_website_user_with_its_role_profile_and_only_its_role(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES)
+        self.run_script(tenant, self.accounts(), sample_links())
+        for email, role in PANEL_ROLES.items():
+            with self.subTest(email=email):
+                user = tenant.users[email]
+                self.assertEqual(user.user_type, "Website User")
+                self.assertEqual(user.role_profiles, [role])
+                self.assertEqual([row.role for row in user.roles], [role])
+
+    def test_an_earlier_system_manager_role_is_taken_away_from_every_account(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES)
+        for email in PANEL_ROLES:
+            tenant.users[email] = FakeUser(tenant, email, "System User", ("System Manager",))
+        self.run_script(tenant, self.accounts(), sample_links())
+        for email in PANEL_ROLES:
+            with self.subTest(email=email):
+                self.assertNotIn("System Manager", [row.role for row in tenant.users[email].roles])
+
+    def test_a_missing_role_profile_stops_before_any_change(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES - {"Reseller Assistant"})
+        with self.assertRaises(SystemExit) as stopped:
+            self.run_script(tenant, self.accounts(), sample_links())
+        self.assertIn("Reseller Assistant", str(stopped.exception.code))
+        self.assertEqual(tenant.saves, [])
+        self.assertEqual(tenant.link_writes, [])
+
+    def test_a_tenant_without_the_link_type_stops_before_any_change(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES, link_type=False)
+        with self.assertRaises(SystemExit) as stopped:
+            self.run_script(tenant, self.accounts(), sample_links())
+        self.assertIn("Reseller Customer Link", str(stopped.exception.code))
+        self.assertEqual(tenant.saves, [])
+
+    def test_each_reseller_gets_only_its_own_sample_customer(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES)
+        links = sample_links()
+        self.run_script(tenant, self.accounts(), links)
+        self.assertEqual(
+            {customer: row["reseller_tenant"] for customer, row in tenant.reseller_links.items()},
+            {link["customer_tenant"]: link["reseller_tenant"] for link in links},
+        )
+
+    def test_a_second_run_changes_nothing_and_does_not_fail(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES)
+        self.run_script(tenant, self.accounts(), sample_links())
+        first = {email: ([row.role for row in user.roles], user.role_profiles, user.user_type)
+                 for email, user in tenant.users.items()}
+        links = {customer: dict(row) for customer, row in tenant.reseller_links.items()}
+        writes = list(tenant.link_writes)
+        self.run_script(tenant, self.accounts(), sample_links())
+        second = {email: ([row.role for row in user.roles], user.role_profiles, user.user_type)
+                  for email, user in tenant.users.items()}
+        self.assertEqual(second, first)
+        self.assertEqual(tenant.reseller_links, links)
+        self.assertEqual(tenant.link_writes, writes)
+
+    def test_a_changed_link_in_the_file_updates_its_row(self):
+        tenant = FakeTenant(ALL_ROLES, ALL_PROFILES)
+        links = sample_links()
+        self.run_script(tenant, self.accounts(), links)
+        changed = [dict(link) for link in links]
+        changed[0]["site_status"] = "Suspended"
+        self.run_script(tenant, self.accounts(), changed)
+        self.assertEqual(tenant.reseller_links[changed[0]["customer_tenant"]]["site_status"], "Suspended")
+        self.assertEqual(tenant.link_writes[-1], ("update", changed[0]["customer_tenant"]))
 
 
 if __name__ == "__main__":

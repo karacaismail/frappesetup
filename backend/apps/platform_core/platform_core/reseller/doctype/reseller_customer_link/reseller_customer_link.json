@@ -1,0 +1,90 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-25 18:00:00.000000",
+ "description": "Links one reseller tenant to one customer tenant. A reseller sees only its linked customers. Only a Platform Operator opens, changes and closes a link. A tenant is its own site; both fields hold a site name.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "reseller_tenant",
+  "customer_tenant",
+  "customer_name",
+  "site_status"
+ ],
+ "fields": [
+  {
+   "description": "Site name of the reseller tenant, for example bayi.example.test.",
+   "fieldname": "reseller_tenant",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Reseller Tenant",
+   "length": 140,
+   "reqd": 1
+  },
+  {
+   "description": "Site name of the customer tenant, for example musteri.example.test. One customer tenant belongs to one reseller only.",
+   "fieldname": "customer_tenant",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Tenant",
+   "length": 140,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Display name of the customer company. The reseller sees it in the customer list.",
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Name",
+   "length": 140
+  },
+  {
+   "default": "Pending",
+   "description": "State of the customer site. Pending: the site is not ready yet. Active: the site is in use. Suspended: the site is stopped. The Platform Operator keeps it current.",
+   "fieldname": "site_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Site Status",
+   "options": "Pending\nActive\nSuspended",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-25 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Reseller",
+ "name": "Reseller Customer Link",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Platform Operator",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "search_fields": "customer_tenant,customer_name",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_tenant",
+ "track_changes": 1
+}
