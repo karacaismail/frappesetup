@@ -48,8 +48,10 @@ LEVEL_GRANTS = {("Role Profile", 1): ("read", "write")}
 # Types of these applications hold scripts, sign-in, tokens, settings and the platform's own
 # records. Their permission rows are written by a System Manager only.
 CLOSED_APPS = frozenset({"frappe", "platform_core"})
+# Only the platform operator gives a reseller role (G-169).
+RESELLER_ROLES = frozenset({"Reseller Admin", "Reseller Assistant"})
 # The holder cannot change these roles, give them to anyone or give them permission rows.
-CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE}
+CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE} | RESELLER_ROLES
 
 
 def ensure_permissions() -> None:
