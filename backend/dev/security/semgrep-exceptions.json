@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "07bb275c72d77ed56146bd1b21ff11ff6c488af13c38596d66d981d9756e7565",
+      "sha256": "93e8bf58cb7a07a1c3f513a408baebde76ac181b321ba3f816e3e3ecbf199123",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -245,6 +245,12 @@
         },
         {
           "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 75,
+          "reason": "Refuses unknown query fields, then delegates to permission_log.list_permission_logs, whose first step tenant_admin.require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-62, G-98). Page length is capped at 100. The rows are the Permission Log of this tenant site only."
+        },
+        {
+          "rule": "frappe-missing-permission",
           "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
           "line": 16,
           "reason": "Answers only for the signed-in session user; a guest gets PermissionError. The server reads that user's own records as evidence and ignores body fields such as user. No document is chosen by the caller."
@@ -254,6 +260,18 @@
           "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
           "line": 25,
           "reason": "Signed-in session user only; a guest gets PermissionError. The final step reruns the same decision and stays closed until the price decision (G-166). No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/identity.py",
+          "line": 119,
+          "reason": "Refuses unknown fields, then delegates to user_admin.set_user_role_profiles, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-98). The target must be a Website User linked to this site's issuer."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/identity.py",
+          "line": 129,
+          "reason": "Refuses unknown fields, then delegates to user_admin.invite_user, whose first step require_manager refuses everyone but System Manager, Administrator and “Tenant Admin” (G-98). The organization comes from site config, and identity-sync checks it is the caller's own. A run needs the digest of its preview."
         },
         {
           "rule": "frappe-ignore-permissions",
@@ -275,6 +293,12 @@
         },
         {
           "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/user_admin.py",
+          "line": 123,
+          "reason": "Saves the User only after require_manager, tenant_user (a Website User linked to this site's issuer) and a check that the chosen Role Profiles hold no protected or desk role (G-98). guard_user still runs on validate and refuses protected, standard and “Tenant Admin” roles."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
           "line": 318,
           "reason": "Inserts the internal file job only after require_user, route authorization and a File read check on the chosen PDF (G-156). The caller sets only route, file, instruction and limit. Both DocTypes are closed to AI writes in hooks.py."
@@ -291,15 +315,18 @@
         "backend/apps/platform_core/platform_core/access/explain.py",
         "backend/apps/platform_core/platform_core/access/hooks.py",
         "backend/apps/platform_core/platform_core/access/link_search.py",
+        "backend/apps/platform_core/platform_core/access/permission_log.py",
         "backend/apps/platform_core/platform_core/access/reports.py",
         "backend/apps/platform_core/platform_core/access/rules.py",
         "backend/apps/platform_core/platform_core/access/subject.py",
         "backend/apps/platform_core/platform_core/access/tenant_admin.py",
         "backend/apps/platform_core/platform_core/api/access.py",
         "backend/apps/platform_core/platform_core/api/atonota_login.py",
+        "backend/apps/platform_core/platform_core/api/identity.py",
         "backend/apps/platform_core/platform_core/hooks.py",
         "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
         "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+        "backend/apps/platform_core/platform_core/identity/user_admin.py",
         "backend/apps/platform_core/platform_core/model_gateway/large_file.py"
       ]
     }
