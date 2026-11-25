@@ -1,6 +1,6 @@
 # frappesetup
 
-Frappe üzerinde çok kiracılı SaaS için **mimari karar çerçevesi ve yol haritası** — Press kontrol düzlemi (Frappe 16), ERPNext v16 müşteri siteleri, Keycloak kimlik, Ant Design tabanlı headless React panel, sağlayıcıdan bağımsız MCP ve AI katmanı ve superadmin operasyon düzlemi. On sabit karar, altı ray, ürün sözleşmeleri (kalite kuralları, URL ve paylaşım, ölçüm, yardım ve tur), 211 numaralı gereksinim (G-1..G-167, SA-1..SA-44) ve sekiz fazlı yol haritası. SaaS henüz kurulmadı: sayfalardaki kontroller tasarım sözleşmesidir, uygulanmış güvenlik sayılmaz.
+Frappe üzerinde çok kiracılı SaaS için **mimari karar çerçevesi ve yol haritası** — Press kontrol düzlemi (Frappe 16), ERPNext v16 müşteri siteleri, Keycloak kimlik, Ant Design tabanlı headless React panel, sağlayıcıdan bağımsız MCP ve AI katmanı ve superadmin operasyon düzlemi. On sabit karar, altı ray, ürün sözleşmeleri (kalite kuralları, URL ve paylaşım, ölçüm, yardım ve tur), 214 numaralı gereksinim (G-1..G-170, SA-1..SA-44) ve sekiz fazlı yol haritası. SaaS henüz kurulmadı: sayfalardaki kontroller tasarım sözleşmesidir, uygulanmış güvenlik sayılmaz.
 
 Yayın: **https://karacaismail.github.io/frappesetup/**
 
