@@ -336,8 +336,8 @@ def set_role_permission(doctype: str, role: str, permissions: dict, permlevel=0,
 		frappe.throw(_("permissions must name only these rights: {0}").format(", ".join(rights)))
 	# JSON gives true and false. A form gives the text "0" or "1".
 	values = {
-		right: int(value) if isinstance(value, bool) else 1 if cint(value) else 0
-		for right, value in permissions.items()
+		right: int(given) if isinstance(given, bool) else 1 if cint(given) else 0
+		for right, given in permissions.items()
 	}
 	copy_standard_rows(doctype)
 	# The caller's right was checked by `require_manager` (exception to G-3).
