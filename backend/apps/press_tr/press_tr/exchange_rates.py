@@ -12,6 +12,12 @@ Only the two fixed addresses in ``SOURCE_URLS`` are called. They are constants, 
 Each request has a timeout, follows no redirect and reads at most ``MAX_BYTES``. The XML is read
 with expat directly: a DOCTYPE, an entity declaration or an external entity stops the parser, so
 no entity is ever expanded or fetched. This is the method defusedxml uses.
+
+The product owner fixed the rate checks on 25 November 2026. They are constants, not settings.
+A rate must lie from ``MIN_RATE`` to ``MAX_RATE`` lira per US dollar. It may move at most
+``MAX_DEVIATION`` from the newest record. Without a record only the range is checked. A rate out
+of range, a larger move, a decimal error or a future date is a source failure: the next source is
+tried. A larger move also sends System Managers an email, even when ECB gives a usable rate.
 """
 
 import re
@@ -40,6 +46,11 @@ MONEY_PLACES = Decimal("0.01")
 XML_DECLARATION = re.compile(rb"\A\s*<\?xml[^>]*?encoding=[\"']([A-Za-z0-9_-]+)[\"'][^>]*\?>")
 ALLOWED_ENCODINGS = {"utf-8", "iso-8859-9", "windows-1254"}
 INVOICE_FIELDS = ("try_exchange_rate", "try_exchange_rate_date", "try_exchange_rate_source")
+# G-10 rate checks, fixed by the product owner. Lira per one US dollar, limits included.
+MIN_RATE = Decimal("1")
+MAX_RATE = Decimal("500")
+# The largest allowed move from the newest record, 15 percent. Exactly 15 percent is allowed.
+MAX_DEVIATION = Decimal("0.15")
 
 
 def commercial_round(amount: Decimal, places: Decimal = MONEY_PLACES) -> Decimal:
@@ -53,6 +64,14 @@ def to_try(price_usd, rate) -> Decimal:
 
 class RateSourceError(ValueError):
 	"""A source did not answer with a usable rate."""
+
+
+class RateDeviationError(RateSourceError):
+	"""The rate moved more than ``MAX_DEVIATION`` from the newest record."""
+
+	def __init__(self, source: str, rate: Decimal, last: dict):
+		super().__init__("Exchange rate moved more than the allowed deviation.")
+		self.source, self.rate, self.last = source, rate, last
 
 
 def download(url: str) -> bytes:
@@ -205,10 +224,7 @@ def _record(source: str, day: date, rate: Decimal) -> dict:
 	return {"source": source, "rate_date": day, "rate": rate}
 
 
-def _alert_admins(failures: list[str]) -> None:
-	title = frappe._("Turkish lira rate could not be updated", context="press_tr")
-	message = frappe._("TCMB and ECB did not answer. The last known rate stays in use.", context="press_tr")
-	frappe.log_error(title=title, message="\n".join([message, *failures]))
+def _mail_admins(title: str, message: str) -> None:
 	users = frappe.get_all(
 		"Has Role", filters={"role": OPERATOR_ROLE, "parenttype": "User"}, fields=["parent"]
 	)
@@ -217,22 +233,73 @@ def _alert_admins(failures: list[str]) -> None:
 		frappe.sendmail(recipients=recipients, subject=title, message=message)
 
 
+def _alert_admins(failures: list[str]) -> None:
+	title = frappe._("Turkish lira rate could not be updated", context="press_tr")
+	message = frappe._("TCMB and ECB did not answer. The last known rate stays in use.", context="press_tr")
+	frappe.log_error(title=title, message="\n".join([message, *failures]))
+	_mail_admins(title, message)
+
+
+def _alert_deviation(deviations: list[RateDeviationError]) -> None:
+	title = frappe._("Turkish lira rate deviation", context="press_tr")
+	message = frappe._(
+		"A source gave a rate that moved more than 15 percent. The rate was not recorded.",
+		context="press_tr",
+	)
+	lines = [
+		f"{error.source}: {error.rate} ({error.last['source']} {error.last['rate_date'].isoformat()}: "
+		f"{error.last['rate']})"
+		for error in deviations
+	]
+	frappe.log_error(title=title, message="\n".join([message, *lines]))
+	_mail_admins(title, "\n".join([message, *lines]))
+
+
+def check_rate(source: str, day: date, rate: Decimal, last) -> None:
+	"""Refuse a rate dated in the future, out of range or too far from the newest record."""
+	if day > frappe.utils.getdate():
+		raise RateSourceError("Exchange rate date is in the future.")
+	if not MIN_RATE <= rate <= MAX_RATE:
+		raise RateSourceError("Exchange rate is out of range.")
+	if last is not None and abs(rate - last["rate"]) > last["rate"] * MAX_DEVIATION:
+		raise RateDeviationError(source, rate, last)
+
+
+def _fetch(source: str, last) -> tuple[date, Decimal]:
+	try:
+		day, rate = PARSERS[source](download(SOURCE_URLS[source]))
+	except ArithmeticError as exc:
+		# A decimal error, for example a rate of 1E40 that cannot be rounded.
+		raise RateSourceError("Exchange rate is not a usable number.") from exc
+	check_rate(source, day, rate, last)
+	return day, rate
+
+
 def update_rate():
 	"""Fetch today's rate. Frappe's scheduler calls this once a day.
 
 	TCMB publishes no rate on weekends and holidays. Its file then still holds the last bulletin,
 	so that date is kept and no record is written twice.
 	"""
-	failures = []
+	failures, deviations, recorded = [], [], None
+	last = current_rate()
 	for source in SOURCE_ORDER:
 		try:
-			day, rate = PARSERS[source](download(SOURCE_URLS[source]))
+			day, rate = _fetch(source, last)
+		except RateDeviationError as exc:
+			deviations.append(exc)
+			failures.append(f"{source}: {type(exc).__name__}")
+			continue
 		except ValueError as exc:
 			failures.append(f"{source}: {type(exc).__name__}")
 			continue
-		return _record(source, day, rate)
-	_alert_admins(failures)
-	return None
+		recorded = _record(source, day, rate)
+		break
+	if deviations:
+		_alert_deviation(deviations)
+	if recorded is None:
+		_alert_admins(failures)
+	return recorded
 
 
 def _as_date(day_or_text) -> date:
@@ -277,13 +344,19 @@ def set_invoice_rate(doc, method=None):
 	"""Fix the rate when an invoice leaves Draft. The rate never changes after that.
 
 	The rate is the newest one on the day the invoice is issued. The lira total follows the dollar
-	total with that fixed rate and Commercial Rounding.
+	total with that fixed rate and Commercial Rounding. A Draft invoice has no rate: its three rate
+	fields and the lira total are cleared, so only this function writes the rate.
 	"""
 	before = doc.get_doc_before_save()
-	if before and before.get("try_exchange_rate"):
+	was_draft = before is None or before.get("status") == "Draft"
+	if doc.get("status") == "Draft" and was_draft:
+		for fieldname in (*INVOICE_FIELDS, "try_total"):
+			setattr(doc, fieldname, None)
+		return
+	if not was_draft and before.get("try_exchange_rate"):
 		if any(str(doc.get(field) or "") != str(before.get(field) or "") for field in INVOICE_FIELDS):
 			frappe.throw(frappe._("You cannot change the invoice exchange rate.", context="press_tr"))
-	elif doc.get("status") != "Draft" and (before is None or before.get("status") == "Draft"):
+	elif was_draft:
 		rate = current_rate()
 		if rate is None:
 			frappe.log_error(

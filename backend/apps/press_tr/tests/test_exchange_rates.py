@@ -174,7 +174,9 @@ class SourceTest(RateCase):
 
 def tcmb_rate(selling, day="24.11.2026"):
 	"""The TCMB sample with another US dollar selling rate or bulletin date."""
-	body = sample("tcmb-today.xml").replace(b"<ForexSelling>41.3088<", f"<ForexSelling>{selling}<".encode(), 1)
+	body = sample("tcmb-today.xml").replace(
+		b"<ForexSelling>41.3088<", f"<ForexSelling>{selling}<".encode(), 1
+	)
 	return body.replace(b'Tarih="24.11.2026"', f'Tarih="{day}"'.encode(), 1)
 
 
@@ -218,7 +220,9 @@ class RateCheckTest(RateCase):
 		self.assertEqual(list(self.stored()), ["ECB-2026-11-24"])
 
 	def test_decimal_error_in_both_sources_alerts_admins(self):
-		ecb = sample("ecb-daily.xml").replace(b"currency='USD' rate='1.0500'", b"currency='USD' rate='1E-40'", 1)
+		ecb = sample("ecb-daily.xml").replace(
+			b"currency='USD' rate='1.0500'", b"currency='USD' rate='1E-40'", 1
+		)
 		self.assertNotEqual(ecb, sample("ecb-daily.xml"))
 		self.serve(tcmb=tcmb_rate("1E40"), ecb=ecb)
 		self.assertIsNone(self.rates.update_rate())

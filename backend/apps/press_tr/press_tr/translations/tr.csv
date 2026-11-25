@@ -161,6 +161,8 @@ Previous Plan,Önceki Plan,press_tr
 Site Plan Price Change,Site Planı Fiyat Değişikliği,press_tr
 Turkish lira rate could not be updated,Türk lirası kuru güncellenemedi,press_tr
 TCMB and ECB did not answer. The last known rate stays in use.,TCMB ve ECB yanıt vermedi. Son bilinen kur kullanılmaya devam ediyor.,press_tr
+Turkish lira rate deviation,Türk lirası kurunda büyük sapma,press_tr
+A source gave a rate that moved more than 15 percent. The rate was not recorded.,Bir kaynak yüzde 15'ten çok değişen bir kur verdi. Kur kaydedilmedi.,press_tr
 No Turkish lira rate is recorded yet.,Henüz kayıtlı bir Türk lirası kuru yok.,press_tr
 The Turkish lira rate is older than 3 days. Rate date: {0}.,Türk lirası kuru 3 günden eski. Kur tarihi: {0}.,press_tr
 You cannot change the invoice exchange rate.,Faturanın kurunu değiştiremezsiniz.,press_tr
