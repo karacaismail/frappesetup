@@ -304,6 +304,7 @@ class RetryTests(unittest.TestCase):
 		with (
 			patch.object(large_file, "_job", return_value=job),
 			patch.object(large_file, "_require_owner"),
+			patch.object(large_file, "_expire_stale"),
 			patch.object(large_file, "_lock_chunk", side_effect=lambda name: job.chunks[1]),
 			patch.object(large_file.frappe, "db", Mock()),
 			patch.object(large_file.frappe, "enqueue") as enqueue,
@@ -326,6 +327,7 @@ class RetryTests(unittest.TestCase):
 		with (
 			patch.object(large_file, "_job", return_value=job),
 			patch.object(large_file, "_require_owner"),
+			patch.object(large_file, "_expire_stale"),
 			patch.object(large_file, "_lock_chunk", side_effect=lambda name: job.chunks[0]),
 			patch.object(large_file.frappe, "db", Mock()),
 			patch.object(large_file.frappe, "enqueue") as enqueue,
@@ -555,8 +557,9 @@ class ExpiryStore:
 	def add(self, name, status, age, chunks):
 		job = FakeJob([chunk_status for chunk_status, _age in chunks])
 		job.name, job.status, job.failure_code = name, status, None
+		job.chunk_count, job.estimate_known, job.estimated_cost, job.currency = len(chunks), 0, 0, None
 		job.modified = NOW - timedelta(seconds=age)
-		for chunk, (_status, chunk_age) in zip(job.chunks, chunks):
+		for chunk, (_status, chunk_age) in zip(job.chunks, chunks, strict=True):
 			chunk.name = f"{name}-{chunk.chunk_index}"
 			chunk.parent, chunk.parenttype = name, large_file.JOB
 			chunk.modified = NOW - timedelta(seconds=chunk_age)

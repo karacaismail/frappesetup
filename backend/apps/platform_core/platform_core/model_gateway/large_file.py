@@ -11,6 +11,7 @@ import json
 from dataclasses import dataclass
 
 import frappe
+from frappe.utils import add_to_date, now_datetime
 from pypdf import PdfReader
 
 from platform_core.model_gateway import gateway, ledger, policy
@@ -27,6 +28,13 @@ MAX_INSTRUCTION_BYTES = 16 * 1024
 # replace them; a missing setting keeps the default, an invalid one stops the job.
 DEFAULT_MAX_PAGES = 1000
 DEFAULT_MAX_CHUNKS = 200
+# How long chunk text may wait. A planned job that is not started and a chunk whose worker
+# stopped would keep their text forever. Site settings model_gateway_file_planned_ttl and
+# model_gateway_file_running_ttl replace these values in seconds.
+# The running limit is far above one model call: gateway.MAX_ROUTE_SECONDS is 60 seconds.
+DEFAULT_PLANNED_TTL = 24 * 60 * 60
+DEFAULT_RUNNING_TTL = 60 * 60
+CLEANUP_ROLE = "System Manager"
 
 
 @dataclass(frozen=True)
@@ -238,10 +246,60 @@ def _commit():
 	frappe.db.commit()  # nosemgrep
 
 
+def _expire_stale():
+	"""Fail jobs and chunks that waited too long and remove their text.
+
+	There is no schedule. The entry functions call this first, and a System Manager
+	can call expire_stale_jobs by hand.
+	"""
+	now = now_datetime()
+	planned_before = add_to_date(
+		now, seconds=-_setting("model_gateway_file_planned_ttl", DEFAULT_PLANNED_TTL)
+	)
+	running_before = add_to_date(
+		now, seconds=-_setting("model_gateway_file_running_ttl", DEFAULT_RUNNING_TTL)
+	)
+	expired = 0
+	for name in frappe.get_all(
+		JOB, filters={"status": "planned", "modified": ["<", planned_before]}, pluck="name"
+	):
+		row = gateway.lock_row(JOB, name, ("name", "status", "modified"))
+		if row.status == "planned" and row.modified < planned_before:
+			frappe.db.set_value(JOB, name, {"status": "failed", "failure_code": "expired"})
+			frappe.db.set_value(CHUNK, {"parenttype": JOB, "parent": name}, {"content": None})
+			expired += 1
+		_commit()
+	lost = set()
+	for chunk in frappe.get_all(
+		CHUNK,
+		filters={"parenttype": JOB, "status": "running", "modified": ["<", running_before]},
+		fields=["name", "parent"],
+	):
+		row = gateway.lock_row(CHUNK, chunk.name, ("name", "status", "modified"))
+		if row.status == "running" and row.modified < running_before:
+			values = {"status": "failed", "failure_code": "worker_lost", "content": None}
+			frappe.db.set_value(CHUNK, chunk.name, values)
+			lost.add((chunk.parent, chunk.name))
+		_commit()
+	for parent in sorted({parent for parent, _name in lost}):
+		_settle(parent)
+	return {"expired_jobs": expired, "lost_chunks": len(lost)}
+
+
+def expire_stale_jobs():
+	"""Run the cleanup by hand. Only a System Manager may call it."""
+	policy.require_user()
+	if CLEANUP_ROLE not in frappe.get_roles():
+		raise frappe.PermissionError
+	gateway._require_clean_transaction()
+	return _expire_stale()
+
+
 def create_job(route, file, instruction, limit=1024):
 	"""Record a file job and queue its text extraction. No provider is called."""
 	policy.require_user()
 	gateway._require_clean_transaction()
+	_expire_stale()
 	if not (
 		isinstance(instruction, str)
 		and instruction.strip()
@@ -332,6 +390,8 @@ def start_job(file_job):
 	job = _job(file_job)
 	_require_owner(job)
 	gateway._require_clean_transaction()
+	_expire_stale()
+	job = _job(file_job)
 	if job.status != "planned":
 		raise Denied(409, "job_not_planned")
 	for chunk in job.chunks:
@@ -415,6 +475,7 @@ def retry_chunk(file_job, chunk_index):
 	"""Queue only the given failed chunk. Finished chunks are not sent again."""
 	job = _job(file_job)
 	_require_owner(job)
+	_expire_stale()
 	chunk = None
 	if type(chunk_index) is int:
 		chunk = next((item for item in job.chunks if item.chunk_index == chunk_index), None)
@@ -440,6 +501,8 @@ def job_status(file_job):
 	"""Return the plan and progress. The chunk count and estimate exist before the start."""
 	job = _job(file_job)
 	_require_owner(job)
+	_expire_stale()
+	job = _job(file_job)
 	return {
 		"name": job.name,
 		"status": job.status,
