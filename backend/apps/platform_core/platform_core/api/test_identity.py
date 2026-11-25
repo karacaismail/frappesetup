@@ -136,10 +136,13 @@ class TestListIdentities(FrappeAPITestCase):
 
 
 class TestUserAdminEndpoints(ua.TenantUsersCase):
-	"""G-98: the two endpoints of the panel refuse a guest and data outside the tenant (AJA-890)."""
+	"""G-98: the three endpoints of the panel refuse a guest and data outside the tenant (AJA-890)."""
 
 	def guest(self):
 		return get_test_client(use_cookies=True)
+
+	def read(self, client, user: str):
+		return self.send(client, ua.API + "get_user_role_profiles", method="GET", query={"user": user})
 
 	def test_set_user_role_profiles_guest_denied(self):
 		response = self.assign(self.guest(), ua.MEMBER, [ua.PROFILE])
@@ -157,6 +160,23 @@ class TestUserAdminEndpoints(ua.TenantUsersCase):
 				self.assertEqual(response.status_code, 403)
 				self.assertNotIn("message", response.json)
 				self.assertNotIn(ua.PLAIN_ROLE, frappe.get_roles(user))
+
+	def test_get_user_role_profiles_guest_denied(self):
+		self.assertEqual(self.assign(self.login(), ua.MEMBER, [ua.PROFILE]).status_code, 200)
+
+		response = self.read(self.guest(), ua.MEMBER)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("message", response.json)
+
+	def test_get_user_role_profiles_foreign_data_denied(self):
+		"""A user of another tenant is not read. A plain user reads nobody, not even itself."""
+		for client, user in ((self.login(), ua.STRANGER), (self.login(ua.MEMBER), ua.MEMBER)):
+			with self.subTest(user=user):
+				response = self.read(client, user)
+
+				self.assertEqual(response.status_code, 403)
+				self.assertNotIn("message", response.json)
 
 	def test_invite_user_guest_denied(self):
 		fake = self.serve(ua.FakeIdentitySync())

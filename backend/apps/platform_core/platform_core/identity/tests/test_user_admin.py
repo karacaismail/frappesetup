@@ -12,6 +12,7 @@ identity-sync is replaced by a fake transport. No request leaves the test. All p
 
 import json
 from unittest.mock import patch
+from urllib.parse import quote
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -251,6 +252,103 @@ class TestTenantUsers(TenantUsersCase):
 			query={"user": MEMBER, "role_profiles": "[]"},
 		)
 		self.assertNotEqual(response.status_code, 200)
+
+	# --- reading the role profile (AJA-913) ---
+	# The PO decided that level 1 of User stays closed to the role: `api_key`, `restrict_ip` and
+	# `login_after` are there. A narrow endpoint gives only the role profiles and the roles.
+
+	def read_profiles(self, client, user: str, **query):
+		return self.send(client, API + "get_user_role_profiles", method="GET", query={"user": user, **query})
+
+	def clear_hidden_fields(self):
+		blank = {"api_key": None, "restrict_ip": None, "login_after": 0}
+		frappe.db.set_value("User", MEMBER, blank, update_modified=False)
+		frappe.db.commit()  # nosemgrep: frappe-test-commit
+
+	def user_record(self, client, user: str):
+		return self.send(client, "/api/resource/User/" + quote(user), method="GET")
+
+	def test_holder_reads_the_role_profiles_of_a_tenant_user(self):
+		client = self.login()
+		self.assertEqual(self.assign(client, MEMBER, [PROFILE]).status_code, 200)
+
+		response = self.read_profiles(client, MEMBER)
+
+		self.assertEqual(response.status_code, 200, response.data[:500])
+		message = response.json["message"]
+		self.assertEqual(message["user"], MEMBER)
+		self.assertEqual(message["role_profiles"], [PROFILE])
+		self.assertIn(PLAIN_ROLE, message["roles"])
+
+	def test_reading_gives_only_the_three_fields(self):
+		client = self.login()
+
+		response = self.read_profiles(client, MEMBER)
+
+		self.assertEqual(response.status_code, 200, response.data[:500])
+		self.assertEqual(set(response.json["message"]), {"user", "role_profiles", "roles"})
+		self.assertEqual(response.json["message"]["role_profiles"], [])
+
+	def test_holder_still_has_no_level_one_right_on_user(self):
+		row = {"parent": "User", "role": TENANT_ADMIN, "permlevel": 1}
+		self.assertFalse(frappe.db.exists("Custom DocPerm", row))
+		self.assertFalse(frappe.db.exists("DocPerm", row))
+		client = self.login()
+		self.assertEqual(self.assign(client, MEMBER, [PROFILE]).status_code, 200)
+		hidden = {"api_key": "tu-ornek-anahtar", "restrict_ip": "192.0.2.10", "login_after": 8}
+		frappe.db.set_value("User", MEMBER, hidden, update_modified=False)
+		self.addCleanup(self.clear_hidden_fields)
+
+		response = self.user_record(client, MEMBER)
+
+		self.assertEqual(response.status_code, 200, response.data[:500])
+		data = response.json["data"]
+		# Frappe empties a field the reader may not read. It does not always drop the key.
+		for field in ("api_key", "restrict_ip", "login_after", "role_profiles", "roles"):
+			self.assertIn(data.get(field), (None, "", 0, []), field)
+
+	def test_holder_cannot_change_role_profiles_by_writing_the_record(self):
+		client = self.login()
+
+		response = self.send(
+			client,
+			"/api/resource/User/" + quote(MEMBER),
+			{"role_profiles": [{"role_profile": PROFILE}]},
+			method="PUT",
+		)
+
+		self.assertEqual(response.status_code, 403, response.data[:500])
+		self.assertFalse(frappe.db.exists("User Role Profile", {"parent": MEMBER}))
+		self.assertNotIn(PLAIN_ROLE, frappe.get_roles(MEMBER))
+
+	def test_reading_a_user_outside_the_tenant_gets_403(self):
+		client = self.login()
+		for user in (STRANGER, SYSTEM_MANAGER_USER, "Administrator", "tu.yok@example.test"):
+			response = self.read_profiles(client, user)
+
+			self.assertEqual(response.status_code, 403, (user, response.data[:500]))
+			self.assertNotIn("message", response.json)
+
+	def test_plain_user_cannot_read_role_profiles(self):
+		response = self.read_profiles(self.login(MEMBER), MEMBER)
+
+		self.assertEqual(response.status_code, 403, response.data[:500])
+		self.assertNotIn("message", response.json)
+
+	def test_reading_refuses_an_unknown_field(self):
+		response = self.read_profiles(self.login(), MEMBER, fields='["api_key"]')
+
+		self.assertEqual(response.status_code, 400, response.data[:500])
+
+	def test_reading_is_get_only(self):
+		response = self.send(self.login(), API + "get_user_role_profiles", {"user": MEMBER})
+
+		self.assertNotEqual(response.status_code, 200)
+
+	def test_system_manager_reads_the_role_profiles(self):
+		response = self.read_profiles(self.login(SYSTEM_MANAGER_USER), MEMBER)
+
+		self.assertEqual(response.status_code, 200, response.data[:500])
 
 	# --- invitation ---
 

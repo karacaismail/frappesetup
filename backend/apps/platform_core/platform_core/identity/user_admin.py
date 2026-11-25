@@ -129,6 +129,26 @@ def set_user_role_profiles(user: object, role_profiles: object) -> dict:
 	}
 
 
+def get_user_role_profiles(user: object) -> dict:
+	"""The role profiles and the roles of a tenant user (AJA-913).
+
+	The two child tables are on level 1 of User. The “Tenant Admin” role gets no level 1 right:
+	`api_key`, `restrict_ip` and `login_after` are on that level too. This read gives only the
+	two tables, and only for a user of this tenant.
+	"""
+	require_manager()
+	user = tenant_user(user)
+	# The caller's right and the target were checked above (exception to G-3: a system read).
+	filters = {"parenttype": "User", "parent": user}
+	return {
+		"user": user,
+		"role_profiles": sorted(
+			frappe.get_all("User Role Profile", filters=filters, pluck="role_profile", limit=0)
+		),
+		"roles": sorted(frappe.get_all("Has Role", filters=filters, pluck="role", limit=0)),
+	}
+
+
 # --- invitation ---
 
 
