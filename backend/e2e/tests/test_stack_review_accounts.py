@@ -49,7 +49,10 @@ class ReviewAccountListTest(unittest.TestCase):
         self.assertEqual(set(accounts["inceleme-panel@example.test"]["tenant_roles"]), {"Employee", "HR User"})
         self.assertTrue(accounts["inceleme-panel@example.test"]["employee"])
         self.assertEqual(accounts["inceleme-yonetici@example.test"]["realm"], "platform")
-        self.assertEqual(accounts["inceleme-yonetici@example.test"]["tenant_roles"], ["System Manager"])
+        self.assertEqual(accounts["inceleme-yonetici@example.test"]["tenant_roles"], ["Tenant Admin"])
+        self.assertEqual(accounts["inceleme-yonetici@example.test"]["user_type"], "Website User")
+        # G-53: only the panel administrator account changes. The others keep their shape.
+        self.assertNotIn("user_type", accounts["inceleme-panel@example.test"])
         self.assertEqual(accounts["inceleme-yerel-yonetici"]["realm"], "master")
         self.assertEqual(accounts["inceleme-yerel-yonetici"]["master_roles"], ["admin"])
         self.assertEqual(accounts["inceleme-press@example.test"]["realm"], "platform")
@@ -79,6 +82,13 @@ class ReviewAccountListTest(unittest.TestCase):
         self.assertIn("inceleme-panel@example.test", first)
         self.assertIn("backend/e2e/review-accounts.json", first)
         self.assertNotIn(password, readme)
+
+    def test_the_readme_describes_the_tenant_administrator_with_the_tenant_admin_role(self):
+        row = next(line for line in (E2E / "README.md").read_text().splitlines()
+                   if line.startswith("| `inceleme-yonetici@example.test`"))
+        self.assertIn("“Tenant Admin”", row)
+        self.assertIn("“Website User”", row)
+        self.assertNotIn("System Manager", row)
 
     def test_the_accounts_file_is_the_only_file_with_the_password(self):
         password = json.loads(ACCOUNTS.read_text())["password"]
@@ -165,6 +175,8 @@ class ReviewAccountsFlowTest(unittest.TestCase):
             {"inceleme-panel@example.test": "sub-panel", "inceleme-yonetici@example.test": "sub-admin"},
         )
         self.assertNotIn("password", json.dumps(tenant))
+        types = {account["email"]: account.get("user_type") for account in tenant["accounts"]}
+        self.assertEqual(types, {"inceleme-panel@example.test": None, "inceleme-yonetici@example.test": "Website User"})
         press = json.loads(run.call_args_list[2].kwargs["input"])
         self.assertEqual(press["accounts"], [{"email": "inceleme-press@example.test", "subject": "sub-press"}])
         self.assertNotIn(password, json.dumps(summary))
@@ -293,6 +305,135 @@ class KeycloakScriptTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.script["apply"](self.payload(), caller_factory=lambda *_: failing)
         self.assertEqual(keycloak.policies["platform"], policy)
+
+
+TENANT_SCRIPT = E2E / "preview" / "stack-review-tenant.py"
+ISSUER = "http://identity.localhost:6700/realms/platform"
+
+
+class Row:
+    def __init__(self, role):
+        self.role = role
+
+
+class FakeUser:
+    """The parts of a Frappe User document that the tenant review script uses."""
+
+    def __init__(self, tenant, email=None, user_type="System User", roles=()):
+        self.tenant = tenant
+        self.email = email
+        self.user_type = user_type
+        self.roles = [Row(role) for role in roles]
+        self.flags = Mock()
+
+    def update(self, values):
+        for key, value in values.items():
+            setattr(self, key, value)
+
+    def append(self, field, row):
+        assert field == "roles"
+        self.roles.append(Row(row["role"]))
+
+    def add_roles(self, *roles):
+        self.roles.extend(Row(role) for role in roles)
+        self.save()
+
+    def save(self):
+        self.tenant.users[self.email] = self
+        self.tenant.saves.append(self.email)
+
+
+class FakeTenant:
+    """A tenant site with a role list and users, standing in for the `frappe` module."""
+
+    def __init__(self, roles):
+        self.role_names = set(roles)
+        self.users = {}
+        self.saves = []
+        self.links = []
+
+    def modules(self):
+        tenant = self
+        frappe = Mock(name="frappe")
+        frappe.db.exists.side_effect = lambda doctype, name: (
+            name in tenant.role_names if doctype == "Role"
+            else name in tenant.users if doctype == "User"
+            else False
+        )
+        frappe.db.get_value.return_value = None
+        frappe.get_doc.side_effect = lambda doctype, name: tenant.users[name]
+        frappe.new_doc.side_effect = lambda doctype: FakeUser(tenant)
+        frappe.get_roles.side_effect = lambda email: [row.role for row in tenant.users[email].roles]
+        sign_in = Mock()
+        sign_in.create_link.side_effect = lambda issuer, subject, email: tenant.links.append(email)
+        identity = Mock(sign_in=sign_in)
+        return {
+            "frappe": frappe,
+            "frappe.utils": Mock(),
+            "platform_core": Mock(identity=identity),
+            "platform_core.identity": identity,
+            "platform_core.identity.sign_in": sign_in,
+        }
+
+
+def administrator(roles=("Tenant Admin",)):
+    return {
+        "email": "inceleme-yonetici@example.test", "subject": "sub-admin", "first_name": "Review",
+        "last_name": "Administrator", "tenant_roles": list(roles), "employee": False,
+        "user_type": "Website User",
+    }
+
+
+class TenantScriptTest(unittest.TestCase):
+    """G-53: the tenant administrator is a Website User whose only role is “Tenant Admin”."""
+
+    def run_script(self, tenant, accounts):
+        modules = tenant.modules()
+        stdin = Mock()
+        with patch.dict("sys.modules", modules), patch("os.chdir"), \
+                patch("json.load", return_value={"issuer": ISSUER, "accounts": accounts}), \
+                patch("sys.stdin", stdin), patch("builtins.print"):
+            runpy.run_path(str(TENANT_SCRIPT))["main"]()
+        return modules["frappe"]
+
+    def test_a_new_administrator_is_a_website_user_with_only_the_tenant_admin_role(self):
+        tenant = FakeTenant({"Tenant Admin", "System Manager"})
+        self.run_script(tenant, [administrator()])
+        user = tenant.users["inceleme-yonetici@example.test"]
+        self.assertEqual(user.user_type, "Website User")
+        self.assertEqual([row.role for row in user.roles], ["Tenant Admin"])
+
+    def test_an_existing_system_manager_administrator_becomes_a_website_user(self):
+        tenant = FakeTenant({"Tenant Admin", "System Manager"})
+        tenant.users["inceleme-yonetici@example.test"] = FakeUser(
+            tenant, "inceleme-yonetici@example.test", "System User", ("System Manager",)
+        )
+        self.run_script(tenant, [administrator()])
+        user = tenant.users["inceleme-yonetici@example.test"]
+        self.assertEqual(user.user_type, "Website User")
+        self.assertEqual([row.role for row in user.roles], ["Tenant Admin"])
+
+    def test_a_missing_tenant_admin_role_stops_with_a_clear_error_and_changes_nobody(self):
+        tenant = FakeTenant({"System Manager"})
+        with self.assertRaises(SystemExit) as stopped:
+            self.run_script(tenant, [administrator()])
+        self.assertIn("Tenant Admin", str(stopped.exception.code))
+        self.assertEqual(tenant.saves, [])
+        self.assertEqual(tenant.users, {})
+
+    def test_an_account_without_a_user_type_keeps_its_roles_and_type(self):
+        tenant = FakeTenant({"Employee", "HR User", "Blogger"})
+        tenant.users["inceleme-panel@example.test"] = FakeUser(
+            tenant, "inceleme-panel@example.test", "System User", ("Blogger",)
+        )
+        panel = {
+            "email": "inceleme-panel@example.test", "subject": "sub-panel", "first_name": "Review",
+            "last_name": "Panel", "tenant_roles": ["Employee", "HR User"], "employee": False,
+        }
+        self.run_script(tenant, [panel])
+        user = tenant.users["inceleme-panel@example.test"]
+        self.assertEqual(user.user_type, "System User")
+        self.assertEqual({row.role for row in user.roles}, {"Blogger", "Employee", "HR User"})
 
 
 if __name__ == "__main__":
