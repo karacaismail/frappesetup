@@ -865,3 +865,25 @@ The sign-in service is not available. Try again later.,Giriş hizmeti şu anda �
 This sign-in information cannot be read on this site.,Bu giriş bilgisi bu sitede okunamaz.,platform_core.identity
 This endpoint takes no parameters.,Bu işlem ek bilgi almaz.,platform_core.identity
 This session is not linked to an AtonotA Login account.,Bu oturum bir AtonotA Login hesabına bağlı değil.,platform_core.identity
+PLT AI File Job,Yapay Zekâ Dosya İşi,
+PLT AI File Chunk,Yapay Zekâ Dosya Parçası,
+Route,Yol,PLT AI File Job
+Source File,Kaynak Dosya,PLT AI File Job
+Instruction,Talimat,PLT AI File Job
+Output Limit,Çıktı Sınırı,PLT AI File Job
+Status,Durum,PLT AI File Job
+Failure Code,Hata Kodu,PLT AI File Job
+Chunk Count,Parça Sayısı,PLT AI File Job
+Estimate Known,Tahmin Biliniyor,PLT AI File Job
+Estimated Cost,Tahmini Maliyet,PLT AI File Job
+Currency,Para Birimi,PLT AI File Job
+Chunks,Parçalar,PLT AI File Job
+Chunk Index,Parça Sırası,PLT AI File Chunk
+First Page,İlk Sayfa,PLT AI File Chunk
+Last Page,Son Sayfa,PLT AI File Chunk
+Content,İçerik,PLT AI File Chunk
+Status,Durum,PLT AI File Chunk
+Failure Code,Hata Kodu,PLT AI File Chunk
+Result,Sonuç,PLT AI File Chunk
+File Job,Dosya İşi,PLT AI Usage Log
+Chunk Index,Parça Sırası,PLT AI Usage Log

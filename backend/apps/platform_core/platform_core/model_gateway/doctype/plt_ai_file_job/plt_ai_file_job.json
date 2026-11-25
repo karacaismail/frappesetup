@@ -1,0 +1,134 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-25 16:40:00.000000",
+ "description": "Large file job: server-side page text, chunk plan, and per-chunk dispatch through the model gateway.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "route",
+  "source_file",
+  "instruction",
+  "output_limit",
+  "status",
+  "failure_code",
+  "chunk_count",
+  "estimate_known",
+  "estimated_cost",
+  "currency",
+  "chunks"
+ ],
+ "fields": [
+  {
+   "description": "Route whose accounts receive the chunks.",
+   "fieldname": "route",
+   "fieldtype": "Link",
+   "label": "Route",
+   "read_only": 1,
+   "options": "PLT AI Route",
+   "reqd": 1
+  },
+  {
+   "description": "PDF file read on this server. The file itself never goes to a provider.",
+   "fieldname": "source_file",
+   "fieldtype": "Link",
+   "label": "Source File",
+   "read_only": 1,
+   "options": "File",
+   "reqd": 1
+  },
+  {
+   "description": "Instruction sent with every chunk. The gateway masks it before external dispatch.",
+   "fieldname": "instruction",
+   "fieldtype": "Long Text",
+   "label": "Instruction",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Maximum output tokens for each chunk.",
+   "fieldname": "output_limit",
+   "fieldtype": "Int",
+   "label": "Output Limit",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Job state: preparing, planned, queued, running, completed, or failed.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "read_only": 1,
+   "options": "preparing\nplanned\nqueued\nrunning\ncompleted\nfailed",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Reason the preparation failed, if it failed.",
+   "fieldname": "failure_code",
+   "fieldtype": "Data",
+   "label": "Failure Code",
+   "read_only": 1
+  },
+  {
+   "description": "Number of chunks, known before the job starts.",
+   "fieldname": "chunk_count",
+   "fieldtype": "Int",
+   "label": "Chunk Count",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "description": "Whether every route target has known prices in one currency.",
+   "fieldname": "estimate_known",
+   "fieldtype": "Check",
+   "label": "Estimate Known",
+   "read_only": 1
+  },
+  {
+   "description": "Largest reservation over the route targets for all chunks. Valid only when the estimate is known.",
+   "fieldname": "estimated_cost",
+   "fieldtype": "Currency",
+   "label": "Estimated Cost",
+   "read_only": 1,
+   "options": "currency"
+  },
+  {
+   "description": "Currency of the estimate.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "read_only": 1,
+   "options": "Currency"
+  },
+  {
+   "description": "Chunks cut at page boundaries to fit the smallest context size of the route.",
+   "fieldname": "chunks",
+   "fieldtype": "Table",
+   "label": "Chunks",
+   "read_only": 1,
+   "options": "PLT AI File Chunk"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-25 16:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "Model Gateway",
+ "name": "PLT AI File Job",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "PLT AI Manager"
+  },
+  {
+   "read": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

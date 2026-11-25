@@ -610,7 +610,9 @@ Bütün DocType'lar `model_gateway` modülündedir. Her alan açıklama taşır 
 | `AI API` | Hesaba bağlı adres ve kimlik bilgisi | hesap, adres, kimlik türü, gizli anahtar, izinli modeller, dakika sınırları, öncelik, ağırlık, sağlık durumu, açık mı |
 | `AI Model` | Model ve yetenekleri | sağlayıcı, model kimliği, yetenekler, bağlam boyu, birim fiyatlar |
 | `AI Route` | İş türüne göre model sırası | ad, gereken yetenekler, seçme yolu, sıralı model ve API listesi, veri kısıtı |
-| `AI Usage Log` | Her çağrının kaydı | zaman, kullanıcı, yol, sağlayıcı, hesap, API, model, token sayıları, maliyet, süre, sonuç |
+| `AI Usage Log` | Her çağrının kaydı | zaman, kullanıcı, yol, sağlayıcı, hesap, API, model, token sayıları, maliyet, süre, sonuç, dosya işi, parça sırası |
+| `AI File Job` | Büyük dosya işi (G-156) | yol, kaynak dosya, talimat, çıktı sınırı, durum, parça sayısı, tahmini maliyet, parçalar |
+| `AI File Chunk` | Dosya işinin bir parçası | sıra, ilk ve son sayfa, metin, durum, hata kodu, sonuç |
 
 ### Bağdaştırıcılar
 
@@ -643,6 +645,24 @@ Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemc
 7. Her denemeyi “AI Usage Log” kaydına yazın.
 
 Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinden döner. Zamanlanmış iş yoktur (O-15).
+
+### Büyük dosya (G-156)
+
+Büyük PDF sağlayıcıya dosya olarak gitmez. İşin adımları şunlardır:
+
+1. Kullanıcı işi `create_file_job` işleviyle açar. Bu adımda sağlayıcı çağrılmaz.
+2. Kuyruk işi PDF metnini sayfa sayfa okur. Metni olmayan sayfa yazı tanıma adımına gider.
+3. Kuyruk işi metni sayfa sınırından parçalara böler. Parça boyunu yolun en küçük bağlam boyu belirler.
+4. Kullanıcı `file_job_status` ile parça sayısını ve tahmini maliyeti görür.
+5. Kullanıcı işi `start_file_job` ile başlatır. Her parça geçitten ayrı istek olarak gider.
+6. Başarısız parçayı kullanıcı `retry_file_chunk` ile tek başına yeniden kuyruğa koyar.
+
+- Tahmini maliyet her parça için yolun en pahalı hedefini sayar. Bir hedefin fiyatı bilinmiyorsa tahmin “bilinmiyor” olur. Para birimleri farklıysa da tahmin “bilinmiyor” olur.
+- Geçit her parçayı maskeler (G-90). Hesabı öncelik, ağırlık, dinlenme süresi, dakika sınırı ve bütçeye göre seçer.
+- Bir hesap 429 dönerse parça o hesabın başka API'sine gitmez. Parça başka bir hesaba gider.
+- Her deneme “AI Usage Log” kaydına dosya işi kimliği ve parça sırasıyla yazılır.
+- Yazı tanıma adımı `model_gateway_ocr` kancasıyla bağlanır. Kanca yoksa taranmış sayfalı iş `ocr_unavailable` koduyla durur.
+- İş kuyruk işidir. Zamanlanmış iş yoktur.
 
 ### Güvenlik
 

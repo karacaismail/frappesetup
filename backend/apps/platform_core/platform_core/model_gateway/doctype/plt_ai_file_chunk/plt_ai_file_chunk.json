@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-11-25 16:40:00.000000",
+ "description": "One chunk of a large file job.",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "chunk_index",
+  "first_page",
+  "last_page",
+  "content",
+  "status",
+  "failure_code",
+  "result"
+ ],
+ "fields": [
+  {
+   "description": "Order of the chunk in the job, starting at zero.",
+   "fieldname": "chunk_index",
+   "fieldtype": "Int",
+   "label": "Chunk Index",
+   "read_only": 1,
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "description": "First PDF page in the chunk, starting at one.",
+   "fieldname": "first_page",
+   "fieldtype": "Int",
+   "label": "First Page",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "description": "Last PDF page in the chunk, starting at one.",
+   "fieldname": "last_page",
+   "fieldtype": "Int",
+   "label": "Last Page",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "description": "Unmasked chunk text kept on this server. The gateway masks it before external dispatch.",
+   "fieldname": "content",
+   "fieldtype": "Long Text",
+   "label": "Content",
+   "read_only": 1
+  },
+  {
+   "description": "Chunk state: planned, queued, running, done, or failed.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "read_only": 1,
+   "options": "planned\nqueued\nrunning\ndone\nfailed",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "description": "Gateway error code of the last failed attempt.",
+   "fieldname": "failure_code",
+   "fieldtype": "Data",
+   "label": "Failure Code",
+   "read_only": 1
+  },
+  {
+   "description": "Model response text for the chunk.",
+   "fieldname": "result",
+   "fieldtype": "Long Text",
+   "label": "Result",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-25 16:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "Model Gateway",
+ "name": "PLT AI File Chunk",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

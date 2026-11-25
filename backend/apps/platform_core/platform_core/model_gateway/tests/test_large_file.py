@@ -35,6 +35,8 @@ def _target(api, account, model):
 			priority=0,
 			weight=1,
 			allowed_models="[]",
+			base_url="https://provider.example.test",
+			auth_type="api_key",
 		),
 		SimpleNamespace(name=account, enabled=1, has_monthly_budget=0, currency="USD"),
 		SimpleNamespace(name="fixture-provider", enabled=1),
@@ -54,9 +56,7 @@ class PageTextTests(unittest.TestCase):
 	def test_text_is_read_page_by_page_and_scanned_pages_use_ocr(self):
 		pages = [FakePage("first page"), FakePage("  "), FakePage("third page")]
 		ocr = Mock(return_value="recognized text")
-		self.assertEqual(
-			large_file.page_texts(pages, ocr), ["first page", "recognized text", "third page"]
-		)
+		self.assertEqual(large_file.page_texts(pages, ocr), ["first page", "recognized text", "third page"])
 		ocr.assert_called_once_with(1, pages[1])
 
 	def test_scanned_page_without_ocr_step_stops_the_job(self):
@@ -109,7 +109,9 @@ class PlanTests(unittest.TestCase):
 		self.assertEqual(result.chunk_count, len(result.chunks))
 		self.assertGreater(result.chunk_count, 1)
 		# Each chunk reserves the model context and the output limit.
-		self.assertEqual(result.estimated_cost, Decimal(2) * (1100 + 64) * result.chunk_count / ledger.MILLION)
+		self.assertEqual(
+			result.estimated_cost, Decimal(2) * (1100 + 64) * result.chunk_count / ledger.MILLION
+		)
 		self.assertEqual(result.currency, "USD")
 
 	def test_cost_is_unknown_when_any_price_is_unknown(self):
@@ -154,6 +156,7 @@ class UsageTagTests(unittest.TestCase):
 			patch.object(ledger.frappe, "get_doc", side_effect=get_doc),
 			patch.object(ledger.frappe, "db", Mock()),
 			patch.object(ledger.frappe, "session", SimpleNamespace(user="fixture")),
+			patch.object(ledger, "now_datetime"),
 		):
 			ledger.begin(
 				"route",
@@ -215,7 +218,9 @@ class RateLimitTests(unittest.TestCase):
 		request = policy.Request([{"role": "user", "content": "chunk"}], [], None, 12)
 		with (
 			patch.object(gateway, "_choose", side_effect=choose),
-			patch.object(gateway, "_target", side_effect=lambda api, model: {t.api.name: t for t in ordered}[api]),
+			patch.object(
+				gateway, "_target", side_effect=lambda api, model: {t.api.name: t for t in ordered}[api]
+			),
 			patch.object(gateway.Target, "endpoint", endpoint),
 			patch.object(gateway.policy, "outbound", side_effect=lambda base, oauth, route, req: req),
 			patch.object(gateway, "_reserve", return_value="log"),

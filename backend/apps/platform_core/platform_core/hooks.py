@@ -88,6 +88,9 @@ ai_write_closed_doctypes = [
 	# G-164: verification notices and cases change only through the signed provider notice and its queue job.
 	"PLT Verification Notice",
 	"PLT Verification Case",
+	# G-156: file jobs and their chunks change only through the large file queue steps.
+	"PLT AI File Job",
+	"PLT AI File Chunk",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
