@@ -172,6 +172,116 @@ class SourceTest(RateCase):
 		self.assertEqual(self.rates.current_rate()["source"], "TCMB")
 
 
+def tcmb_rate(selling, day="24.11.2026"):
+	"""The TCMB sample with another US dollar selling rate or bulletin date."""
+	body = sample("tcmb-today.xml").replace(b"<ForexSelling>41.3088<", f"<ForexSelling>{selling}<".encode(), 1)
+	return body.replace(b'Tarih="24.11.2026"', f'Tarih="{day}"'.encode(), 1)
+
+
+class RateCheckTest(RateCase):
+	"""The product owner's G-10 rate checks: a fixed range and a fixed 15 percent deviation."""
+
+	def deviation_mails(self):
+		return [mail for mail in self.mails if "deviat" in mail["subject"].lower()]
+
+	def test_limits_are_fixed_constants(self):
+		self.assertEqual(self.rates.MIN_RATE, Decimal("1"))
+		self.assertEqual(self.rates.MAX_RATE, Decimal("500"))
+		self.assertEqual(self.rates.MAX_DEVIATION, Decimal("0.15"))
+
+	def test_rate_above_500_is_not_recorded(self):
+		self.serve(tcmb=tcmb_rate("99999999"))
+		self.assertIsNone(self.rates.update_rate())
+		self.assertEqual(self.stored(), {})
+		self.assertEqual(len(self.mails), 1)
+
+	def test_rate_above_500_is_a_source_failure_and_ecb_is_tried(self):
+		self.serve(tcmb=tcmb_rate("500.0001"), ecb=sample("ecb-daily.xml"))
+		self.assertEqual(self.rates.update_rate()["source"], "ECB")
+		self.assertEqual(list(self.stored()), ["ECB-2026-11-24"])
+
+	def test_rate_below_1_is_not_recorded(self):
+		self.serve(tcmb=tcmb_rate("0.9999"))
+		self.assertIsNone(self.rates.update_rate())
+		self.assertEqual(self.stored(), {})
+
+	def test_range_limits_are_inclusive(self):
+		for selling in ("1", "500"):
+			with self.subTest(selling=selling):
+				self.fake.records.pop(DOCTYPE, None)
+				self.serve(tcmb=tcmb_rate(selling))
+				self.assertEqual(self.rates.update_rate()["rate"], Decimal(selling))
+
+	def test_decimal_error_is_a_source_failure(self):
+		self.serve(tcmb=tcmb_rate("1E40"), ecb=sample("ecb-daily.xml"))
+		self.assertEqual(self.rates.update_rate()["source"], "ECB")
+		self.assertEqual(list(self.stored()), ["ECB-2026-11-24"])
+
+	def test_decimal_error_in_both_sources_alerts_admins(self):
+		ecb = sample("ecb-daily.xml").replace(b"currency='USD' rate='1.0500'", b"currency='USD' rate='1E-40'", 1)
+		self.assertNotEqual(ecb, sample("ecb-daily.xml"))
+		self.serve(tcmb=tcmb_rate("1E40"), ecb=ecb)
+		self.assertIsNone(self.rates.update_rate())
+		self.assertEqual(self.stored(), {})
+		self.assertEqual(len(self.mails), 1)
+
+	def test_future_rate_is_a_source_failure(self):
+		self.serve(tcmb=tcmb_rate("41.3088", day="25.11.2026"), ecb=sample("ecb-daily.xml"))
+		self.assertEqual(self.rates.update_rate()["source"], "ECB")
+		self.assertEqual(list(self.stored()), ["ECB-2026-11-24"])
+
+	def test_future_rate_is_not_recorded(self):
+		self.serve(tcmb=tcmb_rate("41.3088", day="25.11.2026"))
+		self.assertIsNone(self.rates.update_rate())
+		self.assertEqual(self.stored(), {})
+
+	def test_change_up_to_15_percent_is_recorded(self):
+		self.store("TCMB", MONDAY, "40.0000")
+		for selling in ("46.0000", "34.0000"):
+			with self.subTest(selling=selling):
+				self.serve(tcmb=tcmb_rate(selling))
+				self.fake.records[DOCTYPE].pop("TCMB-2026-11-24", None)
+				self.assertEqual(self.rates.update_rate()["rate"], Decimal(selling))
+		self.assertEqual(self.mails, [])
+
+	def test_change_above_15_percent_is_not_recorded_and_admins_are_told(self):
+		self.store("TCMB", MONDAY, "40.0000")
+		self.serve(tcmb=tcmb_rate("46.0001"))
+		self.assertIsNone(self.rates.update_rate())
+		self.assertEqual(list(self.stored()), ["TCMB-2026-11-23"])
+		self.assertEqual(len(self.deviation_mails()), 1)
+		self.assertEqual(self.deviation_mails()[0]["recipients"], ["ops@example.test"])
+
+	def test_drop_above_15_percent_is_not_recorded(self):
+		self.store("TCMB", MONDAY, "40.0000")
+		self.serve(tcmb=tcmb_rate("33.9999"))
+		self.assertIsNone(self.rates.update_rate())
+		self.assertEqual(list(self.stored()), ["TCMB-2026-11-23"])
+		self.assertEqual(len(self.deviation_mails()), 1)
+
+	def test_deviation_compares_with_the_newest_record(self):
+		self.store("TCMB", date(2026, 11, 20), "30.0000")
+		self.store("ECB", MONDAY, "41.0000")
+		self.serve(tcmb=sample("tcmb-today.xml"))
+		self.assertEqual(self.rates.update_rate()["rate"], Decimal("41.3088"))
+		self.assertEqual(self.mails, [])
+
+	def test_ecb_is_recorded_after_a_tcmb_deviation_and_admins_are_still_told(self):
+		self.store("TCMB", MONDAY, "41.1000")
+		self.serve(tcmb=tcmb_rate("50.0000"), ecb=sample("ecb-daily.xml"))
+		rate = self.rates.update_rate()
+		self.assertEqual((rate["source"], rate["rate"]), ("ECB", Decimal("41.2500")))
+		self.assertIn("ECB-2026-11-24", self.stored())
+		self.assertNotIn("TCMB-2026-11-24", self.stored())
+		self.assertEqual(len(self.deviation_mails()), 1)
+		self.assertEqual(len(self.mails), 1)
+
+	def test_without_a_record_only_the_range_is_checked(self):
+		self.serve(tcmb=tcmb_rate("499.0000"))
+		self.assertEqual(self.rates.update_rate()["rate"], Decimal("499.0000"))
+		self.assertEqual(self.mails, [])
+
+
 class SafetyTest(RateCase):
 	def test_only_two_fixed_addresses_are_called(self):
 		self.assertEqual(self.rates.SOURCE_URLS, {"TCMB": TCMB, "ECB": ECB})
@@ -301,6 +411,36 @@ class InvoiceRateTest(RateCase):
 		doc = self.invoice(before=before, **{**issued, "try_exchange_rate": "42.0000"})
 		with self.assertRaises(Rejected):
 			self.rates.set_invoice_rate(doc)
+
+	def test_draft_invoice_rate_fields_are_cleared(self):
+		self.store("TCMB", TUESDAY, "41.3088")
+		doc = self.invoice(
+			try_exchange_rate="99.0000",
+			try_exchange_rate_date=MONDAY,
+			try_exchange_rate_source="ECB",
+			try_total="9900.00",
+		)
+		self.rates.set_invoice_rate(doc)
+		for field in (*self.rates.INVOICE_FIELDS, "try_total"):
+			self.assertIsNone(doc.get(field), field)
+
+	def test_saved_draft_with_a_rate_is_cleared(self):
+		draft = {"status": "Draft", "try_exchange_rate": "99.0000", "try_total": "9900.00"}
+		doc = self.invoice(before=SimpleNamespace(get=draft.get), **draft)
+		self.rates.set_invoice_rate(doc)
+		self.assertIsNone(doc.get("try_exchange_rate"))
+		self.assertIsNone(doc.get("try_total"))
+
+	def test_only_set_invoice_rate_writes_the_rate_when_the_draft_is_issued(self):
+		self.store("TCMB", TUESDAY, "41.3088")
+		draft = {"status": "Draft", "try_exchange_rate": "99.0000", "try_exchange_rate_source": "ECB"}
+		doc = self.invoice(before=SimpleNamespace(get=draft.get), **{**draft, "status": "Unpaid"})
+		self.rates.set_invoice_rate(doc)
+		self.assertEqual(
+			(doc.try_exchange_rate, doc.try_exchange_rate_date, doc.try_exchange_rate_source),
+			("41.3088", TUESDAY, "TCMB"),
+		)
+		self.assertEqual(doc.try_total, "4130.88")
 
 	def test_invoice_without_any_rate_is_not_blocked(self):
 		doc = self.invoice(
