@@ -861,6 +861,7 @@ Only the approval endpoint fills the approval fields.,Onay alanlarını yalnız 
 An exception record cannot be deleted. Open a revocation record instead.,İstisna kaydı silinmez. Bunun yerine bir kapanış kaydı açın.,platform_core.identity
 Only a grant record waiting for approval can be approved.,Yalnız onay bekleyen izin kaydı onaylanabilir.,platform_core.identity
 This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.identity
+You cannot open this exception record.,Bu istisna kaydını açamazsınız.,platform_core.identity
 The sign-in service is not available. Try again later.,Giriş hizmeti şu anda çalışmıyor. Biraz sonra yeniden deneyin.,platform_core.identity
 This sign-in information cannot be read on this site.,Bu giriş bilgisi bu sitede okunamaz.,platform_core.identity
 This endpoint takes no parameters.,Bu işlem ek bilgi almaz.,platform_core.identity
