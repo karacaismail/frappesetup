@@ -3261,5 +3261,104 @@
     "reason": "Runs the repository's own osv-setup script with bash and no shell string. The arguments are fixed test values, PATH points curl at a fake that writes only inside a temporary folder.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_agent_patches.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to apply the Agent patch to a local Agent checkout with git.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_agent_patches.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "e631ad65757f6ddf75b862341cd880c41713629b55c69402d55ffa063b13130d",
+    "reason": "Test runs git from its absolute path with no shell. Arguments are fixed subcommands, the repository patch file and temporary folders. It runs only when AGENT_SOURCE is set.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_enterprise_rules.py",
+    "code": "record[\"allowed_domains\"][0][\"client_secret\"] = \"x\"",
+    "statementSha256": "cc14f84ca59919e8254aea5976a40dab05a32f18b4ddbe5d8d2dc7617be8be84",
+    "reason": "The test puts a secret-like field name with the fake value x into a domain row. It checks that the record rules refuse the row. No real secret exists.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/atonota_login/tests/test_enterprise_apply.py",
+    "code": "self.environment = {\"ATONOTA_OPEN_ONE_CLIENT_ID\": \"client-1\", \"ATONOTA_OPEN_ONE_CLIENT_SECRET\": \"s3\"}",
+    "statementSha256": "9e4e4f4abf830858bc5be26c73239909f8bc7c57f191e12dca11b3d0927cd361",
+    "reason": "The apply command test feeds a fake client secret s3 to an in-memory environment. Keycloak is mocked. No real secret exists.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/atonota_login/tests/test_enterprise_apply.py",
+    "code": "\"KC_BOOTSTRAP_ADMIN_PASSWORD\": \"not-used\"}",
+    "statementSha256": "5de2a112b124c9a972d4327b8e4fc868f3f80e154c284262cad41884d9daf5c4",
+    "reason": "The apply command test sets the fake admin password not-used. The test never reaches Keycloak. No real secret exists.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_ci_browser_install.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test imports subprocess to run the CI install script it checks.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_ci_browser_install.py",
+    "code": "proc = subprocess.run(",
+    "statementSha256": "f17701dccdf3a2735d7f4143b6f4a43ffc7e48fa5998b4ad8b75a1108d5ff2b0",
+    "reason": "Test runs the repository's CI install script with bash, a fixed argument list and no shell string; PATH is fixed by the test.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_ci_browser_install.py",
+    "code": "proc = subprocess.run(",
+    "statementSha256": "f17701dccdf3a2735d7f4143b6f4a43ffc7e48fa5998b4ad8b75a1108d5ff2b0",
+    "reason": "Test runs the repository's CI install script with bash, a fixed argument list and no shell string; PATH is fixed by the test.",
+    "owner": "canli-dagitim",
+    "ignoreUntil": "2027-02-23"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_magic_link.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-24"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_magic_link.py",
+    "code": "logs = subprocess.run([\"docker\", \"--context\", context, \"logs\", \"--since\", str(since), f\"{project}-keycloak-1\"],",
+    "statementSha256": "5768f4d6974885c560f7d7e0d8a7a1112260a50e063af0a8bfb2403698392df9",
+    "reason": "The test reads the local Keycloak container log with a fixed docker argument list and no shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-24"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_magic_link.py",
+    "code": "logs = subprocess.run([\"docker\", \"--context\", context, \"logs\", \"--since\", str(since), f\"{project}-keycloak-1\"],",
+    "statementSha256": "5768f4d6974885c560f7d7e0d8a7a1112260a50e063af0a8bfb2403698392df9",
+    "reason": "The developer test runner supplies the executable PATH for this docker command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-24"
   }
 ]

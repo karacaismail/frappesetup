@@ -47,6 +47,32 @@ docker --context colima-factory compose \
   -f backend/dev/press/compose.unpatched.yaml run --rm probe
 ```
 
+### Press Settings ve Telegram
+
+Press Settings açılırken ödeme ve olay kaydı modüllerini de yükler.
+Deneme imajı bu yol için `boto3`, `twilio`, `posthog` ve `razorpay` kurar.
+Press Settings testi, Telegram paketi kurulu imajda ağ kapalıyken geçti.
+Üretim imajında Telegram paketi yoktur. Bu yüzden ekip paketsiz denemeyi de yapar.
+
+Depo kökünde aşağıdaki komutu çalıştırın.
+Komut, Telegram paketini yalnız geçici kaptan kaldırır.
+
+```sh
+docker --context colima-factory run --rm --network none --pull never \
+  fs-pd-press-py314:probe sh -ec '
+    uv pip uninstall --python env/bin/python python-telegram-bot-raw
+    exec env/bin/python -B /opt/press-probe/test_unpatched_runtime.py \
+      UnpatchedRuntimeTest.test_press_settings_prerequisites_import \
+      UnpatchedRuntimeTest.test_press_settings_imports
+  '
+```
+
+Kaynak `7a4384d5eec9f0f0dce4124e9dd48b106e51222f` ile paket yükleme testi geçti.
+Press Settings testi `ModuleNotFoundError: No module named 'telegram'` hatası verdi.
+Ekip, üretimdeki paket seçimiyle test geçene kadar Telegram yamasını tutar.
+
+### Diğer denemeler
+
 İlk dar kapsamlı denemede altı test geçti. Dört test başarısız oldu.
 O sonuç `TypedDict` tanımını ve kaldırılan `init_telemetry` işlevini kapsıyordu.
 Genişletilen testler `press.api.cookies` import'unu ve tam bağımlılık uyumunu da denetler.

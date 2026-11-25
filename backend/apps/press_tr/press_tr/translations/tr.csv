@@ -112,3 +112,4 @@ Number of matching records to skip.,Listede atlanacak kayıt sayısı.,press_tr.
 An identity page and a flag that indicates whether another page exists.,Yanıt kimlikleri verir. Sonraki sayfanın var olup olmadığını da gösterir.,press_tr.openapi
 The page start or length is invalid.,İlk sıra veya kayıt sayısı geçersiz.,press_tr.openapi
 The service token or request parameters were rejected.,Press servis belirtecini veya istek alanlarını reddetti.,press_tr.openapi
+The {0} value is not a valid key. A valid key is 44 characters of URL-safe base64 and ends with one = sign. Copy the key again exactly.,{0} değeri geçerli bir anahtar değil. Geçerli anahtar 44 karakterdir ve tek bir = işaretiyle biter. Anahtarı yeniden ve eksiksiz kopyalayın.,press_tr

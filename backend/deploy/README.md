@@ -37,6 +37,7 @@ shellcheck -x -P backend/deploy/bin:backend/deploy/remote backend/deploy/bin/* b
 
 - Depoya sır yazmayın. Sırlar sunucuda `/etc/atonota/<ortam>/` klasöründe durur.
 - Kod yeni bir üretim ayarı okursa ayarı `settings/` listesine ekleyin. Liste eksikse `tests/test_settings.py` düşer.
+- `atonota_verification_secret` sırrını doğrulama sağlayıcısı verir. DevOps sorumlusu sırrı kiracı sitesinin `site_config.json` dosyasına yazar.
 - Sunucuda bir ayar eksikse `remote/apply` hiçbir şeyi değiştirmeden durur ve eksik anahtarı yazar.
 - İmajı etiketle değil, özetle çağırın.
 - Taşımada kodu yeniden derlemeyin.

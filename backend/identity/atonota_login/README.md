@@ -12,7 +12,8 @@ Bu klasör ürünün kendi kodunu tutar. Kod MIT lisanslıdır (`LICENSE`). Keyc
 | `atonota_login/platforms.py` | Kayıtları denetler ve Keycloak kaydına çevirir. |
 | `atonota_login/keycloak_apply.py` | Platformları çalışan Keycloak'ta açar ya da kapatır. |
 | `atonota_login/decision.py` | Bir işlemin şimdi yapılıp yapılamayacağına karar verir (G-161). |
-| `policy/actions.json` | İşlemler, kontroller ve değer bekleyen kurallar (G-166, G-167). |
+| `atonota_login/policy/actions.json` | İşlemler, kontroller ve değer bekleyen kurallar (G-166, G-167). Dosya paket verisidir. |
+| `pyproject.toml` | Paket tanımı. Kiracı imajı paketi `uv pip install --no-deps` ile kurar. |
 | `atonota_login/verification_inbox.py` | Dış kimlik doğrulama bildirimlerinin gelen kutusu (G-164). |
 | `bin/atonota-login` | Komut satırı aracı. |
 | `tests/` | Ürünün testleri. |
@@ -38,7 +39,7 @@ Platform şu kurala göre açılır:
 
 Açık bir platform e-postanın doğrulandığını bildirmelidir. Kayıt bunun için `email_verified` iddiasını zorunlu kılar. Örnek `google.json` dosyasındadır. Bu kural yoksa biri başkasının e-postasıyla önceden hesap açabilir. Kişi sonra kaydolunca hesap saldırganın olur. Bu saldırıya önceden ele geçirme denir.
 
-Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını kapatan kayıt reddedilir. Platform adresleri https kullanır. Yalnız yerel deneme adresi http kullanabilir.
+Kayıt güvenliği zayıflatan ayarları reddeder. Örneğin imza doğrulamasını kapatan kayıt reddedilir. Platform adresleri https kullanır. Kayıt bütün ortamlara gider. Bu yüzden yerel `http` adresi de reddedilir. Tek istisna geliştirme için yerel Keycloak'a yapılan `apply` işidir. Bu işte `--allow-local-http` seçeneği yerel `http` adresine izin verir. Canlı test bu seçeneği kullanır.
 
 Facebook ve X bu iddiayı Keycloak'a göndermez. Bu yüzden iki kayıt `"active": false` ile gelir. İki platformu açmak için önce ek bir denetim gerekir. Borç satırı proje kaydındadır (O-56).
 
@@ -70,7 +71,25 @@ Parolası olmayan kullanıcı bu yolla bağ kuramaz. Örneğin yalnız sihirli b
 
 Kuruluş kurumsal girişi zorunlu kılabilir. Bu durumda üyelik katmanı kullanıcıya `enterprise-sso-required` rolünü verir. Rolü olan kullanıcı sosyal platformla giremez.
 
-Kurumsal sağlayıcılar kayıtta yoktur. `apply` komutu onları değiştirmez. `email_verified` kuralı olmayan kurumsal sağlayıcıyı komut uyarıyla adlandırır. Bu sağlayıcı da önceden ele geçirmeye açıktır. Borç satırı proje kaydındadır.
+Kurumsal sağlayıcılar kayıtta yoktur. `apply` komutu onları değiştirmez. Komut her kurumsal sağlayıcıyı şu sırayla denetler (G-160):
+
+1. `trustEmail` açıksa komut hata verir.
+2. Sağlayıcıda `email_verified` kuralı varsa sağlayıcı geçer.
+3. Kural yoksa sağlayıcının onaylı bir istisna kaydı olmalıdır. Kayıt yoksa komut hata verir.
+4. Sosyal platform istisna alamaz.
+5. Kayıt bütün kurallara uymalıdır. Kurallar `platform_core/identity/enterprise_rules.py` dosyasındadır.
+6. Kayıttaki `issuer` adresi sağlayıcının adresiyle aynı olmalıdır.
+7. Kaydın bitiş tarihi geçmemiş olmalıdır.
+8. İki giriş akışının adı sabit kalmalıdır.
+
+Komut ilk hatada durur. Komut sağlayıcıyı kapatmaz. Sağlayıcıyı kapatma kararı DevOps sorumlusundadır.
+
+İstisna kaydı Frappe'de `PLT Enterprise IdP Exception` DocType'ında durur. Kayıt onaydan sonra değişmez ve silinmez. Kayıtları DevOps sorumlusu şu iki adımla taşır:
+
+1. `bench --site <site> execute platform_core.identity.enterprise_sync.export_exceptions --kwargs '{"path": "<dosya>"}'` komutu geçerli kayıtları dosyaya yazar.
+2. `bin/atonota-login apply --from-env --enterprise-exceptions <dosya>` komutu sağlayıcıları bu dosyayla denetler.
+
+Dosya sır taşımaz. Dosya Git'e girmez. Kalan işler proje kaydının borç satırındadır.
 
 Bağ, ikinci adımdan ve kurumsal giriş denetiminden önce kaydedilir. Bu sıra Keycloak'ın kendi sırasıdır. İkinci adım başarısız olursa bağ yine de kalır. Bağ yine de giriş açmaz, çünkü her girişte iki denetim yeniden çalışır.
 

@@ -201,11 +201,13 @@ class TestPythonRules(FrappeAPITestCase):
 			("get", "/api/method/platform_core.api.auth.start_login"),
 			("get", "/api/method/platform_core.api.auth.keycloak_callback"),
 			("post", "/api/method/platform_core.api.keycloak_backchannel_logout"),
+			("post", "/api/method/platform_core.api.atonota_login.verification_notice"),
 		]
 		for original, (_name, methods) in login_policy.GATED_FUNCTIONS.items():
 			paths.append(("post" if "POST" in methods else "get", f"/api/method/{original}"))
 		limits = {
 			"/api/method/platform_core.api.keycloak_backchannel_logout": 300,
+			"/api/method/platform_core.api.atonota_login.verification_notice": 300,
 		}
 		with h.SiteSettings({"identity_keycloak_only": 1}):
 			for verb, path in paths:

@@ -108,6 +108,12 @@ class UnpatchedRuntimeTest(unittest.TestCase):
     def test_press_cookies_imports(self):
         self.run_python("import press.api.cookies")
 
+    def test_press_settings_prerequisites_import(self):
+        self.run_python("import boto3, twilio")
+
+    def test_press_settings_imports(self):
+        self.run_python("import press.press.doctype.press_settings.press_settings")
+
     def test_python_and_frappe_versions(self):
         self.run_python(
             "import sys, frappe; assert sys.version_info[:2] == (3, 14); "

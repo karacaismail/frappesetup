@@ -36,7 +36,7 @@ const DOC_SLUGS = readdirSync(new URL('../src/content/docs/', import.meta.url))
   .map((f) => f.replace(/\.md$/, ''))
   .sort();
 const ALL_PAGES = ['', ...DOC_SLUGS.map((slug) => `${slug}/`)];
-const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/'];
+const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/', 'atonota-login-tanitim/'];
 // AI grubundaki sayfa sayısı bölüm üst verisinden türer: yeni AI sayfası eklendiğinde test kendiliğinden uyar.
 const AI_NAV_COUNT = (
   readFileSync(new URL('../src/data/sections.ts', import.meta.url), 'utf8').match(/group: 'AI'/g) ?? []
@@ -1535,6 +1535,71 @@ test.describe('content', () => {
       await wrap.click({ position: { x: 10, y: 10 } });
       expect(await wrap.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// G-165 tanıtım sayfası: değer önerisi gereksinime bağlıdır, fiyat yazmaz, ölçüm satıcısına istek gitmez,
+// durum tabloları görev panosuyla aynıdır.
+test.describe('AtonotA Login landing page', () => {
+  const PATH = 'atonota-login-tanitim/';
+  const reqIds = new Set(requirements.map((r) => r.id));
+
+  test('loading the page sends no request outside the site origin', async ({ page, baseURL }) => {
+    const origin = new URL(baseURL!).origin;
+    const outside: string[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (!url.startsWith('data:') && !url.startsWith('blob:') && new URL(url).origin !== origin) outside.push(url);
+    });
+    await page.goto(PATH, { waitUntil: 'networkidle' });
+    await waitForHydration(page);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForLoadState('networkidle');
+    expect(outside, 'ölçüm satıcısına ya da başka bir origin\'e istek').toEqual([]);
+  });
+
+  test('every value proposition names an existing requirement and no price is written', async ({ page }) => {
+    await page.goto(PATH);
+    const items = await page.evaluate(() => {
+      const h = [...document.querySelectorAll('.prose h2')].find((el) => el.textContent?.includes('Değer önerileri'));
+      let el = h?.nextElementSibling ?? null;
+      while (el && el.tagName !== 'OL' && el.tagName !== 'H2') el = el.nextElementSibling;
+      return el?.tagName === 'OL' ? [...el.querySelectorAll(':scope > li')].map((li) => li.textContent ?? '') : [];
+    });
+    expect(items.length, 'değer önerisi listesi').toBeGreaterThan(0);
+    for (const text of items) {
+      const ids = text.match(/\bG-\d+\b/g) ?? [];
+      expect(ids.length, `gereksinim kimliği yok: ${text}`).toBeGreaterThan(0);
+      for (const id of ids) expect(reqIds.has(id), `${id} gereksinim listesinde yok`).toBe(true);
+    }
+    const body = (await page.locator('.prose').textContent()) ?? '';
+    expect(body).not.toMatch(/[₺$€£]|\b(TL|TRY|USD|EUR)\b|\d\s*(lira|dolar|avro)\b|\/\s*ay\b/i);
+  });
+
+  test('status tables match the task board', async ({ page }) => {
+    await page.goto(PATH);
+    const tables = await page.evaluate(() => {
+      const out: Record<string, string[]> = {};
+      for (const h of document.querySelectorAll('.prose h3')) {
+        let el = h.nextElementSibling;
+        while (el && !el.querySelector('table') && !/^H[23]$/.test(el.tagName)) el = el.nextElementSibling;
+        const rows = el?.querySelectorAll('tbody tr') ?? [];
+        out[(h.textContent ?? '').replace('#', '').trim()] = [...rows].map((r) => r.children[1]?.textContent?.trim() ?? '');
+      }
+      return out;
+    });
+    const status = (id: string) => board.items[id]?.status;
+    const done = tables['Bitti'] ?? [];
+    const ongoing = tables['Kodu yazıldı, iş sürüyor'] ?? [];
+    const soon = tables['Yakında'] ?? [];
+    expect(done.length * ongoing.length * soon.length, 'üç durum tablosu').toBeGreaterThan(0);
+    for (const id of done) expect(status(id), `${id} "Bitti" tablosunda`).toBe('done');
+    for (const id of [...ongoing, ...soon]) expect(status(id), `${id} panoda bitti, "Bitti" tablosuna taşınmalı`).not.toBe('done');
+    const boardDone = Object.entries(board.items)
+      .filter(([, it]) => it.epic === 'login-product' && it.status === 'done')
+      .map(([id]) => id);
+    expect([...new Set(done)].sort(), 'panoda biten her ürün kalemi "Bitti" tablosundadır').toEqual(boardDone.sort());
   });
 });
 
