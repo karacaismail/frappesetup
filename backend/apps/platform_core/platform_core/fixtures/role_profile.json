@@ -1,0 +1,58 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Role Profile",
+  "name": "Tenant Admin",
+  "role_profile": "Tenant Admin",
+  "roles": [
+   {
+    "parent": "Tenant Admin",
+    "parentfield": "roles",
+    "parenttype": "Role Profile",
+    "role": "Tenant Admin"
+   }
+  ]
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Role Profile",
+  "name": "Tenant Admin Assistant",
+  "role_profile": "Tenant Admin Assistant",
+  "roles": [
+   {
+    "parent": "Tenant Admin Assistant",
+    "parentfield": "roles",
+    "parenttype": "Role Profile",
+    "role": "Tenant Admin Assistant"
+   }
+  ]
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Role Profile",
+  "name": "Reseller Admin",
+  "role_profile": "Reseller Admin",
+  "roles": [
+   {
+    "parent": "Reseller Admin",
+    "parentfield": "roles",
+    "parenttype": "Role Profile",
+    "role": "Reseller Admin"
+   }
+  ]
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Role Profile",
+  "name": "Reseller Assistant",
+  "role_profile": "Reseller Assistant",
+  "roles": [
+   {
+    "parent": "Reseller Assistant",
+    "parentfield": "roles",
+    "parenttype": "Role Profile",
+    "role": "Reseller Assistant"
+   }
+  ]
+ }
+]
