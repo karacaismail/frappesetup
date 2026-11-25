@@ -154,6 +154,12 @@ x-site-settings:
       example: "(secret, not written in this file)"
       required: false
       note: Required for outgoing service token requests. Store it only in the site setting and in the `.env` file.
+    - key: mobile_identity_sync_url
+      example: https://identity-sync.example.test
+      required: false
+      note: |
+        Root address of identity-sync. It must use HTTPS. The phone session revocation and the AtonotA Login reads (AJA-459) use it.
+        If it is empty, the two AtonotA Login reads return 503.
     - key: identity_brand_name
       example: AtonotA Login
       required: true
@@ -650,6 +656,136 @@ paths:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "401":
           $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.api.auth.list_login_providers:
+    get:
+      tags: [login]
+      operationId: listLoginProviders
+      summary: Lists the sign-in platforms that this site may show.
+      description: |
+        The source is the panel contract (`atonota-web`, `src/auth/README.md`, G-159) and the security review AJA-458.
+        The site reads the list from identity-sync (`GET /v1/login-providers`). The site carries no Keycloak management role.
+        The site calls with its own service token from `service_client.identity_sync_bearer()`. The token of the user never leaves the site.
+        identity-sync finds the tenant from the token. The list has the general platforms and the platforms of this tenant only.
+        A platform without a secret is not in the list. A platform of another tenant is never in the list.
+
+        The method needs no session (AJA-516). The sign-in screen calls it before sign-in.
+        A signed-in panel account may call it too. The panel contract says so: G-159, "Uç oturum istemez".
+        The reply names no person. It carries no client secret, no internal address and no provider configuration.
+        The method takes only GET. A POST gets 403 and `PermissionError`.
+        The method takes no parameters. A `subject`, a `user` or any other value gets 400 and `InvalidInput`.
+        The reply is built from an allow list. Each row has only `alias` and `display_name`.
+        The reply carries `Cache-Control: private, no-store`.
+        If identity-sync or Keycloak does not answer, the method returns 503 and `IdentityServiceUnavailable`.
+        The message carries no secret, no token and no internal address.
+        The limit is 30 requests per minute per IP address. The method only reads.
+      x-yikici: false
+      security: []
+      responses:
+        "200":
+          description: The platforms this site may show, in the order of identity-sync.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/LoginProviderList"}
+              examples:
+                atonota:
+                  value:
+                    message:
+                      providers:
+                        - alias: google
+                          display_name: Google
+        "400":
+          description: The request has a parameter. The `exc_type` value is `InvalidInput`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "403":
+          description: |
+            The request method is not GET, or identity-sync refused the site. The `exc_type` value is `PermissionError` or `LoginReadForbidden`.
+            A cookie of an expired session gets 401, not 403.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "503":
+          description: identity-sync or Keycloak did not answer. The `exc_type` value is `IdentityServiceUnavailable`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+
+  /platform_core.api.auth.list_linked_accounts:
+    get:
+      tags: [login]
+      operationId: listLinkedAccounts
+      summary: Lists the linked platforms of the signed-in user.
+      description: |
+        The source is the panel contract (`atonota-web`, `src/auth/README.md`, G-160) and the security review AJA-458.
+        The site reads the list from identity-sync (`POST /v1/linked-accounts`) with its own service token.
+        The person comes only from the session. The site takes the `keycloak_sub` value of the session.
+        The value must match a `PLT Identity Link` record of `frappe.session.user` with the configured issuer.
+        If there is no such record, the method makes no call and returns 403 and `IdentityLinkMissing`.
+        identity-sync checks that the person is a member of this tenant. If not, the method returns 403 and `LoginReadForbidden`.
+        An unknown person gets the same 403.
+
+        The method needs a signed-in session. A guest gets 403 and `PermissionError`, not 417.
+        The method takes no parameters. A `subject`, a `user` or any other value gets 400 and `InvalidInput`.
+        The reply is built from an allow list. A row has only `alias`, `display_name` and `linked`.
+        The outside user name, credential data and Keycloak ids never reach the reply.
+        `local_sign_in_methods` is the number of sign-in ways without a platform. Examples are a password and a passkey.
+        The reply carries `Cache-Control: private, no-store`. The reply is never kept.
+        If identity-sync or Keycloak does not answer, the method returns 503 and `IdentityServiceUnavailable`.
+        The message carries no secret, no token and no internal address.
+        The limit is 30 requests per minute per signed-in user. The method only reads.
+      x-yikici: false
+      security:
+        - frappeSession: []
+      responses:
+        "200":
+          description: The linked platforms of the signed-in user and the number of local sign-in ways.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/LinkedAccounts"}
+              examples:
+                atonota:
+                  value:
+                    message:
+                      providers:
+                        - alias: google
+                          display_name: Google
+                          linked: true
+                      local_sign_in_methods: 1
+        "400":
+          description: The request has a parameter. The `exc_type` value is `InvalidInput`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "403":
+          description: |
+            The request has no session, the session has no matching identity link, or the person is not a member of this tenant.
+            The `exc_type` value is `PermissionError`, `IdentityLinkMissing` or `LoginReadForbidden`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "503":
+          description: identity-sync or Keycloak did not answer. The `exc_type` value is `IdentityServiceUnavailable`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
 
   /platform_core.api.auth.setup_keycloak_login:
     post:
@@ -2779,6 +2915,38 @@ components:
             Keycloak logout address. It carries `client_id` and `post_logout_redirect_uri`.
             It does not carry `id_token_hint`.
 
+    LoginProviderList:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [alias, display_name]
+            properties:
+              alias: {type: string, pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"}
+              display_name: {type: string, minLength: 1, maxLength: 80}
+            additionalProperties: false
+      additionalProperties: false
+    LinkedAccounts:
+      type: object
+      required: [providers, local_sign_in_methods]
+      properties:
+        providers:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [alias, display_name, linked]
+            properties:
+              alias: {type: string, pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"}
+              display_name: {type: string, minLength: 1, maxLength: 80}
+              linked: {type: boolean}
+            additionalProperties: false
+        local_sign_in_methods: {type: integer, minimum: 0}
+      additionalProperties: false
     CsrfToken:
       type: object
       required: [csrf_token]

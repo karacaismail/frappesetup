@@ -16,8 +16,9 @@ __ID_HOST__ {
 
 # Press (O-55, G-6, G-13, G-119). Desk, dashboard and every Press API answer only on Tailscale.
 # Customers reach only the account deletion flow (O-27): the page, its files, the Keycloak login
-# and return, Keycloak's logout notice and the deletion request. A new customer path is added here
-# one by one, with its reason in O-55. Everything else gets 404.
+# and return, Keycloak's logout notice and the deletion request. They also reach the account
+# recovery request (G-163), because a person who lost their key cannot sign in. A new customer
+# path is added here one by one, with its reason in O-55. Everything else gets 404.
 # Only the Tailscale ranges count as private. Docker's own 172.16.0.0/12 addresses do not: a public
 # IPv6 client can reach Caddy from the Docker gateway address.
 __PRESS_HOST__ {
@@ -33,6 +34,7 @@ __PRESS_HOST__ {
 		path /account-deletion /account-deletion/ /assets/* /website_script.js
 		path /api/method/press_tr.api.auth.get_login_url /api/method/press_tr.api.auth.keycloak_callback
 		path /api/method/press_tr.api.keycloak_backchannel_logout /api/method/press_tr.api.account.request_deletion
+		path /api/method/press_tr.api.account.request_recovery
 	}
 	@press_private remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48
 	handle @press_private {
