@@ -11,11 +11,12 @@ Bu ray, Frappe v16 / ERPNext v16 kiracı sitelerinde özel kodun tek evi olan `p
 | Modül | Bileşen | Frappe mekanizması | G-id |
 | --- | --- | --- | --- |
 | `access` | Access Rule doctype, derleyici, `has_permission` / `permission_query_conditions` hook'ları, `explain_permission` | Hook'lar, DocPerm, User Permission, permlevel | G-60, G-61, G-62, G-104 |
-| `meta` | `api.meta.get_doctype`, `api.shell.get_bootstrap`, meta hash/ETag | `/api/v2/doctype/<doctype>/meta`, `getdoctype`, Workspace Sidebar | G-63, G-94, X-12 |
-| `audit` | AI Action Log doctype, saklama işi, correlation-id | Version, Activity Log, Permission Log, Access Log | G-64, G-52, X-05 |
+| `shell` | `api.meta.get_doctype` ve `api.shell.get_bootstrap` | Kayıt tanımı, açılış verisi ve kenar çubuğu | G-63, G-94, X-12 |
+| `ai` | Araç kaydı, MCP, önizleme, insan onayı ve işlem günlüğü | `api.ai`, `ai_tools`, AI Action Log | G-64, G-84, G-86 |
+| `model_gateway` | Sağlayıcı seçimi ve kullanım kaydı | `api.model`, AI Usage Log | G-64, G-83, G-87 |
 | `flags` | `subscription.has_feature`, `@require_feature`, Platform Settings | site\_config, Press Developer API | G-35, G-106, G-38, G-90 |
-| `outbox` | Platform Event doctype, dağıtıcı, ölü mektup | `doc_events`, `scheduler_events`, `frappe.enqueue` | G-15, G-81, G-83, X-12 |
-| `identity` | provision, SLO, JWT auth\_hooks | `auth_hooks`, `on_logout`, Social Login Key | G-57, G-58, G-59 |
+| `outbox` | Platform Event doctype, dağıtıcı, ölü mektup | `doc_events` ve `frappe.enqueue` | G-15, G-81, G-83, X-12 |
+| `identity` | Keycloak giriş dönüşü, kullanıcı bağı, çıkış ve servis belirteci | `api.auth`, `api.identity`, `auth_hooks` | G-44, G-57, G-58, G-59 |
 | `baseline` | TR System Settings, Desk yönlendirme, SPA www sayfası | `setup_wizard_complete`, `before_request`, `www/` | G-41, G-45, G-53, G-75 |
 | `support` | Support Session doctype, impersonate kapısı, Hocuspocus `onAuthenticate` doğrulama ucu | `user.impersonate`, Activity Log, Notification Log | SA-27, SA-28, SA-29 |
 | `ops` | `api.ops.customer_360` (operatör modu, salt okur birleştirme) | Press API + yerel doctype'lar | SA-24 |
@@ -63,7 +64,7 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | Dışa aktarım, Data Import | `export_query`, Data Import | Liste koşulu + dışa aktarım izni; içe aktarma yalnız yetkili rol |
 | Dosya ve ekler | `File`, private dosya uçları | Ekin bağlı olduğu belgenin izni |
 | Özel metotlar, arka plan işleri | whitelisted metot, `frappe.enqueue` | Metot içinde `has_permission`; işler kullanıcı bağlamını taşır |
-| MCP araçları, realtime | `frappe_mcp`, socket.io | Kullanıcı kimliğiyle aynı yol (G-85); oda aboneliğinde `has_permission` |
+| MCP araçları, realtime | `platform_core.ai`, socket.io | Kullanıcı kimliğiyle aynı yol (G-85); oda aboneliğinde `has_permission` |
 | Sistem bağlamı | `frappe.get_all`, ham SQL | İzin uygulamaz (doğrulandı: Frappe Database API); kullanıcı yüzeyli kodda yalnız gerekçeli istisna + lint |
 
 ## Meta API ve shell bootstrap
@@ -76,8 +77,9 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | --- | --- | --- |
 | Version (alan farkları) | `track_changes=1` satılan tüm doctype'larda | belge ömrü |
 | Activity Log, Access Log | Frappe yerel | 365 gün |
-| Permission Log, Deleted Document | Frappe yerel; LogType protokolüne uymadığı için `platform_core` günlük işiyle temizlenir | 365 gün |
-| AI Action Log | `platform_core` doctype: session\_id, user, model, tool, args\_hash, target doctype/name, preview\_hash, confirm durumu, sonuç, token/maliyet, ip, `request_id` | 365 gün (G-87) |
+| Permission Log, Deleted Document | Frappe kayıtları. Yönetici saklama temizliğini elle başlatır (D-6, O-32). | 365 gün |
+| AI Action Log | Araç, kullanıcı, hedef kayıt, girdi özeti, onay ve işlem sonucu (G-64) | 365 gün (G-87) |
+| AI Usage Log | Model, token ve maliyet (G-64) | 365 gün (G-87) |
 | Support Session | `platform_core` doctype: operatör, kapsam kademesi, rıza sürümü, başlangıç/bitiş, Hocuspocus oda kimliği, bağlı HD Ticket | saklama matrisi (SA-36) |
 
 `X-Request-Id` başlığı `before_request`'te okunur, Activity Log ve AI Action Log kayıtlarına Custom Field olarak yazılır ve outbox olaylarına taşınır (X-05); AI Action Log ilgili Version kaydına Link ile bağlanır (G-64).
@@ -88,7 +90,7 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 
 ## Outbox: işlemsel giden kutusu
 
-`Platform Event` doctype'ı (event\_type, `ref_doctype/ref_name`, payload JSON, idempotency\_key, correlation\_id, status Pending/Sent/Failed/Dead, attempts, next\_attempt\_at) iş belgesiyle aynı veritabanı işleminde `doc_events` içinden yazılır; Frappe isteği tek işlemde commit ettiği için olay ve belge birlikte kalıcı olur. Dağıtıcı `scheduler_events.cron` ile dakikada bir çalışır, HMAC imzalı HTTPS ile agent servisine (G-83) ve identity-sync'e (G-81) teslim eder, üstel geri çekilme ve beş denemeden sonra Dead durumuna alır; tüketiciler idempotency\_key ile yinelemeyi bastırır. Olay kataloğu: `meta_changed`, `user_provisioned`, `user_disabled`, `access_rule_changed`, `ai_action_logged`, `subscription_changed`, `personal_data_request`, `support_session_changed`. Dağıtıcı `long` kuyruğunda çalışır; worker boyutlandırması G-50'ye göre DevOps sorumlusu tarafından Release Group'ta ayarlanır. Press tarafındaki karşılığı press\_tr `doc_events` kanalı (G-15) ve Rail 6'ya giden `press_ops_bridge` (SA-22) kanalıdır.
+`Platform Event` doctype'ı (event\_type, `ref_doctype/ref_name`, payload JSON, idempotency\_key, correlation\_id, status Pending/Sent/Failed/Dead, attempts, next\_attempt\_at) iş belgesiyle aynı veritabanı işleminde `doc_events` içinden yazılır; Frappe isteği tek işlemde commit ettiği için olay ve belge birlikte kalıcı olur. Frappe kayıtlar kalıcı olunca dağıtımı kuyruğa alır. Zamanlanmış iş kurulmaz (D-6). Dağıtıcı HMAC imzalı HTTPS ile agent servisine (G-83) ve identity-sync'e (G-81) teslim eder. Beş başarısız denemeden sonra olay Dead durumunda kalır. Operatör bekleyen olayları elle yeniden işler. Tüketiciler idempotency\_key ile yinelemeyi bastırır. Olay kataloğu: `meta_changed`, `user_provisioned`, `user_disabled`, `access_rule_changed`, `ai_action_logged`, `subscription_changed`, `personal_data_request`, `support_session_changed`. Dağıtıcı `long` kuyruğunda çalışır; worker boyutlandırması G-50'ye göre DevOps sorumlusu tarafından Release Group'ta ayarlanır. Press tarafındaki karşılığı press\_tr `doc_events` kanalı (G-15) ve Rail 6'ya giden `press_ops_bridge` (SA-22) kanalıdır.
 
 ## API sözleşme politikası
 
@@ -108,7 +110,7 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | `press_tr.api.ops.*` | yeni özel | press\_tr (Press bench'i) | System User servis hesabı; operatör kimliği denetime |
 | `create-fc-invoice`, `delete-fc-team` | upstream istemci adı, yeni alıcı | press\_tr\_finance (operasyon sitesi) | `override_whitelisted_methods` ile bağlı; ayrılmış API kullanıcısı |
 | `press.api.site.install_app` ve diğer `press.api.*` | upstream hazır | press | Press oturumu + Press Role (G-16) |
-| Kiracı MCP (`frappe_mcp` + `ai_tools`) | upstream deneysel + özel | frappe\_mcp, platform\_core | Aracı belirteci (G-148, G-59) |
+| Kiracı MCP | Uygulama araçları | `platform_core.ai` (karar notu 0002) | Aracı belirteci (G-148, G-59) |
 
 
 ## Teslim sırası ve kabul
@@ -118,6 +120,21 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | P1-a | `platform_core` iskeleti, baseline, SPA www sayfası | Test kiracısında `setup_complete=1`, TR değerleri korunmuş (G-41), csrf dolu (G-45) |
 | P1-b | Access Rule motoru + wildcard hook'lar + veri yüzeyi matrisi | own/team/department/company senaryoları liste, tek belge, rapor, arama, dışa aktarım ve PDF'te aynı sonucu verir (G-121); permlevel alanı yanıtta yok; `explain_permission` reddeden kuralı adlandırır |
 | P1-c | Meta API + bootstrap + outbox | Custom Field eklendiğinde 5 sn içinde `meta_changed` olayı ve yeni `meta_hash`; Dead olay sayısı 0 |
-| P1-d | Denetim + saklama işleri | 366 günlük Permission Log kaydı silinir; AI Action Log Version'a bağlı |
+| P1-d | Denetim ve elle başlatılan saklama temizliği | Yönetici temizliği başlattığında 366 günlük Permission Log kaydı kalıcı silinir. AI Action Log, Version kaydına bağlanır. |
 | P1 (asgari) / P3 (tam) | auth\_hooks adaptörü: aracı belirteci ve servis JWT'si (G-59, G-148) | Aracı belirteciyle yapılan MCP çağrısı Access Rule'dan geçer; süresi dolmuş, başka siteye ait veya yeniden kullanılan belirteç reddedilir; yetkisiz çağrı `denied` olarak loglanır (G-85) |
 | P6 | `support` ve `ops` modülleri | Support Session olmadan `user.impersonate` reddedilir; `customer_360` yalnız operatör rolüyle döner ve her çağrı Operator Audit'e yazılır (SA-25, SA-26) |
+
+## Website User yöntem izin listesi
+
+Kiracıdaki son kullanıcı “Website User” olur. Kaynak D-5 ve O-3 kararıdır.
+
+Website User yalnız izin listesindeki yöntemleri çağırabilir. Sunucu diğer yöntemlere 403 yanıtı verir. Sunucu, Frappe'nin bulduğu işlevi denetler. Aynı işlevin takma adresi de aynı kurala uyar.
+
+- Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` çağrılarına uygulanır.
+- Her uygulama kendi yöntemlerini `website_user_allowed_methods` kancasına ekler.
+- Frappe'den yalnız `frappe.auth.get_logged_user`, `logout` ve kurallı `frappe.desk.search.search_link` çağrıları listededir.
+- Frappe kayıt izinleri ve erişim kuralları REST kayıt uçlarında yürür. Bu uçlar `/api/resource` ve `/api/v2/document` yollarıdır.
+- Kayıt yöntemleri belge izinlerine uyar. Bunlar `/api/v2/document/<doctype>/<name>/method/<method>/` ve eski `run_method` çağrılarıdır.
+- Frappe masaüstü hesabı bu listeden etkilenmez.
+
+Website User yöntem izin listesini `backend/docs/contracts.md` dosyasının 5. bölümü tanımlar.

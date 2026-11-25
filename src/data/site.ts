@@ -2,7 +2,7 @@
 export const SITE_TITLE = 'frappesetup';
 export const SITE_TAGLINE = 'Frappe Headless SaaS — mimari karar çerçevesi';
 // Sitenin backend ile son eşitlendiği gün. İçerik değişince elle güncellenir; tests/as-of.spec.ts denetler.
-export const AS_OF = '24 Kasım 2026';
+export const AS_OF = '25 Kasım 2026';
 export const REPO_URL = 'https://github.com/karacaismail/frappesetup';
 export const DECISION_COUNT = 10;
 export const RAIL_COUNT = 6;

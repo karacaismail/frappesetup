@@ -6,11 +6,21 @@ order: 21
 
 Bu sayfa iki kararı verir: hangi hazır MCP sunucusu neye kullanılır ve paketin `press-ai` sunucusu nasıl çalıştırılır. Hazır depolar 8 Ekim 2026'da yüzeysel klonlardan okundu; hiçbiri kurulmadı. Seçimde ilk ölçüt kimliktir: tek paylaşılan servis anahtarıyla çalışan sunucu Frappe izin modelini aşar ve yetki eşitliği ilkesine (G-85) uymaz.
 
+## Kiracı MCP sözleşmesi
+
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
+
+MCP, ajanın araç listesini almasını ve araç çağırmasını sağlayan protokoldür. Kiracı ucu `platform_core.api.ai.mcp` olarak tasarlandı. Okuma ve araç çağrısı insan oturumu veya kısa süreli aracı belirteciyle yapılır. Yazma çağrısı 10 dakika geçerli bir öneri açar. İnsan öneriyi ayrı `approve_proposal` ucundan onaylar.
+
+Tasarım, Frappe 16'nın hazır `/api/v2/mcp` ucunu kiracıda kapatır. `frappe/mcp` deposu arşivlendi. İncelenen kayıtta kiracı MCP uç dosyası `platform_core/api/ai.py` yolundadır. Gerçek MCP istemcisi ve canlı Keycloak denenmedi (`not_run`).
+
+Kaynaklar `backend/docs/contracts.md` 10. bölüm, karar notu 0002 ve dalın dosya ağacıdır.
+
 ## Kararlar
 
-- **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır; açmadan önce etkisini DevOps sorumlusu inceler.
+- **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır. DevOps sorumlusu açmadan önce etkisini inceler.
 - **Press kurulum ve dağıtımı:** hazır sunucu yok; paketin `press-ai` sunucusu yazılır (taslak).
-- **Site içi veri araçları:** kullanıcı kimliğiyle çalışan ve yazmayı kodda onaylayan model (vyogotech) ya da `frappe/mcp` çatısıyla yazılan araçlar (G-84). Paylaşılan anahtarlı proxy'ler kullanılmaz.
+- **Site içi veri araçları:** `platform_core.ai` kullanıcı yetkisiyle çalışır. İnsan yazma önerisini ayrı uçtan onaylar. Kaynak: karar notu 0002 ve sözleşme 10. bölüm.
 - **Ağa açılmaz:** kimliksiz uç açan ya da keyfi komut çalıştıran sunucular.
 
 ## Hazır sunucular: kanıt
@@ -18,7 +28,7 @@ Bu sayfa iki kararı verir: hangi hazır MCP sunucusu neye kullanılır ve paket
 | Depo | Biçim | Lisans | Kimlik | Yazma onayı (kodda) | Denetim izi | Test kanıtı | Press ve altyapı |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | frappe/press `press/mcp` | Press içi | bu incelemede okunmadı | System Manager, System User | yazan araçlarda `confirm=True` | gizli değer maskeleme | incelenmedi | telemetri, log, disk teşhisi; kurulum ve dağıtım aracı yok |
-| frappe/mcp | Frappe app kütüphanesi (`pip install frappe-mcp`) | MIT | Frappe oturumu, OAuth2 | yok (yalnız çatı) | yok | 4 test dosyası | yok |
+| frappe/mcp (arşivlendi, karar notu 0002) | Frappe app kütüphanesi (`pip install frappe-mcp`) | MIT | Frappe oturumu, OAuth2 | yok (yalnız çatı) | yok | 4 test dosyası | yok |
 | buildswithpaul/Frappe_Assistant_Core | Frappe app | AGPL-3.0 | OAuth 2.0, API anahtarı | genel önizleme yok | `Assistant Audit Log` | yaklaşık 50 test dosyası | yok |
 | vyogotech/frappe-mcp-server | Go proxy | MIT | OAuth2 bearer, `sid`, API anahtarı | tek kullanımlık onay token'ı | log satırı | yaklaşık 60 test dosyası | yok |
 | skaslam1407/Frappe-MCP-Server | Python, yerel bench ya da SSH | MIT | tam ve salt okunur token | onay kapısı | JSONL | 19 test dosyası | bench, site, app, yedek; `fc_request` |

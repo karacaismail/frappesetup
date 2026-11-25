@@ -60,7 +60,7 @@ Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmu
 - Manifestin on kalemi X-09 `docs/app-conformance.md` listesinde işaretli; otomatikleştirilebilen kalemler (pyproject sınırı, fixture filtresi, `AppModule` tip denetimi, `ai_tools` şema doğrulaması, permlevel şablonu varlığı, `support_mask_fields` varlığı) CI'da yeşil.
 - `erpnext-v16-tr-staging` Release Group'unda Deploy Candidate Success, ardından test kiracısında `bench --site X install-app <app>` idempotent ikinci çalışma hatasız (G-102).
 - Aktivasyon E2E'si 320 px ve masaüstünde geçer; Marketplace App Subscription Active, `site_config` içinde `sk_<app>`, sidebar'da uygulama başlığı ve Workspace çocukları görünür (G-29, G-94, SA-16).
-- Yetki matrisi ve AI negatif testleri (yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, onaysız yıkıcı aksiyon) reddedilir ve AI Action Log'a `denied` düşer (G-85, G-64).
+- Testler yetkisiz kayıt türünü, kaydı ve alanı dener. Testler insan onayı olmadan yazmayı da dener. Sunucu reddedilen çağrıyı AI Action Log kaydına `denied` olarak yazar (G-85, G-64).
 - `user_data_fields` ile Personal Data Download/Deletion talebi uygulamanın tüm kişisel veri doctype'larını kapsar (G-52).
 - Backend metinleri `_()` ile bağlamla sarılır. Türkçe çeviri `translations/tr.csv` dosyasında tamdır. Panel metinleri dil kataloğundadır (G-73).
 - İlk Paid Invoice operasyon sitesinde `APP-<ad>` satırıyla Sales Invoice olarak görünür (SA-19).
