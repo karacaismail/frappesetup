@@ -3,8 +3,8 @@
 The requests go through Frappe's WSGI application, so the session and the permission checks run
 on the real path. Every person and record here is made up.
 
-The "Tenant Admin" role has no definition yet (G-62). The test creates it as a stand-in, so the
-grant endpoint can be tried with the role that G-62 will own.
+The "Tenant Admin" and "Tenant Admin Assistant" roles and their Role Profiles come from the
+fixtures (AJA-832). The test does not create them.
 """
 
 import json
@@ -75,7 +75,6 @@ class TestTenantAdminAssistant(IntegrationTestCase):
 	def setUpClass(cls):
 		super().setUpClass()
 		frappe.set_user("Administrator")
-		ensure_role(panel_roles.TENANT_ADMIN_ROLE, 0)
 		ensure_role(ROLE_MEMBER, 0)
 		ensure_role(ROLE_DESK, 1)
 		if not frappe.db.exists("Role Profile", ADMIN_PROFILE):
@@ -91,8 +90,6 @@ class TestTenantAdminAssistant(IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
 		frappe.set_user("Administrator")
-		# A user save in one test may commit. Each test starts from the correct profile.
-		panel_roles.ensure_assistant_profile()
 		for email, roles in PEOPLE:
 			reset_user(email, roles)
 		# Committed on purpose: the request uses another connection.
@@ -149,25 +146,6 @@ class TestTenantAdminAssistant(IntegrationTestCase):
 	def test_profile_gives_only_the_assistant_role(self):
 		profile = frappe.get_doc("Role Profile", panel_roles.ASSISTANT_PROFILE)
 		self.assertEqual({row.role for row in profile.roles}, {panel_roles.ASSISTANT_ROLE})
-
-	def test_setup_does_not_save_an_unchanged_profile(self):
-		before = frappe.db.get_value("Role Profile", panel_roles.ASSISTANT_PROFILE, "modified")
-		panel_roles.ensure_assistant_profile()
-		self.assertEqual(
-			frappe.db.get_value("Role Profile", panel_roles.ASSISTANT_PROFILE, "modified"), before
-		)
-
-	def test_setup_repairs_a_widened_profile(self):
-		self.make_assistant()
-		profile = frappe.get_doc("Role Profile", panel_roles.ASSISTANT_PROFILE)
-		profile.append("roles", {"role": "System Manager"}).db_insert()
-		profile.clear_cache()
-		frappe.get_doc("User", ASSISTANT).save()
-		self.assertIn("System Manager", self.roles_of(ASSISTANT))
-		panel_roles.ensure_assistant_profile()
-		profile.reload()
-		self.assertEqual({row.role for row in profile.roles}, {panel_roles.ASSISTANT_ROLE})
-		self.assertEqual(self.roles_of(ASSISTANT), {panel_roles.ASSISTANT_ROLE})
 
 	# --- grant ---
 

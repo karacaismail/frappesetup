@@ -57,14 +57,12 @@ override_whitelisted_methods = {
 # The AI access layer turns off Frappe's built-in MCP endpoint.
 after_install = [
 	"platform_core.identity.session_policy.apply",
-	"platform_core.access.panel_roles.ensure_assistant_profile",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
-	"platform_core.access.panel_roles.ensure_assistant_profile",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
@@ -74,10 +72,26 @@ after_migrate = [
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
-# G-168: the tenant admin assistant role has no desk access. Its Role Profile is not a fixture:
-# every fixture sync saves the profile, and each save queues a job that locks the record.
-# `panel_roles.ensure_assistant_profile` writes the profile only when it is missing or wrong.
-fixtures = [{"dt": "Role", "filters": [["name", "in", ["PLT AI Manager", "Tenant Admin Assistant"]]]}]
+# G-62, G-168, G-169, G-170: the four panel roles and their profiles are fixtures.
+# The roles have no desk access, so their holders stay Website Users.
+# No panel profile holds "System Manager". Permission rows are set elsewhere.
+# The value stays a literal: the fixture tests read it without Frappe.
+fixtures = [
+	{
+		"dt": "Role",
+		"filters": [
+			[
+				"name",
+				"in",
+				["PLT AI Manager", "Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"],
+			]
+		],
+	},
+	{
+		"dt": "Role Profile",
+		"filters": [["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]],
+	},
+]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.

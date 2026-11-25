@@ -11,40 +11,11 @@ from frappe.core.doctype.user.user import STANDARD_USERS
 
 ASSISTANT_ROLE = "Tenant Admin Assistant"
 ASSISTANT_PROFILE = "Tenant Admin Assistant"
-# G-62 defines this role. Until then only a System Manager passes the check in practice.
+# The role and the profiles are fixtures (`fixtures/role.json`, `fixtures/role_profile.json`).
 TENANT_ADMIN_ROLE = "Tenant Admin"
 GRANTING_ROLES = frozenset({TENANT_ADMIN_ROLE, "System Manager"})
 # A grant replaces all roles, so it must never demote an admin.
 PROTECTED_ROLES = frozenset({TENANT_ADMIN_ROLE, "System Manager", "Administrator"})
-
-
-def ensure_assistant_profile() -> None:
-	"""Creates the role and the Role Profile when missing. An unchanged profile is not saved again."""
-	if not frappe.db.exists("Role", ASSISTANT_ROLE):
-		frappe.get_doc({"doctype": "Role", "role_name": ASSISTANT_ROLE, "desk_access": 0}).insert(
-			ignore_permissions=True
-		)
-	elif frappe.db.get_value("Role", ASSISTANT_ROLE, "desk_access"):
-		frappe.db.set_value("Role", ASSISTANT_ROLE, "desk_access", 0)
-	if not frappe.db.exists("Role Profile", ASSISTANT_PROFILE):
-		frappe.get_doc(
-			{
-				"doctype": "Role Profile",
-				"role_profile": ASSISTANT_PROFILE,
-				"roles": [{"role": ASSISTANT_ROLE}],
-			}
-		).insert(ignore_permissions=True)
-		return
-	profile = frappe.get_doc("Role Profile", ASSISTANT_PROFILE)
-	if {row.role for row in profile.roles} == {ASSISTANT_ROLE}:
-		return
-	# A save queues a job and locks the record. Without a worker the lock stays, and the next
-	# migrate fails. So the rows are written directly and the holders are synced here.
-	frappe.db.delete("Has Role", {"parenttype": "Role Profile", "parent": ASSISTANT_PROFILE})
-	profile.set("roles", [])
-	profile.append("roles", {"role": ASSISTANT_ROLE}).db_insert()
-	profile.clear_cache()
-	profile.update_all_users()
 
 
 def grant_assistant(user: str) -> dict:
