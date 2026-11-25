@@ -452,6 +452,28 @@ test.describe('content consistency', () => {
     expect(p0exit).not.toMatch(/Press'e (sosyal )?giriş/);
   });
 
+  test('panel roles G-168, G-169 and G-170 are MVP items (AJA-827)', () => {
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    for (const id of ['G-168', 'G-169', 'G-170']) {
+      const r = reqs.find((x) => x.id === id)!;
+      expect(r.priority, id).toBe('MUST');
+      expect(r.phase, id).toBe('P1');
+      expect(board.items[id].level, id).toBe('mvp');
+    }
+    for (const id of ['G-169', 'G-170']) {
+      const d = reqs.find((x) => x.id === id)!.detail;
+      expect(d, id).not.toContain('Kalem G-33 partner programına bağlıdır.');
+      expect(d, id).not.toContain('Kalem MVP kapsamında değildir.');
+    }
+    const g169 = reqs.find((x) => x.id === 'G-169')!.detail;
+    expect(g169).not.toContain('Partner programı G-33 gereksinimindedir.');
+    expect(g169).toContain('Press partner ödemeleri ve partner seviyeleri G-33 içinde kalır.');
+    expect(g169).toContain('Bağ, platform_core içinde bir kayıtla tutulur.');
+    expect(g169).toContain('Kayıt bayi kiracısını müşteri kiracısına bağlar.');
+    expect(g169).toContain('Bu kaydı yalnız platform operatörü açar ve kapatır.');
+    expect(g169).toContain('Platform operatörü isteği onaylar.');
+  });
+
   test('built pages have no table rows rendered as paragraphs', () => {
     // Tablo içindeki boş satır markdown tablosunu böler; kalan satırlar `<p>| …` olarak yayımlanır.
     const dist = new URL('dist/', root);
