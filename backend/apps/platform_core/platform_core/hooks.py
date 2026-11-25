@@ -168,7 +168,8 @@ doc_events = {
 		],
 	},
 	"Role": {
-		"validate": ["platform_core.access.tenant_admin.guard_role"],
+		# Before Frappe's own validate: disabling a role deletes its user rows there.
+		"before_validate": ["platform_core.access.tenant_admin.guard_role"],
 		"before_rename": ["platform_core.access.tenant_admin.guard_role"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
@@ -310,6 +311,8 @@ extend_doctype_class = {
 	"Prepared Report": ["platform_core.access.reports.GuardedPreparedReport"],
 	"Auto Email Report": ["platform_core.access.reports.GuardedAutoEmailReport"],
 	"File": ["platform_core.access.reports.GuardedFile"],
+	# G-62: a “Tenant Admin” profile change reaches its users.
+	"Role Profile": ["platform_core.access.tenant_admin.GuardedRoleProfile"],
 }
 # A Prepared Report queued before a rule existed is refused when its job starts.
 before_job = ["platform_core.access.reports.refuse_prepared_report_job"]

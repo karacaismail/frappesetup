@@ -415,8 +415,10 @@ paths:
 
         Only the “System Manager” and “Tenant Admin” roles call this endpoint.
         A “Tenant Admin” gets 403 in these cases:
-        the role is “System Manager” or “Administrator”;
-        the document type is a role or permission type, or “User”.
+        the role is a standard role (“Administrator”, “System Manager”, “Script Manager”,
+        “All”, “Guest”) or “Tenant Admin”;
+        the document type belongs to the `frappe` or `platform_core` application;
+        the document type is a single-record type or has a password field.
 
         The operation can be undone. The same endpoint is called again with the old values.
         The endpoint does not start a paid job.

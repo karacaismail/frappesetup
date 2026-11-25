@@ -28,7 +28,7 @@ CUSTOM_ROLE = "TA Deneme Rol"
 OTHER_ROLE = "TA Ikinci Rol"
 PROFILE = "TA Deneme Profil"
 # A business type without stored permission rows of its own, so the copy of the standard rows can be seen.
-PERMISSION_TYPE = "Brand"
+PERMISSION_TYPE = "Sales Partner Type"
 DESK_ROLE = "TA Masa Rol"
 RULE_TYPE = "ToDo"
 PROTECTED = ("System Manager", "Administrator")
@@ -56,6 +56,8 @@ class TestTenantAdmin(IntegrationTestCase):
 		super().setUpClass()
 		cls.site = frappe.local.site
 		frappe.set_user("Administrator")
+		# An interrupted run can leave a profile link behind. The users are saved below.
+		cls.clean()
 		tenant_admin.ensure_role()
 		for role in (CUSTOM_ROLE, OTHER_ROLE):
 			if not frappe.db.exists("Role", role):
@@ -80,6 +82,7 @@ class TestTenantAdmin(IntegrationTestCase):
 		frappe.db.delete("PLT Access Rule", {"title": ("like", "TA %")})
 		frappe.db.delete("User Permission", {"user": ("in", [PLAIN, SYSTEM_MANAGER_USER])})
 		frappe.db.delete("User Role Profile", {"role_profile": PROFILE})
+		frappe.db.set_value("User", {"role_profile_name": PROFILE}, "role_profile_name", None)
 		if frappe.db.exists("Role Profile", PROFILE):
 			frappe.delete_doc("Role Profile", PROFILE, ignore_permissions=True, force=True)
 		frappe.db.delete("Custom DocPerm", {"parent": PERMISSION_TYPE})
@@ -569,7 +572,9 @@ class TestTenantAdmin(IntegrationTestCase):
 			doc.flags.ignore_permissions = True
 			# The profile sync of a System Manager save keeps the direct role of this test user.
 			doc.save()
-		frappe.db.set_value("Has Role", {"parent": SYSTEM_MANAGER_USER, "role": CUSTOM_ROLE}, "role", "System Manager")
+		frappe.db.set_value(
+			"Has Role", {"parent": SYSTEM_MANAGER_USER, "role": CUSTOM_ROLE}, "role", "System Manager"
+		)
 		frappe.clear_cache()
 		self.assertIn("System Manager", frappe.get_roles(SYSTEM_MANAGER_USER))
 

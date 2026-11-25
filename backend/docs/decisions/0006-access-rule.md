@@ -1105,14 +1105,31 @@ Rol sahibi “System Manager” ve “Administrator” rollerini kimseye veremez
 4. Bu iki role erişim kuralı yazamaz.
 5. Bu iki rolden birini taşıyan kullanıcıya kullanıcı izni yazamaz.
 6. Bir role masa erişimi veremez. Masa erişimi kullanıcıyı System User yapar. O zaman panelin uç listesi devreden çıkar.
-7. Rol ve izin türlerinin kendi izin satırlarını değiştiremez. Örneğin “Role” türüne yeni izin satırı ekleyemez. Yoksa rol sahibi kendi yetkisini adım adım büyütebilirdi.
+7. Yalnız iş türlerine izin satırı yazabilir. Örneğin ERPNext ve HRMS türleri iş türüdür.
+8. Frappe ve `platform_core` türlerine izin satırı yazamaz. Bu türlerde betik, giriş, belirteç ve ayar kayıtları vardır. Örneğin “Client Script” ve “OAuth Bearer Token” bu türlerdendir. Bu kayıtlar rol sahibini System Manager gücüne taşıyabilirdi.
+9. Tek kayıtlı ayar türlerine ve parola alanı olan türlere de izin satırı yazamaz.
+10. Standart rollere izin satırı yazamaz. Standart roller “Administrator”, “System Manager”, “Script Manager”, “All” ve “Guest” rolleridir.
+11. Kullanıcıya ve rol profiline yalnız sade rol verebilir. Masa rolü, standart rol ve “Tenant Admin” rolü sade rol değildir.
+12. Kendi rolünü değiştiremez, kapatamaz ve silemez.
 
 Bu denetimler “System Manager” rolü olmayan herkes için çalışır. Kurulum ve göç bu denetimlere girmez.
+
+### Rol profili değişince
+
+Rol sahibi bir profili değiştirince profilin kullanıcıları da güncellenir. Frappe bu kayıtları rol sahibinin adıyla saklar. Rol sahibinin kullanıcı yazma izni yoktur. Bu yüzden `GuardedRoleProfile` sınıfı kullanıcıları izin denetimi olmadan saklar. Kullanıcı denetimi yine çalışır. System Manager rolü olan kullanıcı atlanır. Yoksa profil eşitlemesi bu kullanıcının rolünü silerdi.
+
+### Göç ve saklı izin satırları
+
+Her göç rolün izin satırlarını yeniden tamamlar. System Manager bir hakkı kaldırırsa sonraki göç o hakkı geri verir.
+
+Rol kurulurken beş türün standart izin satırları saklı satıra kopyalanır. Bu türler “Role”, “Role Profile”, “User”, “User Permission” ve “PLT Access Rule” türleridir. Frappe bu türlerin standart satırlarını sonraki sürümde değiştirirse saklı satırlar değişmez. Bu durumda satırları System Manager eşitler.
 
 ### Kiracı sınırı
 
 Her kiracı ayrı bir Frappe sitesidir. Rol, oturum ve kayıtlar yalnız o sitede yaşar. Bu yüzden rol sahibi yalnız kendi kiracısında çalışır.
 
-### Bilinen sınır
+### Bilinen sınırlar
+
+Website User kayıt yöntemlerini `run_method` yoluyla çağırabilir. Kabuğun uç listesi bu yolu denetlemez. Bu durum G-62 işinden önce de vardı. Rol sahibi yalnız iş türlerine izin verebildiği için açık küçülür. Bu yolun kapatılması ayrı bir iştir.
 
 Bir erişim kuralı türün bütününü yönetir (3. bölüm). Kuralı olmayan roller o türde kayıt göremez. Rol sahibi sıradan bir role kural yazarsa “System Manager” rolü de etkilenebilir. Motor kaydı saklarken kuralsız rolleri uyarı olarak gösterir. Bu sınır motorun tasarımından gelir.
