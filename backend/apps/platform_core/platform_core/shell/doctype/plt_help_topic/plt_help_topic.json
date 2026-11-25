@@ -1,0 +1,169 @@
+{
+ "actions": [],
+ "autoname": "HT-.#####",
+ "creation": "2026-11-25 12:00:00.000000",
+ "description": "Help content linked to a field, component or route of the user interface. The help panel shows tenant content first, then application content, then the field description.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "status",
+  "layer",
+  "content_owner",
+  "target_type",
+  "document_type",
+  "fieldname",
+  "component_id",
+  "route_pattern",
+  "app",
+  "language",
+  "version",
+  "target_roles",
+  "content"
+ ],
+ "fields": [
+  {
+   "description": "Short name of the help topic. Shown as the heading in the help panel.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "description": "Publishing state. Only published topics are shown to users. A topic is written as a draft, reviewed and then published.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nIn Review\nPublished\nArchived",
+   "reqd": 1
+  },
+  {
+   "default": "Tenant",
+   "description": "Who provides the content. Tenant content comes first, then application content. Help on a custom field must be tenant content.",
+   "fieldname": "layer",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Layer",
+   "options": "Tenant\nApp",
+   "reqd": 1
+  },
+  {
+   "description": "User responsible for this content. Standard fields belong to the application team, custom fields to the tenant administrator.",
+   "fieldname": "content_owner",
+   "fieldtype": "Link",
+   "label": "Content Owner",
+   "options": "User"
+  },
+  {
+   "default": "Field",
+   "description": "What the topic explains: a field of a document type, a user interface component or a route.",
+   "fieldname": "target_type",
+   "fieldtype": "Select",
+   "label": "Target Type",
+   "options": "Field\nComponent\nRoute",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.target_type=='Field'",
+   "description": "Document type of the field. Required when the target type is Field.",
+   "fieldname": "document_type",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Document Type",
+   "mandatory_depends_on": "eval:doc.target_type=='Field'",
+   "options": "DocType",
+   "search_index": 1
+  },
+  {
+   "depends_on": "eval:doc.target_type=='Field'",
+   "description": "Field name in the document type, custom fields included. Required when the target type is Field.",
+   "fieldname": "fieldname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Field Name",
+   "mandatory_depends_on": "eval:doc.target_type=='Field'"
+  },
+  {
+   "depends_on": "eval:doc.target_type=='Component'",
+   "description": "Identifier of the user interface component. Required when the target type is Component.",
+   "fieldname": "component_id",
+   "fieldtype": "Data",
+   "label": "Component ID",
+   "mandatory_depends_on": "eval:doc.target_type=='Component'"
+  },
+  {
+   "depends_on": "eval:doc.target_type=='Route'",
+   "description": "Route the topic applies to, for example /app/sales-invoice. Required when the target type is Route.",
+   "fieldname": "route_pattern",
+   "fieldtype": "Data",
+   "label": "Route Pattern",
+   "mandatory_depends_on": "eval:doc.target_type=='Route'"
+  },
+  {
+   "description": "Application that owns the target. For a field it is filled from the document type when the topic is saved.",
+   "fieldname": "app",
+   "fieldtype": "Data",
+   "label": "App",
+   "read_only_depends_on": "eval:doc.target_type=='Field'"
+  },
+  {
+   "description": "Language of the content. Leave empty to show the topic in every language.",
+   "fieldname": "language",
+   "fieldtype": "Link",
+   "label": "Language",
+   "options": "Language"
+  },
+  {
+   "description": "Application version the content applies to. Leave empty to show the topic in every version.",
+   "fieldname": "version",
+   "fieldtype": "Data",
+   "label": "Version"
+  },
+  {
+   "description": "Roles that see the topic. Leave empty to show the topic to every role.",
+   "fieldname": "target_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Target Roles",
+   "options": "PLT Help Topic Role"
+  },
+  {
+   "description": "Help text in plain text. Do not write record data, personal data or secrets here.",
+   "fieldname": "content",
+   "fieldtype": "Text",
+   "label": "Content",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-25 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Shell",
+ "name": "PLT Help Topic",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}
