@@ -17,7 +17,7 @@ from press.press.doctype.stripe_webhook_log import stripe_webhook_log as stripe_
 from test_auth_http import PressHttpClient
 
 from press_tr import api
-from press_tr.api import auth
+from press_tr.api import account, auth
 from press_tr.press_identity import request_policy
 from press_tr.press_identity.machine_routes import machine_targets
 
@@ -46,11 +46,18 @@ class MachineRoutesTest(PressHttpClient, unittest.TestCase):
 		expected_machine_routes = {path.removeprefix("/api/method/") for path in contract}
 		machines = machine_targets()
 		self.assertEqual(set(machines.values()), expected_machine_routes)
-		allowed = {frappe.ping, auth.get_login_url, auth.keycloak_callback, api.keycloak_backchannel_logout}
+		allowed = {
+			frappe.ping,
+			auth.get_login_url,
+			auth.keycloak_callback,
+			api.keycloak_backchannel_logout,
+			account.request_recovery,
+		}
 		by_name = {
 			"press_tr.api.auth.get_login_url": auth.get_login_url,
 			"press_tr.api.auth.keycloak_callback": auth.keycloak_callback,
 			"press_tr.api.keycloak_backchannel_logout": api.keycloak_backchannel_logout,
+			"press_tr.api.account.request_recovery": account.request_recovery,
 		}
 		guest_functions = tuple(frappe.guest_methods)
 		self.assertTrue(guest_functions)
