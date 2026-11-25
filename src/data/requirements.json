@@ -422,7 +422,7 @@
  {
   "id": "G-43",
   "title": "Oturum ve parola politikası",
-  "detail": "Kiracı oturumu 1 saat boşta kalır veya toplam 24 saat sürer (kaynak: proje kaydı O-25), enable_password_policy=1, minimum_password_score=3, allow_consecutive_login_attempts=5, allow_login_after_fail=300, logout_on_password_reset=1, reset_password_link_expiry_duration=900, password_reset_limit=3, document_share_key_expiry=7; Keycloak realm SSO Session Idle/Max bu değerlerle hizalanır. Frappe parola politikası yalnızca Administrator/break-glass hesapları için geçerli kalır.",
+  "detail": "Kiracı oturumu 1 saat boşta kalır veya toplam 24 saat sürer (kaynak: proje kaydı O-25), `enable_password_policy=1`, `minimum_password_score=3`, `allow_consecutive_login_attempts=5`, `allow_login_after_fail=300`, `logout_on_password_reset=1`, `reset_password_link_expiry_duration=900`, `password_reset_limit=3`, `document_share_key_expiry=7`; Keycloak realm SSO Session Idle/Max bu değerlerle hizalanır. Frappe parola politikası yalnızca Administrator/break-glass hesapları için geçerli kalır.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",

@@ -83,7 +83,7 @@ Kararların metni [Karar kataloğu](/frappesetup/karar-katalogu/) sayfasındadı
 | K-58 | Notun küçük ölçüleri (AU-05) | Ürün sahibi | 15 px clamp, 32 px hedef / kalıcı kural: ≥ 1rem, 44/48 px | Kalıcı kural geçerli; notun değerleri uygulanmadı | — |
 | K-59 | Doğrulanamayan AI olguları (AI-15) | Ürün sahibi | Not: üç depo var, OpenAEC MIT / 8 Ekim klon denemesi: 404, LGPL v3 metni | Depoya dayanan öneriler doğrulanana kadar uygulanmaz | — |
 | K-60 | Mimari adı (AU-01) | Ürün sahibi | Üç not, üç ad | Resmi ad kaydı yok | — |
-| K-61 | Keycloak fark denetimi (KM-22) | Platform ekibi | Gecelik rapor veya elle denetim | Operatör fark denetimini elle başlatır. Bu kural D-6, O-11 ve SUS-03’te açıklanır. | Faz yok |
+| K-62 | Keycloak fark denetimi (KM-22) | Platform ekibi | Gecelik rapor veya elle denetim | Operatör fark denetimini elle başlatır. Bu kural D-6, O-11 ve SUS-03’te açıklanır. | Faz yok |
 
 ## Başlıca riskler ve azaltımlar
 

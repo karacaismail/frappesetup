@@ -567,7 +567,7 @@ test.describe('documents without JavaScript', () => {
   test('embeds stay under their headings and script controls are disabled @touch', async ({ page }) => {
     await page.goto('yol-haritasi/');
     await expect(page.locator('[data-embed]')).toHaveCount(0);
-    for (const [name, heading] of [['phase-table', 'Faz tablosu'], ['timeline', 'Zaman çizelgesi (göreli)']]) {
+    for (const [name, heading] of [['phase-table', 'Faz tablosu'], ['timeline', 'Faz sırası']]) {
       const block = page.locator(`.prose [data-embed-source="${name}"]`);
       await expect(block).toBeVisible();
       await expect(block.locator('xpath=preceding-sibling::h2[1]')).toHaveText(heading);
