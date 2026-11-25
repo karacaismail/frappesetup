@@ -130,6 +130,16 @@ def set_user_role_profiles(user: object = None, role_profiles: object = None) ->
 	return user_admin.set_user_role_profiles(user, role_profiles)
 
 
+@frappe.whitelist(methods=["GET"])
+def get_user_role_profiles(user: object = None) -> dict:
+	"""The role profiles and the roles of a user of this tenant (G-98, AJA-913).
+
+	“System Manager” and “Tenant Admin” only. No other field of the user is given.
+	"""
+	_only("user")
+	return user_admin.get_user_role_profiles(user)
+
+
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=INVITE_LIMIT, seconds=INVITE_WINDOW, user_based=True)
 def invite_user(
