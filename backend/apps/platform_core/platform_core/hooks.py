@@ -57,6 +57,7 @@ override_whitelisted_methods = {
 # The AI access layer turns off Frappe's built-in MCP endpoint.
 after_install = [
 	"platform_core.identity.session_policy.apply",
+	"platform_core.setup.role_profiles.ensure_role_profiles",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
@@ -65,6 +66,7 @@ after_install = [
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
+	"platform_core.setup.role_profiles.ensure_role_profiles",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
@@ -75,7 +77,30 @@ after_migrate = [
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
-fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
+# G-62, G-168, G-169, G-170: the four panel roles are fixtures.
+# The roles have no desk access, so their holders stay Website Users.
+# Their Role Profiles are no fixtures: a fixture is rewritten on each migrate and a profile write
+# leaves a lock. The install step above writes only missing profiles (setup/role_profiles.py).
+# No panel profile holds "System Manager". Permission rows are set elsewhere.
+# The value stays a literal: the fixture tests read it without Frappe.
+fixtures = [
+	{
+		"dt": "Role",
+		"filters": [
+			[
+				"name",
+				"in",
+				[
+					"PLT AI Manager",
+					"Tenant Admin",
+					"Tenant Admin Assistant",
+					"Reseller Admin",
+					"Reseller Assistant",
+				],
+			]
+		],
+	},
+]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
