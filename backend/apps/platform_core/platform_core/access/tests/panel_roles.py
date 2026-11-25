@@ -48,6 +48,8 @@ try:
 	from frappe.tests.test_api import make_request
 	from frappe.utils import get_test_client
 	from frappe.utils.password import update_password
+
+	from platform_core.access.tests.base import PASSWORD
 except ImportError:  # The fixture tests also run without Frappe.
 	frappe = None
 	IntegrationTestCase = unittest.TestCase
@@ -76,7 +78,6 @@ RESELLER_API = "platform_core.api.reseller."
 ACCESS_API = "platform_core.api.access."
 METHOD = "/api/method/"
 REST = "/api/v2/document/"
-PASSWORD = "Sahte-Parola-831-rol!"
 
 # Made-up tenants. The test site is the reseller tenant of every request.
 OWN_CUSTOMERS = ("musteri-a.example.test", "musteri-b.example.test")
@@ -203,7 +204,7 @@ class RoleFixtureContract:
 
 
 def endpoint_exists(dotted: str) -> bool:
-	module_name, _, attr = dotted.rpartition(".")
+	module_name, _separator, attr = dotted.rpartition(".")
 	try:
 		function = getattr(importlib.import_module(module_name), attr)
 	except (ImportError, AttributeError):

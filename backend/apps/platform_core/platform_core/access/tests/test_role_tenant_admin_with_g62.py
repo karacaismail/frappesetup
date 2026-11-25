@@ -67,7 +67,7 @@ class TestTenantAdminOnSite(IntegrationTestCase):
 
 		rows = self.permission_rows()
 		self.assertGreater(rows, 0, "the G-62 step gave the role no permission row")
-		for _ in range(2):
+		for _attempt in range(2):
 			sync_fixtures("platform_core")
 			ensure_role_profiles()
 			ensure_role()

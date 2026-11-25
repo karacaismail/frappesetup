@@ -63,7 +63,7 @@ class TestRoleProfileSeed(IntegrationTestCase):
 	def test_existing_profile_is_not_written_again(self):
 		before = {name: frappe.db.get_value(PROFILE, name, "modified") for name in PANEL_ROLES}
 		with mock.patch("frappe.utils.background_jobs.get_queue") as get_queue:
-			for _ in range(3):
+			for _attempt in range(3):
 				seed()
 		get_queue.assert_not_called()
 		for name in PANEL_ROLES:
@@ -99,7 +99,7 @@ class TestRoleProfileSeed(IntegrationTestCase):
 		name = panel_roles.TENANT_ADMIN_ASSISTANT
 		frappe.delete_doc(PROFILE, name, force=True, ignore_permissions=True)
 		with mock.patch("frappe.utils.background_jobs.get_queue"):
-			for _ in range(3):
+			for _attempt in range(3):
 				seed()
 				frappe.db.commit()  # nosemgrep: frappe-request-commit
 		for profile in PANEL_ROLES:
