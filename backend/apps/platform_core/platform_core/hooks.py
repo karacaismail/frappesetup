@@ -99,6 +99,8 @@ website_user_allowed_methods = [
 	"platform_core.api.shell.get_bootstrap",
 	"platform_core.api.collection.group_summary",
 	"platform_core.api.meta.get_doctype",
+	# G-138: field help reuses the shell metadata check. The coverage report is for the System Manager.
+	"platform_core.api.help.get_field_help",
 	"frappe.auth.get_logged_user",
 	"logout",
 	"frappe.desk.search.search_link",
