@@ -27,3 +27,8 @@ def start_file_job(file_job):
 def retry_file_chunk(file_job, chunk_index):
 	"""Queue one failed chunk again. Finished chunks are not sent again."""
 	return large_file.retry_chunk(file_job, chunk_index)
+
+
+def expire_file_jobs():
+	"""Fail file jobs and chunks that waited too long and remove their text. System Manager only."""
+	return large_file.expire_stale_jobs()

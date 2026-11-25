@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "1c0bbbf0d66e83124d9af810eb1dc435276d791830ba9650fc6393b53f4a1b84",
+      "sha256": "e3f1f9f0f3a97582bc8158351e183977d2ff0908df7aad83a8a776486a028acb",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -228,13 +228,13 @@
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
-          "line": 260,
+          "line": 318,
           "reason": "Inserts the internal file job only after require_user, route authorization and a File read check on the chosen PDF (G-156). The caller sets only route, file, instruction and limit. Both DocTypes are closed to AI writes in hooks.py."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
-          "line": 326,
+          "line": 384,
           "reason": "Saves the chunk plan from prepare_job, a queue step that no endpoint whitelists (G-156). Page and chunk counts are capped by site settings before any row is written. Chunk text is cleared after each attempt and when the job finishes."
         }
       ],

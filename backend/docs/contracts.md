@@ -665,6 +665,17 @@ Büyük PDF sağlayıcıya dosya olarak gitmez. İşin adımları şunlardır:
 - İş kuyruk işidir. Zamanlanmış iş yoktur.
 - Her adımın bir HTTP ucu vardır (D-9). Uçlar aşağıdaki tabloda yazılıdır. Başka kullanıcının işini yalnız yönetici okuyabilir.
 
+Parça metni yalnız iş sürerken tutulur. Bekleyen metin için iki süre sınırı vardır:
+
+1. Bir iş en çok 24 saat “planned” durumunda kalır. Süre dolunca iş “failed” olur. Hata kodu `expired` olur.
+2. Bir parça en çok 1 saat “running” durumunda kalır. Süre dolunca parça “failed” olur. Hata kodu `worker_lost` olur. Sonra işin durumu yeniden hesaplanır.
+3. İki durumda da parçanın metni silinir.
+
+- Süreler saniye cinsinden site ayarından okunur. Ayarlar `model_gateway_file_planned_ttl` ve `model_gateway_file_running_ttl` adını taşır. Varsayılanlar 86400 ve 3600 saniyedir. Geçersiz ayar `invalid_setting` hatası verir.
+- Bu temizliği zamanlanmış iş yapmaz. Temizlik `create_file_job`, `start_file_job`, `retry_file_chunk` ve `file_job_status` işlevlerinin başında çalışır.
+- “System Manager” rolü temizliği `expire_file_jobs` işleviyle elle de başlatabilir. Başka rol bu işlevi çağıramaz.
+- `worker_lost` koduyla düşen parça `retry_file_chunk` ile yeniden denenebilir. Metin dosyadan yeniden kurulur.
+
 ### Güvenlik
 
 - Dış bağlantı (`external`) özel ağ adresine gidemez. Denetim bağlantı anında çözülen adrese yapılır.

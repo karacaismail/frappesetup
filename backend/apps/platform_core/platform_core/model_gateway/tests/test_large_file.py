@@ -2,6 +2,7 @@
 
 import json
 import unittest
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -303,6 +304,7 @@ class RetryTests(unittest.TestCase):
 		with (
 			patch.object(large_file, "_job", return_value=job),
 			patch.object(large_file, "_require_owner"),
+			patch.object(large_file, "_expire_stale"),
 			patch.object(large_file, "_lock_chunk", side_effect=lambda name: job.chunks[1]),
 			patch.object(large_file.frappe, "db", Mock()),
 			patch.object(large_file.frappe, "enqueue") as enqueue,
@@ -325,6 +327,7 @@ class RetryTests(unittest.TestCase):
 		with (
 			patch.object(large_file, "_job", return_value=job),
 			patch.object(large_file, "_require_owner"),
+			patch.object(large_file, "_expire_stale"),
 			patch.object(large_file, "_lock_chunk", side_effect=lambda name: job.chunks[0]),
 			patch.object(large_file.frappe, "db", Mock()),
 			patch.object(large_file.frappe, "enqueue") as enqueue,
@@ -540,6 +543,208 @@ class TextRetentionTests(unittest.TestCase):
 			)
 		send.assert_not_called()
 		self.assertEqual((job.chunks[1].status, job.chunks[1].failure_code), ("failed", "source_changed"))
+
+
+NOW = datetime(2026, 11, 25, 12, 0, 0)
+
+
+class ExpiryStore:
+	"""In-memory jobs and chunks with modified times, queried like the database."""
+
+	def __init__(self):
+		self.jobs = {}
+
+	def add(self, name, status, age, chunks):
+		job = FakeJob([chunk_status for chunk_status, _age in chunks])
+		job.name, job.status, job.failure_code = name, status, None
+		job.chunk_count, job.estimate_known, job.estimated_cost, job.currency = len(chunks), 0, 0, None
+		job.modified = NOW - timedelta(seconds=age)
+		for chunk, (_status, chunk_age) in zip(job.chunks, chunks, strict=True):
+			chunk.name = f"{name}-{chunk.chunk_index}"
+			chunk.parent, chunk.parenttype = name, large_file.JOB
+			chunk.modified = NOW - timedelta(seconds=chunk_age)
+		self.jobs[name] = job
+		return job
+
+	def _rows(self, doctype):
+		if doctype == large_file.JOB:
+			return list(self.jobs.values())
+		return [chunk for job in self.jobs.values() for chunk in job.chunks]
+
+	def _row(self, doctype, name):
+		return next(row for row in self._rows(doctype) if row.name == name)
+
+	@staticmethod
+	def _matches(row, filters):
+		for key, expected in filters.items():
+			value = getattr(row, key)
+			if isinstance(expected, list):
+				operator, operand = expected
+				if operator != "<":
+					raise AssertionError(operator)
+				if not value < operand:
+					return False
+			elif value != expected:
+				return False
+		return True
+
+	def get_all(self, doctype, filters=None, fields=None, pluck=None, **kwargs):
+		rows = [row for row in self._rows(doctype) if self._matches(row, filters or {})]
+		if pluck:
+			return [getattr(row, pluck) for row in rows]
+		return [SimpleNamespace(**{field: getattr(row, field) for field in fields}) for row in rows]
+
+	def set_value(self, doctype, name, values, value=None, **kwargs):
+		if not isinstance(values, dict):
+			values = {values: value}
+		if isinstance(name, dict):
+			rows = [row for row in self._rows(doctype) if self._matches(row, name)]
+		else:
+			rows = [self._row(doctype, name)]
+		for row in rows:
+			for key, new_value in values.items():
+				setattr(row, key, new_value)
+
+	def lock_row(self, doctype, name, fields):
+		return self._row(doctype, name)
+
+	def db(self):
+		db = Mock()
+		db.set_value.side_effect = self.set_value
+		return db
+
+
+class ExpiryTests(unittest.TestCase):
+	"""Chunk text of a job that never started or a worker that stopped is removed (AJA-741)."""
+
+	HOUR = 60 * 60
+	DAY = 24 * HOUR
+
+	def setUp(self):
+		self.store = ExpiryStore()
+		self.conf = {}
+		self.roles = ["System Manager"]
+		patches = [
+			patch.object(large_file, "now_datetime", return_value=NOW),
+			patch.object(large_file.frappe, "conf", self.conf),
+			patch.object(large_file.frappe, "get_all", side_effect=self.store.get_all),
+			patch.object(large_file.frappe, "db", self.store.db()),
+			patch.object(large_file.frappe, "enqueue"),
+			patch.object(large_file.frappe, "get_roles", side_effect=lambda *args: self.roles),
+			patch.object(large_file.gateway, "lock_row", side_effect=self.store.lock_row),
+			patch.object(large_file.gateway, "_require_clean_transaction"),
+			patch.object(large_file.policy, "require_user"),
+			patch.object(large_file, "_job", side_effect=lambda name: self.store.jobs[name]),
+			patch.object(large_file, "_require_owner"),
+		]
+		for item in patches:
+			item.start()
+			self.addCleanup(item.stop)
+
+	def _texts(self, job):
+		return [chunk.content for chunk in job.chunks]
+
+	def test_planned_job_older_than_a_day_fails_as_expired_without_text(self):
+		job = self.store.add("old", "planned", self.DAY + 1, [("planned", self.DAY + 1)] * 2)
+		large_file.expire_stale_jobs()
+		self.assertEqual((job.status, job.failure_code), ("failed", "expired"))
+		self.assertEqual(self._texts(job), [None, None])
+
+	def test_planned_job_younger_than_a_day_keeps_its_state_and_text(self):
+		job = self.store.add("new", "planned", self.DAY - 60, [("planned", self.DAY - 60)] * 2)
+		large_file.expire_stale_jobs()
+		self.assertEqual((job.status, job.failure_code), ("planned", None))
+		self.assertEqual(self._texts(job), ["text 0", "text 1"])
+
+	def test_chunk_running_longer_than_an_hour_fails_as_worker_lost(self):
+		job = self.store.add("job", "running", self.HOUR + 1, [("done", 10), ("running", self.HOUR + 1)])
+		job.chunks[0].content = None
+		large_file.expire_stale_jobs()
+		chunk = job.chunks[1]
+		self.assertEqual((chunk.status, chunk.failure_code), ("failed", "worker_lost"))
+		self.assertEqual(self._texts(job), [None, None])
+		# No other chunk is running, so the job is settled as failed.
+		self.assertEqual(job.status, "failed")
+
+	def test_job_with_another_running_chunk_stays_running(self):
+		job = self.store.add(
+			"job", "running", self.HOUR + 1, [("running", self.HOUR + 1), ("running", 60), ("queued", 60)]
+		)
+		large_file.expire_stale_jobs()
+		self.assertEqual([chunk.status for chunk in job.chunks], ["failed", "running", "queued"])
+		self.assertEqual(job.status, "running")
+		self.assertEqual(self._texts(job), [None, "text 1", "text 2"])
+
+	def test_chunk_running_less_than_an_hour_is_not_touched(self):
+		job = self.store.add("job", "running", 60, [("running", self.HOUR - 60)])
+		large_file.expire_stale_jobs()
+		self.assertEqual((job.chunks[0].status, job.chunks[0].content), ("running", "text 0"))
+		self.assertEqual(job.status, "running")
+
+	def test_lost_chunk_can_be_retried(self):
+		job = self.store.add("job", "running", self.HOUR + 1, [("done", 10), ("running", self.HOUR + 1)])
+		large_file.expire_stale_jobs()
+		large_file.retry_chunk("job", 1)
+		self.assertEqual(job.chunks[1].status, "queued")
+		self.assertIsNone(job.chunks[1].failure_code)
+		large_file.frappe.enqueue.assert_called_once()
+		self.assertEqual(large_file.frappe.enqueue.call_args.kwargs["chunk_index"], 1)
+
+	def test_the_waiting_times_follow_the_site_settings(self):
+		self.conf.update({"model_gateway_file_planned_ttl": 60, "model_gateway_file_running_ttl": 30})
+		planned = self.store.add("planned", "planned", 61, [("planned", 61)])
+		running = self.store.add("running", "running", 31, [("running", 31)])
+		large_file.expire_stale_jobs()
+		self.assertEqual(planned.failure_code, "expired")
+		self.assertEqual(running.chunks[0].failure_code, "worker_lost")
+
+	def test_invalid_waiting_time_setting_fails_closed(self):
+		for key in ("model_gateway_file_planned_ttl", "model_gateway_file_running_ttl"):
+			for setting in (0, -1, "3600", 2.5, True):
+				with self.subTest(key=key, setting=setting):
+					self.conf.clear()
+					self.conf[key] = setting
+					with self.assertRaises(policy.Denied) as failure:
+						large_file.expire_stale_jobs()
+					self.assertEqual(failure.exception.code, "invalid_setting")
+
+	def test_only_a_system_manager_can_start_the_cleanup_by_hand(self):
+		job = self.store.add("old", "planned", self.DAY + 1, [("planned", self.DAY + 1)])
+		for roles in (["PLT AI User"], ["PLT AI Manager"]):
+			with self.subTest(roles=roles):
+				self.roles = roles
+				with self.assertRaises(large_file.frappe.PermissionError):
+					large_file.expire_stale_jobs()
+				self.assertEqual(job.status, "planned")
+		self.roles = ["System Manager"]
+		self.assertEqual(large_file.expire_stale_jobs(), {"expired_jobs": 1, "lost_chunks": 0})
+
+	def test_start_refuses_an_expired_job(self):
+		job = self.store.add("old", "planned", self.DAY + 1, [("planned", self.DAY + 1)])
+		with self.assertRaises(policy.Denied) as failure:
+			large_file.start_job("old")
+		self.assertEqual(failure.exception.code, "job_not_planned")
+		self.assertEqual((job.status, job.failure_code), ("failed", "expired"))
+		large_file.frappe.enqueue.assert_not_called()
+
+	def test_status_runs_the_cleanup_first(self):
+		self.store.add("old", "planned", self.DAY + 1, [("planned", self.DAY + 1)])
+		status = large_file.job_status("old")
+		self.assertEqual((status["status"], status["failure_code"]), ("failed", "expired"))
+
+	def test_retry_runs_the_cleanup_first(self):
+		job = self.store.add("job", "running", self.HOUR + 1, [("running", self.HOUR + 1)])
+		large_file.retry_chunk("job", 0)
+		self.assertEqual(job.chunks[0].status, "queued")
+
+	def test_create_runs_the_cleanup_first(self):
+		job = self.store.add("old", "planned", self.DAY + 1, [("planned", self.DAY + 1)])
+		with (
+			patch.object(large_file.gateway, "route_targets", side_effect=policy.Denied(404, "stop_here")),
+			self.assertRaises(policy.Denied),
+		):
+			large_file.create_job("route", "file", "Summarize.", 64)
+		self.assertEqual(job.failure_code, "expired")
 
 
 if __name__ == "__main__":
