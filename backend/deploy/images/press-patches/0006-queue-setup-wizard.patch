@@ -1,0 +1,48 @@
+Press patch 0006: queue the headless setup wizard once a new site becomes Active (G-42).
+Purpose: process_new_site_job_update writes the Active status with frappe.db.set_value and
+builds the site with Site("Site", ...). Site hooks never run there, and the press_tr SetupSite
+class (override_doctype_class) is never used. This patch calls queue_setup_wizard right after
+Press writes a changed status. The helper returns unless the status is Active. It opens the
+site with frappe.get_doc, so SetupSite is used. It stops when setup_wizard_complete is set or
+press_tr is not installed. It then queues Site.complete_setup_wizard(args) with
+frappe.enqueue_doc and enqueue_after_commit=True. SetupSite.complete_setup_wizard locks the
+site row and skips a second Agent call when a Complete Setup Wizard Agent Job already exists.
+Upstream: new proposal 6 in backend/docs/press-python314-upstream.md (not sent to Press yet).
+Remove when Press calls the setup wizard itself after a new site becomes Active, or when Press
+runs Site hooks on that status change (decision O-52 in backend/PROJECT-RECORD.md).
+
+diff --git a/press/press/doctype/site/site.py b/press/press/doctype/site/site.py
+index 9477d07..1a0f18c 100644
+--- a/press/press/doctype/site/site.py
++++ b/press/press/doctype/site/site.py
+@@ -4909,6 +4909,7 @@ def process_new_site_job_update(job):  # noqa: C901
+ 		update_backup_restoration_test_status(job, updated_status)
+ 		frappe.db.set_value("Site", job.site, "status", updated_status)
+ 		create_site_status_update_webhook_event(job.site)
++		queue_setup_wizard(job.site, updated_status)
+ 
+ 	if job.status == "Success":
+ 		request_data = json.loads(job.request_data)
+@@ -4937,6 +4938,22 @@ def process_new_site_job_update(job):  # noqa: C901
+ 		frappe.get_doc("Site Group Deploy", site_group_deploy).update_site_group_deploy_on_process_job(job)
+ 
+ 
++def queue_setup_wizard(site_name, status):
++	"""Queue the headless setup wizard once Press marks a new site Active (press_tr, G-42)."""
++	if status != "Active":
++		return
++	site = frappe.get_doc("Site", site_name)
++	if site.setup_wizard_complete or not hasattr(site, "setup_wizard_args"):
++		return
++	frappe.enqueue_doc(
++		"Site",
++		site_name,
++		"complete_setup_wizard",
++		args=site.setup_wizard_args(),
++		enqueue_after_commit=True,
++	)
++
++
+ def update_product_trial_request_status_based_on_site_status(site, is_site_active, error=None):
+ 	records = frappe.get_list("Product Trial Request", filters={"site": site}, fields=["name"])
+ 	if not records:
