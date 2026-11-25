@@ -16,11 +16,19 @@ from unittest.mock import Mock, patch
 
 APP = Path(__file__).resolve().parents[1] / "press_tr"
 DOCTYPE = APP / "press_identity/doctype/ptr_recovery_review/ptr_recovery_review.json"
+ROLE_FIXTURE = APP / "fixtures/role.json"
+REVIEWER = "Recovery Reviewer"
 
 
-def _framework(user=None, link=None, open_review=False, session_user="reviewer@example.test"):
+def _framework(
+	user=None, link=None, open_review=False, session_user="reviewer@example.test", roles=(REVIEWER,)
+):
 	framework = Mock()
 	framework.session = SimpleNamespace(user=session_user)
+	# Administrator receives every role from frappe.get_roles, so the stand-in does the same.
+	framework.get_roles.side_effect = lambda user=None: (
+		[REVIEWER, "System Manager", "Administrator"] if session_user == "Administrator" else list(roles)
+	)
 
 	def get_value(doctype, filters, field):
 		if doctype == "User":
@@ -174,8 +182,8 @@ class RecoveryDecisionTest(unittest.TestCase):
 			get_doc_before_save=lambda: previous,
 		)
 
-	def _check(self, doc, session_user="reviewer@example.test"):
-		framework = _framework(user="customer@example.test", session_user=session_user)
+	def _check(self, doc, session_user="reviewer@example.test", roles=(REVIEWER,)):
+		framework = _framework(user="customer@example.test", session_user=session_user, roles=roles)
 		with (
 			patch.object(self.recovery, "frappe", framework),
 			patch.object(self.recovery, "_", lambda text, context=None: text),
@@ -206,6 +214,64 @@ class RecoveryDecisionTest(unittest.TestCase):
 		for doc, user in cases:
 			with self.subTest(user=user, note=doc.review_note), self.assertRaises(PermissionError):
 				self._check(doc, session_user=user)
+
+	def test_system_manager_without_reviewer_role_cannot_decide(self):
+		# AJA-421, acceptance 1: System Manager alone is not enough to approve a recovery request.
+		for roles in (("System Manager",), ()):
+			for status in ("Approved", "Rejected"):
+				doc = self._doc(status, before="Open")
+				with self.subTest(roles=roles, status=status), self.assertRaises(PermissionError):
+					self._check(doc, session_user="manager@example.test", roles=roles)
+				self.assertIsNone(doc.reviewed_by)
+				self.assertIsNone(doc.reviewed_at)
+
+	def test_reviewer_role_approves_another_persons_request(self):
+		# AJA-421, acceptance 2.
+		doc = self._doc("Approved", before="Open")
+		framework = self._check(doc, session_user="reviewer@example.test", roles=(REVIEWER,))
+		self.assertEqual(doc.reviewed_by, "reviewer@example.test")
+		self.assertIs(doc.reviewed_at, framework.utils.now_datetime.return_value)
+		framework.get_roles.assert_called_with("reviewer@example.test")
+
+	def test_owner_with_reviewer_role_cannot_approve_own_request(self):
+		# AJA-421, acceptance 3: the role does not lift the owner rule.
+		doc = self._doc("Approved", before="Open")
+		with self.assertRaises(PermissionError):
+			self._check(doc, session_user="customer@example.test", roles=(REVIEWER, "System Manager"))
+		self.assertIsNone(doc.reviewed_by)
+
+	def test_administrator_cannot_decide(self):
+		# Administrator holds every role and is a shared account, so the decision would have no named reviewer.
+		doc = self._doc("Approved", before="Open")
+		with self.assertRaises(PermissionError):
+			self._check(doc, session_user="Administrator")
+		self.assertIsNone(doc.reviewed_by)
+
+	def test_reviewer_role_name_is_one_constant(self):
+		self.assertEqual(self.recovery.REVIEWER_ROLE, REVIEWER)
+
+	def test_require_reviewer_returns_the_named_reviewer(self):
+		doc = self._doc("Approved", before="Open")
+		framework = _framework(user="customer@example.test")
+		with (
+			patch.object(self.recovery, "frappe", framework),
+			patch.object(self.recovery, "_", lambda text, context=None: text),
+		):
+			self.assertEqual(self.recovery.require_reviewer(doc), "reviewer@example.test")
+		for user, roles in (
+			("Guest", (REVIEWER,)),
+			("Administrator", (REVIEWER,)),
+			("manager@example.test", ("System Manager",)),
+			("customer@example.test", (REVIEWER,)),
+		):
+			framework = _framework(user="customer@example.test", session_user=user, roles=roles)
+			with (
+				self.subTest(user=user),
+				patch.object(self.recovery, "frappe", framework),
+				patch.object(self.recovery, "_", lambda text, context=None: text),
+				self.assertRaises(PermissionError),
+			):
+				self.recovery.require_reviewer(doc)
 
 	def test_decision_is_final(self):
 		for before, after in (("Approved", "Open"), ("Rejected", "Approved"), ("Approved", "Rejected")):
@@ -376,9 +442,104 @@ class RecoveryRouteTest(unittest.TestCase):
 		self.assertTrue(fields["identity_link"].get("set_only_once"))
 		self.assertTrue(all(field.get("description") for field in doc["fields"]))
 		roles = {permission["role"]: permission for permission in doc["permissions"]}
-		self.assertEqual(set(roles), {"System Manager"})
-		self.assertFalse(roles["System Manager"].get("create"))
-		self.assertFalse(roles["System Manager"].get("delete"))
+		self.assertEqual(set(roles), {"System Manager", REVIEWER})
+		# AJA-421: System Manager only reads. Only the reviewer role writes the decision.
+		manager = roles["System Manager"]
+		self.assertTrue(manager.get("read"))
+		for right in ("write", "create", "delete", "submit", "cancel", "amend"):
+			self.assertFalse(manager.get(right), right)
+		reviewer = roles[REVIEWER]
+		for right in ("read", "write", "report"):
+			self.assertTrue(reviewer.get(right), right)
+		for right in ("create", "delete", "submit", "cancel", "amend"):
+			self.assertFalse(reviewer.get(right), right)
+
+
+class ReviewerRoleSetupTest(unittest.TestCase):
+	def test_role_is_created_by_the_app_fixture(self):
+		# AJA-421, acceptance 4: Frappe imports every file in the app's fixtures folder on install and migrate.
+		records = json.loads(ROLE_FIXTURE.read_text(encoding="utf-8"))
+		roles = [record for record in records if record["doctype"] == "Role"]
+		self.assertEqual([role["name"] for role in roles], [REVIEWER])
+		self.assertEqual(roles[0]["role_name"], REVIEWER)
+		self.assertEqual(roles[0]["desk_access"], 1)
+
+	def test_user_validate_hook_guards_the_role(self):
+		hooks = ast.literal_eval(
+			next(
+				node.value
+				for node in ast.parse((APP / "hooks.py").read_text(encoding="utf-8")).body
+				if isinstance(node, ast.Assign) and node.targets[0].id == "doc_events"
+			)
+		)
+		self.assertEqual(
+			hooks["User"],
+			{
+				"on_update": "press_tr.press_identity.accounts.revoke_disabled_user_keys",
+				"validate": "press_tr.press_identity.accounts.guard_reviewer_role",
+			},
+		)
+
+
+class ReviewerRoleGrantTest(unittest.TestCase):
+	"""AJA-421: only Administrator gives or takes the reviewer role.
+
+	A System Manager can edit users in Desk. Without this check a taken over
+	System Manager account could give itself the role and approve requests.
+	"""
+
+	def setUp(self):
+		from press_tr.press_identity import accounts
+
+		self.accounts = accounts
+
+	def _user(self, before, after):
+		previous = None if before is None else SimpleNamespace(roles=[SimpleNamespace(role=r) for r in before])
+		return SimpleNamespace(
+			name="operator@example.test",
+			roles=[SimpleNamespace(role=role) for role in after],
+			get_doc_before_save=lambda: previous,
+		)
+
+	def _validate(self, doc, session_user):
+		framework = Mock()
+		framework.session = SimpleNamespace(user=session_user)
+		framework.throw.side_effect = PermissionError
+		with (
+			patch.object(self.accounts, "frappe", framework),
+			patch.object(self.accounts, "_", lambda text, context=None: text),
+		):
+			self.accounts.guard_reviewer_role(doc, "validate")
+		return framework
+
+	def test_system_manager_cannot_give_or_take_the_role(self):
+		for before, after in (
+			(["System Manager"], ["System Manager", REVIEWER]),
+			(["System Manager", REVIEWER], ["System Manager"]),
+			(None, ["System Manager", REVIEWER]),
+		):
+			with self.subTest(before=before, after=after), self.assertRaises(PermissionError):
+				self._validate(self._user(before, after), "manager@example.test")
+
+	def test_administrator_gives_and_takes_the_role(self):
+		for before, after in (
+			(["System Manager"], ["System Manager", REVIEWER]),
+			(["System Manager", REVIEWER], ["System Manager"]),
+			(None, [REVIEWER]),
+		):
+			with self.subTest(before=before, after=after):
+				framework = self._validate(self._user(before, after), "Administrator")
+				framework.throw.assert_not_called()
+
+	def test_other_role_changes_are_not_blocked(self):
+		for before, after in (
+			(["System Manager"], ["System Manager", "Press Admin"]),
+			([REVIEWER], [REVIEWER, "Press Admin"]),
+			(None, ["Press User"]),
+		):
+			with self.subTest(before=before, after=after):
+				framework = self._validate(self._user(before, after), "manager@example.test")
+				framework.throw.assert_not_called()
 
 
 if __name__ == "__main__":

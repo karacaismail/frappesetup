@@ -1294,6 +1294,12 @@ class IdentityHttpTest(
 		frappe.init("press.localhost")
 		frappe.connect()
 		try:
+			# AJA-421: the run copies app files without a migrate, so the role fixture and the
+			# DocType permissions are loaded here the same way a migrate loads them.
+			from frappe.utils.fixtures import sync_fixtures
+
+			sync_fixtures("press_tr")
+			frappe.reload_doc("press_identity", "doctype", "ptr_recovery_review", force=True)
 			frappe.get_doc(
 				{
 					"doctype": "User",
@@ -1301,7 +1307,7 @@ class IdentityHttpTest(
 					"first_name": "Reviewer",
 					"user_type": "System User",
 					"send_welcome_email": 0,
-					"roles": [{"role": "System Manager"}],
+					"roles": [{"role": "Recovery Reviewer"}],
 				}
 			).insert(ignore_permissions=True)
 			frappe.db.set_value("User", email, "api_key", key)
