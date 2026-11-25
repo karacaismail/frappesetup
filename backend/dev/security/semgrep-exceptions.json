@@ -31,7 +31,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "795f1cc9615daa91463c62f4ac47ea2bde63c0efa8eaf4fe4ffb1d5e2ccef56e",
+  "sha256": "4bfb4def864a6737d67ea922f77bbd96319d4693b7a14e9a4fc774f2b13b0164",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
