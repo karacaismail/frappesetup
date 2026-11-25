@@ -68,7 +68,8 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 | Mermaid yükleyici (`Mermaid`); mermaid çekirdeği yalnız diyagramlı sayfada dinamik | 2,1 KB (+ mermaid parçaları isteğe bağlı; `rail-4-keycloak` sayfasında kabuğa ek 196,4 KB, KaTeX inmez) | — |
 | CSS (Mantine + global + fontsource bildirimleri) | 55,8 KB toplam (23 Kasım 2026) | ≤ 70 KB |
 | Yazı tipleri (Outfit Variable latin + latin-ext; JetBrains Mono 400/600) | ilk görünümde 88,0 KB (Inter ile 172,2 KB) | ≤ 200 KB |
-| HTML: ana sayfa / tipik bölüm / Gereksinimler | 19,7 KB / 14,8 KB / 152,1 KB (Gereksinimler görev panosuyla, 23 Kasım 2026) | 25 / 25 / 180 KB |
+| HTML: ana sayfa / Kararlar / Gereksinimler | 20,6 KiB / 14,9 KiB / 155,8 KiB (25 Kasım 2026, site karar farkları taşındıktan sonra) | 25 / 25 / 180 KiB |
+| HTML: Ölçüm ve gözlem | 24,2 KiB (25 Kasım 2026) | 25 KiB |
 
 Kabuk bütçesi ilk görünümde inen tüm JavaScript dosyalarını kapsar. Giriş parçaları ayrıca ölçülür. Eski 85 KB hesabı yalnız giriş parçalarını saymıştı. Aynı derlemenin toplamı 125,2 KB idi. Kabuktan Tooltip, ScrollArea, NavLink ve ActionIcon çıktı. Gezgin süzgeçleri düğme grubuna geçti. Kabuk 96,7 KB oldu. Tema ve gezinme düzeltmelerinden sonra 96,9 KB ölçüldü. Astro 7.4.7 sürümü satır içi betiğe yaklaşık 0,2 KB gzip ekledi. Astro 7.3.7 ile eski HTML ölçümü 199,6 KB idi. Sunucu Gereksinimler sayfasında yalnız kartları hazırlar. Tarayıcı yalnız geniş ekranda tabloyu hazırlar. Çizim için işlemcinin boşta kaldığı an beklenir. Okur kartlara kaydırdıysa veya bir kart odaktaysa görünüm değişmez. Gezgin, alan adları tekrarlanmayan kısa bir JSON dizisi alır. JSON, veriyi yazıyla taşıyan bir biçimdir. Bütçe aşımı teslimi durdurur.
 
