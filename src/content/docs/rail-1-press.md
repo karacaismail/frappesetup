@@ -4,7 +4,11 @@ nav: "Rail 1 · Press"
 order: 3
 ---
 
-Press v0.154.x ticari katmanın omurgasıdır: Site Plan, Marketplace App / App Plan, Subscription → Usage Record → Invoice zinciri, Team Tier, Product Trial standby havuzu ve App Source → Release Group → Deploy Candidate → Bench → Site Update dağıtım zinciri olduğu gibi kullanılır (doğrulandı). Frappe Cloud'a özgü varsayımları kendi ticari gerçekliğimize uyarlayan tek özel uygulama `press_tr`dir (G-7): ödeme, TRY, e-belge köprüsü, fixture temizliği, auth allowlist, Keycloak sarmalayıcıları ve Türkçe e-posta şablonları `hooks`, `override_doctype_class`, `doc_events` ve Custom Field ile burada yaşar; Press'te düzeltme gerektiren noktalar ayrıca upstream PR olarak açılır.
+Press ticari katmanı yönetir. Frappe 16 denemesindeki Press sürümü KD-05 kaydındadır. Press site planlarını, mağaza uygulamalarını, takım kademelerini ve hazır deneme sitelerini yönetir. Abonelik, kullanım kaydı ve fatura aynı akışa bağlıdır. Dağıtım, App Source kaydından Site Update adımına kadar Press üzerinden yürür.
+
+`press_tr` ödeme, TRY, e-belge ve Türkçe e-posta işlerini Press’e uyarlar (G-7). İzin listesi ve Keycloak giriş sarmalayıcıları da bu uygulamadadır. Uygulama kancalar, kayıt örnekleri, sınıf geçersiz kılma ve özel alanları kullanır. Ekip, Press düzeltmelerini ana projeye ayrı değişiklik olarak önerir.
+
+Press, Frappe 16 üzerinde yamalarla açılır. Sunucu kurma akışı doğrulanmadan üretime çıkılmaz. Kaynak: proje kaydı D-7 ve O-9.
 
 ## 1. Aktivasyon akışı (G-29, G-30, G-35, G-95)
 
@@ -92,7 +96,7 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 | Frappe Version | 'Version 16' default=1 (X-04) |
 | Scheduler | `press.signup_e2e.run_signup_e2e` devre dışı (kimlik Keycloak'ta) |
 | Roller | v0.8.0 yaması Press Admin/Member → Press User; takım içi yetki Press Role bayrakları (admin\_access, allow\_billing, allow\_apps, allow\_site\_creation, allow\_webhook\_configuration, allow\_local\_payment) ve press\_tr rol şablonları; operatör rolleri Rail 6'da (SA-2) |
-| Kimlik uçları | signup/send\_otp/verify\_otp/login\_link/reset\_password/2fa uçları 403; `/login`, `/signup`, `/dashboard/login` Keycloak'a yönlendirilir; Social Login Key provider 'Keycloak', user\_id\_property='sub', sign\_ups='Allow' |
+| Kimlik uçları | G-12, 403 ile kapanan yöntemlerin tam listesini verir. `press.api.account` altında `signup`, `send_otp`, `verify_otp` ve `send_login_link` kapanır. Aynı yerde `login_using_key`, `reset_password`, `enable_2fa` ve `verify_2fa` kapanır. `product_trial.send_verification_code_for_login` da 403 döner. `/login`, `/signup` ve `/dashboard/login` panele veya Keycloak’a yönlenir. `press_tr.api.auth.keycloak_callback` kullanıcıyı `(iss, sub)` bağıyla bulur. Press Vue `/dashboard` dış ağa kapalıdır. Press 2FA zorunluluğunu açmaz. Çok adımlı doğrulama Keycloak’ta kalır. |
 | E-posta | 'Frappe Cloud' içeren 29 şablon + 13 string Türkçe markalı set ile değiştirilir; Press host için Email Account + SPF/DKIM |
 
 ## 6. Press altyapı envanteri — Hetzner (G-2..G-6, G-36, G-37)
@@ -106,19 +110,19 @@ Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha
 | Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); MVP'de Press `press.atonota.net` adresindedir. Press müşteri paneli için `panel.atonota.net` adı MVP sonrası hedeftir, backend ad haritasında yoktur. Backend MVP'de bu adı açmaz (`ortamlar.md` madde 4). `allow_cors` yok (G-119) | DevOps sorumlusu |
 | n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | DevOps sorumlusu |
 | f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | DevOps sorumlusu |
-| m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | DevOps sorumlusu |
+| m1 veritabanı | Database Server (binlog, audit log, replika, G-55) | DevOps sorumlusu |
 | r1 registry | Registry Server + Press Settings docker\_registry\_\* | DevOps sorumlusu |
 | İzleme / log | Monitor Server (Prometheus/Grafana/Alertmanager), Log Server (ES/Kibana), Incident Settings, Telegram + e-posta. MVP'de yalnız e-posta vardır: Telegram paketi Press üretim imajında yoktur (7. bölüm) | DevOps sorumlusu |
 | Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test. MVP'de düzenli yedek yoktur, çünkü zamanlanmış iş yasaktır. Yedek yalnız dağıtımda ve elle alınır. Düzenli yedek için proje sahibinin kararı gerekir (E-7). RPO ve aylık test bu karardan sonra geçerli olur | DevOps sorumlusu |
-| Cluster | 'hetzner-fsn1' cloud\_provider='Generic' (bare metal); Hetzner Cloud VM'ler 'Hetzner' | DevOps sorumlusu |
+| Cluster | 'hetzner-fsn1' cloud\_provider='Generic' fiziksel sunucular için kullanılır. Hetzner Cloud VM’ler için değer 'Hetzner' olur. | DevOps sorumlusu |
 | DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53`. MVP'de Route 53 yoktur: DNS GoDaddy'de kalır, sertifika her ad için ayrı alınır. Route 53 kararı Press sunucu kurma akışı çalışınca yeniden açılır (7. bölüm) | DevOps sorumlusu (Route 53/IAM, sonuç doğrulama) |
 | Kiracı adları ve NS delegasyonu | MVP: kiracılar `<kiracı>.app.atonota.net` adresindedir, ilk kiracı `demo.app.atonota.net` olur. Kayıtlar GoDaddy'dedir, NS devri yoktur. GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı (E-11). MVP sonrası hedef: `app.atonota.net` NS kayıtları GoDaddy'den Route 53'e devredilir, sabit host'lar GoDaddy'de kalır (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
-| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.atonota.net` (MVP sonrası hedef, backend ad haritasında yok); P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | DevOps sorumlusu; DNS alan adı sorumlusu |
-| Operatör modu ve `ops-bff` (Rail 6) | `operator.atonota.net` (MVP sonrası hedef, backend ad haritasında yok): aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS); DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
+| Operasyon sitesi (Rail 6) | Kendi takımında 'ops' Release Group ve `ops.atonota.net` (MVP sonrası hedef, backend ad haritasında yok) bulunur. Finans çekirdeği P2’de, CRM ve Helpdesk P6’da açılır (SA-17). | DevOps sorumlusu dağıtımı yapar. Alan adı sorumlusu DNS kaydını uygular. |
+| Operatör modu ve `ops-bff` (Rail 6) | `operator.atonota.net` (MVP sonrası hedef, backend ad haritasında yok): aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında. Yalnız Tailscale veya özel ağdan erişilir, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS). DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
 | Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | DevOps sorumlusu |
 | Sürüm takibi | v0.155.x+ rc ortamındaki Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | DevOps sorumlusu |
-| Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | DevOps sorumlusu |
-| Güvenlik danışmanlığı | Danışmanlık izleme ve karar kaydı; acil yama rutin takvimi beklemez (G-142, K-26) | DevOps sorumlusu |
+| Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible, birinci taraf ürün analitiği adayı). Rıza ve ekran kurallarını G-134 belirler. | DevOps sorumlusu |
+| Güvenlik danışmanlığı | Ekip güvenlik duyurularını izler ve karar kaydı tutar. Acil yama rutin takvimi beklemez. (G-142, K-26) | DevOps sorumlusu |
 
 Kabul (P0): DNS kayıtları GoDaddy'den çözülür, TLS sertifikaları Active, test sitesi Active, offsite yedek bucket'ta listelenir ve geri yüklenir, Grafana/Kibana uyarıları e-postaya düşer. Route 53 açılırsa `dig NS` Route 53 sunucularını döner. Press üretim imajında Telegram paketi yoktur (7. bölüm).
 

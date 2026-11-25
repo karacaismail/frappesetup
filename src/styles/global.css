@@ -1028,8 +1028,3 @@ tr[id^="req-"][tabindex="-1"]:focus {
 .task-row-status {
   margin: 0 0 calc(0.25rem * var(--mantine-scale));
 }
-
-/* Taşınacak bloklar yer tutucusuna konana kadar çizilmez ([slug].astro satır içi betikleri). */
-html[data-embeds-pending] [data-embed-source] {
-  display: none;
-}

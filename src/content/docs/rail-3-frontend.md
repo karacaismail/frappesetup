@@ -62,7 +62,7 @@ Sidebar şu veriden kurulur: kurulu uygulama → üst öğe (Marketplace App iko
 
 ## 5. Veri katmanı ve realtime (G-68, G-13, G-15, G-45)
 
-| İşlem | Kiracı (Frappe v16) | Press (v15) |
+| İşlem | Kiracı (Frappe v16) | Press (Frappe 16, proje kaydı O-9) |
 | --- | --- | --- |
 | Liste / sayım | `GET /api/v2/document/<dt>`, `GET /api/v2/doctype/<dt>/count` | `press.api.client.get_list` |
 | Belge CRUD | `GET/POST/PATCH/DELETE /api/v2/document/<dt>/<name>` | `press.api.client.get/insert/set_value/delete` |

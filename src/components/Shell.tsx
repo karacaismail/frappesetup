@@ -62,6 +62,7 @@ function ColorSchemeToggle() {
       className="icon-btn"
       aria-label={label}
       title={label}
+      disabled={!mounted}
       data-testid="color-scheme-toggle"
       onClick={() => setColorScheme(dark ? 'light' : 'dark')}
     >
@@ -117,12 +118,14 @@ function CollapsibleGroup({
   label,
   icon,
   defaultOpened,
+  ready,
   children,
 }: {
   id: string;
   label: string;
   icon: string;
   defaultOpened: boolean;
+  ready: boolean;
   children: ReactNode;
 }) {
   const [opened, setOpened] = useState(defaultOpened);
@@ -133,6 +136,7 @@ function CollapsibleGroup({
       <button
         type="button"
         className="nav-link nav-wrapper"
+        disabled={!ready}
         aria-expanded={opened}
         aria-controls={panelId}
         data-testid={`nav-wrapper-${id}`}
@@ -142,7 +146,7 @@ function CollapsibleGroup({
         <span className="nav-link-label">{label}</span>
         <IconChevronDown size={18} aria-hidden className="nav-wrapper-chevron" />
       </button>
-      <div id={panelId} hidden={!opened} className="nav-wrapper-panel">
+      <div id={panelId} hidden={!opened} role="group" aria-label={label} className="nav-wrapper-panel">
         <Stack gap={2}>{children}</Stack>
       </div>
     </>
@@ -151,6 +155,8 @@ function CollapsibleGroup({
 
 function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, children }: ShellProps) {
   const [opened, { toggle, close }] = useDisclosure(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const navRef = useRef<HTMLDivElement>(null);
   // Etkin bölüm bağlantısı gezinme listesinin görünür alanında değilse yalnız liste kaydırılır (odak ve sayfa
   // kaydırması değişmez); mobil çekmece açılınca da aynı denetim yapılır.
@@ -216,6 +222,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
               className="burger"
               opened={opened}
               onClick={toggle}
+              disabled={!ready}
               hiddenFrom="md"
               size="sm"
               aria-label={opened ? 'Menüyü kapat' : 'Menüyü aç'}
@@ -254,6 +261,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
                     label={group}
                     icon={wrapperIcon}
                     defaultOpened={items.some((item) => item.href === current)}
+                    ready={ready}
                   >
                     {items.map(renderLink)}
                   </CollapsibleGroup>

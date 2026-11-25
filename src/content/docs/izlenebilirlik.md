@@ -55,7 +55,7 @@ Bu sayfa değerlendirme raporundaki her maddenin sonucunu ve bu sürümdeki doğ
 
 ## Kaynak defteri
 
-Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılmaz; sürüm değişince satır yeniden doğrulanır (G-128).
+Dış depo kayıtları 8 Ekim 2026 tarihinde doğrulandı. Backend kaynakları 22 Kasım 2026 Pazar günü okundu. Hareketli dal tek başına kanıt sayılmaz. Ekip sürüm değişince satırı yeniden doğrular (G-128).
 
 | No | İddia | Kaynak | Sürüm / SHA | Doğrulama türü |
 | --- | --- | --- | --- | --- |
@@ -63,8 +63,11 @@ Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılm
 | KD-02 | ERPNext ve HRMS GPL-3.0 | [erpnext](https://github.com/frappe/erpnext/blob/v16.50.0/license.txt), [hrms](https://github.com/frappe/hrms/blob/v16.50.0/license.txt) | v16.50.0 (`7474d9e`, `7c03769`) | Kaynak dosya |
 | KD-03 | Press, Agent, CRM, Helpdesk AGPL-3.0 | [press](https://github.com/frappe/press/blob/v0.155.3/license.txt) | press v0.155.3 `8493bf8`; crm v1.86.0; helpdesk v1.30.1 | Kaynak dosya |
 | KD-04 | ERPNext destek: v14 31 Ocak 2026'da bitti, v15 2027 sonu, v16 2029 sonu (planlı) | [Supported Versions](https://github.com/frappe/erpnext/wiki/Supported-Versions/304a17ecd1c1e7d12576dc8c1745dda0d0e57c1c) | wiki `304a17e` | Resmi wiki revizyonu |
-| KD-05 | Press son sürüm ve Frappe aralığı beyanı (`>=15,<17`; v16 çalışması doğrulanmadı) | [pyproject](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/pyproject.toml#L91-L92) | v0.155.3, `8493bf8` (etiket commit'i) | Kaynak dosya |
+| KD-05 | Press sürüm aralığı ve Frappe 16 denemesi | [Press sürüm aralığı](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/pyproject.toml#L91-L92) ve `backend/PROJECT-RECORD.md` O-9 | Press v0.155.3 beyanı. Yerel deneme Press 0.154.1, Frappe 16 ve Python 3.14. Kayıt `c1fd2c6`. | Yerel Press yamalarla açıldı. Sunucu kurma akışı açık iş. |
 | KD-06 | `allow_cors` tam eşleşme; `"*"` origin'i kimlik bilgisiyle yansıtır | [app.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/app.py#L319-L353) | `6b450a1` | Kod okuma |
+| KD-06A | Backend kararları ve bilinen sınırlar | `backend/PROJECT-RECORD.md` | `c1fd2c6` | Proje kaydı |
+| KD-06B | Kimlik, MCP ve model geçidi sözleşmeleri | `backend/docs/contracts.md` | `c1fd2c6` | Tasarım sözleşmesi |
+| KD-06C | Kiracı yapay zekâ katmanı ve model geçidi | `backend/docs/decisions/0002-ai-layer.md` ve `backend/docs/decisions/0004-model-gateway.md` | `c1fd2c6` | Karar notları |
 | KD-07 | Site `rate_limit` istek süresi toplamını site geneli ölçer | [rate\_limiter.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/rate_limiter.py#L48-L97) | `6b450a1` | Kod okuma |
 | KD-08 | `get_all` izin uygulamaz | [Database API](https://docs.frappe.io/framework/user/en/api/database) | Güncel doküman | Resmi doküman |
 | KD-09 | `override_whitelisted_methods` rastgele adı eşler | [handler.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/handler.py#L66-L87) | `6b450a1` | Kod okuma |
@@ -153,4 +156,10 @@ Sunucu eskiden kartları ve tabloyu birlikte üretirdi. Tarayıcı, gereksinim v
 | Gerçek cihaz doğrulaması | WebKit ve iPhone 13 emülasyondur | Gerçek macOS/iOS Safari ve Android'de odak, dokunma, kaydırma ve tema senaryoları `pass/fail` kaydıyla | Depo sahibi |
 | 320 px genişlikte %300 yazı | İnceleme, ana sayfanın yatay taştığını gördü. Bu ölçek mevcut kabul aralığı dışında. | Ana sayfa taşmadan okunur. | Depo sahibi |
 | Görsel referans kapsamı | Referanslar yedi görünüm içindir; mobil gezinme çekmecesi ve Teslim grubu gezinmesi görüntüde yok (davranış testleri var) | Gerekirse ek referans, bağımsız onayla | Depo sahibi |
-| Action güncellemeleri | Action'lar commit SHA'sına sabittir; otomatik güncelleme işi kurulmadı (zamanlanmış iş kurma kararı kullanıcıdadır) | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | DevOps sorumlusu |
+| Action güncellemeleri | Action sürümleri commit koduna sabittir. Otomatik güncelleme işi kurulmadı. Zamanlama kararı kullanıcıya aittir. | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | DevOps sorumlusu |
+
+## Kapanan kararlar
+
+| Kimlik | Karar | Kanıt |
+| --- | --- | --- |
+| K-36 | 8 Ekim 2026 Perşembe günü karar kapandı. JS bütçesi ilk görünümde indirilen tüm kabuk parçalarını kapsar. Önceki 85 KB ölçümü yalnız giriş parçalarını saydı. O derlemede gerçek toplam 125,2 KB idi. | Kabuk hafifletilince toplam 96,9 KB oldu. Giriş parçaları 77,9 KB idi. CI, her koşuda toplamın en çok 100 KB olduğunu denetler. Güncel ölçüm doğrulama tablosundadır. |

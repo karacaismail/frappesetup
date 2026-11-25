@@ -8,15 +8,15 @@ Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine ku
 
 | # | Karar | Gerekçe | Sonuç |
 | --- | --- | --- | --- |
-| K1 | Kontrol düzlemi: **Press v0.154.x** (`master` dalı, semantic-release) + **Frappe 16** + Python 3.14 | Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde geliştirilir. Bu karar backend proje kaydındaki D-7, D-15 ve O-9 kararıdır | Press bu sürümde yalnız açık bir yama dizisiyle açılır (O-52). Press'in sunucu kurma akışı Frappe 16'da çalışmadan üretime çıkılmaz. Press kendi sunucusunda çalışır |
-| K2 | Müşteri siteleri: **ERPNext v16.50 + Frappe v16**, müşteri başına bir Frappe sitesi | En güncel kararlı ürün hattı; Press v16 siteleri yönetiyor | Siteler Press'in kurduğu Docker bench'lerinde çalışır (n/f/m sunucuları) |
-| K3 | Altyapı: **Hetzner bare-metal, self-host** | Maliyet ve veri egemenliği; KVKK için AB içi veri yerleşimi | Press'in ihtiyaç duyduğu tüm sunucu rolleri Hetzner'de kurulur; sahibi DevOps sorumlusu |
+| K1 | Kontrol düzlemi: **Press v0.154.x** (`master` dalı, semantic-release) + **Frappe 16** + Python 3.14 | Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde geliştirilir. Bu karar backend proje kaydındaki D-7, D-15 ve O-9 kararıdır | Press bu sürümde yalnız açık bir yama dizisiyle açılır (O-52). Press'in sunucu kurma akışı Frappe 16'da çalışmadan üretime çıkılmaz. Press kendi sunucusunda veya sanal makinesinde çalışır. Bugün Press ve kiracı siteleri Frappe 16 kullanır. Ekip ileride kiracı sitelerinin sürümünü Press sürümünden bağımsız seçebilir |
+| K2 | Müşteri siteleri: **ERPNext 16.50 + Frappe 16**, müşteri başına bir Frappe sitesi | Proje güncel kararlı sürüm ailesini seçti. Press, 16 serisindeki siteleri yönetir. | Siteler Press'in kurduğu Docker bench'lerinde çalışır (n/f/m sunucuları) |
+| K3 | Altyapı: **Hetzner bare-metal, self-host** | Maliyet ve veri denetimi gözetilir. KVKK için veri AB içinde kalır. | Press'in ihtiyaç duyduğu tüm sunucu rolleri Hetzner’de kurulur. Kurulumdan DevOps sorumlusu sorumludur. |
 | K4 | Frontend: **%100 headless React SPA**; **Ant Design** tek tasarım sistemi; **`@ant-design/x`** AI arayüzlerinde birinci sınıf; **TanStack** (Query, Router, Table) | Tek görsel dil, AI-first bileşenler hazır, veri katmanı olgun | Tasarım kimliği AntD token'larının üstündeki semantik token katmanında kurulur |
 | K5 | Frontend **metadata-driven** çalışır; DocType meta'sı çalışma zamanında API'den okunur | Doctype değişikliği frontend'e otomatik yansımalı; tenant'a özel Custom Field'lar siteden siteye farklı meta üretir | Alan tipi → bileşen eşleme motoru + doctype bazlı açık override mekanizması |
 | K6 | Sidebar ve navigasyon **Workspace + kurulu app + izin** verisinden türetilir | Modül etkinleşince sidebar kendiliğinden güncellenmeli | Hiçbir menü elle kodlanmaz |
 | K7 | Kimlik: **Keycloak** tüm uygulamalar için tek giriş/kayıt sağlayıcısı | Çoklu uygulama (panel, faturalama, gelecek app'ler) için tek kimlik | Frappe ve Press Keycloak'a OIDC ile bağlanır |
 | K8 | Erişim: **Zoho/Odoo düzeyinde** rol ve yetki yönetimi (ReBAC/ABAC kayıt kuralları, hiyerarşi, alan düzeyi) | Frappe RBAC tek başına SaaS müşterisinin kendi yönettiği yetki modelini karşılamaz | Platform çekirdek app'inde erişim politikası motoru geliştirilir |
-| K9 | **AI-first**: Press ve siteler MCP ile yönetilir. Ajan servisi ve model geçidi sağlayıcıdan bağımsızdır. Panelde sağda AI paneli bulunur. AI eylemleri aynı sunucu izinlerinden geçer. Yazma eylemi önizleme ve onay ister. Her eylem denetim günlüğüne düşer | Tek tıkla aksiyon ve kararlı orkestrasyon. Proje sahibi her şeyin yapay zekâyla yönetilmesini ve sağlayıcıdan bağımsızlığı istedi (D-9, D-11) | Sisteme birden çok sağlayıcı, hesap ve API eklenir. Model adı kodda yazılmaz, model kaydında durur (O-10, O-13). Modelde onay alanı yoktur. Onay insan oturumundaki ayrı uçtan gelir. KVKK uyumu zorunludur |
+| K9 | **AI-first**: Press ve siteler MCP ile yönetilir. Ajan servisi ve model geçidi sağlayıcıdan bağımsızdır. Panelde sağda AI paneli bulunur. AI eylemleri aynı sunucu izinlerinden geçer. Yazma eylemleri önizleme ve onay gerektirir. Sistem her eylemi denetim kaydına yazar. | Tek tıkla aksiyon ve kararlı orkestrasyon. Proje sahibi her şeyin yapay zekâyla yönetilmesini ve sağlayıcıdan bağımsızlığı istedi (D-9, D-11) | Sisteme birden çok sağlayıcı, hesap ve API eklenir. Model adı kodda yazılmaz, model kaydında durur (O-10, O-13). Modelde onay alanı yoktur. Onay insan oturumundaki ayrı uçtan gelir. KVKK uyumu zorunludur |
 | K10 | Ürünler ayrı Frappe app'leri olarak satılır: **HRMS TR** önce, sonra **CRM**, **Webshop**; hepsi ortak **admin shell** çerçevesine uyar; modül etkinleştirme **Press Marketplace / App Plan** üzerinden | Zoho/Odoo tarzı "etkinleştir" deneyimi | Her app bu dokümandaki app çerçevesi şablonunu karşılar |
 
 K3 notu: Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; aktarım mekanizması hukukça belirlenir (G-90, G-116).
@@ -38,3 +38,9 @@ K1 ve K9 notu: Bu iki satır 23 Kasım 2026 Pazartesi günü backend proje kayd�
 | Alan adı sorumlusu | GoDaddy hesabı, domain ve DNS değişiklikleri (teknik gereksinimi DevOps sorumlusu hazırlar) |
 | Finans/Muhasebe ve mali müşavir | Vergi ve belge zamanlaması, finans olay–belge matrisi (K-13, SA-41) |
 | Hukuk | KVKK, rıza ve aktarım mekanizması, lisans değerlendirmesi (K-1, K-27, K-28) |
+
+## Kapanan kararlar
+
+| Kimlik | Karar | Kaynak |
+| --- | --- | --- |
+| K-31 | 22 Kasım 2026 Pazar günü karar kapandı. Site ve indirilen Press AI paketi görev sahiplerini rol adıyla yazar. Rol adları “DevOps sorumlusu” ve “alan adı sorumlusu” olur. Ürün sahibi başka karar verirse karar yeniden açılır. | `c1fd2c6` kaydında `backend/PROJECT-RECORD.md`, O-1 ve O-29. |

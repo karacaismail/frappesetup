@@ -745,7 +745,71 @@ async function frameStep(page: Page) {
 }
 
 /* ------------------------------------------------------------------ */
+test.describe('documents without JavaScript', () => {
+  test.use({ javaScriptEnabled: false, viewport: { width: 320, height: 720 } });
+
+  test('desktop AI links remain usable without JavaScript', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('kararlar/');
+    const group = page.getByRole('group', { name: 'AI', exact: true });
+    await expect(group).toBeVisible();
+    const links = group.locator('a[href*="/ai-"]');
+    await expect(links).toHaveCount(DOC_SLUGS.filter((slug) => slug.startsWith('ai-')).length);
+    await expect(links.first()).toBeVisible();
+    await links.first().click();
+    await expect(page).toHaveURL(/\/ai-bakis\/$/);
+  });
+
+  test('embeds stay under their headings and script controls are disabled @touch', async ({ page }) => {
+    await page.goto('yol-haritasi/');
+    await expect(page.locator('[data-embed]')).toHaveCount(0);
+    for (const [name, heading] of [['phase-table', 'Faz tablosu'], ['timeline', 'Faz sırası']]) {
+      const block = page.locator(`.prose [data-embed-source="${name}"]`);
+      await expect(block).toBeVisible();
+      await expect(block).not.toHaveClass(/\bprose\b/);
+      await expect(block.locator('xpath=preceding-sibling::h2[1]')).toHaveText(heading);
+    }
+    await expect(page.getByRole('button', { name: 'Menüyü aç' })).toBeDisabled();
+    await expect(page.getByTestId('color-scheme-toggle')).toBeDisabled();
+    await expect(page.getByTestId('nav-wrapper-ai')).toBeDisabled();
+  });
+
+  test('mobile readers can reach the section list without JavaScript @touch', async ({ page }) => {
+    await page.goto('kararlar/');
+    await page.getByRole('link', { name: 'Doküman bölümlerini aç' }).click();
+    await expect(page).toHaveURL(/\/#sections-h$/);
+    await expect(page.getByRole('heading', { name: 'Doküman bölümleri' })).toBeVisible();
+  });
+});
+
 test.describe('AI nav group', () => {
+  test('keeps its initial AI group state when the shell loads', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    let releaseShell!: () => void;
+    const shellGate = new Promise<void>((resolve) => { releaseShell = resolve; });
+    await page.route(/\/_astro\/Shell\.[^/]+\.js$/, async (route) => {
+      await shellGate;
+      await route.continue();
+    });
+
+    try {
+      await page.goto('kararlar/', { waitUntil: 'domcontentloaded' });
+      const group = page.getByTestId('nav-wrapper-ai');
+      const firstLink = page.locator('#site-nav a[href*="/ai-"]').first();
+      await expect(group).toBeDisabled();
+      await expect(group).toHaveAttribute('aria-expanded', 'false');
+      await expect(firstLink).toBeHidden();
+
+      releaseShell();
+      await waitForHydration(page);
+      await expect(group).toBeEnabled();
+      await expect(group).toHaveAttribute('aria-expanded', 'false');
+      await expect(firstLink).toBeHidden();
+    } finally {
+      releaseShell();
+    }
+  });
+
   test('wrapper is collapsed elsewhere, open on AI pages, keyboard operable', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
@@ -1695,7 +1759,7 @@ test.describe('diagrams', () => {
     expect(problems).toEqual([]);
   });
 
-  test('roadmap timeline is moved next to its placeholder', async ({ page }) => {
+  test('roadmap timeline renders in the document', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('yol-haritasi/');
     await expect(page.locator('.prose .diagram-timeline')).toHaveCount(1);

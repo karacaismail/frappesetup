@@ -28,6 +28,7 @@ type TaskBoard = {
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
   items: Record<string, TaskItem>;
 };
+const decisionRows = docs.flatMap(({ text }) => [...text.matchAll(/^\| (K-\d+) \|.*$/gm)]);
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
 
 // Git yardımcıları: kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer.
@@ -273,6 +274,80 @@ test.describe('content consistency', () => {
     expect(read('src/data/task-board.json')).not.toMatch(/staging/i);
   });
 
+  test('published retention, AI safeguards and decision caveats remain documented', () => {
+    const text = (slug: string) => docs.find((doc) => doc.slug === slug)!.text;
+    expect(text('rail-5-ai')).toContain('konuşma içeriği 90 gün');
+    expect(reqs.find((req) => req.id === 'G-87')?.detail).toContain('konuşma içeriği 90 gün');
+
+    const k9 = text('kararlar').split('\n').find((line) => line.startsWith('| K9 |'));
+    const homeCard = read('src/pages/index.astro').split('\n').find((line) => line.includes("id: 'K9'"));
+    for (const decision of [k9, homeCard]) {
+      expect(decision).toContain('AI eylemleri aynı sunucu izinlerinden geçer.');
+      expect(decision).toContain('Yazma eylemleri önizleme ve onay gerektirir.');
+      expect(decision).toContain('Sistem her eylemi denetim kaydına yazar.');
+      expect(decision).toContain('KVKK uyumu zorunlu');
+    }
+
+    const introduction = text('acik-kararlar').split('\n## ')[0];
+    expect(introduction).toContain('Kararlar üç türdür ve **Tür** sütununda yazılıdır');
+    expect(introduction).toContain('"Öneri" sütunundaki sayılar ölçülmüş kapasite veya kabul edilmiş taahhüt değildir.');
+  });
+
+  test('revised rows retain their original ids and decision links', () => {
+    // Bunlar incelemede karşılaştırılan önceki satırların bağlarıdır. CI için bir Git dalı gerekmez.
+    const originalLinks: Record<string, string[]> = {
+      'G-12': ['G-120'],
+      'G-57': ['G-120'],
+      'G-64': ['G-52'],
+      'G-77': ['G-124', 'G-148', 'G-16', 'G-82', 'K-25'],
+      'G-78': ['G-57'],
+      'G-81': ['G-152'],
+      'G-83': ['G-15'],
+      'G-87': ['G-64'],
+      'G-88': ['G-137'],
+      'G-90': ['G-116'],
+      'G-110': ['G-3'],
+      'G-116': ['G-24', 'G-52'],
+      'G-148': ['G-28', 'K-25'],
+      'SA-41': ['G-22', 'K-13', 'SA-19', 'SA-21'],
+    };
+    const linksById = new Map(reqs.map((req) => [req.id, req.detail.match(/\b(?:G-|SA-|K-|X-)\d+\b/g) ?? []]));
+    const missing = Object.entries(originalLinks).flatMap(([id, links]) => {
+      const current = linksById.get(id);
+      return current ? links.filter((link) => !current.includes(link)).map((link) => `${id} → ${link}`) : [id];
+    });
+    expect(missing).toEqual([]);
+
+    const decisions = new Map(decisionRows.map((row) => [row[1], row[0]]));
+    for (const [id, links] of Object.entries({ 'K-6': ['G-80', 'G-152'], 'K-8': ['G-43'], 'K-41': ['G-78', 'K-8'] })) {
+      for (const link of links) expect(decisions.get(id), `${id} → ${link}`).toContain(link);
+    }
+  });
+
+  test('revised approval and identity rules retain their acceptance conditions', () => {
+    const requirements = new Map(reqs.map((req) => [req.id, req.detail]));
+    const approval = requirements.get('G-86');
+    for (const rule of [
+      'approve_proposal', 'İnsan oturumu', 'fiyat sürümü', 'yeniden önizleme',
+      'Otomatik zincirleme yazma yasaktır', 'silme', 'iptal', 'submit', 'toplu güncelleme',
+      'ödeme', 'dış sisteme gönderim', 'tekrar gönderim', 'süresi dolan', 'değişen belge', 'başka kullanıcı',
+    ]) expect(approval?.toLocaleLowerCase('tr'), `G-86: ${rule}`).toContain(rule.toLocaleLowerCase('tr'));
+
+    const pressLogin = requirements.get('G-12');
+    for (const endpoint of [
+      'signup', 'send_otp', 'verify_otp', 'send_login_link', 'login_using_key',
+      'reset_password', 'enable_2fa', 'verify_2fa', 'product_trial.send_verification_code_for_login',
+      'Press Vue `/dashboard` yalnız iç ağa açıktır', 'Press 2FA kapalı, Keycloak MFA açık kalır',
+    ]) expect(pressLogin, `G-12: ${endpoint}`).toContain(endpoint);
+
+    for (const rule of ['K-25', 'açık', 'PKCE S256']) expect(requirements.get('G-77')).toContain(rule);
+    for (const rule of ['yetki gereksinimi', 'yıkıcı', 'ücretli']) expect(requirements.get('G-84')).toContain(rule);
+    for (const setting of ['enable_onboarding=0', 'disable_system_update_notification=1', 'disable_change_log_notification=1']) {
+      expect(requirements.get('G-53')).toContain(setting);
+    }
+    expect(requirements.get('G-90')).toContain('Rail 6 ile aynı maskeleme sözlüğü');
+  });
+
   test('requirement ids are unique, contiguous and well formed', () => {
     expect(ids.size).toBe(reqs.length);
     for (const prefix of ['G', 'SA']) {
@@ -304,9 +379,18 @@ test.describe('content consistency', () => {
     expect(missing).toEqual([]);
   });
 
-  test('every K decision reference exists in the open decisions page', () => {
-    const decisions = docs.find((d) => d.slug === 'acik-kararlar')!.text;
-    const defined = new Set([...decisions.matchAll(/^\| (K-\d+) \|/gm)].map((m) => m[1]));
+  test('decision ids are unique', () => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const [, id] of decisionRows) {
+      if (seen.has(id)) duplicates.add(id);
+      seen.add(id);
+    }
+    expect([...duplicates]).toEqual([]);
+  });
+
+  test('every K decision reference has a documented decision', () => {
+    const defined = new Set(decisionRows.map((row) => row[1]));
     const missing: string[] = [];
     const scan = (where: string, text: string) => {
       for (const m of text.matchAll(/\bK-(\d+)\b/g)) if (!defined.has(`K-${m[1]}`)) missing.push(`${where}: K-${m[1]}`);
@@ -314,6 +398,18 @@ test.describe('content consistency', () => {
     for (const d of docs) scan(d.slug, d.text);
     for (const r of reqs) scan(r.id, r.detail);
     expect(missing).toEqual([]);
+  });
+
+  test('all document embeds render once without placeholders', () => {
+    for (const doc of docs) {
+      const names = [...doc.text.matchAll(/<div data-embed="([a-z0-9-]+)"><\/div>/g)].map((match) => match[1]);
+      expect(new Set(names).size, doc.slug).toBe(names.length);
+      if (names.length === 0) continue;
+      const html = read(`dist/${doc.slug}/index.html`);
+      expect(html, doc.slug).not.toMatch(/<[^>]*\sdata-embed=/);
+      const sources = [...html.matchAll(/data-embed-source="([a-z0-9-]+)"/g)].map((match) => match[1]);
+      expect(sources, doc.slug).toEqual(names);
+    }
   });
 
   test('internal links point to existing pages and anchors', () => {
