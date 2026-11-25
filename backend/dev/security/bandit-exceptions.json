@@ -3360,5 +3360,23 @@
     "reason": "The developer test runner supplies the executable PATH for this docker command.",
     "owner": "kimlik-realm",
     "ignoreUntil": "2027-02-24"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_source_ledger.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; the single subprocess call in this test is reviewed separately.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_source_ledger.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "c62b47cc251ca0d7c33fe3d48bf441ddc7e493f2e6330001121c7da37653a636",
+    "reason": "Runs the repository's fixed check-source-ledger script with the current interpreter and a test-owned ledger path, without a shell.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
   }
 ]
