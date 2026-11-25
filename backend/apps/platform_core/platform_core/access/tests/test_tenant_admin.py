@@ -30,6 +30,7 @@ PROFILE = "TA Deneme Profil"
 # A business type without stored permission rows of its own, so the copy of the standard rows can be seen.
 PERMISSION_TYPE = "Sales Partner Type"
 DESK_ROLE = "TA Masa Rol"
+CUSTOM_TYPE = "TA Ozel Tur"
 RULE_TYPE = "ToDo"
 PROTECTED = ("System Manager", "Administrator")
 
@@ -64,6 +65,16 @@ class TestTenantAdmin(IntegrationTestCase):
 				frappe.get_doc(doctype="Role", role_name=role, desk_access=0).insert()
 		if not frappe.db.exists("Role", DESK_ROLE):
 			frappe.get_doc(doctype="Role", role_name=DESK_ROLE, desk_access=1).insert()
+		if not frappe.db.exists("DocType", CUSTOM_TYPE):
+			# A type a System Manager makes on the site. Such types are business types.
+			frappe.get_doc(
+				doctype="DocType",
+				name=CUSTOM_TYPE,
+				module="Custom",
+				custom=1,
+				fields=[{"fieldname": "title", "fieldtype": "Data", "label": "Title"}],
+				permissions=[{"role": "System Manager", "read": 1, "write": 1, "create": 1}],
+			).insert()
 		_user(HOLDER, [tenant_admin.ROLE])
 		_user(PLAIN, [CUSTOM_ROLE])
 		_user(SYSTEM_MANAGER_USER, ["System Manager"])
@@ -85,7 +96,7 @@ class TestTenantAdmin(IntegrationTestCase):
 		frappe.db.set_value("User", {"role_profile_name": PROFILE}, "role_profile_name", None)
 		if frappe.db.exists("Role Profile", PROFILE):
 			frappe.delete_doc("Role Profile", PROFILE, ignore_permissions=True, force=True)
-		frappe.db.delete("Custom DocPerm", {"parent": PERMISSION_TYPE})
+		frappe.db.delete("Custom DocPerm", {"parent": ("in", [PERMISSION_TYPE, CUSTOM_TYPE])})
 		frappe.db.delete("Custom DocPerm", {"role": ("in", [CUSTOM_ROLE, OTHER_ROLE])})
 		frappe.db.delete("Role", {"name": "TA Yeni Rol"})
 		frappe.clear_cache()
@@ -597,3 +608,39 @@ class TestTenantAdmin(IntegrationTestCase):
 
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		self.assertEqual(frappe.db.get_value("Custom DocPerm", self.custom_row(CUSTOM_ROLE), "write"), 0)
+
+	# --- third review (AJA-802) ---
+
+	def test_holder_gives_a_permission_row_on_a_custom_type_of_the_site(self):
+		response = self.set_row(self.login(), CUSTOM_ROLE, {"read": 1}, doctype=CUSTOM_TYPE)
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertTrue(self.custom_row(CUSTOM_ROLE, CUSTOM_TYPE))
+
+	def test_holder_cannot_change_a_role_that_is_not_plain(self):
+		"""Turning off desk access, 2FA or the role itself would hit the role's users."""
+		client = self.login()
+		for body in ({"desk_access": 0}, {"two_factor_auth": 1}, {"disabled": 1}):
+			response = self.resource(client, "PUT", "Role", DESK_ROLE, body=body)
+			self.assertEqual(response.status_code, 403, body)
+		deleted = self.resource(client, "DELETE", "Role", DESK_ROLE)
+
+		self.assertEqual(deleted.status_code, 403)
+		self.assertEqual(frappe.db.get_value("Role", DESK_ROLE, ["desk_access", "disabled"]), (1, 0))
+
+	def test_holder_does_not_list_the_rows_of_a_closed_type(self):
+		response = self.rows(self.login(), "Client Script")
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_holder_cannot_take_a_role_that_is_not_plain_from_a_user(self):
+		user = frappe.get_doc("User", PLAIN)
+		user.append("roles", {"role": "Script Manager"})
+		user.save()
+		frappe.set_user(HOLDER)
+		doc = frappe.get_doc("User", PLAIN)
+		doc.set("roles", [row for row in doc.roles if row.role != "Script Manager"])
+
+		with self.assertRaises(frappe.PermissionError):
+			doc.save(ignore_permissions=True)
+		frappe.set_user("Administrator")
