@@ -44,7 +44,7 @@ class SiteConfigKeysTest(unittest.TestCase):
 		from press.press.doctype.site_config.site_config import SiteConfig
 
 		rows = json.loads(FIXTURE.read_text(encoding="utf-8"))
-		fake_password = "synthetic-g39-value-for-log-test"
+		synthetic_value = "synthetic-g39-value-for-log-test"
 
 		def get_all(doctype, filters=None, fields=None, pluck=None, **kwargs):
 			self.assertEqual(doctype, "Site Config Key")
@@ -60,7 +60,7 @@ class SiteConfigKeysTest(unittest.TestCase):
 			return [frappe._dict({field: row.get(field) for field in fields or ["name"]}) for row in matches]
 
 		configs = [
-			SimpleNamespace(key=key, value=fake_password, type="String") for key in sorted(PASSWORD_KEYS)
+			SimpleNamespace(key=key, value=synthetic_value, type="String") for key in sorted(PASSWORD_KEYS)
 		]
 		configs.append(SimpleNamespace(key="custom_public", value="visible", type="String"))
 		stdout = io.StringIO()
@@ -90,7 +90,7 @@ class SiteConfigKeysTest(unittest.TestCase):
 		self.assertEqual(values["custom_public"], "visible")
 		emitted = json.dumps([vars(config) for config in result])
 		for text in (emitted, stdout.getvalue(), stderr.getvalue(), log.getvalue()):
-			self.assertNotIn(fake_password, text)
+			self.assertNotIn(synthetic_value, text)
 
 	@unittest.skipUnless(find_spec("press"), "Requires the Press bench")
 	def test_press_panel_lists_only_public_fixture_keys(self):
