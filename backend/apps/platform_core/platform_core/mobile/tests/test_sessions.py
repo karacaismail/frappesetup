@@ -10,6 +10,16 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 
+def _run_commit_callbacks(after_commit):
+	"""Run what the code queued for after the commit.
+
+	Frappe also queues its own cache callbacks there. For example, set_value queues one.
+	So a test checks the effect of the callbacks, not their number.
+	"""
+	for call in list(after_commit.add.call_args_list):
+		call.args[0]()
+
+
 class MobileSessionTest(IntegrationTestCase):
 	def setUp(self):
 		self.account = (
@@ -191,7 +201,9 @@ class MobileSessionTest(IntegrationTestCase):
 			after_commit.reset_mock()
 			plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
 			self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
-			after_commit.add.assert_not_called()
+			_run_commit_callbacks(after_commit)
+			send.assert_called_once()
+			after_commit.reset_mock()
 			frappe.db.set_value(
 				"PLT Mobile Revoked Session", _session_key(self.sid), "last_delivery_attempt_at", "1"
 			)
@@ -227,7 +239,8 @@ class MobileSessionTest(IntegrationTestCase):
 			with patch("platform_core.mobile.lifecycle.time.time", return_value=time.time() + 1):
 				plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
 				self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
-			after_commit.add.assert_not_called()
+			_run_commit_callbacks(after_commit)
+			send.assert_called_once()
 
 	def test_legacy_installation_gets_sid_on_explicit_registration(self):
 		from platform_core.api.mobile import _register
