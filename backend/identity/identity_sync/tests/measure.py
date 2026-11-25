@@ -220,6 +220,14 @@ class _Bench:
         body = {"issuer": self.issuer, "subject": subject, "reauthenticated_at": int(time.time())}
         return self.call("POST", "/v1/account-deletions", body, PRESS)
 
+    def remove_recovery_keys(self) -> Callable[[], int]:
+        # One old passkey per call. The user stays, so the sample keeps its size.
+        subject = self.subjects[self.counter % len(self.subjects)]
+        self.counter += 1
+        self.keycloak.add_credential(subject, "webauthn-passwordless", created=1000)
+        body = {"issuer": self.issuer, "subject": subject, "review_id": self.fresh("review"), "approved_at": int(time.time())}
+        return self.call("POST", "/v1/recovery-key-removals", body, PRESS)
+
     def preview_reconcile(self) -> Callable[[], int]:
         return self.call("POST", "/v1/reconcile", {"dry_run": True}, OPERATOR)
 
@@ -383,6 +391,7 @@ def run(
             ("POST /v1/events", "write", bench.event),
             ("POST /v1/invitations (execute)", "write", bench.execute_invitation),
             ("POST /v1/sessions/revoke", "write", bench.revoke_session),
+            ("POST /v1/recovery-key-removals", "write", bench.remove_recovery_keys),
             ("POST /v1/account-deletions", "write", bench.delete_account),
             # Last: every call adds one account to Keycloak, so the lists grow.
             ("POST /v1/reconcile (execute)", "write", bench.execute_reconcile),

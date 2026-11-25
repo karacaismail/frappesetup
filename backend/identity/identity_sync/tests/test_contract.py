@@ -45,7 +45,7 @@ def request_schema(method: str, path: str) -> dict:
 
 class DocumentationTest(unittest.TestCase):
     def test_contract_lists_operations(self) -> None:
-        self.assertEqual(len(operations()), 12)
+        self.assertEqual(len(operations()), 13)
 
     def test_every_operation_is_documented(self) -> None:
         # Every endpoint has a summary, description and destructive-action flag (`docs/sozlesmeler.md`, section 10).
@@ -560,6 +560,27 @@ class SchemaTest(ServerCase):
         self.assert_response(
             self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN)), "GET", "/v1/dead-letters", 200
         )
+
+    def test_recovery_key_removal(self) -> None:
+        from .test_server import NOW, PRESS_TOKEN
+
+        path = "/v1/recovery-key-removals"
+        kc = self.stack.keycloak
+        key = kc.add_credential(SUBJECT, "webauthn", created=(NOW - 3600) * 1000)
+        request = {"issuer": self.stack.issuer, "subject": SUBJECT, "review_id": "a1b2c3d4e5", "approved_at": NOW - 60}
+
+        self.assert_request(request, "POST", path)
+        self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 403)
+        self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
+        for rejected in ({}, {**request, "subject": ".."}, {**request, "approved_at": "dun"}, {**request, "dry_run": True}):
+            with self.subTest(rejected=rejected):
+                self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
+                self.assert_response(self.post_json(path, rejected, PRESS_TOKEN), "POST", path, 400)
+        kc.on("DELETE", f"{kc.admin}/users/{SUBJECT}/credentials/{key}", (500, None))
+        self.assert_response(self.post_json(path, request, PRESS_TOKEN), "POST", path, 502)
+        kc.on("DELETE", f"{kc.admin}/users/{SUBJECT}/credentials/{key}", lambda _r: kc._delete_credential(SUBJECT, key))
+        done = self.assert_response(self.post_json(path, request, PRESS_TOKEN), "POST", path, 200)
+        self.assertEqual(done, {"status": "done", "removed": 1})
 
     def test_proposed_target_replies_match_the_target_schemas(self) -> None:
         tenant, press = fakes.FakeTenant(), fakes.FakePress()

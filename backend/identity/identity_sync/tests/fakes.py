@@ -262,18 +262,36 @@ class FakeKeycloak(FakeServer):
             {"identityProvider": alias, "userId": f"outside-{alias}-id", "userName": user_name}
         )
 
-    def add_credential(self, subject: str, kind: str, label: str = "") -> None:
-        """Store a credential. Keycloak returns its id and its data too."""
+    def add_credential(self, subject: str, kind: str, label: str = "", *, created: int = 1_795_000_000_000) -> str:
+        """Store a credential and return its id. Keycloak returns its id and its data too.
+
+        `created` is the Keycloak `createdDate` value in milliseconds. Keycloak can delete the credential.
+        """
+        credential_id = f"credential-{kind}-{len(self.credentials.get(subject, []))}"
         self.credentials.setdefault(subject, []).append(
             {
-                "id": f"credential-{kind}-{len(self.credentials.get(subject, []))}",
+                "id": credential_id,
                 "type": kind,
                 "userLabel": label,
-                "createdDate": 1_795_000_000_000,
+                "createdDate": created,
                 "credentialData": '{"hashIterations":5,"algorithm":"argon2"}',
                 "priority": 10,
             }
         )
+        self.on(
+            "DELETE",
+            f"{self.admin}/users/{subject}/credentials/{credential_id}",
+            lambda _r: self._delete_credential(subject, credential_id),
+        )
+        return credential_id
+
+    def _delete_credential(self, subject: str, credential_id: str) -> Reply:
+        rows = self.credentials.get(subject, [])
+        for row in rows:
+            if row["id"] == credential_id:
+                rows.remove(row)
+                return 204, None
+        return 404, {"error": "Credential not found"}
 
     def _identity_providers(self, req: Recorded) -> Reply:
         first, size = int(req.query.get("first", ["0"])[0]), int(req.query.get("max", ["100"])[0])
