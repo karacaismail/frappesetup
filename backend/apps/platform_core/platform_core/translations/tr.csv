@@ -887,3 +887,14 @@ Failure Code,Hata Kodu,PLT AI File Chunk
 Result,Sonuç,PLT AI File Chunk
 File Job,Dosya İşi,PLT AI Usage Log
 Chunk Index,Parça Sırası,PLT AI Usage Log
+No permission to explain permissions.,İzinleri açıklama yetkiniz yok.,
+Not permitted,İzin verilmedi,
+Only a System Manager can give or change the System Manager and Administrator roles.,System Manager ve Administrator rollerini yalnız System Manager verebilir ve değiştirebilir.,
+Only a System Manager can give a role desk access.,Bir role masa erişimini yalnız System Manager verebilir.,
+Only a System Manager can change the permissions of {0}.,{0} izinlerini yalnız System Manager değiştirebilir.,
+No permission to manage role permissions.,Rol izinlerini yönetme yetkiniz yok.,
+Child tables take the permissions of their parent type.,Alt tablolar üst kayıt türünün izinlerini kullanır.,
+permlevel and if_owner must be whole numbers.,permlevel ve if_owner tam sayı olmalıdır.,
+permlevel must be from 0 to 9 and if_owner must be 0 or 1.,permlevel 0 ile 9 arasında olmalıdır. if_owner 0 ya da 1 olmalıdır.,
+permissions must name only these rights: {0},permissions yalnız şu hakları içermelidir: {0},
+The role has no permission row at this level.,Rolün bu düzeyde izin satırı yok.,
