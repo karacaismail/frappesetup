@@ -56,6 +56,8 @@ class MeasurementTest(unittest.TestCase):
                 "POST /v1/invitations (preview)": ("read", 500),
                 "POST /v1/invitations (execute)": ("write", 1000),
                 "POST /v1/sessions/revoke": ("write", 1000),
+                "GET /v1/login-providers": ("read", 500),
+                "POST /v1/linked-accounts": ("read", 500),
                 "POST /v1/account-deletions": ("write", 1000),
             },
         )

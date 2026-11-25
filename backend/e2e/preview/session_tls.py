@@ -8,7 +8,12 @@ import sys
 
 
 RELAY_TARGETS = {
-    "sessions": {("POST", "/v1/sessions/revoke")},
+    # The tenant calls identity-sync through this origin. The login reads share it (AJA-459).
+    "sessions": {
+        ("POST", "/v1/sessions/revoke"),
+        ("GET", "/v1/login-providers"),
+        ("POST", "/v1/linked-accounts"),
+    },
     "keycloak": {
         ("POST", "/realms/platform/protocol/openid-connect/token"),
         ("GET", "/realms/platform/protocol/openid-connect/certs"),

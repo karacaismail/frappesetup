@@ -222,7 +222,7 @@ class PreviewFixturesTest(unittest.TestCase):
         ]
         self.assertEqual(
             set(granted_roles),
-            {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"},
+            {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations", "view-identity-providers"},
         )
 
     def test_loopback_provider_is_rejected_before_fixtures_are_seeded(self):

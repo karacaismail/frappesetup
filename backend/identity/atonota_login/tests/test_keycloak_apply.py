@@ -70,7 +70,11 @@ class ApplyTest(unittest.TestCase):
         self.environment = {"ATONOTA_OPEN_ONE_CLIENT_ID": "client-1", "ATONOTA_OPEN_ONE_CLIENT_SECRET": self.secret}
         old_secret = secrets.token_urlsafe(24)
         self.kept_secret = old_secret
-        corporate = {"alias": "corporate", "providerId": "oidc", "enabled": True, "config": {"clientId": "c"}}
+        # A corporate provider with the email_verified rule and the fixed broker flows (G-160).
+        corporate = {"alias": "corporate", "providerId": "oidc", "enabled": True,
+                     "firstBrokerLoginFlowAlias": platforms.FIRST_BROKER_FLOW,
+                     "postBrokerLoginFlowAlias": platforms.POST_BROKER_FLOW,
+                     "config": {"clientId": "c", **platforms.VERIFIED_EMAIL_CLAIM}}
         closed = {"alias": "closed-one", "providerId": "oidc", "enabled": True, "hideOnLogin": False,
                   "internalId": "id-1", "config": {"clientId": "old", "clientSecret": old_secret, "extra": "kept"}}
         self.keycloak = FakeKeycloak([corporate, closed])
@@ -102,29 +106,33 @@ class ApplyTest(unittest.TestCase):
 
     def test_other_providers_are_listed_not_changed(self):
         report = keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
-        self.assertIn({"alias": "corporate", "action": "not-in-registry-unverified-email", "enabled": True}, report)
+        self.assertIn({"alias": "corporate", "action": "not-in-registry", "enabled": True}, report)
         self.assertFalse([w for w in self.keycloak.writes if "corporate" in w[1]])
         self.assertTrue(self.keycloak.providers["corporate"]["enabled"])
 
-    def test_provider_outside_the_registry_is_flagged_by_its_e_mail_rule(self):
+    def test_provider_outside_the_registry_without_the_e_mail_rule_stops_the_command(self):
         # Review 1, important 3: a corporate provider without the email_verified rule can pre-hijack an
-        # account. The command does not change it, but names it so the operator sees it.
-        safe = {"alias": "corporate-safe", "providerId": "oidc", "enabled": True,
-                "config": dict(platforms.VERIFIED_EMAIL_CLAIM)}
-        self.keycloak.providers["corporate-safe"] = safe
-        report = keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
-        actions = {line["alias"]: line["action"] for line in report}
-        self.assertEqual(actions["corporate"], "not-in-registry-unverified-email")
-        self.assertEqual(actions["corporate-safe"], "not-in-registry")
+        # account. G-160 (AJA-229): a warning is not enough. Without an exception record the command
+        # stops with an error. It does not change or close the provider.
+        unsafe = {"alias": "corporate-unsafe", "providerId": "oidc", "enabled": True,
+                  "firstBrokerLoginFlowAlias": platforms.FIRST_BROKER_FLOW,
+                  "postBrokerLoginFlowAlias": platforms.POST_BROKER_FLOW, "config": {"clientId": "c"}}
+        self.keycloak.providers["corporate-unsafe"] = unsafe
+        with self.assertRaises(ApplyError) as raised:
+            keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
+        self.assertEqual(raised.exception.rule, "missing_exception")
+        self.assertFalse([w for w in self.keycloak.writes if "corporate" in w[1]])
+        self.assertTrue(self.keycloak.providers["corporate-unsafe"]["enabled"])
 
     def test_provider_with_null_config_does_not_stop_the_command(self):
         # Review 2, finding 1: Keycloak may return "config": null. The command must not crash.
+        # A null config has no email_verified rule, so the corporate provider now stops the command
+        # with a named rule instead of a crash (G-160).
         self.keycloak.providers["closed-one"]["config"] = None
         self.keycloak.providers["corporate"]["config"] = None
-        report = keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
-        actions = {line["alias"]: line["action"] for line in report}
-        self.assertEqual(actions["closed-one"], "updated")
-        self.assertEqual(actions["corporate"], "not-in-registry-unverified-email")
+        with self.assertRaises(ApplyError) as raised:
+            keycloak_apply.apply_registry(self.keycloak, self.registry, self.environment)
+        self.assertEqual(raised.exception.rule, "missing_exception")
         closed = self.keycloak.providers["closed-one"]
         self.assertFalse(closed["enabled"])
         self.assertEqual(closed["config"]["clientSecret"], "")

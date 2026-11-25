@@ -13,6 +13,7 @@
  ],
  "fields": [
   {
+   "description": "The case id that the provider's notices refer to. It is unique, so each case has one record.",
    "fieldname": "case_id",
    "fieldtype": "Data",
    "in_list_view": 1,

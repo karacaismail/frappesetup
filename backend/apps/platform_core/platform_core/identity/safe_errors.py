@@ -45,6 +45,11 @@ def safe_errors(fn):
 			status = getattr(error, "http_status_code", 500)
 			if status < 500:
 				raise
+			if getattr(error, "expected_outage", False) and type(error).__module__.startswith(
+				"platform_core"
+			):
+				# An expected outage of a service the site calls (AJA-459). The caller logged it without data.
+				raise
 			for field in PERSONAL_FIELDS:
 				if field in frappe.form_dict:
 					frappe.form_dict[field] = REDACTED

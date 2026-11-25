@@ -211,10 +211,48 @@ test('sign-out: the confirmation signs the user out', async ({ page }) => {
   await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
   await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
   await screen('sign-out-confirm').open(page);
-  await page.getByRole('button', { name: 'Oturumu kapatın', exact: true }).click();
+  await page.getByRole('button', { name: 'Bu oturumu kapatın', exact: true }).click();
   await expect(page.locator('#kc-page-title')).toHaveText('Oturumu kapattınız');
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await expect(page.locator('#kc-form-login')).toBeVisible({ timeout: 20_000 });
+});
+
+test('sign-out: the screen offers three scopes, and every device ends the sessions of all devices', async ({ page, browser }) => {
+  const email = await createUser();
+  // A second device: another browser with its own Keycloak session.
+  const other = await browser.newContext({ locale: 'tr-TR' });
+  const otherPage = await other.newPage();
+  await openLogin(otherPage);
+  await submitPassword(otherPage, email);
+  await expect(otherPage).toHaveURL(accountUrl, { timeout: 20_000 });
+  await openLogin(page);
+  await submitPassword(page, email);
+  await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
+
+  await screen('sign-out-confirm').open(page);
+  const scopes = page.locator('#kc-logout-scopes > li');
+  await expect(scopes).toHaveCount(3);
+  await expect(scopes.getByRole('heading', { level: 2 })).toHaveText(['Bu oturum', 'Başka bir oturum', 'Bütün cihazlar']);
+  await expect(page.getByRole('button', { name: 'Bu oturumu kapatın', exact: true })).toBeVisible();
+  const deviceActivity = `/realms/${REALM}/account/account-security/device-activity`;
+  for (const name of ['Başka bir oturumu kapatın', 'Bütün cihazlarda oturumu kapatın']) {
+    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', deviceActivity);
+  }
+
+  await page.getByRole('link', { name: 'Bütün cihazlarda oturumu kapatın', exact: true }).click();
+  await expect(page).toHaveURL(`${KC}${deviceActivity}`, { timeout: 20_000 });
+  // The every-device text names this button. The account console shows it when another device is signed in.
+  await page.getByRole('button', { name: 'Bütün cihazlarda oturumu kapatın', exact: true }).click({ timeout: 20_000 });
+  const signedOutAll = page.waitForResponse((response) => response.request().method() === 'DELETE' && response.url().includes('/account/sessions'));
+  await page.getByRole('dialog').getByRole('button', { name: 'Onaylayın', exact: true }).click();
+  expect((await signedOutAll).ok()).toBe(true);
+
+  // Both devices must sign in again. The account console reloads this device by itself.
+  await expect(page.locator('#kc-form-login')).toBeVisible({ timeout: 20_000 });
+  await otherPage.goto(`${KC}/realms/${REALM}/account/`);
+  await expect(otherPage.locator('#kc-form-login')).toBeVisible({ timeout: 20_000 });
+  await other.close();
 });
 
 for (const choice of ['decline', 'confirm'] as const) {

@@ -301,6 +301,22 @@ class KeycloakAdmin:
         """Ids of the user's active sessions. Used to check that a session belongs to the user."""
         return tuple(str(row.get("id", "")) for row in self._list(f"/users/{_quote(subject)}/sessions"))
 
+    def list_identity_providers(self) -> Iterator[Mapping[str, object]]:
+        """Every sign-in platform of the realm. Needs the `view-identity-providers` role.
+
+        The rows carry `config`. Keycloak masks a stored secret, but the rows must still never
+        leave the service as they are. `identity_sync.login_reads` builds the reply from an allow list.
+        """
+        return self._pages("/identity-provider/instances")
+
+    def list_federated_identities(self, subject: str) -> list[Mapping[str, object]]:
+        """The outside accounts linked to the user. The rows carry the outside user name."""
+        return self._list(f"/users/{_quote(subject)}/federated-identity")
+
+    def list_credentials(self, subject: str) -> list[Mapping[str, object]]:
+        """The stored credentials of the user. The rows carry `credentialData`."""
+        return self._list(f"/users/{_quote(subject)}/credentials")
+
     def delete_session(self, session_id: str) -> None:
         """End one Keycloak session. Its refresh token stops working too.
 

@@ -41,7 +41,7 @@ from identity_sync.events import (
 from identity_sync.httpjson import HttpError, TransportError, deadline
 from identity_sync.keycloak_admin import InviteResult, PlanChanged
 from identity_sync.mapping import Tenant, service_client_id
-from identity_sync import pipeline
+from identity_sync import login_reads, pipeline
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -65,6 +65,8 @@ _LOG = logging.getLogger("identity_sync")
 RESOLUTIONS = ("completed", "abandoned")
 _RESOLVE_PATH = re.compile(r"^/v1/operations/([A-Za-z0-9_-]{1,128})/resolve$")
 RESOLVE_ROUTE = "/v1/operations/{operation_id}/resolve"
+# The platform list holds no personal data and may be kept for a short time (AJA-459).
+LOGIN_PROVIDER_CACHE_SECONDS = 30.0
 
 Reply = tuple[int, object]
 Query = Mapping[str, list[str]]
@@ -188,6 +190,9 @@ class _Api:
     def __init__(self, app: App) -> None:
         self._app = app
         self._settings = app.settings
+        self._platforms = login_reads.CatalogCache(
+            self._load_platforms, seconds=LOGIN_PROVIDER_CACHE_SECONDS, clock=time.monotonic
+        )
 
     # --- event endpoint: signed, automatic ---
 
@@ -474,6 +479,73 @@ class _Api:
         _LOG.info("execute operation=revoke_session azp=%s outcome=executed", azp)
         return 200, {"sid": sid, "revoked": True}
 
+    # --- AtonotA Login reads: called by platform_core sites (AJA-459) ---
+
+    def get_login_providers(self, body: bytes, azp: str) -> Reply:
+        """The sign-in platforms the calling tenant may show. The request names no person.
+
+        The tenant comes from the token's `azp`. General platforms and the platforms of the
+        tenant's own organization are listed. A platform of another tenant is never named.
+        """
+        if body:
+            raise _BadRequest
+        tenant = self._login_tenant("list_login_providers", azp)
+        try:
+            platforms = login_reads.visible_to(self._platforms.get(), tenant.organization)
+        except (HttpError, TransportError):
+            _LOG.warning("read operation=list_login_providers azp=%s outcome=upstream_failed", azp)
+            raise
+        _LOG.info("read operation=list_login_providers azp=%s outcome=executed", azp)
+        return 200, login_reads.provider_list(platforms)
+
+    def post_linked_accounts(self, body: bytes, azp: str) -> Reply:
+        """The tenant's platforms with a `linked` flag for one member, and the count of local sign-in ways.
+
+        The person must be a member of the calling tenant's organization. An unknown person and
+        a member of another tenant get the same 403. The reply is never kept.
+        """
+        payload = _json_object(body)
+        if set(payload) != {"subject"}:
+            raise _BadRequest
+        subject = _text(payload, "subject", required=True, max_length=128)
+        if not RESOURCE_ID.fullmatch(subject):
+            raise _BadRequest
+        tenant = self._login_tenant("list_linked_accounts", azp)
+        keycloak = self._app.keycloak
+        try:
+            if not self._is_member(subject, tenant.organization):
+                _LOG.warning("read operation=list_linked_accounts azp=%s outcome=forbidden", azp)
+                raise _Forbidden
+            platforms = login_reads.visible_to(self._platforms.get(), tenant.organization)
+            reply = login_reads.linked_accounts(
+                platforms, keycloak.list_federated_identities(subject), keycloak.list_credentials(subject)
+            )
+        except (HttpError, TransportError):
+            _LOG.warning("read operation=list_linked_accounts azp=%s outcome=upstream_failed", azp)
+            raise
+        # The log names the endpoint, the caller and the result, never the person.
+        _LOG.info("read operation=list_linked_accounts azp=%s outcome=executed", azp)
+        return 200, reply
+
+    def _login_tenant(self, operation: str, azp: str) -> Tenant:
+        tenant = self._tenant_of(azp)
+        if tenant is None:
+            _LOG.warning("read operation=%s azp=%s outcome=forbidden", operation, azp)
+            raise _Forbidden
+        return tenant
+
+    def _load_platforms(self) -> tuple[login_reads.Platform, ...]:
+        keycloak = self._app.keycloak
+        aliases: dict[str, str | None] = {}
+
+        def organization_alias(organization_id: str) -> str | None:
+            if organization_id not in aliases:
+                organization = keycloak.get_organization(organization_id)
+                aliases[organization_id] = organization.alias if organization is not None else None
+            return aliases[organization_id]
+
+        return login_reads.catalog(keycloak.list_identity_providers(), organization_alias)
+
     def _tenant_of(self, azp: str) -> Tenant | None:
         """The tenant whose service client is calling. The tenant comes from the token, never from the body.
 
@@ -570,6 +642,8 @@ def make_server(
         "/v1/dead-letters/replay": ("POST", api.post_replay),
         "/v1/invitations": ("POST", api.post_invitation),
         "/v1/sessions/revoke": ("POST", api.post_revoke_session),
+        "/v1/login-providers": ("GET", api.get_login_providers),
+        "/v1/linked-accounts": ("POST", api.post_linked_accounts),
         "/v1/account-deletions": ("POST", lambda body, azp: api.post_account_deletion(body, azp, clock())),
     }
     # Routes for platform_core site clients. Every other token route is for the preview and approval flow.
@@ -577,7 +651,13 @@ def make_server(
     list_routes = {"/v1/dead-letters": api.get_dead_letters, "/v1/operations": api.get_operations}
     limiter = _RateLimiter(settings.rate_limit)
     # Each of these routes has its own caller list. A client is in one list only.
-    special_routes = {"/v1/sessions/revoke": settings.session_azp, "/v1/account-deletions": settings.deletion_azp}
+    # The AtonotA Login reads are open to the tenant site clients only (AJA-459).
+    special_routes = {
+        "/v1/sessions/revoke": settings.session_azp,
+        "/v1/login-providers": settings.session_azp,
+        "/v1/linked-accounts": settings.session_azp,
+        "/v1/account-deletions": settings.deletion_azp,
+    }
     operator_routes = {"/v1/reconcile", "/v1/dead-letters/replay", "/v1/dead-letters", "/v1/operations"}
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
     methods.update(dict.fromkeys(list_routes, "GET"))

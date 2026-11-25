@@ -88,6 +88,8 @@ class RequestGuardsTest(unittest.TestCase):
 			"press_tr.api.auth.get_login_url": Mock(),
 			"press_tr.api.auth.keycloak_callback": Mock(),
 			"press_tr.api.keycloak_backchannel_logout": Mock(),
+			# G-163: a person who lost their key cannot sign in, so the recovery request is a guest call.
+			"press_tr.api.account.request_recovery": Mock(),
 		}
 		with patch.object(request_policy, "frappe") as facade:
 			facade.get_attr.side_effect = targets.__getitem__

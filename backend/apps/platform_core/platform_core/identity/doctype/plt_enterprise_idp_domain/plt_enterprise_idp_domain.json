@@ -1,0 +1,65 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "description": "One allowed e-mail domain of a corporate provider exception (G-160). The domain is proven by a DNS TXT record. Only the record name is kept, not its value.",
+ "field_order": [
+  "domain",
+  "verification_method",
+  "verified_on",
+  "verification_record"
+ ],
+ "fields": [
+  {
+   "fieldname": "domain",
+   "fieldtype": "Data",
+   "label": "Domain",
+   "in_list_view": 1,
+   "reqd": 1,
+   "length": 253,
+   "description": "Lowercase full domain name. No wildcard, no public mail domain."
+  },
+  {
+   "fieldname": "verification_method",
+   "fieldtype": "Select",
+   "label": "Verification Method",
+   "in_list_view": 1,
+   "reqd": 1,
+   "options": "dns-txt",
+   "default": "dns-txt",
+   "description": "How the organisation proved that it owns the domain. Only a DNS TXT record is accepted."
+  },
+  {
+   "fieldname": "verified_on",
+   "fieldtype": "Datetime",
+   "label": "Verified On",
+   "in_list_view": 1,
+   "reqd": 1,
+   "description": "When the DNS TXT record was checked. It must be before the approval."
+  },
+  {
+   "fieldname": "verification_record",
+   "fieldtype": "Data",
+   "label": "Verification Record",
+   "in_list_view": 1,
+   "reqd": 1,
+   "length": 253,
+   "description": "The name of the DNS TXT record. Its value is not written here."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-24 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Identity",
+ "name": "PLT Enterprise IdP Domain",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

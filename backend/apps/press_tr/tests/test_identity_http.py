@@ -30,6 +30,8 @@ KID = uuid4().hex
 ACCOUNT_ROUTE = "/api/method/press.api.account.get"
 DELETION_ROUTE = "/api/method/press_tr.api.account.request_deletion"
 IDENTITY_INVENTORY_ROUTE = "/api/method/press_tr.api.identity.list_identities"
+RECOVERY_ROUTE = "/api/method/press_tr.api.account.request_recovery"
+RECOVERY_RESOURCE = "/api/resource/PTR%20Recovery%20Review"
 
 
 class IdentityHttpTest(
@@ -1234,3 +1236,91 @@ class IdentityHttpTest(
 
 		status, _headers, _body = self.exchange("GET", ACCOUNT_ROUTE, session_cookie)
 		self.assertIn(status, {401, 403})
+
+	def request_recovery(self, email):
+		status, _headers, body = self.exchange(
+			"POST", RECOVERY_ROUTE, {"Content-Type": "application/json"}, json.dumps({"email": email})
+		)
+		return status, body
+
+	def open_recovery_reviews(self, email):
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			link = frappe.db.get_value("PTR Identity Link", {"user": email}, "name")
+			return frappe.get_all("PTR Recovery Review", {"identity_link": link, "status": "Open"}, pluck="name")
+		finally:
+			frappe.destroy()
+
+	def test_guest_recovery_request_is_open_rate_limited_and_answers_the_same(self):
+		# G-163: a person who lost their key cannot sign in, so the request works without a session.
+		subject = uuid4().hex
+		email = f"{subject}@example.test"
+		self.sign_in(subject, email, uuid4().hex)
+		known = self.request_recovery(email)
+		unknown = self.request_recovery(f"nobody-{uuid4().hex}@example.test")
+		self.assertEqual(known[0], 200)
+		self.assertEqual(json.loads(known[1])["message"], {"received": True})
+		# The answer does not show whether an account exists.
+		self.assertEqual(unknown, known)
+		self.assertEqual(len(self.open_recovery_reviews(email)), 1)
+		# A repeated request does not stack open reviews.
+		self.assertEqual(self.request_recovery(email), known)
+		self.assertEqual(len(self.open_recovery_reviews(email)), 1)
+		# The limit is 5 requests an hour from one address.
+		for _iteration in range(2):
+			self.assertEqual(self.request_recovery(f"nobody-{uuid4().hex}@example.test")[0], 200)
+		self.assertEqual(self.request_recovery(email)[0], 429)
+
+	def recovery_reviewer(self):
+		from frappe.utils.password import set_encrypted_password
+
+		email = f"reviewer-{uuid4().hex}@example.test"
+		key, secret = uuid4().hex, uuid4().hex
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": email,
+					"first_name": "Reviewer",
+					"user_type": "System User",
+					"send_welcome_email": 0,
+					"roles": [{"role": "System Manager"}],
+				}
+			).insert(ignore_permissions=True)
+			frappe.db.set_value("User", email, "api_key", key)
+			set_encrypted_password("User", email, secret, "api_secret")
+			frappe.db.commit()
+		finally:
+			frappe.destroy()
+		return {"Authorization": f"token {key}:{secret}", "Content-Type": "application/json"}
+
+	def test_recovery_decision_compares_dates_by_value(self):
+		# AJA-410: the stored date sent back in Frappe form or in ISO form with "T" is the same moment.
+		reviewer = self.recovery_reviewer()
+		for form in ("frappe", "iso", "changed"):
+			with self.subTest(form=form):
+				subject = uuid4().hex
+				email = f"{subject}@example.test"
+				self.sign_in(subject, email, uuid4().hex)
+				self.assertEqual(self.request_recovery(email)[0], 200)
+				(name,) = self.open_recovery_reviews(email)
+				status, _headers, body = self.exchange("GET", f"{RECOVERY_RESOURCE}/{name}", reviewer)
+				self.assertEqual(status, 200)
+				requested_at = json.loads(body)["data"]["requested_at"]
+				value = {
+					"frappe": requested_at,
+					"iso": requested_at.replace(" ", "T"),
+					"changed": "2000-01-01T00:00:00",
+				}[form]
+				decision = {
+					"status": "Approved",
+					"review_note": "Identity confirmed by phone call.",
+					"requested_at": value,
+				}
+				status, _headers, _body = self.exchange(
+					"PUT", f"{RECOVERY_RESOURCE}/{name}", reviewer, json.dumps(decision)
+				)
+				self.assertEqual(status, 403 if form == "changed" else 200)
