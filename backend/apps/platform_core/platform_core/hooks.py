@@ -60,8 +60,10 @@ after_install = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
-	# G-62: the tenant administrator role and its permission rows.
-	"platform_core.access.tenant_admin.ensure_role",
+	# G-62, G-168, G-169, G-170: the panel roles and profiles, only the missing ones (AJA-899).
+	"platform_core.setup.panel_roles.ensure",
+	# G-62: the permission rows of the "Tenant Admin" role.
+	"platform_core.access.tenant_admin.ensure_permissions",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
@@ -69,12 +71,15 @@ after_migrate = [
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 	"platform_core.config.turkey_setup.apply",
-	"platform_core.access.tenant_admin.ensure_role",
+	"platform_core.setup.panel_roles.ensure",
+	"platform_core.access.tenant_admin.ensure_permissions",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
+# The panel roles and profiles are not fixtures: Frappe rewrites every fixture on each migrate,
+# and a Role Profile write leaves a lock (AJA-857). `platform_core.setup.panel_roles` opens them.
 fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
@@ -94,6 +99,9 @@ ai_write_closed_doctypes = [
 	# G-156: file jobs and their chunks change only through the large file queue steps.
 	"PLT AI File Job",
 	"PLT AI File Chunk",
+	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
+	"Reseller Customer Link",
+	"Reseller Customer Request",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
@@ -148,6 +156,10 @@ website_user_allowed_methods = [
 	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
+	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.
+	"platform_core.api.reseller.list_customers",
+	"platform_core.api.reseller.customer_status",
+	"platform_core.api.reseller.request_customer",
 ]
 
 
