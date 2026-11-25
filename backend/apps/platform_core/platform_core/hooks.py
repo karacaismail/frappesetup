@@ -60,51 +60,27 @@ after_install = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
+	# G-62, G-168, G-169, G-170: the panel roles and profiles, only the missing ones (AJA-899).
+	"platform_core.setup.panel_roles.ensure",
+	# G-62: the permission rows of the "Tenant Admin" role.
+	"platform_core.access.tenant_admin.ensure_permissions",
 ]
-# G-62: the "Tenant Admin" role is a fixture. Frappe syncs fixtures after `after_install`,
-# so the role's permission rows are set after the sync.
-after_sync = ["platform_core.access.tenant_admin.ensure_permissions"]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 	"platform_core.config.turkey_setup.apply",
+	"platform_core.setup.panel_roles.ensure",
 	"platform_core.access.tenant_admin.ensure_permissions",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
-# G-62, G-168, G-169, G-170: the four panel roles and their profiles are fixtures.
-# The roles have no desk access, so their holders stay Website Users.
-# No panel profile holds "System Manager". Permission rows are set elsewhere.
-# The value stays a literal: the fixture tests read it without Frappe.
-fixtures = [
-	{
-		"dt": "Role",
-		"filters": [
-			[
-				"name",
-				"in",
-				[
-					"PLT AI Manager",
-					"Tenant Admin",
-					"Tenant Admin Assistant",
-					"Reseller Admin",
-					"Reseller Assistant",
-					"Platform Operator",
-				],
-			]
-		],
-	},
-	{
-		"dt": "Role Profile",
-		"filters": [
-			["name", "in", ["Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant"]]
-		],
-	},
-]
+# The panel roles and profiles are not fixtures: Frappe rewrites every fixture on each migrate,
+# and a Role Profile write leaves a lock (AJA-857). `platform_core.setup.panel_roles` opens them.
+fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.

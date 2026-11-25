@@ -171,7 +171,9 @@ class RoleFixtureContract:
 
 	def test_role_and_profile_are_not_fixtures(self):
 		self.assertFalse(hook_exports("Role", self.ROLE), f"hooks.py fixtures export {self.ROLE!r}")
-		self.assertFalse(hook_exports("Role Profile", self.ROLE), f"hooks.py fixtures export the {self.ROLE!r} profile")
+		self.assertFalse(
+			hook_exports("Role Profile", self.ROLE), f"hooks.py fixtures export the {self.ROLE!r} profile"
+		)
 		# Frappe loads every file of `fixtures/`, not only the exported ones.
 		for name in ("role.json", "role_profile.json"):
 			names = {row.get("name") for row in load_fixture(name)}

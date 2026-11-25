@@ -53,7 +53,7 @@ CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE}
 
 
 def ensure_permissions() -> None:
-	"""Gives the fixture role its permission rows after a fixture sync. Without the role it does nothing."""
+	"""Gives the role its permission rows. Runs after the setup step. Without the role it does nothing."""
 	if not frappe.db.exists("Role", ROLE):
 		return
 	grants = {(doctype, 0): ptypes for doctype, ptypes in GRANTS.items()} | LEVEL_GRANTS

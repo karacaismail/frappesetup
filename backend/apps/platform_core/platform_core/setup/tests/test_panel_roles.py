@@ -10,7 +10,13 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-ROLES = ("Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant", "Platform Operator")
+ROLES = (
+	"Tenant Admin",
+	"Tenant Admin Assistant",
+	"Reseller Admin",
+	"Reseller Assistant",
+	"Platform Operator",
+)
 PROFILES = ("Tenant Admin", "Tenant Admin Assistant", "Reseller Admin", "Reseller Assistant")
 PROTECTED_ROLES = ("System Manager", "Administrator")
 # A made-up role and profile. The test rolls them back.
@@ -68,9 +74,10 @@ class TestPanelRoleSetup(IntegrationTestCase):
 			for doctype, names in (("Role", ROLES), ("Role Profile", PROFILES))
 			for name in names
 		}
-		with patch.object(frappe.model.document.Document, "save") as save, patch.object(
-			frappe.model.document.Document, "insert"
-		) as insert:
+		with (
+			patch.object(frappe.model.document.Document, "save") as save,
+			patch.object(frappe.model.document.Document, "insert") as insert,
+		):
 			self.setup.ensure()
 			self.setup.ensure()
 		save.assert_not_called()
