@@ -52,10 +52,10 @@ CLOSED_APPS = frozenset({"frappe", "platform_core"})
 CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE}
 
 
-def ensure_role() -> None:
-	"""Creates the role and its permission rows. Runs after install and after every migrate."""
+def ensure_permissions() -> None:
+	"""Gives the fixture role its permission rows after a fixture sync. Without the role it does nothing."""
 	if not frappe.db.exists("Role", ROLE):
-		frappe.get_doc(doctype="Role", role_name=ROLE, desk_access=0).insert(ignore_permissions=True)
+		return
 	grants = {(doctype, 0): ptypes for doctype, ptypes in GRANTS.items()} | LEVEL_GRANTS
 	for (doctype, level), ptypes in grants.items():
 		if not frappe.db.exists("DocType", doctype):

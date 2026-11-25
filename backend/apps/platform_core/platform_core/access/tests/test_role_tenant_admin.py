@@ -62,8 +62,13 @@ class TestTenantAdminHttp(panel_roles.PanelRoleHttpCase):
 	)
 
 	def test_admin_reads_the_permission_rows_of_a_type(self):
-		"""Positive case: the G-62 endpoint exists and serves the admin."""
-		response = self.call(self.login(), "GET", ACCESS_API + "list_role_permissions", doctype="ToDo")
+		"""Positive case: the G-62 endpoint exists and serves the admin.
+
+		The type is a business type. Framework types such as "ToDo" stay closed to the admin (G-62).
+		"""
+		response = self.call(
+			self.login(), "GET", ACCESS_API + "list_role_permissions", doctype="Sales Partner Type"
+		)
 
 		self.assertEqual(response.status_code, 200, response.data[:300])
 

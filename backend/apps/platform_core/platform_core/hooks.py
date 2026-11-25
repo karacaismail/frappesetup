@@ -60,16 +60,17 @@ after_install = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
-	# G-62: the tenant administrator role and its permission rows.
-	"platform_core.access.tenant_admin.ensure_role",
 ]
+# G-62: the "Tenant Admin" role is a fixture. Frappe syncs fixtures after `after_install`,
+# so the role's permission rows are set after the sync.
+after_sync = ["platform_core.access.tenant_admin.ensure_permissions"]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 	"platform_core.config.turkey_setup.apply",
-	"platform_core.access.tenant_admin.ensure_role",
+	"platform_core.access.tenant_admin.ensure_permissions",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
