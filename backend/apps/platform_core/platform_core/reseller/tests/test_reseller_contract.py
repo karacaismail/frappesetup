@@ -132,8 +132,9 @@ class TestResellerEndpoints(unittest.TestCase):
 		self.assertEqual(record.get("desk_access"), 1)
 		exported = next(entry for entry in hook_value("fixtures") if entry.get("dt") == "Role")
 		self.assertIn(OPERATOR, exported["filters"][0][2])
-		# No panel profile holds the operator role.
-		profiles = json.loads((APP_DIR / "fixtures" / "role_profile.json").read_text(encoding="utf-8"))
+		# No panel profile holds the operator role. The profiles live in `setup/`, not in `fixtures/` (AJA-857).
+		profiles = json.loads((APP_DIR / "setup" / "role_profile.json").read_text(encoding="utf-8"))
+		self.assertTrue(profiles, "setup/role_profile.json holds no profile")
 		for profile in profiles:
 			self.assertNotIn(OPERATOR, {row.get("role") for row in profile.get("roles", [])})
 
