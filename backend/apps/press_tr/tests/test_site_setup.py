@@ -98,6 +98,7 @@ class FakePress:
 		self.frappe.db.get_value.side_effect = self.get_value
 		self.frappe.get_doc = Mock(side_effect=self.get_doc)
 		self.frappe.enqueue_doc = Mock(side_effect=self.enqueue_doc)
+		self.frappe.log_error = Mock()
 		self.agent = Mock(side_effect=self.make_agent)
 
 	def get_value(self, doctype, name, fields=None, for_update=False, as_dict=False):
@@ -107,6 +108,8 @@ class FakePress:
 		if doctype == "Agent Job":
 			return self.jobs[0] if self.jobs else None
 		record = {"Team": self.team, "User": self.user}[doctype]
+		if record is None:
+			return None
 		return SimpleNamespace(**{field: record[field] for field in fields})
 
 	def get_doc(self, doctype, name):
@@ -128,6 +131,17 @@ class FakePress:
 
 		agent.complete_setup_wizard.side_effect = complete_setup_wizard
 		return agent
+
+	def write_status(self, queue_setup_wizard, status):
+		"""Write the status like process_new_site_job_update. An error rolls the write back."""
+		previous = self.site["status"]
+		self.site["status"] = status
+		try:
+			queue_setup_wizard(self.site["name"], status)
+		except Exception:
+			self.site["status"] = previous
+			self.queue = []
+			raise
 
 	def commit(self):
 		"""Run queued jobs the way the worker does after the transaction commits."""
@@ -213,3 +227,16 @@ class TestSiteActivationPatch(unittest.TestCase):
 		self.assertIn(" " + STATUS_WRITE, lines[call - 3 : call])
 		self.assertIn("process_new_site_job_update", "\n".join(lines[:call]).rsplit("@@", 1)[-1])
 		self.assertEqual(self.patch_text.count("diff --git"), 1)
+
+	def test_missing_team_or_user_keeps_the_site_active(self):
+		for missing in ("team", "user"):
+			with self.subTest(missing=missing):
+				press, queue_setup_wizard = self.load(status="Pending")
+				setattr(press, missing, None)
+				press.write_status(queue_setup_wizard, "Active")
+				press.commit()
+				self.assertEqual(press.site["status"], "Active")
+				self.assertEqual(press.queue, [])
+				self.assertEqual(press.agent_calls, [])
+				press.frappe.log_error.assert_called_once()
+				self.assertEqual(press.frappe.log_error.call_args.kwargs["reference_name"], "tenant.example.test")

@@ -24,6 +24,8 @@ Yama, site “Active” olunca sihirbazı kendiliğinden kuyruğa atar.
 Kuyruk işi kayıt kesinleşince çalışır.
 Sihirbaz bilgileri sitenin ekibinden gelir.
 Şirket adı ekibin fatura adıdır. Fatura adı boşsa ekip sahibinin adı kullanılır.
+Ekip ya da kullanıcı kaydı yoksa yama sihirbaz işini açmaz.
+Yama bu hatayı Press günlüğüne yazar. Site yine “Active” kalır.
 Yama sahte Agent ile test edildi. Gerçek Agent ile deneme O-9 sonrasına kalır.
 O zaman yukarıdaki 3. adımı elle yapmayın. Yamanın işi kuyruğa attığını doğrulayın.
 

@@ -4,7 +4,9 @@ builds the site with Site("Site", ...). Site hooks never run there, and the pres
 class (override_doctype_class) is never used. This patch calls queue_setup_wizard right after
 Press writes a changed status. The helper returns unless the status is Active. It opens the
 site with frappe.get_doc, so SetupSite is used. It stops when setup_wizard_complete is set or
-press_tr is not installed. It then queues Site.complete_setup_wizard(args) with
+press_tr is not installed. If setup_wizard_args fails, for example when the Team or User
+record is missing, the helper writes the error to the Press Error Log and returns. The Active
+status write is kept. Otherwise it queues Site.complete_setup_wizard(args) with
 frappe.enqueue_doc and enqueue_after_commit=True. SetupSite.complete_setup_wizard locks the
 site row and skips a second Agent call when a Complete Setup Wizard Agent Job already exists.
 Upstream: new proposal 6 in backend/docs/press-python314-upstream.md (not sent to Press yet).
@@ -23,7 +25,7 @@ index 9477d07..1a0f18c 100644
  
  	if job.status == "Success":
  		request_data = json.loads(job.request_data)
-@@ -4937,6 +4938,22 @@ def process_new_site_job_update(job):  # noqa: C901
+@@ -4937,6 +4938,32 @@ def process_new_site_job_update(job):  # noqa: C901
  		frappe.get_doc("Site Group Deploy", site_group_deploy).update_site_group_deploy_on_process_job(job)
  
  
@@ -34,11 +36,21 @@ index 9477d07..1a0f18c 100644
 +	site = frappe.get_doc("Site", site_name)
 +	if site.setup_wizard_complete or not hasattr(site, "setup_wizard_args"):
 +		return
++	try:
++		args = site.setup_wizard_args()
++	except Exception:
++		# A missing Team or User must not roll back the Active status write.
++		frappe.log_error(
++			title="press_tr: setup wizard not queued",
++			reference_doctype="Site",
++			reference_name=site_name,
++		)
++		return
 +	frappe.enqueue_doc(
 +		"Site",
 +		site_name,
 +		"complete_setup_wizard",
-+		args=site.setup_wizard_args(),
++		args=args,
 +		enqueue_after_commit=True,
 +	)
 +
