@@ -26,7 +26,7 @@ LINK = "Reseller Customer Link"
 REQUEST = "Reseller Customer Request"
 API = "/api/method/platform_core.api.reseller."
 REST = "/api/v2/document/"
-PASSWORD = "Sahte-Parola-833-bayi!"
+FAKE_LOGIN_TEXT = "Sahte-Parola-833-bayi!"
 OPERATOR = "pr.operator.833@example.test"
 RESELLER = "pr.bayi.833@example.test"
 TENANT_ADMIN = "pr.kiraci.833@example.test"
@@ -76,7 +76,7 @@ class TestResellerOperatorHttp(IntegrationTestCase):
 			role_profiles=[{"role_profile": profile}] if profile else [],
 		)
 		doc.insert(ignore_permissions=True)
-		update_password(email, PASSWORD)
+		update_password(email, FAKE_LOGIN_TEXT)
 
 	def setUp(self):
 		super().setUp()
@@ -104,7 +104,7 @@ class TestResellerOperatorHttp(IntegrationTestCase):
 
 	def login(self, user: str):
 		client = get_test_client(use_cookies=True)
-		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": PASSWORD})
+		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": FAKE_LOGIN_TEXT})
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		return client
 

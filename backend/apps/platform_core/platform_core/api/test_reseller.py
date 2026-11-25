@@ -26,7 +26,7 @@ except ImportError:
 LINK = "Reseller Customer Link"
 REQUEST = "Reseller Customer Request"
 API = "/api/method/platform_core.api.reseller."
-PASSWORD = "Sahte-Parola-898-bayi!"
+FAKE_LOGIN_TEXT = "Sahte-Parola-898-bayi!"
 RESELLER = "pr.bayi.898@example.test"
 OTHER_RESELLER = "baska-bayi-898.example.test"
 OWN_CUSTOMER = "kendi-musteri-898.example.test"
@@ -50,7 +50,7 @@ class TestResellerEndpointSecurity(IntegrationTestCase):
 			role_profiles=[{"role_profile": "Reseller Admin"}],
 		)
 		doc.insert(ignore_permissions=True)
-		update_password(RESELLER, PASSWORD)
+		update_password(RESELLER, FAKE_LOGIN_TEXT)
 		for reseller, customer in ((cls.site, OWN_CUSTOMER), (OTHER_RESELLER, OTHER_CUSTOMER)):
 			frappe.get_doc(
 				doctype=LINK,
@@ -108,7 +108,7 @@ class TestResellerEndpointSecurity(IntegrationTestCase):
 
 	def login(self):
 		client = get_test_client(use_cookies=True)
-		response = self.send(client, "POST", "/api/method/login", body={"usr": RESELLER, "pwd": PASSWORD})
+		response = self.send(client, "POST", "/api/method/login", body={"usr": RESELLER, "pwd": FAKE_LOGIN_TEXT})
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		return client
 

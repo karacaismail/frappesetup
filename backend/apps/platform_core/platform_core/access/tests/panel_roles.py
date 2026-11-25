@@ -73,7 +73,7 @@ RESELLER_API = "platform_core.api.reseller."
 ACCESS_API = "platform_core.api.access."
 METHOD = "/api/method/"
 REST = "/api/v2/document/"
-PASSWORD = "Sahte-Parola-831-rol!"
+FAKE_LOGIN_TEXT = "Sahte-Parola-831-rol!"
 
 # Made-up tenants. The test site is the reseller tenant of every request.
 OWN_CUSTOMERS = ("musteri-a.example.test", "musteri-b.example.test")
@@ -297,7 +297,7 @@ class PanelRoleHttpCase(IntegrationTestCase):
 			send_welcome_email=0,
 			role_profiles=[{"role_profile": profile}],
 		).insert(ignore_permissions=True)
-		update_password(email, PASSWORD)
+		update_password(email, FAKE_LOGIN_TEXT)
 
 	def setUp(self):
 		super().setUp()
@@ -328,7 +328,7 @@ class PanelRoleHttpCase(IntegrationTestCase):
 	def login(self, user: str | None = None):
 		client = get_test_client(use_cookies=True)
 		response = self.send(
-			client, "POST", "/api/method/login", body={"usr": user or self.USER, "pwd": PASSWORD}
+			client, "POST", "/api/method/login", body={"usr": user or self.USER, "pwd": FAKE_LOGIN_TEXT}
 		)
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		return client
