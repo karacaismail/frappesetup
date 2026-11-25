@@ -3,6 +3,7 @@
 import json
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 from threading import Event
 from time import time
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from uuid import uuid4
 import frappe
 from frappe.utils import add_days, now_datetime
 from frappe.utils.password import get_decrypted_password, set_encrypted_password
+from pypdf import PdfWriter
 
 from platform_core.model_gateway import adapters, gateway, policy
 
@@ -935,3 +937,104 @@ class TestModelHTTP(unittest.TestCase):
 	def delete_provider(self, name):
 		response = self.request("manager", "DELETE", self.resource("PLT AI Provider", name))
 		self.assertEqual(response.status_code, 202)
+
+	def _blank_pdf(self):
+		writer = PdfWriter()
+		writer.add_blank_page(width=72, height=72)
+		stream = BytesIO()
+		writer.write(stream)
+		return stream.getvalue()
+
+	def _file_job(self, owner, status="planned"):
+		"""Insert a planned large file job owned by one fixture user. No provider is called."""
+		source = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": f"fixture-{uuid4().hex[:8]}.pdf",
+				"content": self._blank_pdf(),
+				"is_private": 1,
+			}
+		).insert(ignore_permissions=True)
+		job = frappe.get_doc(
+			{
+				"doctype": "PLT AI File Job",
+				"route": self.fixture["role_route"],
+				"source_file": source.name,
+				"instruction": "Summarize the fixture file.",
+				"output_limit": 12,
+				"status": status,
+				"chunk_count": 1,
+				"chunks": [
+					{"chunk_index": 0, "first_page": 1, "last_page": 1, "byte_count": 8, "status": "failed"}
+				],
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.set_value("PLT AI File Job", job.name, "owner", owner, update_modified=False)
+		frappe.db.commit()
+		self.addCleanup(self._delete_file_job, job.name, source.name)
+		return job.name, source.name
+
+	def _delete_file_job(self, job, source):
+		frappe.delete_doc("PLT AI File Job", job, force=True, ignore_permissions=True)
+		frappe.delete_doc("File", source, force=True, ignore_permissions=True)
+		frappe.db.commit()
+
+	def _file_job_request(self, actor, endpoint, payload):
+		return self._maintenance(actor, endpoint, payload)
+
+	def test_d6_file_job_status_and_plan(self):
+		job, _source = self._file_job(self.fixture["users"]["manager"])
+		self._assert_d6_access(
+			"file_job_status",
+			lambda actor: self._file_job_request(actor, "file_job_status", {"file_job": job}),
+		)
+		plan = self._file_job_request("manager", "file_job_status", {"file_job": job}).json()["message"]
+		self.assertEqual((plan["status"], plan["chunk_count"]), ("planned", 1))
+
+	def test_file_job_owner_reads_the_plan_and_other_users_cannot(self):
+		job, _source = self._file_job(self.fixture["users"]["authorized"])
+		self.assertEqual(
+			self._file_job_request("authorized", "file_job_status", {"file_job": job}).status_code, 200
+		)
+		for actor in ("guest", "regular", "desk_no_gateway_role"):
+			for endpoint, payload in (
+				("file_job_status", {"file_job": job}),
+				("start_file_job", {"file_job": job}),
+				("retry_file_chunk", {"file_job": job, "chunk_index": 0}),
+			):
+				with self.subTest(actor=actor, endpoint=endpoint):
+					response = self._file_job_request(actor, endpoint, payload)
+					self.assertEqual(response.status_code, 403)
+					self.assertEqual(response.json().get("exc_type"), "PermissionError")
+		frappe.db.rollback()
+		self.assertEqual(frappe.db.get_value("PLT AI File Job", job, "status"), "planned")
+		self.assertEqual(frappe.db.get_value("PLT AI File Chunk", {"parent": job}, "status"), "failed")
+
+	def test_unauthorized_users_cannot_create_a_file_job(self):
+		_job, source = self._file_job(self.fixture["users"]["manager"])
+		payload = {
+			"route": self.fixture["role_route"],
+			"file": source,
+			"instruction": "Summarize.",
+			"limit": 12,
+		}
+		# The guest is not signed in, the regular user lacks the route role,
+		# and the authorized caller cannot read the private file of another user.
+		for actor in ("guest", "regular", "desk_no_gateway_role", "authorized"):
+			with self.subTest(actor=actor):
+				response = self._file_job_request(actor, "create_file_job", payload)
+				self.assertEqual(response.status_code, 403)
+				self.assertEqual(response.json().get("exc_type"), "PermissionError")
+		frappe.db.rollback()
+		self.assertEqual(frappe.db.count("PLT AI File Job", {"source_file": source}), 1)
+
+	def test_file_job_start_and_retry_report_the_job_state(self):
+		job, _source = self._file_job(self.fixture["users"]["manager"], status="preparing")
+		response = self._file_job_request("manager", "start_file_job", {"file_job": job})
+		self.assertEqual(
+			(response.status_code, response.json()["message"]), (409, {"error": "job_not_planned"})
+		)
+		response = self._file_job_request("manager", "retry_file_chunk", {"file_job": job, "chunk_index": 5})
+		self.assertEqual(
+			(response.status_code, response.json()["message"]), (404, {"error": "chunk_not_found"})
+		)

@@ -663,6 +663,7 @@ Büyük PDF sağlayıcıya dosya olarak gitmez. İşin adımları şunlardır:
 - Her deneme “AI Usage Log” kaydına dosya işi kimliği ve parça sırasıyla yazılır.
 - Yazı tanıma adımı `model_gateway_ocr` kancasıyla bağlanır. Kanca yoksa taranmış sayfalı iş `ocr_unavailable` koduyla durur.
 - İş kuyruk işidir. Zamanlanmış iş yoktur.
+- Her adımın bir HTTP ucu vardır (D-9). Uçlar aşağıdaki tabloda yazılıdır. Başka kullanıcının işini yalnız yönetici okuyabilir.
 
 ### Güvenlik
 
@@ -687,3 +688,7 @@ Büyük PDF sağlayıcıya dosya olarak gitmez. İşin adımları şunlardır:
 | --- | --- | --- | --- |
 | `platform_core.api.model.complete` | POST | İnsan oturumu ya da API anahtarı | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
 | `platform_core.api.model.test_api` | POST | “AI Manager” rolü | Bir API'ye küçük deneme çağrısı yapar. Ücretlidir. |
+| `platform_core.api.model.create_file_job` | POST | İnsan oturumu | Büyük PDF işini açar. Yol ve dosya yetkisi denetlenir. Sağlayıcı çağrılmaz. |
+| `platform_core.api.model.file_job_status` | POST | İşin sahibi ya da yönetici | Parça planını, tahmini maliyeti ve parça durumlarını gösterir. Parça metnini dönmez. |
+| `platform_core.api.model.start_file_job` | POST | İşin sahibi ya da yönetici | Planlanmış işin parçalarını kuyruğa koyar. Her parça ücretli olabilir. |
+| `platform_core.api.model.retry_file_chunk` | POST | İşin sahibi ya da yönetici | Başarısız tek parçayı yeniden kuyruğa koyar. |
