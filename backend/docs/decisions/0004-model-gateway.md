@@ -30,7 +30,7 @@ Ollama, yerel model sağlayıcısı olarak kalır.
 
 Tabloda `create` oluşturma, `delete` silme, `read` okuma, `write` yazma iznidir.
 İzin seviyesi 0 kayda, seviye 1 ise `api_key` parola alanına uygulanır.
-Alt tablo erişimini bağlı olduğu yol kaydından alır.
+Alt tablo erişimini bağlı olduğu üst kayıttan alır.
 
 | Kayıt türü | İzin seviyesi | Rol | İşlemler |
 | --- | --- | --- | --- |
@@ -41,7 +41,9 @@ Alt tablo erişimini bağlı olduğu yol kaydından alır.
 | `PLT AI Provider` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
 | `PLT AI Route` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
 | `PLT AI Usage Log` | 0 | PLT AI Manager, System Manager | read |
+| `PLT AI File Job` | 0 | PLT AI Manager, System Manager | read |
 | `PLT AI Route Target` | 0 | Yok | Yok |
+| `PLT AI File Chunk` | 0 | Yok | Yok |
 
 Orkestratör, D-10, 22 Kasım 2026 Pazar
 
