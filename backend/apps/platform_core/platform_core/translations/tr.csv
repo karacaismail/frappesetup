@@ -887,3 +887,7 @@ Failure Code,Hata Kodu,PLT AI File Chunk
 Result,Sonuç,PLT AI File Chunk
 File Job,Dosya İşi,PLT AI Usage Log
 Chunk Index,Parça Sırası,PLT AI Usage Log
+Only a tenant admin can give this role.,Bu rolü yalnız kiracı yöneticisi verebilir.,
+This user cannot receive the role.,Bu kullanıcıya bu rol verilemez.,
+User not found.,Kullanıcı bulunamadı.,
+Only a panel user without admin roles can receive this role.,Bu rol yalnız yönetici rolü olmayan panel kullanıcısına verilebilir.,

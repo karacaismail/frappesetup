@@ -347,6 +347,68 @@ paths:
             The level is not between 1 and 9, or write was requested without read.
             A document type that holds the permission system also gets this response.
 
+  /platform_core.api.access.grant_tenant_admin_assistant:
+    post:
+      tags: [roles]
+      operationId: grantTenantAdminAssistant
+      summary: Gives the tenant admin assistant Role Profile to a panel user (G-168).
+      description: |
+        The endpoint sets the “Tenant Admin Assistant” Role Profile on the user.
+        The profile replaces all roles of the user with the “Tenant Admin Assistant” role.
+        This role has no desk access, so the user stays a Website User (G-53).
+        The user gets neither “Tenant Admin” nor “System Manager”.
+
+        The endpoint is open only to the “Tenant Admin” and “System Manager” roles.
+        The target must be an enabled Website User of this site.
+        The endpoint refuses a standard user, the caller and any user with an admin role.
+        The endpoint does not start a paid job.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user]
+              additionalProperties: false
+              properties:
+                user:
+                  type: string
+                  maxLength: 140
+                  description: Name of the user. This is the e-mail address.
+            examples:
+              member:
+                value: {user: uye@example.test}
+      responses:
+        "200":
+          description: The user, the profile and the roles after the change.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [user, role_profile, roles]
+                    properties:
+                      user: {type: string}
+                      role_profile: {type: string, enum: [Tenant Admin Assistant]}
+                      roles:
+                        type: array
+                        items: {type: string}
+        "401":
+          $ref: "#/components/responses/SessionExpired"
+        "403":
+          description: The caller has neither “Tenant Admin” nor “System Manager”, or is a guest.
+        "404":
+          description: The user does not exist.
+        "417":
+          description: |
+            The target is a standard user, the caller, a disabled user, a desk user
+            or a user with “Tenant Admin” or “System Manager”.
+
   /platform_core.access.link_search.search_link:
     get:
       x-frappe-original: [frappe.desk.search.search_link]

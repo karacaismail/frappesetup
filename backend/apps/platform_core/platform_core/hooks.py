@@ -57,12 +57,14 @@ override_whitelisted_methods = {
 # The AI access layer turns off Frappe's built-in MCP endpoint.
 after_install = [
 	"platform_core.identity.session_policy.apply",
+	"platform_core.access.panel_roles.ensure_assistant_profile",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
+	"platform_core.access.panel_roles.ensure_assistant_profile",
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
@@ -72,7 +74,10 @@ after_migrate = [
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
-fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
+# G-168: the tenant admin assistant role has no desk access. Its Role Profile is not a fixture:
+# every fixture sync saves the profile, and each save queues a job that locks the record.
+# `panel_roles.ensure_assistant_profile` writes the profile only when it is missing or wrong.
+fixtures = [{"dt": "Role", "filters": [["name", "in", ["PLT AI Manager", "Tenant Admin Assistant"]]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
@@ -131,6 +136,8 @@ website_user_allowed_methods = [
 	"platform_core.api.mobile_pwa.v1_revoke_installation",
 	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
 	"platform_core.api.access.get_access_summary",
+	# G-168: a tenant admin is a Website User too. The endpoint checks the role itself.
+	"platform_core.api.access.grant_tenant_admin_assistant",
 	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",

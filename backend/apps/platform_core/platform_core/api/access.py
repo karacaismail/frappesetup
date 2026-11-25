@@ -6,7 +6,7 @@ Contract: `backend/contracts/platform_core-access.openapi.yaml`.
 import frappe
 from frappe import _
 
-from platform_core.access import explain, field_level
+from platform_core.access import explain, field_level, panel_roles
 
 
 @frappe.whitelist(methods=["GET"])
@@ -39,3 +39,9 @@ def set_level_access(doctype: str, role: str, permlevel: int, read: bool, write:
 	if not frappe.has_permission("Custom DocPerm", "write"):
 		frappe.throw(_("No permission to change role permissions."), frappe.PermissionError)
 	return field_level.set_level_access(doctype, role, permlevel, read, write)
+
+
+@frappe.whitelist(methods=["POST"])
+def grant_tenant_admin_assistant(user: str) -> dict:
+	"""Gives the tenant admin assistant Role Profile (G-168). “Tenant Admin” or “System Manager” only."""
+	return panel_roles.grant_assistant(user)
