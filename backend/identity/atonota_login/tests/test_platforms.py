@@ -136,13 +136,31 @@ class RegistryTest(unittest.TestCase):
             record = sample_record()
             record["config"].update(useJwksUrl="true", issuer="http://identity.localhost:5280/realms/x")
             write_record(Path(folder), record)
-            self.assertEqual(len(platforms.load_platforms(Path(folder))), 1)
+            self.assertEqual(len(platforms.load_platforms(Path(folder), allow_local_http=True)), 1)
         with tempfile.TemporaryDirectory() as folder:
             record = sample_record()
             record["config"]["issuer"] = "http://login.example.test/realms/x"
             write_record(Path(folder), record)
             with self.assertRaises(RegistryError):
                 platforms.load_platforms(Path(folder))
+
+    def test_local_http_address_is_only_for_development(self):
+        # Review 2, finding 2: the registry reaches every environment. In production Keycloak would
+        # look for http://localhost on its own machine. Only the development path may allow it.
+        for url in ("http://localhost/token", "http://127.0.0.1/token", "http://identity.localhost:5280/token"):
+            with self.subTest(url=url), tempfile.TemporaryDirectory() as folder:
+                record = sample_record()
+                record["config"]["tokenUrl"] = url
+                write_record(Path(folder), record)
+                with self.assertRaises(RegistryError):
+                    platforms.load_platforms(Path(folder))
+                self.assertEqual(platforms.load_platforms(Path(folder), allow_local_http=True)[0].config["tokenUrl"], url)
+        with tempfile.TemporaryDirectory() as folder:
+            record = sample_record()
+            record["config"]["tokenUrl"] = "http://login.example.test/token"
+            write_record(Path(folder), record)
+            with self.assertRaises(RegistryError):
+                platforms.load_platforms(Path(folder), allow_local_http=True)
 
     def test_duplicate_secret_name_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:

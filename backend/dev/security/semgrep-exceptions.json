@@ -15,9 +15,12 @@
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.py",
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.json",
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.py",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_recovery_review/ptr_recovery_review.json",
+    "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_recovery_review/ptr_recovery_review.py",
     "backend/apps/press_tr/press_tr/press_identity/identity.py",
     "backend/apps/press_tr/press_tr/press_identity/machine_routes.py",
     "backend/apps/press_tr/press_tr/press_identity/oidc.py",
+    "backend/apps/press_tr/press_tr/press_identity/recovery.py",
     "backend/apps/press_tr/press_tr/press_identity/request_policy.py",
     "backend/apps/press_tr/press_tr/press_identity/service.py",
     "backend/apps/press_tr/press_tr/press_identity/sessions.py",
@@ -28,7 +31,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "b73c3558c475ef4b903213343b708829384ec1a872f38ae59ea8f35412b425f4",
+  "sha256": "795f1cc9615daa91463c62f4ac47ea2bde63c0efa8eaf4fe4ffb1d5e2ccef56e",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -45,7 +48,7 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/account.py",
-      "line": 18,
+      "line": 21,
       "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
     },
     {
@@ -143,12 +146,24 @@
       "path": "backend/apps/press_tr/press_tr/press_identity/sessions.py",
       "line": 37,
       "reason": "Matches the current account and exact logout session ID before deleting the internal mapping."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/account.py",
+      "line": 49,
+      "reason": "Guest recovery request is POST-only and rate limited, accepts only an address, gives the same answer for every address and only opens a review record."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/recovery.py",
+      "line": 29,
+      "reason": "Guests cannot create records, so the recovery request inserts one Open review for a verified identity link. The controller freezes the record and a non-owner reviewer decides."
     }
   ],
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "e80c605c7a90926eec93895ebcd66a34d8d170121ef8ad1436b68347cfa4caaf",
+      "sha256": "0be8c452e3f6be7e8c833c7321b34c23fe1b020d6001026f8a76e2f09bdcf15a",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -179,6 +194,36 @@
           "path": "backend/apps/platform_core/platform_core/api/access.py",
           "line": 20,
           "reason": "Checks DocType read permission before returning the session user’s access summary."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
+          "line": 16,
+          "reason": "Answers only for the signed-in session user; a guest gets PermissionError. The server reads that user's own records as evidence and ignores body fields such as user. No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
+          "line": 25,
+          "reason": "Signed-in session user only; a guest gets PermissionError. The final step reruns the same decision and stays closed until the price decision (G-166). No document is chosen by the caller."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
+          "line": 108,
+          "reason": "The server opens one owner task per empty rule for the System Manager role (G-167). The text is built from the policy, not from the request. The calling user needs no ToDo write right."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+          "line": 88,
+          "reason": "Writes the verification case only from open_attempt, a server-side call that no endpoint whitelists. The case id is checked for length first (G-164). Both DocTypes are closed to AI writes in hooks.py."
+        },
+        {
+          "rule": "frappe-ignore-permissions",
+          "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+          "line": 109,
+          "reason": "Stores the notice only after the HMAC signature over the raw body is verified (G-164). The caller is the provider without a session. The unique event_id index refuses duplicates."
         }
       ],
       "files": [
@@ -190,7 +235,10 @@
         "backend/apps/platform_core/platform_core/access/rules.py",
         "backend/apps/platform_core/platform_core/access/subject.py",
         "backend/apps/platform_core/platform_core/api/access.py",
-        "backend/apps/platform_core/platform_core/hooks.py"
+        "backend/apps/platform_core/platform_core/api/atonota_login.py",
+        "backend/apps/platform_core/platform_core/hooks.py",
+        "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
+        "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py"
       ]
     }
   ]

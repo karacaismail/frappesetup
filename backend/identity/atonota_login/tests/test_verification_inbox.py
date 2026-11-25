@@ -16,7 +16,14 @@ import unittest
 from pathlib import Path
 
 from atonota_login import verification_inbox as inbox_module
-from atonota_login.verification_inbox import ConfigurationRequired, HmacSignature, SignatureRejected, VerificationInbox
+from atonota_login.verification_inbox import (
+    ConfigurationRequired,
+    HmacSignature,
+    NoticeStore,
+    SignatureRejected,
+    SqliteNoticeStore,
+    VerificationInbox,
+)
 
 
 def signed(secret: bytes, body: bytes, stamp: int) -> dict:
@@ -174,6 +181,54 @@ class InboxTest(unittest.TestCase):
         body, headers = self.notice("e1", 1, "approve-everything")
         with self.assertRaises(ValueError):
             self.inbox.receive(body, headers, self.now)
+
+    def test_ids_longer_than_the_store_allows_are_refused(self):
+        # AJA-231: the Frappe store keeps ids in 140-character fields. Both stores refuse longer ids.
+        for field in ("event_id", "case_id"):
+            with self.subTest(field=field):
+                values = {"event_id": "e1", "case_id": "case-1", "attempt": 1, "outcome": "approved"}
+                values[field] = "x" * (inbox_module.MAX_ID_LENGTH + 1)
+                body = json.dumps(values).encode()
+                with self.assertRaises(ValueError):
+                    self.inbox.receive(body, signed(self.secret, body, self.now), self.now)
+
+
+class StoreInterfaceTest(unittest.TestCase):
+    """AJA-231: the rules run on any store behind the ``NoticeStore`` interface. SQLite is one store."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.secret = secrets.token_bytes(32)
+        self.now = int(time.time())
+
+    def test_sqlite_store_implements_the_interface(self):
+        store = SqliteNoticeStore(Path(self.folder.name) / "inbox.sqlite3")
+        self.addCleanup(store.close)
+        self.assertIsInstance(store, NoticeStore)
+
+    def test_inbox_takes_a_store_object(self):
+        store = SqliteNoticeStore(Path(self.folder.name) / "inbox.sqlite3")
+        inbox = VerificationInbox(store, HmacSignature(self.secret))
+        self.addCleanup(inbox.close)
+        inbox.open_attempt("case-1")
+        body = json.dumps({"event_id": "e1", "case_id": "case-1", "attempt": 1, "outcome": "approved"}).encode()
+        self.assertEqual(inbox.receive(body, signed(self.secret, body, self.now), self.now), "accepted")
+        self.assertEqual(inbox.process(), [("e1", "applied")])
+        self.assertEqual(inbox.decision("case-1"), "approved")
+
+    def test_process_needs_no_provider(self):
+        # The queue worker applies stored notices. It does not check signatures, so it needs no verifier.
+        path = Path(self.folder.name) / "inbox.sqlite3"
+        receiver = VerificationInbox(path, HmacSignature(self.secret))
+        receiver.open_attempt("case-1")
+        body = json.dumps({"event_id": "e1", "case_id": "case-1", "attempt": 1, "outcome": "rejected"}).encode()
+        receiver.receive(body, signed(self.secret, body, self.now), self.now)
+        receiver.close()
+        worker = VerificationInbox(path, None)
+        self.addCleanup(worker.close)
+        self.assertEqual(worker.process(), [("e1", "applied")])
+        self.assertEqual(worker.decision("case-1"), "rejected")
 
 
 if __name__ == "__main__":

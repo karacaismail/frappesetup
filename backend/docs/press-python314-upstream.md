@@ -4,6 +4,8 @@
 Press v0.154.1, Python 3.14 ve Frappe 16 ile yamasız açılamadı.
 O-18 borcu açıktır. Mevcut geliştirme yaması kaldırılmadı.
 Bu belge Press bakımcılarına gönderilecek öneridir. Henüz gönderilmedi.
+Üç kaynak önerisinin yama dizisi ve İngilizce PR metni [öneri klasöründedir](upstream/press-python314/).
+Gönderim adımları [devir notundadır](handoff/press-upstream-proposal.md) (O-57).
 
 ## Kaynak ve çalışma ortamı
 
@@ -199,7 +201,9 @@ Bakımcılar uzun vadede bakımı süren bir Telegram istemcisine geçmelidir.
 
 [Yama kaydı](../dev/press/patch-registry.json) geliştirme ve üretim yamalarını listeler.
 Her kayıtta yamanın sahibi, testi ve kaldırma koşulu bulunur.
-Kayıt sahibi, yamayı çıkarıp koşulu sabitlenen Press sürümünde doğrular.
+`upstream` alanı Press'in asıl geliştirici deposundaki ilgili kaydı gösterir.
+Ekip öneriyi göndermediyse alan bu belgenin ilgili bölümünü gösterir.
+Ekip her Press yükseltmesinde ilgili testi yamasız imajda çalıştırır. Test geçerse ekip yamayı kaldırır.
 
 Geliştirme betiğinde her yama için bir `patch-id` satırı açın.
 Aynı komut birden çok yamayı uygulayabilir. Her yama ayrı kayıt alır.

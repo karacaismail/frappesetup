@@ -11,6 +11,7 @@ from platform_core.identity.tests import helpers as h
 
 ENDPOINT = "/api/method/platform_core.api.keycloak_backchannel_logout"
 SID = "11111111-1111-4111-8111-111111111111"
+OTHER_DEVICE_SID = "77777777-7777-4777-8777-777777777777"
 
 
 class TestBackChannelLogout(FrappeAPITestCase):
@@ -103,6 +104,44 @@ class TestBackChannelLogout(FrappeAPITestCase):
 		response = self.send(self.key.sign(h.logout_payload(sub="sub-ayse", sid=SID)))
 		self.assertEqual(response.json["message"], {"closed_sessions": 1})
 		self.assertEqual(h.logged_user(self.client), "Guest")
+		self.assertEqual(h.logged_user(mehmet), h.MEHMET)
+
+	def test_forgetting_one_device_closes_its_sessions_and_spares_the_other_device(self):
+		"""G-163 sentence 7. The account console signs out one device. Keycloak sends one logout
+		token with that device's sid. Every Frappe session of that device closes. The other device stays."""
+		first = h.new_client()
+		h.login_with_keycloak(first, h.userinfo("sub-ayse", h.AYSE, sid=SID))
+		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE, sid=SID))
+		other_device = h.new_client()
+		h.login_with_keycloak(other_device, h.userinfo("sub-ayse", h.AYSE, sid=OTHER_DEVICE_SID))
+		self.assertEqual(h.session_count(h.AYSE), 3)
+		response = self.send(self.key.sign(h.logout_payload(sub="sub-ayse", sid=SID)))
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"], {"closed_sessions": 2})
+		self.assertEqual(h.logged_user(first), "Guest")
+		self.assertEqual(h.logged_user(self.client), "Guest")
+		self.assertEqual(h.logged_user(other_device), h.AYSE)
+		self.assertEqual(h.session_count(h.AYSE), 1)
+
+	def test_signing_out_every_device_closes_every_frappe_session_of_the_user(self):
+		"""G-163 sentence 12. "Sign out all devices" ends every Keycloak session of the user.
+		Keycloak sends one logout token per session. Afterwards no Frappe session of the user is left.
+		Another user stays signed in."""
+		devices = {SID: h.new_client(), OTHER_DEVICE_SID: self.client}
+		for sid, client in devices.items():
+			h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE, sid=sid))
+		mehmet = h.new_client()
+		h.login_with_keycloak(
+			mehmet, h.userinfo("sub-mehmet", h.MEHMET, sid="33333333-3333-4333-8333-333333333333")
+		)
+		self.assertEqual(h.session_count(h.AYSE), 2)
+		for sid in devices:
+			response = self.send(self.key.sign(h.logout_payload(sub="sub-ayse", sid=sid)))
+			self.assertEqual(response.status_code, 200, response.data[:300])
+			self.assertEqual(response.json["message"], {"closed_sessions": 1})
+		self.assertEqual(h.session_count(h.AYSE), 0)
+		for client in devices.values():
+			self.assertEqual(h.logged_user(client), "Guest")
 		self.assertEqual(h.logged_user(mehmet), h.MEHMET)
 
 	def test_unknown_identity_returns_200_and_closes_nothing(self):

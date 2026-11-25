@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core identity endpoints
-  version: 0.7.0
+  version: 0.8.0
   summary: Endpoints for Keycloak sign-in, callback, sign-out and user sync.
   description: |
     This contract describes the identity endpoints of the `platform_core` app.
@@ -95,6 +95,10 @@ tags:
     description: Admin endpoint that turns on Keycloak sign-in on the site.
   - name: sync
     description: User endpoints of the sync service. They need a service token.
+  - name: atonota-login
+    description: |
+      AtonotA Login action decisions (G-161, G-166). They need a signed-in session.
+      The verification inbox endpoint (G-164) is the one exception: the provider calls it without a session.
 
 x-site-settings:
   description: |
@@ -129,6 +133,11 @@ x-site-settings:
       example: platform
       required: false
       note: The default is `platform`.
+    - key: atonota_verification_secret
+      required: false
+      note: |
+        Signing secret of the external verification provider (G-164). At least 32 bytes. Keep it in site configuration only.
+        While it is missing or shorter, every verification notice gets 503 and `VerificationNotConfigured`.
     - key: keycloak_client_id
       example: site-tenant1
       required: true
@@ -145,6 +154,12 @@ x-site-settings:
       example: "(secret, not written in this file)"
       required: false
       note: Required for outgoing service token requests. Store it only in the site setting and in the `.env` file.
+    - key: mobile_identity_sync_url
+      example: https://identity-sync.example.test
+      required: false
+      note: |
+        Root address of identity-sync. It must use HTTPS. The phone session revocation and the AtonotA Login reads (AJA-459) use it.
+        If it is empty, the two AtonotA Login reads return 503.
     - key: identity_brand_name
       example: AtonotA Login
       required: true
@@ -642,6 +657,136 @@ paths:
         "401":
           $ref: "#/components/responses/OturumBitti"
 
+  /platform_core.api.auth.list_login_providers:
+    get:
+      tags: [login]
+      operationId: listLoginProviders
+      summary: Lists the sign-in platforms that this site may show.
+      description: |
+        The source is the panel contract (`atonota-web`, `src/auth/README.md`, G-159) and the security review AJA-458.
+        The site reads the list from identity-sync (`GET /v1/login-providers`). The site carries no Keycloak management role.
+        The site calls with its own service token from `service_client.identity_sync_bearer()`. The token of the user never leaves the site.
+        identity-sync finds the tenant from the token. The list has the general platforms and the platforms of this tenant only.
+        A platform without a secret is not in the list. A platform of another tenant is never in the list.
+
+        The method needs no session (AJA-516). The sign-in screen calls it before sign-in.
+        A signed-in panel account may call it too. The panel contract says so: G-159, "Uç oturum istemez".
+        The reply names no person. It carries no client secret, no internal address and no provider configuration.
+        The method takes only GET. A POST gets 403 and `PermissionError`.
+        The method takes no parameters. A `subject`, a `user` or any other value gets 400 and `InvalidInput`.
+        The reply is built from an allow list. Each row has only `alias` and `display_name`.
+        The reply carries `Cache-Control: private, no-store`.
+        If identity-sync or Keycloak does not answer, the method returns 503 and `IdentityServiceUnavailable`.
+        The message carries no secret, no token and no internal address.
+        The limit is 30 requests per minute per IP address. The method only reads.
+      x-yikici: false
+      security: []
+      responses:
+        "200":
+          description: The platforms this site may show, in the order of identity-sync.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/LoginProviderList"}
+              examples:
+                atonota:
+                  value:
+                    message:
+                      providers:
+                        - alias: google
+                          display_name: Google
+        "400":
+          description: The request has a parameter. The `exc_type` value is `InvalidInput`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "403":
+          description: |
+            The request method is not GET, or identity-sync refused the site. The `exc_type` value is `PermissionError` or `LoginReadForbidden`.
+            A cookie of an expired session gets 401, not 403.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "503":
+          description: identity-sync or Keycloak did not answer. The `exc_type` value is `IdentityServiceUnavailable`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+
+  /platform_core.api.auth.list_linked_accounts:
+    get:
+      tags: [login]
+      operationId: listLinkedAccounts
+      summary: Lists the linked platforms of the signed-in user.
+      description: |
+        The source is the panel contract (`atonota-web`, `src/auth/README.md`, G-160) and the security review AJA-458.
+        The site reads the list from identity-sync (`POST /v1/linked-accounts`) with its own service token.
+        The person comes only from the session. The site takes the `keycloak_sub` value of the session.
+        The value must match a `PLT Identity Link` record of `frappe.session.user` with the configured issuer.
+        If there is no such record, the method makes no call and returns 403 and `IdentityLinkMissing`.
+        identity-sync checks that the person is a member of this tenant. If not, the method returns 403 and `LoginReadForbidden`.
+        An unknown person gets the same 403.
+
+        The method needs a signed-in session. A guest gets 403 and `PermissionError`, not 417.
+        The method takes no parameters. A `subject`, a `user` or any other value gets 400 and `InvalidInput`.
+        The reply is built from an allow list. A row has only `alias`, `display_name` and `linked`.
+        The outside user name, credential data and Keycloak ids never reach the reply.
+        `local_sign_in_methods` is the number of sign-in ways without a platform. Examples are a password and a passkey.
+        The reply carries `Cache-Control: private, no-store`. The reply is never kept.
+        If identity-sync or Keycloak does not answer, the method returns 503 and `IdentityServiceUnavailable`.
+        The message carries no secret, no token and no internal address.
+        The limit is 30 requests per minute per signed-in user. The method only reads.
+      x-yikici: false
+      security:
+        - frappeSession: []
+      responses:
+        "200":
+          description: The linked platforms of the signed-in user and the number of local sign-in ways.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/LinkedAccounts"}
+              examples:
+                atonota:
+                  value:
+                    message:
+                      providers:
+                        - alias: google
+                          display_name: Google
+                          linked: true
+                      local_sign_in_methods: 1
+        "400":
+          description: The request has a parameter. The `exc_type` value is `InvalidInput`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "403":
+          description: |
+            The request has no session, the session has no matching identity link, or the person is not a member of this tenant.
+            The `exc_type` value is `PermissionError`, `IdentityLinkMissing` or `LoginReadForbidden`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "503":
+          description: identity-sync or Keycloak did not answer. The `exc_type` value is `IdentityServiceUnavailable`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+
   /platform_core.api.auth.setup_keycloak_login:
     post:
       tags: [setup]
@@ -729,6 +874,12 @@ paths:
         2. If there is no match and `sub` is present, the sessions of the user in the `(iss, sub)` link close.
            This fallback path closes only sessions opened before the `iat` value of the token.
            Sessions opened after the notice stay open.
+
+        The `aud` value is this site's client or a phone client in the `kimlik_mobil_azp` setting.
+        A phone token closes only the phone session. It must carry `sid`.
+        The phone session is denied at once. Its installations are revoked.
+        The phone does not keep its access token until the token expires.
+        A phone token never closes a web session through `sub` (G-163).
 
         If no session matches, the response is still 200. The `closed_sessions` value is 0.
         The response carries the `Cache-Control: no-store` header.
@@ -1268,6 +1419,338 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
+
+  /platform_core.api.atonota_login.evaluate:
+    post:
+      tags: [atonota-login]
+      operationId: atonotaLoginEvaluate
+      summary: Says whether the signed-in user may take one action now.
+      description: |
+        Keycloak answers who the person is. This endpoint answers whether the person may take one action now (G-161).
+        The rules are in the `atonota_login` package (`atonota_login/policy/actions.json`). The package has no Frappe code.
+
+        The endpoint accepts only a signed-in user. A guest request gets 403 and `PermissionError`.
+
+        The server collects the evidence itself. The caller cannot send evidence.
+        Extra body fields such as `evidence` or `user` are dropped before the endpoint runs.
+        The endpoint does not read roles from a token. It reads two Frappe records:
+
+        - `identity`: the user is enabled and has a `PLT Identity Link` record.
+        - `membership`: the user is enabled and is a `System User` of this tenant site.
+
+        Evidence collected in one request holds for that request only.
+        The final step of an action collects it again (see `open_paid_plan`).
+
+        The result has one of three states:
+
+        - `ready`: every required control passed. The result holds for the named action and policy version only.
+        - `denied`: a required control has no valid evidence. `reasons` names the controls.
+        - `configuration_required`: a rule of the action has no value yet. `owner_tasks` names the rule and its owner.
+          The server opens one Frappe `ToDo` per rule for the `System Manager` role.
+          It does not open a second open task for the same rule and action.
+
+        An unknown action gives `denied` with the reason `unknown-action`.
+        A request writes at most one task per empty rule. It writes no other record. No endpoint does paid work.
+      security:
+        - frappeSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AtonotaDecisionRequest"
+            examples:
+              siparis:
+                summary: Ask whether the user may place an order.
+                value: {action: place-order}
+      responses:
+        "200":
+          description: The decision for the action.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AtonotaDecision"}
+              examples:
+                hazir:
+                  value:
+                    message:
+                      status: ready
+                      action: place-order
+                      policy_version: 0f3c0b5e2d9a4c1b8e7f6a5d4c3b2a190817263544536271809a8b7c6d5e4f3a
+                      reasons: []
+                      owner_tasks: []
+                kural_bekliyor:
+                  value:
+                    message:
+                      status: configuration_required
+                      action: open-paid-plan
+                      policy_version: 0f3c0b5e2d9a4c1b8e7f6a5d4c3b2a190817263544536271809a8b7c6d5e4f3a
+                      reasons: [configuration-required]
+                      owner_tasks:
+                        - {rule: paid-plan-pricing, owner: product-owner, action: open-paid-plan}
+        "400":
+          description: The `action` field is missing, is not text or is longer than 140 characters. The `exc_type` value is `InvalidInput`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "403":
+          description: Guest request. The `exc_type` value is `PermissionError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.api.atonota_login.open_paid_plan:
+    post:
+      tags: [atonota-login]
+      operationId: atonotaLoginOpenPaidPlan
+      summary: Opens a paid AtonotA Login plan. The gate is closed until the price decision (G-166).
+      description: |
+        This endpoint is the example final step of an action (G-161).
+        It judges the `open-paid-plan` action, collects the evidence again and calls `Policy.confirm` right before the write.
+        The write runs only when the final check says `ready` again.
+        A policy change between the two checks refuses the action with the reason `policy-changed`.
+
+        **The gate is closed today.** The `paid-plan-pricing` rule has no value. The price decision is open (G-166, K-61).
+        So every call returns 403 and `ActionRefused`, and the rule owner gets a task.
+        A system manager or administrator cannot pass the gate. The caller cannot send evidence.
+        A refused call writes no plan record and no billing record.
+        The plan record and its price come with the price decision. This file holds no price, currency or amount.
+
+        The request has no body fields. Extra fields are dropped.
+      security:
+        - frappeSession: []
+          csrfToken: []
+      responses:
+        "200":
+          description: |
+            Not reachable today. The gate is closed. When the price decision closes, this response returns the new plan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: object}
+        "403":
+          description: |
+            Guest request (`PermissionError`), or the action is refused (`ActionRefused`).
+            The message names the decision state, for example `configuration_required`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+              examples:
+                kapali:
+                  value:
+                    exc_type: ActionRefused
+                    exception: "platform_core.identity.atonota.decision_api.ActionRefused: The action open-paid-plan is not allowed now (configuration_required)."
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.api.atonota_login.verification_notice:
+    post:
+      tags: [atonota-login]
+      operationId: atonotaLoginVerificationNotice
+      summary: Receives one result notice of the external document and face check (G-164).
+      description: |
+        The external verification provider calls this endpoint. The browser does not call it.
+        The provider carries no session, so the endpoint is open to guests. The signature authorizes the notice.
+        The provider is not chosen yet. Until the `atonota_verification_secret` site setting exists,
+        every notice gets 503 and `VerificationNotConfigured`, and nothing is stored.
+
+        Order of work:
+
+        1. The endpoint reads the raw body with `frappe.request.get_data()`.
+        2. It checks the `X-Verification-Signature` header over these raw bytes, before it reads any field.
+           The header is `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>." + raw body>`.
+           The time may differ from the server clock by at most 300 seconds. Several `v1` values may be sent; one match is enough.
+           A missing, wrong or old signature gets 401 and `NoticeSignatureRejected`. Nothing is stored.
+        3. It reads four fields: `event_id`, `case_id`, `attempt` and `outcome`. Bad fields get 400 and `InvalidInput`.
+        4. It stores one `PLT Verification Notice` record. The provider's `event_id` is unique.
+           The same notice again gives `duplicate` and stores nothing new.
+        5. It hands the processing to the queue (`frappe.enqueue`, after the commit). Processing never runs in the request.
+
+        Frappe itself copies JSON body fields into its form fields before the endpoint runs.
+        The endpoint does not use them and empties them first, so they cannot reach an error log.
+        Other body fields, such as document images or face data, are dropped. They never reach a record or a log.
+
+        The queue job applies each notice once. Only the newest attempt of a case decides.
+        A notice for an older attempt is kept as `stale`. A notice for an unknown attempt is kept as `unknown-attempt`.
+        No scheduled job runs. A System Manager replays unknown-attempt notices by hand with
+        `bench execute platform_core.identity.atonota.verification_api.replay_unknown`.
+        No endpoint marks a case complete from the browser.
+
+        At most 300 requests per minute are accepted from the same IP address. Extra requests get 429.
+        This is the same limit as `keycloak_backchannel_logout`.
+      x-yikici: false
+      security: []
+      parameters:
+        - name: X-Verification-Signature
+          in: header
+          required: true
+          schema: {type: string}
+          description: Signature over the raw body, as described above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AtonotaVerificationNotice"
+            examples:
+              onay:
+                summary: The provider approved attempt 1 of a case.
+                value: {event_id: evt-0001, case_id: case-0001, attempt: 1, outcome: approved}
+      responses:
+        "200":
+          description: |
+            The notice was stored (`accepted`) or was stored before (`duplicate`). Only `accepted` queues processing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AtonotaVerificationReceipt"}
+              examples:
+                yeni:
+                  value: {message: {status: accepted}}
+                tekrar:
+                  value: {message: {status: duplicate}}
+        "400":
+          description: |
+            The signature is valid but a field is missing or wrong. The `exc_type` value is `InvalidInput`.
+            A body that is not JSON may also get the Frappe value `DataError`. Nothing is stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          description: The signature is missing, wrong or too old. The `exc_type` value is `NoticeSignatureRejected`. Nothing is stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "503":
+          description: No verification provider is configured. The `exc_type` value is `VerificationNotConfigured`. Nothing is stored.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+
+  /platform_core.identity.enterprise_membership.approve_exception:
+    post:
+      tags: [atonota-login]
+      operationId: approveEnterpriseIdpException
+      summary: Approves a waiting corporate provider exception record (G-160).
+      description: |
+        A corporate provider must require the `email_verified` claim. A provider that never sends the claim
+        needs an approved `PLT Enterprise IdP Exception` record. This endpoint approves one waiting grant record.
+
+        The caller needs three things. Without any of them the endpoint returns 403 and `PermissionError`:
+
+        - the `System Manager` role,
+        - read permission on the named record,
+        - a human session: a cookie session with a checked CSRF token. A request with an `Authorization` header is refused.
+          Agent tokens and MCP OAuth tokens are refused this way.
+
+        The approver must be another user than the requester. The endpoint writes only three fields:
+        `approved_by`, `approved_on` and `approval_principal`. No role has write permission on the record.
+        The record never changes after approval and is never deleted.
+        A rule break returns 417 and `ValidationError`. The endpoint does not write Keycloak.
+        The `atonota-login apply` command reads the approved records later.
+      x-yikici: false
+      security:
+        - frappeSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 140, description: Name of the waiting grant record.}
+      responses:
+        "200":
+          description: The name of the approved record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: string, description: Name of the approved record.}
+        "403":
+          description: Guest, no `System Manager` role, no read permission or no human session. The `exc_type` value is `PermissionError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "417":
+          description: The record is not a waiting grant or breaks a rule. The `exc_type` value is `ValidationError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
+
+  /platform_core.identity.enterprise_membership.revoke_exception:
+    post:
+      tags: [atonota-login]
+      operationId: revokeEnterpriseIdpException
+      summary: Opens a revocation record that ends a corporate provider exception (G-160).
+      description: |
+        The endpoint opens a new revocation record. The new record supersedes the named current grant.
+        The old record stays unchanged. A revocation record means the provider has no exception.
+
+        The caller needs the same three things as `approve_exception`. Without any of them the endpoint
+        returns 403 and `PermissionError`: the `System Manager` role, read permission on the named record and
+        a human session with a checked CSRF token.
+
+        Only a current grant can be revoked. Otherwise the endpoint returns 417 and `ValidationError`.
+        The endpoint does not write Keycloak. The `atonota-login apply` command reads the records later.
+      x-yikici: false
+      security:
+        - frappeSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, reason]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 140, description: Name of the current grant record.}
+                reason: {type: string, minLength: 1, description: Why the exception ends.}
+      responses:
+        "200":
+          description: The name of the new revocation record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: string, description: Name of the revocation record.}
+        "403":
+          description: Guest, no `System Manager` role, no read permission or no human session. The `exc_type` value is `PermissionError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "417":
+          description: The named record is not the current grant. The `exc_type` value is `ValidationError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "401":
+          $ref: "#/components/responses/OturumBitti"
 
   /platform_core.identity.login_policy.reset_password:
     post:
@@ -2432,6 +2915,38 @@ components:
             Keycloak logout address. It carries `client_id` and `post_logout_redirect_uri`.
             It does not carry `id_token_hint`.
 
+    LoginProviderList:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [alias, display_name]
+            properties:
+              alias: {type: string, pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"}
+              display_name: {type: string, minLength: 1, maxLength: 80}
+            additionalProperties: false
+      additionalProperties: false
+    LinkedAccounts:
+      type: object
+      required: [providers, local_sign_in_methods]
+      properties:
+        providers:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [alias, display_name, linked]
+            properties:
+              alias: {type: string, pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"}
+              display_name: {type: string, minLength: 1, maxLength: 80}
+              linked: {type: boolean}
+            additionalProperties: false
+        local_sign_in_methods: {type: integer, minimum: 0}
+      additionalProperties: false
     CsrfToken:
       type: object
       required: [csrf_token]
@@ -2619,6 +3134,75 @@ components:
             - $ref: "#/components/schemas/Email"
           description: The new name of the user. If nothing changed, the old name is returned.
 
+    AtonotaDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: Id of the action in `actions.json`, for example `place-order` or `open-paid-plan`.
+    AtonotaOwnerTask:
+      type: object
+      additionalProperties: false
+      required: [rule, owner, action]
+      properties:
+        rule: {type: string, description: Id of the rule that has no value yet.}
+        owner: {type: string, description: Role name of the rule owner, for example `product-owner`.}
+        action: {type: string, description: The action that waits for the rule.}
+    AtonotaDecision:
+      type: object
+      additionalProperties: false
+      required: [status, action, policy_version, reasons, owner_tasks]
+      properties:
+        status:
+          type: string
+          enum: [ready, denied, configuration_required]
+          description: The decision state.
+        action: {type: string, description: The judged action.}
+        policy_version:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: SHA-256 of the policy file. A ready result holds for this version only.
+        reasons:
+          type: array
+          items: {type: string}
+          description: Ids of the controls that failed, or a general reason such as `unknown-action`.
+        owner_tasks:
+          type: array
+          items: {$ref: "#/components/schemas/AtonotaOwnerTask"}
+          description: Rules without a value and their owners. Empty unless the state is `configuration_required`.
+    AtonotaVerificationNotice:
+      type: object
+      required: [event_id, case_id, attempt, outcome]
+      description: |
+        Fields the endpoint reads. Other fields are allowed and dropped. They are never stored.
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: The provider's event id. It is unique.
+        case_id:
+          type: string
+          minLength: 1
+          maxLength: 140
+        attempt:
+          type: integer
+          minimum: 1
+        outcome:
+          type: string
+          enum: [approved, rejected, review]
+    AtonotaVerificationReceipt:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, duplicate]
     FrappeError:
       type: object
       description: |
@@ -2626,7 +3210,8 @@ components:
         The custom values in this file are these: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
-        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable` and `IdentityInternalError`.
+        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable`, `IdentityInternalError`,
+        `ActionRefused`, `NoticeSignatureRejected` and `VerificationNotConfigured`.
         The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
         `DataError`, `RateLimitExceededError` and `ValidationError`.
         The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.
