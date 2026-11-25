@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "f1d8971068b9be8de7998a47b69f7b98d8254cb1f9209b26e32a41f290fc0ae9",
+      "sha256": "f9a33bd4da688f6fa18b76dc466e36ae8cb2535203df15f55963ce61fc257773",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -336,7 +336,7 @@
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/identity/user_admin.py",
-          "line": 123,
+          "line": 140,
           "reason": "Saves the User only after require_manager, tenant_user (a Website User linked to this site's issuer) and a check that the chosen Role Profiles hold no protected or desk role (G-98). guard_user still runs on validate and refuses protected, standard and “Tenant Admin” roles."
         },
         {
