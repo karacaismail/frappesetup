@@ -40,7 +40,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
 const EMBEDS: Record<string, string[]> = {
   raylar: ['rails'],
   'yol-haritasi': ['phase-table', 'timeline'],
-  gereksinimler: ['req-summary', 'task-rules'],
+  gereksinimler: ['task-rules'],
   // press-ai indirme blokları (dl-<grup>): statik bağlantılar, dosyalar derlemede üretilir.
   'ai-mcp': ['dl-mcp'],
   'ai-skills': ['dl-skills'],
@@ -56,6 +56,37 @@ const embeds = EMBEDS[entry.id] ?? [];
   current={`${base}/${entry.id}/`}
   headings={entry.id === 'gereksinimler' ? [] : headings}
 >
+  <Fragment slot="head">
+    {embeds.length > 0 && (
+      <script is:inline>
+        // JS varsa taşınacak bloklar yerlerine konana kadar gizlenir. Böylece blok ilk çizimde başka yerde görünmez.
+        document.documentElement.dataset.embedsPending = '';
+      </script>
+    )}
+    {entry.id === 'gereksinimler' && (
+      <script is:inline>
+        if (location.hash.startsWith('#req-')) {
+          const root = document.documentElement;
+          root.dataset.initialRequirementLink = '';
+          window.addEventListener('load', () => {
+            requestAnimationFrame(() => delete root.dataset.initialRequirementLink);
+          }, { once: true });
+        }
+      </script>
+    )}
+    {entry.id === 'gereksinimler' && (
+      <noscript>
+        <style is:inline>
+          .req-explorer {
+            --fs-requirements-static: yes;
+          }
+          .req-explorer :is(.req-search-help, .req-priority, .req-filters, .req-more, .req-detail-toggle, [aria-label="Görünüm"]) {
+            display: none;
+          }
+        </style>
+      </noscript>
+    )}
+  </Fragment>
   <div class="progress" aria-hidden><span id="progress-bar"></span></div>
 
   <article class="doc">
@@ -82,13 +113,6 @@ const embeds = EMBEDS[entry.id] ?? [];
     }
     {embeds.includes('timeline') && <div data-embed-source="timeline"><Timeline /></div>}
     {
-      embeds.includes('req-summary') && (
-        <div data-embed-source="req-summary" class="prose">
-          <RequirementSummary />
-        </div>
-      )
-    }
-    {
       embeds.includes('task-rules') && (
         <div data-embed-source="task-rules" class="prose">
           <TaskBoardRules />
@@ -109,6 +133,9 @@ const embeds = EMBEDS[entry.id] ?? [];
     {
       entry.id === 'gereksinimler' && (
         <div class="explorer">
+          <noscript>
+            <p>Arama ve süzgeçler JavaScript gerektirir. Tüm gereksinimleri aşağıda okuyabilirsiniz.</p>
+          </noscript>
           <RequirementsExplorer
             client:visible
             rowsJson={JSON.stringify(requirements.map((r) => toRequirementRow(r, taskBoard)))}
@@ -120,7 +147,28 @@ const embeds = EMBEDS[entry.id] ?? [];
 
     <div class="prose">
       <Content />
+      {entry.id === 'gereksinimler' && (
+        <>
+          <h2 id="dağılım-özeti">Dağılım özeti</h2>
+          <p>Sayılar derleme anında <code>requirements.json</code> dosyasından hesaplanır.</p>
+          <RequirementSummary />
+        </>
+      )}
     </div>
+    {
+      embeds.length > 0 && (
+        <script is:inline>
+          // Derleme anında üretilen blokları metindeki yer tutucularına taşı. Bloklar o ana kadar gizlidir (head betiği).
+          // Uzun sayfada tarayıcı bu betikten önce çizebilir; görünür blok o çizimde gezginin üstünde kalır (CLS).
+          // JS yoksa bloklar başlığın altında kalır. Yer tutucusu bulunmayan blok gizlilik kalkınca aynı yerde görünür.
+          for (const source of document.querySelectorAll('[data-embed-source]')) {
+            const target = document.querySelector(`[data-embed="${source.dataset.embedSource}"]`);
+            if (target) target.replaceWith(source);
+          }
+          delete document.documentElement.dataset.embedsPending;
+        </script>
+      )
+    }
 
     <nav class="pager" aria-label="Bölümler arası geçiş">
       {
@@ -151,11 +199,7 @@ const embeds = EMBEDS[entry.id] ?? [];
 </Site>
 
 <script>
-  // 1) Derleme anında üretilen blokları metindeki yer tutucularına taşı (JS yoksa başlığın altında kalır).
-  for (const source of document.querySelectorAll<HTMLElement>('[data-embed-source]')) {
-    const target = document.querySelector(`[data-embed="${source.dataset.embedSource}"]`);
-    if (target) target.replaceWith(source);
-  }
+  // 1) Bloklar yer tutucularına yukarıdaki satır içi betikle, ilk çizimden önce taşınır.
 
   // 2) Başlık bağlantıları: h2/h3 kimliğine kopyalanabilir # bağlantısı.
   for (const h of document.querySelectorAll<HTMLElement>('.prose h2[id], .prose h3[id]')) {
@@ -195,7 +239,7 @@ const embeds = EMBEDS[entry.id] ?? [];
   //    break-word ağı kapalı: kodun satırı taşıyor mu?), böylece durum salınmaz. Yalnız gerçekten taşan kaydırma kutusu
   //    Tab sırasına girer. Sayfanın boyutu (genişlik, kök yazı, yazı tipi), yazı tipi yüklemesi ve gezginin yeniden
   //    çizimi durumu yeniler; kutunun kaydırma konumu korunur.
-  const CODE = '.prose :not(pre, a) > code, :is(.req-card-detail, .req-detail) > code';
+  const CODE = '.prose :not(pre, a) > code, .req-detail > code';
   const lineBox = (code: HTMLElement) => {
     let box = code.parentElement!;
     while (box.parentElement && getComputedStyle(box).display === 'inline') box = box.parentElement;
@@ -255,27 +299,70 @@ const embeds = EMBEDS[entry.id] ?? [];
       }
     });
   };
+  let results: HTMLElement | null = null;
+  const measureResults = () => {
+    if (!results) return;
+    const scrolls = results.scrollWidth > results.clientWidth &&
+      ['auto', 'scroll'].includes(getComputedStyle(results).overflowX);
+    if (scrolls) {
+      results.tabIndex = 0;
+      results.setAttribute('role', 'region');
+      results.setAttribute('aria-label', 'Gereksinim tablosu (yatay kaydırılabilir)');
+    } else {
+      if (document.activeElement !== results) results.removeAttribute('tabindex');
+      results.removeAttribute('role');
+      results.removeAttribute('aria-label');
+    }
+  };
+  if (document.querySelector('.explorer')) {
+    const root = document.documentElement;
+    const clearKeyboardFocus = () => delete root.dataset.requirementKeyboardFocus;
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        root.dataset.requirementKeyboardFocus = '';
+      }
+    });
+    document.addEventListener('pointerdown', clearKeyboardFocus);
+    document.addEventListener('touchstart', clearKeyboardFocus, { passive: true });
+    document.addEventListener('keydown', (event) => {
+      if (!results || event.target !== results || !results.hasAttribute('role')) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      event.preventDefault();
+      results.scrollBy({ left: event.key === 'ArrowRight' ? 40 : -40, behavior: 'instant' });
+    });
+  }
   let frame = 0;
   const schedule = () => {
     cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(markScrollingCode);
+    frame = requestAnimationFrame(() => {
+      markScrollingCode();
+      observeResults();
+      measureResults();
+    });
   };
   // Ölçüm başlayınca satır içi kodda break-word ağı kapanır (global.css); betik yoksa ağ yerinde kalır.
   document.documentElement.setAttribute('data-code-measured', '');
   markScrollingCode();
-  const content = document.getElementById('icerik');
-  if (content) {
-    let previousWidth = 0;
-    let previousFontSize = '';
-    new ResizeObserver(([entry]) => {
-      const width = entry.contentRect.width;
-      const fontSize = getComputedStyle(document.documentElement).fontSize;
-      if (width === previousWidth && fontSize === previousFontSize) return;
-      previousWidth = width;
-      previousFontSize = fontSize;
-      schedule();
-    }).observe(content);
-  }
+  const resize = new ResizeObserver(schedule);
+  resize.observe(document.body);
+  const observeResults = () => {
+    const current = document.querySelector<HTMLElement>('.req-results');
+    if (current === results) return;
+    if (results) {
+      results.removeEventListener('blur', schedule);
+      resize.unobserve(results);
+      if (results.firstElementChild) resize.unobserve(results.firstElementChild);
+    }
+    results = current;
+    if (results) {
+      results.addEventListener('blur', schedule);
+      resize.observe(results);
+      if (results.firstElementChild) resize.observe(results.firstElementChild);
+    }
+  };
+  observeResults();
+  measureResults();
   document.fonts.addEventListener('loadingdone', schedule);
   document.fonts.ready.then(schedule);
   const explorer = document.querySelector('.explorer');

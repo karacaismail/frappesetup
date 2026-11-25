@@ -82,6 +82,7 @@
 }
 
 /* ------------------------------------------------------------------ */
+html[data-initial-requirement-link] { scroll-behavior: auto; }
 html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--fs-header-h) + 1rem);
@@ -493,17 +494,17 @@ body {
   overflow-wrap: normal;
 }
 [data-code-measured] .prose code,
-[data-code-measured] :is(.req-card-detail, .req-detail) > code {
+[data-code-measured] .req-detail > code {
   /* Betik ölçtükten sonra ağ satır içi kodda kapanır: Gecko ağ açıkken kodun bitiş dolgusunu sığma hesabına katıp
      satırına sığan kodu da bölüyor. Satırdan uzun dizileri kod kutuları çözer. */
   overflow-wrap: normal;
 }
-[data-code-measured] :is(.req-card-detail, .req-detail) > code:not(.req-code-wrap),
+[data-code-measured] .req-detail > code:not(.req-code-wrap),
 code[data-scroll="single-line"] {
   white-space: nowrap;
 }
 .prose :not(pre, a) > code[data-scroll],
-:is(.req-card-detail, .req-detail) > code[data-scroll] {
+.req-detail > code[data-scroll] {
   display: inline-block;
   max-width: 100%;
   overflow: auto hidden;
@@ -703,7 +704,7 @@ code[data-scroll="single-line"] {
   margin-bottom: 0.75rem;
 }
 .req-explorer {
-  container-type: inline-size;
+  container: requirements / inline-size;
 }
 .req-explorer .mantine-Input-input {
   min-height: var(--fs-hit);
@@ -767,7 +768,7 @@ code[data-scroll="single-line"] {
   margin-bottom: 0.75rem;
 }
 .req-id,
-:is(.req-card-detail, .req-detail) > code {
+.req-detail > code {
   font-family: var(--mantine-font-family-monospace);
   font-size: var(--fs-font-body);
 }
@@ -779,7 +780,7 @@ code[data-scroll="single-line"] {
   border-radius: 4px;
   white-space: nowrap;
 }
-:is(.req-card-detail, .req-detail) > code {
+.req-detail > code {
   background: var(--fs-tint);
   padding: 0.05em 0.3em;
   border-radius: 4px;
@@ -787,8 +788,6 @@ code[data-scroll="single-line"] {
 /* Kart ve tablo satırının metinleri sade <p>'dir (Gereksinimler HTML bütçesi). Mantine Text kökünün etkili stilleri
    aynı tokenlarla: md yazı boyutu ve satır yüksekliği, dış boşluk yok; başlık 600, ayrıntı ikincil renk, tabloda
    ayrıntı ve sahip 0.25rem üst boşlukla. Aşağıdaki özel kurallar (satır yüksekliği, en fazla 60ch) bunları daraltır. */
-.req-card-title,
-.req-card-detail,
 .req-title,
 .req-detail,
 .req-owner {
@@ -796,11 +795,9 @@ code[data-scroll="single-line"] {
   font-size: var(--fs-font-body);
   line-height: var(--fs-leading-body);
 }
-.req-card-title,
 .req-title {
   font-weight: 600;
 }
-.req-card-detail,
 .req-detail {
   color: var(--mantine-color-dimmed);
 }
@@ -822,33 +819,117 @@ code[data-scroll="single-line"] {
 .req-table thead th {
   background: var(--fs-surface-2);
 }
-.req-cards {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.6rem;
+tr[id^="req-"] {
+  scroll-margin-top: calc(var(--fs-header-h) + 1rem);
 }
-.req-cards,
-.req-card,
-.req-card > * {
+tr[id^="req-"][tabindex="-1"]:focus {
+  outline: none;
+}
+
+.req-meta-label {
+  display: none;
+}
+.req-results:focus {
+  outline: none;
+}
+[data-requirement-keyboard-focus] .req-results:focus-visible {
+  box-shadow: 0 -2px var(--fs-focus);
+}
+@media (forced-colors: active) {
+  [data-requirement-keyboard-focus] .req-results:focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}
+
+@container requirements (width < 40rem) or ((width < 62rem) and style(--fs-requirements-static: yes)) {
+  .req-results {
+    overflow: visible;
+  }
+  .req-results-inner {
+    min-width: 0;
+  }
+  .req-table {
+    display: block;
+  }
+  .req-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .req-table tbody {
+    display: grid;
+    gap: var(--mantine-spacing-sm);
+  }
+  .req-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--mantine-spacing-xs);
+    padding: var(--mantine-spacing-md);
+    border: 0;
+    border-radius: var(--mantine-radius-md);
+    background: var(--fs-surface-2);
+  }
+  .req-table td {
+    grid-column: span 2;
+    padding: 0;
+    min-width: 0;
+  }
+  .req-table td:first-child,
+  .req-table td:nth-child(4) {
+    grid-column: span 3;
+    grid-row: 1;
+  }
+  .req-table td:nth-child(4) {
+    justify-self: end;
+  }
+  .req-table td:nth-child(2),
+  .req-table td[colspan] {
+    grid-column: 1 / -1;
+  }
+  .req-table td:nth-child(2) {
+    grid-row: 2;
+  }
+  .req-table .req-detail {
+    contain: none;
+    max-width: none;
+  }
+  .req-meta-label {
+    display: block;
+    font-weight: var(--fs-weight-strong);
+  }
+  .req-table .req-meta {
+    color: var(--fs-quiet);
+    line-height: var(--fs-leading-body);
+  }
+}
+
+/* Gruplu görünümün kartları liste öğesidir. Tablo satırları da `req-card` sınıfını taşır. Bu yüzden kart kuralları
+   yalnız görev listesinin öğelerinde çalışır. Kart metni tablo satırıyla aynı `req-title` ve `req-detail` kurallarını
+   kullanır. Satırdan uzun kod da aynı betikle kendi kutusunda kayar. */
+.task-list > .req-card,
+.task-list > .req-card > * {
   min-width: 0;
 }
-.req-card {
+.task-list > .req-card {
   padding: 0.9rem 1rem;
   border-radius: var(--mantine-radius-md);
   background: var(--fs-surface-2);
   display: grid;
   gap: 0.4rem;
 }
-.req-card-top {
+.task-list .req-card-top {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
 }
-.req-meta {
+.task-list .req-detail {
+  margin-top: 0;
+}
+.task-list .req-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.5rem;
@@ -857,7 +938,7 @@ code[data-scroll="single-line"] {
   line-height: var(--fs-leading-body);
 }
 /* Uzun sahip adı gibi öğe satırdan genişse satır genişliğine iner ve sözcük aralarından sarılır (kart taşmaz). */
-.req-meta > * {
+.task-list .req-meta > * {
   min-width: 0;
 }
 
@@ -946,4 +1027,9 @@ code[data-scroll="single-line"] {
 }
 .task-row-status {
   margin: 0 0 calc(0.25rem * var(--mantine-scale));
+}
+
+/* Taşınacak bloklar yer tutucusuna konana kadar çizilmez ([slug].astro satır içi betikleri). */
+html[data-embeds-pending] [data-embed-source] {
+  display: none;
 }
