@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "1b38486510e40463ce459d79a4e256c2c79399a0e08334f68ced1168ec439762",
+      "sha256": "82e1e3a279e938f24f76e1ddb8a8f4e81addbcf7b7cf0245d0c0a4bbc266f5e0",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -186,25 +186,25 @@
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 349,
+          "line": 351,
           "reason": "Saves the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on save and refuses protected roles, standard roles and closed types."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 351,
+          "line": 353,
           "reason": "Inserts the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs before insert and refuses protected roles, standard roles and closed types."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 368,
+          "line": 370,
           "reason": "Deletes the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on trash."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 397,
+          "line": 399,
           "reason": "Saves the users of a Role Profile that guard_role_profile allowed to hold only plain roles (G-62). Administrator and users with any role that is not plain are skipped. guard_user still runs on each save."
         },
         {
