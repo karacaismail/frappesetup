@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from identity_sync.httpjson import HttpError
+from identity_sync.httpjson import HttpError, TransportError
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import Organization
 from identity_sync.tokens import TokenProvider
@@ -330,3 +330,89 @@ class InviteTest(AdminCase):
         self.assertEqual(len(result.previews), 3)
         self.assertEqual(self.writes(), [])
         self.assertNotIn("davetli@example.test", " ".join(p.summary for p in result.previews))
+
+
+class RecoveryKeyRemovalTest(AdminCase):
+    """AJA-420: after an approved recovery, the old strong keys of the user are removed.
+
+    Only the two strong key types are removed, and only keys set up before the approval.
+    The password, one-time codes and recovery codes stay. The user's sessions end last.
+    """
+
+    APPROVED_MS = 1_795_000_000_000
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.kc.add_user(keycloak_user())
+
+    def credential_ids(self) -> list[str]:
+        return [row["id"] for row in self.kc.credentials.get(SUBJECT, [])]
+
+    def deletes(self) -> list[str]:
+        return [r.path for r in self.kc.requests if r.method == "DELETE"]
+
+    def test_only_old_strong_keys_are_removed_and_the_sessions_end(self) -> None:
+        old_passkey = self.kc.add_credential(SUBJECT, "webauthn-passwordless", created=self.APPROVED_MS - 5000)
+        old_hardware = self.kc.add_credential(SUBJECT, "webauthn", created=self.APPROVED_MS - 1)
+        new_passkey = self.kc.add_credential(SUBJECT, "webauthn-passwordless", created=self.APPROVED_MS + 1)
+        password = self.kc.add_credential(SUBJECT, "password", created=1)
+        otp = self.kc.add_credential(SUBJECT, "otp", created=1)
+        codes = self.kc.add_credential(SUBJECT, "recovery-authn-codes", created=1)
+
+        removed = self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS)
+
+        self.assertEqual(removed, 2)
+        self.assertEqual(self.credential_ids(), [new_passkey, password, otp, codes])
+        self.assertEqual(
+            self.deletes(),
+            [f"{self.base}/users/{SUBJECT}/credentials/{old_passkey}", f"{self.base}/users/{SUBJECT}/credentials/{old_hardware}"],
+        )
+        self.assertEqual(self.kc.logged_out, [SUBJECT])
+        # The sessions end after the keys are gone.
+        self.assertEqual(self.kc.requests[-1].path, f"{self.base}/users/{SUBJECT}/logout")
+
+    def test_second_call_removes_nothing_and_succeeds(self) -> None:
+        self.kc.add_credential(SUBJECT, "webauthn", created=self.APPROVED_MS - 1)
+        self.assertEqual(self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS), 1)
+
+        self.assertEqual(self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS), 0)
+        self.assertEqual(len(self.deletes()), 1)
+
+    def test_key_that_is_already_gone_counts_as_removed(self) -> None:
+        key = self.kc.add_credential(SUBJECT, "webauthn", created=self.APPROVED_MS - 1)
+        self.kc.on("DELETE", f"{self.base}/users/{SUBJECT}/credentials/{key}", (404, {"error": "Credential not found"}))
+
+        self.assertEqual(self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS), 1)
+        self.assertEqual(self.kc.logged_out, [SUBJECT])
+
+    def test_404_from_a_wrong_address_is_not_taken_as_removed(self) -> None:
+        key = self.kc.add_credential(SUBJECT, "webauthn", created=self.APPROVED_MS - 1)
+        self.kc.on("DELETE", f"{self.base}/users/{SUBJECT}/credentials/{key}", (404, None))
+        self.kc.on("GET", f"{self.base}/users/count", (404, None))
+
+        with self.assertRaises(HttpError):
+            self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS)
+        self.assertEqual(self.kc.logged_out, [])
+
+    def test_missing_user_has_no_keys(self) -> None:
+        self.kc.remove_user(SUBJECT)
+
+        self.assertEqual(self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS), 0)
+        self.assertEqual(self.deletes(), [])
+
+    def test_failed_delete_stops_before_the_sessions_end(self) -> None:
+        key = self.kc.add_credential(SUBJECT, "webauthn", created=self.APPROVED_MS - 1)
+        self.kc.on("DELETE", f"{self.base}/users/{SUBJECT}/credentials/{key}", (500, None))
+
+        with self.assertRaises(HttpError):
+            self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS)
+        self.assertEqual(self.kc.logged_out, [])
+
+    def test_unreadable_creation_time_removes_nothing(self) -> None:
+        self.kc.add_credential(SUBJECT, "webauthn", created=self.APPROVED_MS - 1)
+        self.kc.credentials[SUBJECT][0]["createdDate"] = "yesterday"
+
+        with self.assertRaises(TransportError):
+            self.admin.remove_recovery_keys(SUBJECT, self.APPROVED_MS)
+        self.assertEqual(self.deletes(), [])
+        self.assertEqual(self.kc.logged_out, [])

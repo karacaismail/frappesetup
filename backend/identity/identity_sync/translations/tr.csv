@@ -482,6 +482,7 @@ These three lists cannot contain a client starting with `site-`, including an un
 Invalid settings prevent startup. An empty operator list disables platform endpoints.
 This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
 A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
+The same client can also remove the old keys of a user after an approved recovery. That is a narrower permission than a deletion.
 Only a trusted service client goes into the execute list.
 The agent token and the model identity do not go into this list.
 The trust boundary is this. Only the client of the approval layer can call execution.
@@ -727,6 +728,7 @@ Bu üç listede `site-` ile başlayan istemci bulunamaz. Kayıtsız kiracı adla
 Hatalı ayarla servis açılmaz. Operatör listesi boşsa platform uçları kapalıdır.
 Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
+Aynı istemci, onaylı kurtarmadan sonra kullanıcının eski anahtarlarını da silebilir. Bu yetki hesap silmeden daha dardır.
 Yürütme listesine yalnız güvenilir servis istemcisi girer.
 Aracı belirteci ve model kimliği bu listeye girmez.
 Güven sınırı şudur: yürütmeyi yalnız onay katmanının istemcisi çağırabilir.
@@ -1390,3 +1392,49 @@ The alias of the platform in Keycloak.,Platformun Keycloak'taki takma adı.,iden
 The name of the platform on the account page.,Hesap sayfasındaki platform adı.,identity_sync.openapi.yaml: components.schemas.LinkedProvider.properties.display_name.description
 True when the member has linked an account of this platform.,Üye bu platformun bir hesabını bağladıysa değer doğrudur.,identity_sync.openapi.yaml: components.schemas.LinkedProvider.properties.linked.description
 The number of sign-in ways without a platform. Only a password and a passkey count.,Platform dışındaki giriş yollarının sayısı. Yalnız parola ve geçiş anahtarı sayılır.,identity_sync.openapi.yaml: components.schemas.LinkedAccounts.properties.local_sign_in_methods.description
+Removes the old strong keys of a user after an approved recovery.,Onaylı kurtarmadan sonra kullanıcının eski güçlü anahtarlarını siler.,identity_sync.openapi.yaml: paths./v1/recovery-key-removals.post.summary
+"The source is task AJA-420 and the design in task AJA-426.
+A user who lost a key asks for recovery on Press. A reviewer who is not the account owner approves the request.
+Then a person with review permission calls Press, and Press calls this endpoint.
+
+The service removes the strong keys of the user. These are the `webauthn-passwordless` and `webauthn` types.
+It removes only keys whose Keycloak `createdDate` is before `approved_at`. A key the user set up later stays.
+The password, one-time codes and recovery codes stay.
+Then the service ends every Keycloak session of the user. The sites end their sessions through back-channel logout.
+After this the user signs in with the first key flow and sets up a new key.
+
+This endpoint is destructive and cannot be undone. A removed key is gone.
+Only Press can call the endpoint. The token carries `azp=press-service` and `aud=identity-sync`.
+The allowed clients are in the `IDENTITY_SYNC_DELETION_AZP` setting. Clients in the other lists get 403.
+This endpoint has no preview and no approval id. The consent is the approval on the Press review record.
+
+The call is repeatable. A key that is already gone counts as removed. A user missing in Keycloak has no keys.
+A repeated call returns 200 with `removed` 0.
+When Keycloak fails, the reply is 502 and the sessions stay. Press records the failure and the call can be sent again.
+The service log names only the review record, never the person.
+","Kaynak AJA-420 görevidir. Tasarım AJA-426 görevindedir.
+Anahtarını kaybeden kullanıcı Press'te kurtarma ister. Hesap sahibi olmayan bir inceleyici isteği onaylar.
+Sonra inceleme yetkisi olan bir kişi Press'i çağırır. Press bu ucu çağırır.
+
+Servis kullanıcının güçlü anahtarlarını siler. Bunlar `webauthn-passwordless` ve `webauthn` türleridir.
+Servis yalnız Keycloak `createdDate` değeri `approved_at` zamanından önce olan anahtarları siler. Kullanıcının sonra kurduğu anahtar kalır.
+Parola, tek kullanımlık kodlar ve kurtarma kodları kalır.
+Sonra servis kullanıcının bütün Keycloak oturumlarını kapatır. Siteler kendi oturumlarını arka kanal bildirimiyle kapatır.
+Bundan sonra kullanıcı ilk anahtar yoluyla girer ve yeni anahtar kurar.
+
+Bu uç yıkıcıdır ve geri alınamaz. Silinen anahtar geri gelmez.
+Ucu yalnız Press çağırabilir. Belirteç `azp=press-service` ve `aud=identity-sync` taşır.
+İzinli istemciler `IDENTITY_SYNC_DELETION_AZP` ayarındadır. Öteki listelerdeki istemciler 403 alır.
+Bu ucun önizlemesi ve onay kimliği yoktur. Onay, Press inceleme kaydındaki onaydır.
+
+Çağrı tekrarlanabilir. Zaten silinmiş anahtar silinmiş sayılır. Keycloak'ta olmayan kullanıcının anahtarı yoktur.
+Tekrarlanan çağrı 200 döner ve `removed` değeri 0 olur.
+Keycloak hata verirse yanıt 502 olur ve oturumlar açık kalır. Press hatayı kaydeder ve çağrı yeniden gönderilebilir.
+Servis günlüğü yalnız inceleme kaydını anar, kişiyi hiç anmaz.
+",identity_sync.openapi.yaml: paths./v1/recovery-key-removals.post.description
+The old keys are removed and the sessions ended.,Eski anahtarlar silindi ve oturumlar kapandı.,identity_sync.openapi.yaml: paths./v1/recovery-key-removals.post.responses.200.description
+"The body is invalid. For example, a field is missing, the body carries another field or `approved_at` is in the future.","Gövde geçersizdir. Örneğin bir alan eksiktir, gövdede başka bir alan vardır ya da `approved_at` gelecektedir.",identity_sync.openapi.yaml: paths./v1/recovery-key-removals.post.responses.400.description
+The issuer of the realm. It must be equal to the issuer in the service settings.,Realm'in yayıncısıdır. Servis ayarlarındaki yayıncıyla aynı olmalıdır.,identity_sync.openapi.yaml: components.schemas.RecoveryKeyRemovalRequest.properties.issuer.description
+The time when the reviewer approved the recovery. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).,İnceleyicinin kurtarmayı onayladığı zamandır. Birim 1970-01-01 00.00 UTC zamanından bu yana geçen saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.RecoveryKeyRemovalRequest.properties.approved_at.description
+The old keys are gone and the sessions of the user ended.,Eski anahtarlar silindi ve kullanıcının oturumları kapandı.,identity_sync.openapi.yaml: components.schemas.RecoveryKeyRemovalResult.properties.status.description
+The number of keys this call removed. A repeated call returns 0.,Bu çağrının sildiği anahtar sayısıdır. Tekrarlanan çağrı 0 döner.,identity_sync.openapi.yaml: components.schemas.RecoveryKeyRemovalResult.properties.removed.description

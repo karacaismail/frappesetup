@@ -447,6 +447,44 @@ class _Api:
         # The log names the request, never the person.
         _LOG.info("execute operation=delete_account azp=%s request_id=%s outcome=%s", azp, request_id, outcome)
 
+    # --- recovery key removal (AJA-420, design in AJA-426) ---
+
+    def post_recovery_key_removal(self, body: bytes, azp: str, now: float) -> Reply:
+        """Remove the old strong keys of a user after an approved recovery. Only Press calls this.
+
+        A reviewer who is not the account owner approved the recovery record on Press. Press sends
+        the record name and the approval time. The service removes the passkeys and hardware keys
+        set up before that time and ends the user's Keycloak sessions. The call is repeatable.
+        """
+        payload = _json_object(body)
+        if set(payload) != {"issuer", "subject", "review_id", "approved_at"}:
+            raise _BadRequest
+        subject = _text(payload, "subject", required=True, max_length=128)
+        issuer = _text(payload, "issuer", required=True, max_length=512)
+        review_id = _text(payload, "review_id", required=True, max_length=128)
+        approved_at = payload["approved_at"]
+        if not RESOURCE_ID.fullmatch(subject) or not RESOURCE_ID.fullmatch(review_id) or issuer != self._settings.issuer:
+            raise _BadRequest
+        if isinstance(approved_at, bool) or not isinstance(approved_at, int):
+            raise _BadRequest
+        if approved_at <= 0 or approved_at > now + CLOCK_SKEW_SECONDS:
+            raise _BadRequest
+        try:
+            removed = self._app.keycloak.remove_recovery_keys(subject, approved_at * 1000)
+        except (HttpError, TransportError):
+            self._audit_key_removal(azp, review_id, "upstream_failed")
+            raise
+        self._audit_key_removal(azp, review_id, "done", removed)
+        return 200, {"status": "done", "removed": removed}
+
+    @staticmethod
+    def _audit_key_removal(azp: str, review_id: str, outcome: str, removed: int | None = None) -> None:
+        # The log names the review record, never the person.
+        suffix = "" if removed is None else f" removed={removed}"
+        _LOG.info(
+            "execute operation=remove_recovery_keys azp=%s request_id=%s outcome=%s%s", azp, review_id, outcome, suffix
+        )
+
     # --- sessions: called by platform_core sites, not by the approval flow ---
 
     def post_revoke_session(self, body: bytes, azp: str) -> Reply:
@@ -645,6 +683,7 @@ def make_server(
         "/v1/login-providers": ("GET", api.get_login_providers),
         "/v1/linked-accounts": ("POST", api.post_linked_accounts),
         "/v1/account-deletions": ("POST", lambda body, azp: api.post_account_deletion(body, azp, clock())),
+        "/v1/recovery-key-removals": ("POST", lambda body, azp: api.post_recovery_key_removal(body, azp, clock())),
     }
     # Routes for platform_core site clients. Every other token route is for the preview and approval flow.
     # Read-only lists. They take paging values from the query.
@@ -657,6 +696,8 @@ def make_server(
         "/v1/login-providers": settings.session_azp,
         "/v1/linked-accounts": settings.session_azp,
         "/v1/account-deletions": settings.deletion_azp,
+        # Press removes the old keys after an approved recovery. This is narrower than a deletion.
+        "/v1/recovery-key-removals": settings.deletion_azp,
     }
     operator_routes = {"/v1/reconcile", "/v1/dead-letters/replay", "/v1/dead-letters", "/v1/operations"}
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}

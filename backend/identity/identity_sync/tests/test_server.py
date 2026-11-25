@@ -1603,3 +1603,109 @@ class TargetErrorValueTest(ServerCase):
             with self.subTest(name=name):
                 error = HttpError(409, name)
                 self.assertEqual((error.code, str(error)), (None, "HTTP 409"))
+
+
+class RecoveryKeyRemovalEndpointTest(ServerCase):
+    """POST /v1/recovery-key-removals (AJA-420, design in AJA-426).
+
+    Press calls it after a reviewer approved a recovery request. The service removes the
+    user's strong keys set up before the approval and ends the user's sessions.
+    """
+
+    PATH = "/v1/recovery-key-removals"
+    REVIEW_ID = "a1b2c3d4e5"
+    APPROVED_AT = NOW - 60
+
+    def setUp(self) -> None:
+        super().setUp()
+        kc = self.stack.keycloak
+        self.old_key = kc.add_credential(SUBJECT, "webauthn-passwordless", created=(self.APPROVED_AT - 3600) * 1000)
+        self.new_key = kc.add_credential(SUBJECT, "webauthn", created=(self.APPROVED_AT + 10) * 1000)
+        self.password = kc.add_credential(SUBJECT, "password", created=1000)
+
+    def body(self, **changes: object) -> dict[str, object]:
+        return {
+            "issuer": self.stack.issuer,
+            "subject": SUBJECT,
+            "review_id": self.REVIEW_ID,
+            "approved_at": self.APPROVED_AT,
+            **changes,
+        }
+
+    def request(self, token: str = PRESS_TOKEN, **changes: object) -> tuple[int, object]:
+        return self.post_json(self.PATH, self.body(**changes), token)
+
+    def nothing_written(self) -> None:
+        self.assertEqual(self.keycloak_writes(), [])
+        self.assertEqual(len(self.stack.keycloak.credentials[SUBJECT]), 3)
+
+    def test_press_removes_the_old_keys_and_ends_the_sessions(self) -> None:
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            status, body = self.request()
+
+        self.assertEqual((status, body), (200, {"status": "done", "removed": 1}))
+        ids = [row["id"] for row in self.stack.keycloak.credentials[SUBJECT]]
+        self.assertEqual(ids, [self.new_key, self.password])
+        self.assertEqual(self.stack.keycloak.logged_out, [SUBJECT])
+        audit = "\n".join(logs.output)
+        self.assertIn(
+            f"execute operation=remove_recovery_keys azp=press-service request_id={self.REVIEW_ID} outcome=done removed=1",
+            audit,
+        )
+        # The log names the review record, not the person.
+        self.assertNotIn(SUBJECT, audit)
+        self.assertNotIn("example.test", audit)
+
+    def test_repeated_request_succeeds_and_removes_nothing_more(self) -> None:
+        self.request()
+
+        self.assertEqual(self.request(), (200, {"status": "done", "removed": 0}))
+        self.assertEqual(len(self.stack.keycloak.credentials[SUBJECT]), 2)
+
+    def test_only_press_may_remove_keys(self) -> None:
+        for token in (PREVIEW_TOKEN, EXECUTE_TOKEN, SESSION_TOKEN, OPERATOR_TOKEN, "stranger-token"):
+            with self.subTest(token=token):
+                self.assertEqual(self.request(token=token), (403, {"error": "forbidden"}))
+        self.assertEqual(self.call("POST", self.PATH, b"{}")[0], 401)
+        self.nothing_written()
+
+    def test_bad_requests(self) -> None:
+        for payload in (
+            {},
+            {"issuer": self.stack.issuer, "subject": SUBJECT, "review_id": self.REVIEW_ID},
+            self.body(issuer="http://baska.example.test/realms/platform"),
+            self.body(subject=".."),
+            self.body(subject=5),
+            self.body(review_id=""),
+            self.body(review_id="../x"),
+            self.body(approved_at="dun"),
+            self.body(approved_at=True),
+            self.body(approved_at=1.5),
+            self.body(approved_at=0),
+            self.body(approved_at=NOW + 120),
+            self.body(dry_run=True),
+            self.body(email="ayse@example.test"),
+        ):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.post_json(self.PATH, payload, PRESS_TOKEN), (400, {"error": "bad_request"}))
+        self.nothing_written()
+
+    def test_keycloak_failure_is_an_upstream_error(self) -> None:
+        kc = self.stack.keycloak
+        kc.on("DELETE", f"{kc.admin}/users/{SUBJECT}/credentials/{self.old_key}", (500, None))
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            reply = self.request()
+
+        self.assertEqual(reply, (502, {"error": "upstream_failed"}))
+        self.assertEqual(kc.logged_out, [])
+        audit = "\n".join(logs.output)
+        self.assertIn("operation=remove_recovery_keys", audit)
+        self.assertIn("outcome=upstream_failed", audit)
+        self.assertNotIn(SUBJECT, audit)
+
+    def test_user_missing_in_keycloak_counts_as_done(self) -> None:
+        self.stack.keycloak.remove_user(SUBJECT)
+        self.stack.keycloak.on("GET", f"{self.stack.keycloak.admin}/users/{SUBJECT}/credentials", (404, None))
+
+        self.assertEqual(self.request(), (200, {"status": "done", "removed": 0}))

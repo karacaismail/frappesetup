@@ -74,6 +74,7 @@ info:
     Invalid settings prevent startup. An empty operator list disables platform endpoints.
     This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
     A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
+    The same client can also remove the old keys of a user after an approved recovery. That is a narrower permission than a deletion.
     Only a trusted service client goes into the execute list.
     The agent token and the model identity do not go into this list.
     The trust boundary is this. Only the client of the approval layer can call execution.
@@ -878,6 +879,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /v1/recovery-key-removals:
+    post:
+      operationId: removeRecoveryKeys
+      summary: Removes the old strong keys of a user after an approved recovery.
+      description: |
+        The source is task AJA-420 and the design in task AJA-426.
+        A user who lost a key asks for recovery on Press. A reviewer who is not the account owner approves the request.
+        Then a person with review permission calls Press, and Press calls this endpoint.
+
+        The service removes the strong keys of the user. These are the `webauthn-passwordless` and `webauthn` types.
+        It removes only keys whose Keycloak `createdDate` is before `approved_at`. A key the user set up later stays.
+        The password, one-time codes and recovery codes stay.
+        Then the service ends every Keycloak session of the user. The sites end their sessions through back-channel logout.
+        After this the user signs in with the first key flow and sets up a new key.
+
+        This endpoint is destructive and cannot be undone. A removed key is gone.
+        Only Press can call the endpoint. The token carries `azp=press-service` and `aud=identity-sync`.
+        The allowed clients are in the `IDENTITY_SYNC_DELETION_AZP` setting. Clients in the other lists get 403.
+        This endpoint has no preview and no approval id. The consent is the approval on the Press review record.
+
+        The call is repeatable. A key that is already gone counts as removed. A user missing in Keycloak has no keys.
+        A repeated call returns 200 with `removed` 0.
+        When Keycloak fails, the reply is 502 and the sessions stay. Press records the failure and the call can be sent again.
+        The service log names only the review record, never the person.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: press-only
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoveryKeyRemovalRequest"
+      responses:
+        "200":
+          description: The old keys are removed and the sessions ended.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoveryKeyRemovalResult"
+        "400":
+          description: The body is invalid. For example, a field is missing, the body carries another field or `approved_at` is in the future.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
   /v1/invitations:
     post:
       operationId: inviteUser
@@ -1600,6 +1655,36 @@ components:
           description: The names of the steps that finished with definite success in this call.
           items:
             type: string
+      additionalProperties: false
+    RecoveryKeyRemovalRequest:
+      type: object
+      required: [issuer, subject, review_id, approved_at]
+      properties:
+        issuer:
+          type: string
+          maxLength: 512
+          description: The issuer of the realm. It must be equal to the issuer in the service settings.
+        subject:
+          $ref: "#/components/schemas/ResourceId"
+        review_id:
+          $ref: "#/components/schemas/ResourceId"
+        approved_at:
+          type: integer
+          minimum: 1
+          description: The time when the reviewer approved the recovery. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).
+      additionalProperties: false
+    RecoveryKeyRemovalResult:
+      type: object
+      required: [status, removed]
+      properties:
+        status:
+          type: string
+          enum: [done]
+          description: The old keys are gone and the sessions of the user ended.
+        removed:
+          type: integer
+          minimum: 0
+          description: The number of keys this call removed. A repeated call returns 0.
       additionalProperties: false
     ReconcileRequest:
       description: The caller must write the `dry_run` field explicitly. One of two forms is valid.

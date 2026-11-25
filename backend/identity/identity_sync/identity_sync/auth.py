@@ -10,7 +10,7 @@ There are five client lists (O-38):
   They may also revoke sessions of their own members.
 - `operator_azp` alone grants access to platform reconciliation, replay and queue lists.
 - `preview_azp` permits invitation previews, never platform queue access or execution.
-- `deletion_azp` permits Press to request global account deletion.
+- `deletion_azp` permits Press to request global account deletion and the removal of old keys after an approved recovery.
 
 Operator, preview and deletion lists are disjoint from each other and from tenant lists.
 They must not contain any client whose name starts with `site-`.

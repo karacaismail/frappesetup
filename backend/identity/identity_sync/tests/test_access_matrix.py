@@ -76,6 +76,8 @@ ROWS = (
     # AtonotA Login reads (AJA-459). Each tenant reads its own platform list, so the other tenant gets 200.
     Row("login providers", "GET", "/v1/login-providers", None, SITE, 200, AGENT, 200),
     Row("linked accounts", "POST", "/v1/linked-accounts", {"subject": SUBJECT}, SITE, 200, AGENT, 403),
+    # AJA-420: Press removes the old keys after an approved recovery. The user stays.
+    Row("recovery key removal", "POST", "/v1/recovery-key-removals", None, PRESS, 200, SITE, 403),
     # Last: the right client of this row deletes the sample user that the rows above read.
     Row("account deletion", "POST", "/v1/account-deletions", None, PRESS, 200, SITE, 403),
 )
@@ -120,6 +122,9 @@ class MatrixCase(unittest.TestCase):
     def body_of(self, row: Row) -> bytes | None:
         if row.name == "account deletion":
             return json.dumps({"issuer": self.stack.issuer, "subject": SUBJECT, "reauthenticated_at": int(self.now) - 10}).encode()
+        if row.name == "recovery key removal":
+            body = {"issuer": self.stack.issuer, "subject": SUBJECT, "review_id": "a1b2c3d4e5", "approved_at": int(self.now) - 10}
+            return json.dumps(body).encode()
         return None if row.body is None else json.dumps(row.body).encode()
 
     def send(self, row: Row, authorization: str | None, headers: dict[str, str] | None = None) -> int:

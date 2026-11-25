@@ -125,6 +125,7 @@ Servis beş istemci listesi tutar. O-38 kararı yetkileri şöyle ayırır:
 - `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
 - `IDENTITY_SYNC_OPERATOR_AZP` listesi platform işlemlerini açar. Bu istemci mutabakatı ve kuyruk yeniden işletmesini yürütür. Kuyruk ve işlem listelerini yalnız bu istemci okuyabilir.
 - `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
+- Aynı istemci, onaylı kurtarmadan sonra eski anahtarları da silebilir. Bu yetki hesap silmeden daha dardır.
 
 İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
 
@@ -211,6 +212,23 @@ OpenAPI dosyasındaki özet ve açıklama metinleri İngilizcedir. Araçlar ve y
 ## Ayarlar
 
 Servis ayarları ve sırları ortam değişkeninden okur. Örnek değerler `.env.example` dosyasındadır. O dosyadaki bütün değerler sahtedir. Gerçek sırrı depoya yazmayın.
+
+## Kurtarmadan sonra eski anahtarın silinmesi
+
+Anahtarını kaybeden kullanıcı Press'te kurtarma ister. Hesap sahibi olmayan bir inceleyici isteği onaylar. Sonra Press `POST /v1/recovery-key-removals` ucunu çağırır (AJA-420).
+
+- Ucu yalnız Press çağırabilir. İzinli istemci `IDENTITY_SYNC_DELETION_AZP` ayarındadır.
+- Gövde `issuer`, `subject`, `review_id` ve `approved_at` alanlarını taşır. Başka alan gelirse yanıt 400 olur.
+- `approved_at` onayın zamanıdır. Birim Unix saniyesidir.
+- Servis yalnız güçlü anahtarları siler. Bunlar `webauthn-passwordless` ve `webauthn` türleridir.
+- Servis yalnız onaydan önce kurulan anahtarları siler. Kullanıcının sonra kurduğu anahtar kalır.
+- Parola, tek kullanımlık kodlar ve kurtarma kodları silinmez.
+- Servis en son kullanıcının bütün Keycloak oturumlarını kapatır.
+- Uç tekrar edilebilir. Zaten silinmiş anahtar silinmiş sayılır. Tekrarlanan çağrı `removed` değerini 0 döner.
+- Keycloak hata verirse yanıt 502 olur. Press kaydı "Removal Failed" yapar. İnceleyici ucu yeniden çağırabilir.
+- Günlük satırı yalnız inceleme kaydının adını yazar. Örnek: `execute operation=remove_recovery_keys azp=press-service request_id=<kayıt adı> outcome=done removed=2`.
+
+`tests.test_server.RecoveryKeyRemovalEndpointTest` ve `tests.test_keycloak_admin.RecoveryKeyRemovalTest` sınıfları bu kuralları sınar.
 
 ## Hesap silme
 
@@ -421,6 +439,7 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 | `POST /v1/sessions/revoke` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `GET /v1/login-providers` | 401 | 401 | 403 | 401 | 401 | 200, kendi listesi | 200 |
 | `POST /v1/linked-accounts` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/recovery-key-removals` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/account-deletions` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/events` | 401 | 401 | 401 | 401 | 401 | 401 | 202, imzayla |
 | `GET /healthz` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |

@@ -20,6 +20,8 @@ from identity_sync.tokens import TokenProvider
 PAGE_SIZE = 100
 INVITE_ACTIONS = ("UPDATE_PASSWORD", "CONFIGURE_TOTP")
 SITE_BACKCHANNEL_LOGOUT_PATH = "/api/method/platform_core.api.keycloak_backchannel_logout"
+# The two strong key types of Keycloak: a passkey and a hardware security key (AJA-420).
+STRONG_KEY_TYPES = ("webauthn-passwordless", "webauthn")
 
 
 @dataclass(frozen=True)
@@ -330,7 +332,70 @@ class KeycloakAdmin:
                 raise
             self._confirm_realm_answers()
 
+    def delete_credential(self, subject: str, credential_id: str) -> None:
+        """Delete one stored credential of the user. This cannot be undone.
+
+        Repeatable: a credential that is already gone counts as done. A 404 alone does not
+        prove that, because a wrong address answers 404 too, so the realm must answer.
+        """
+        try:
+            _expect(self._call("DELETE", f"/users/{_quote(subject)}/credentials/{_quote(credential_id)}"), 200, 204)
+        except HttpError as error:
+            if error.status != 404:
+                raise
+            self._confirm_realm_answers()
+
+    def logout_user(self, subject: str) -> None:
+        """End every Keycloak session of the user. Repeatable. A missing user counts as done."""
+        try:
+            _expect(self._call("POST", f"/users/{_quote(subject)}/logout"), 200, 204)
+        except HttpError as error:
+            if error.status != 404:
+                raise
+            self._confirm_realm_answers()
+
+    def list_strong_keys(self, subject: str, created_before_ms: int) -> list[str] | None:
+        """Ids of the user's strong keys set up before the given time, in milliseconds.
+
+        Only the passkey and the hardware key types count. The password, one-time codes and
+        recovery codes never appear. `None` means the user does not exist in Keycloak.
+        A key without a readable creation time is an error, so no key of unknown age is removed.
+        """
+        try:
+            rows = self.list_credentials(subject)
+        except HttpError as error:
+            if error.status != 404:
+                raise
+            self._confirm_realm_answers()
+            return None
+        keys: list[str] = []
+        for row in rows:
+            if row.get("type") not in STRONG_KEY_TYPES:
+                continue
+            created, credential_id = row.get("createdDate"), row.get("id")
+            if isinstance(created, bool) or not isinstance(created, int) or not isinstance(credential_id, str):
+                raise TransportError("unexpected Keycloak response")
+            if created < created_before_ms:
+                keys.append(credential_id)
+        return keys
+
     # --- composite operations: repeatable ---
+
+    def remove_recovery_keys(self, subject: str, approved_before_ms: int) -> int:
+        """Remove the old strong keys after an approved recovery, then end the sessions (AJA-420).
+
+        Only keys set up before the approval are removed, so a key the user sets up later stays.
+        Returns how many keys this call removed. A repeated call removes nothing more and succeeds.
+        A missing user has no keys and no sessions, so that counts as done too.
+        A failed step raises before the sessions end. The caller may call again.
+        """
+        keys = self.list_strong_keys(subject, approved_before_ms)
+        if keys is None:
+            return 0
+        for credential_id in keys:
+            self.delete_credential(subject, credential_id)
+        self.logout_user(subject)
+        return len(keys)
 
     def ensure_organization_member(
         self, alias: str, name: str, subject: str, organization_id: str | None
