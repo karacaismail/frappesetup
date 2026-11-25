@@ -24,6 +24,7 @@ from frappe import _
 from frappe.core.doctype.custom_docperm.custom_docperm import update_custom_docperm
 from frappe.core.doctype.doctype.doctype import validate_permissions_for_doctype
 from frappe.core.doctype.role.role import STANDARD_ROLES
+from frappe.modules.utils import get_module_app
 from frappe.permissions import add_permission, rights, setup_custom_perms
 from frappe.utils import cint
 
@@ -73,16 +74,36 @@ def ensure_role() -> None:
 	frappe.clear_cache()
 
 
+def _has_password(meta) -> bool:
+	"""A password field of the type or of one of its child tables."""
+	for field in meta.fields:
+		if field.fieldtype == "Password":
+			return True
+		if field.fieldtype in frappe.model.table_fields and field.options:
+			if any(child.fieldtype == "Password" for child in frappe.get_meta(field.options).fields):
+				return True
+	return False
+
+
 def grantable_type(doctype: str) -> bool:
-	"""A business type: not single, without a password field and outside the closed applications."""
+	"""A business type: not single, without a password field and outside the closed applications.
+
+	A type a System Manager made on the site (`custom`) belongs to no application and is open.
+	Any other type belongs to the application of its module. The dock placement of a module
+	(`Module Def.app_name`) is not used: it only says where a custom module is shown.
+	"""
 	if not doctype or not frappe.db.exists("DocType", doctype):
 		return False
 	meta = frappe.get_meta(doctype)
-	if meta.istable or meta.issingle or any(field.fieldtype == "Password" for field in meta.fields):
+	if meta.istable or meta.issingle or _has_password(meta):
 		return False
-	# The module list is system data (exception to G-3).
-	app = frappe.db.get_value("Module Def", meta.module, "app_name")
-	return bool(app) and app not in CLOSED_APPS
+	if meta.custom:
+		return True
+	try:
+		app = get_module_app(meta.module)
+	except frappe.DoesNotExistError:
+		return False
+	return app not in CLOSED_APPS
 
 
 def grantable_role(role: str) -> bool:
@@ -132,19 +153,24 @@ def _child_roles(doc) -> set[str]:
 
 
 def guard_role(doc, method=None, *args, **kwargs) -> None:
-	"""A standard role and this role are not changed, renamed or deleted. A role does not get desk access."""
+	"""Only a plain role is made, changed, renamed or deleted. A role does not get desk access.
+
+	A desk role is not plain. Turning its desk access or 2FA off, or disabling it, would hit
+	every user of the role, a System Manager too.
+	"""
 	if _trusted():
 		return
 	# `before_rename` passes the old and the new name.
 	names = {doc.name, doc.get("role_name"), *(arg for arg in args if isinstance(arg, str))}
 	if names & PROTECTED_ROLES:
 		_deny(_protected_message())
-	for name in names & CLOSED_ROLES:
+	for name in sorted(names & CLOSED_ROLES):
 		_deny(_role_message(name))
+	before = _before(doc)
+	if before is not None and before.desk_access:
+		_deny(_role_message(before.name))
 	if method == "before_validate" and doc.desk_access:
-		before = _before(doc)
-		if before is None or not before.desk_access:
-			_deny(_("Only a System Manager can give a role desk access."))
+		_deny(_("Only a System Manager can give a role desk access."))
 
 
 def guard_role_profile(doc, method=None, *args, **kwargs) -> None:
@@ -226,6 +252,8 @@ def guard_user(doc, method=None, *args, **kwargs) -> None:
 	for role in sorted(new - old):
 		if not grantable_role(role):
 			_deny(_role_message(role))
+	for role in sorted((old - new) & CLOSED_ROLES):
+		_deny(_role_message(role))
 	if before is not None and doc.name == "Administrator":
 		_deny(_protected_message())
 
@@ -260,6 +288,8 @@ def list_role_permissions(doctype: str) -> dict:
 	"""The permission rows of a type. Stored rows win over the standard rows of the type."""
 	require_manager()
 	_require_type(doctype)
+	if not _trusted() and not grantable_type(doctype):
+		_deny(_("Only a System Manager can change the permissions of {0}.").format(doctype))
 	stored = frappe.db.exists("Custom DocPerm", {"parent": doctype})
 	# The permission rows are system data of the type (exception to G-3).
 	rows = frappe.get_all(
@@ -347,7 +377,7 @@ class GuardedRoleProfile:
 	Frappe saves each user of the profile as the session user. A “Tenant Admin” has no write
 	permission on users, so the save would fail. The user's roles change only through the
 	profile, so the save skips the permission check. `guard_user` still runs on each save.
-	A user who holds a protected role is skipped: the sync would take that role away.
+	A user who holds a role that is not plain is skipped: the sync would take that role away.
 	"""
 
 	def update_all_users(self):
@@ -357,9 +387,18 @@ class GuardedRoleProfile:
 		users = frappe.get_all(
 			"User Role Profile", filters={"role_profile": self.name}, pluck="parent", limit=0
 		)
+		skipped = []
 		for name in users:
-			if name == "Administrator" or set(frappe.get_roles(name)) & PROTECTED_ROLES:
-				continue
 			user = frappe.get_doc("User", name)
+			# The sync drops every role outside the profile. A role that is not plain stays.
+			if name == "Administrator" or any(not grantable_role(row.role) for row in user.roles):
+				skipped.append(name)
+				continue
 			user.flags.ignore_permissions = True
 			user.save()
+		if skipped:
+			frappe.logger("platform_core.access").info(
+				"Role Profile %s: %s users kept their roles; a System Manager saves them.",
+				self.name,
+				len(skipped),
+			)

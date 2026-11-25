@@ -1105,18 +1105,20 @@ Rol sahibi “System Manager” ve “Administrator” rollerini kimseye veremez
 4. Bu iki role erişim kuralı yazamaz.
 5. Bu iki rolden birini taşıyan kullanıcıya kullanıcı izni yazamaz.
 6. Bir role masa erişimi veremez. Masa erişimi kullanıcıyı System User yapar. O zaman panelin uç listesi devreden çıkar.
-7. Yalnız iş türlerine izin satırı yazabilir. Örneğin ERPNext ve HRMS türleri iş türüdür.
+7. Yalnız iş türlerine izin satırı yazabilir. Örneğin ERPNext ve HRMS türleri iş türüdür. System Manager'ın sitede açtığı özel türler de iş türüdür.
 8. Frappe ve `platform_core` türlerine izin satırı yazamaz. Bu türlerde betik, giriş, belirteç ve ayar kayıtları vardır. Örneğin “Client Script” ve “OAuth Bearer Token” bu türlerdendir. Bu kayıtlar rol sahibini System Manager gücüne taşıyabilirdi.
-9. Tek kayıtlı ayar türlerine ve parola alanı olan türlere de izin satırı yazamaz.
+9. Tek kayıtlı ayar türlerine ve parola alanı olan türlere de izin satırı yazamaz. Alt tablodaki parola alanı da sayılır.
 10. Standart rollere izin satırı yazamaz. Standart roller “Administrator”, “System Manager”, “Script Manager”, “All” ve “Guest” rolleridir.
 11. Kullanıcıya ve rol profiline yalnız sade rol verebilir. Masa rolü, standart rol ve “Tenant Admin” rolü sade rol değildir.
-12. Kendi rolünü değiştiremez, kapatamaz ve silemez.
+12. Yalnız sade rolü değiştirebilir ve silebilir. Kendi rolünü ve masa rollerini değiştiremez. Örneğin bir masa rolünü kapatamaz.
+13. Kullanıcıdan standart rolü ve “Tenant Admin” rolünü alamaz.
+14. Kapalı türlerin izin satırlarını listeleyemez.
 
 Bu denetimler “System Manager” rolü olmayan herkes için çalışır. Kurulum ve göç bu denetimlere girmez.
 
 ### Rol profili değişince
 
-Rol sahibi bir profili değiştirince profilin kullanıcıları da güncellenir. Frappe bu kayıtları rol sahibinin adıyla saklar. Rol sahibinin kullanıcı yazma izni yoktur. Bu yüzden `GuardedRoleProfile` sınıfı kullanıcıları izin denetimi olmadan saklar. Kullanıcı denetimi yine çalışır. System Manager rolü olan kullanıcı atlanır. Yoksa profil eşitlemesi bu kullanıcının rolünü silerdi.
+Rol sahibi bir profili değiştirince profilin kullanıcıları da güncellenir. Frappe bu kayıtları rol sahibinin adıyla saklar. Rol sahibinin kullanıcı yazma izni yoktur. Bu yüzden `GuardedRoleProfile` sınıfı kullanıcıları izin denetimi olmadan saklar. Kullanıcı denetimi yine çalışır. Sade olmayan bir rolü taşıyan kullanıcı atlanır. Örneğin System Manager kullanıcısı atlanır. Yoksa profil eşitlemesi bu rolü silerdi. Atlanan kullanıcı sayısı günlüğe yazılır. Bu kullanıcıları System Manager kaydeder.
 
 ### Göç ve saklı izin satırları
 
