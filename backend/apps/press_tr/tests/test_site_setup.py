@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -66,6 +67,18 @@ def patch_function(text, name):
 		if inside:
 			lines.append(line[1:])
 	return "\n".join(lines).rstrip() + "\n"
+
+
+def load_patch_function(text, name, frappe):
+	"""Write a patch function to a temporary module and import it."""
+	with tempfile.TemporaryDirectory() as folder:
+		path = Path(folder) / f"{name}_patch.py"
+		path.write_text("import frappe\n\n" + patch_function(text, name), encoding="utf-8")
+		spec = importlib.util.spec_from_file_location(f"{name}_patch", path)
+		module = importlib.util.module_from_spec(spec)
+		with patch.dict(sys.modules, {"frappe": frappe}):
+			spec.loader.exec_module(module)
+	return getattr(module, name)
 
 
 class FakePress:
@@ -142,9 +155,7 @@ class TestSiteActivationPatch(unittest.TestCase):
 		):
 			spec.loader.exec_module(module)
 		press.site_class = module.SetupSite
-		namespace = {"frappe": press.frappe}
-		exec(patch_function(self.patch_text, "queue_setup_wizard"), namespace)
-		return press, namespace["queue_setup_wizard"]
+		return press, load_patch_function(self.patch_text, "queue_setup_wizard", press.frappe)
 
 	def test_active_site_sends_setup_wizard_to_the_agent_once(self):
 		press, queue_setup_wizard = self.load()
