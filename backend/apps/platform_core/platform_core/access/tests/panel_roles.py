@@ -14,7 +14,7 @@ Every holder is a "Website User". No role and no profile holds "System Manager".
 
 Two kinds of tests use this file:
 
-1. Fixture tests read `fixtures/*.json` and `hooks.py` only. They run without Frappe:
+1. Setup tests read `setup/*.json`, `fixtures/*.json` and `hooks.py` only. They run without Frappe:
    `python3 -I -m unittest discover -s backend/apps/platform_core/platform_core/access/tests
    -t backend/apps/platform_core -p 'test_role_*.py'`
 2. HTTP tests send requests through the WSGI application of Frappe (D-6). They run with
@@ -53,6 +53,9 @@ except ImportError:  # The fixture tests also run without Frappe.
 
 APP_DIR = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = APP_DIR / "fixtures"
+# AJA-899: the panel roles and profiles are not fixtures. The setup step opens the missing ones.
+SETUP_DIR = APP_DIR / "setup"
+SETUP_HOOK = "platform_core.setup.panel_roles.ensure"
 HOOKS_FILE = APP_DIR / "hooks.py"
 
 TENANT_ADMIN = "Tenant Admin"
@@ -82,23 +85,32 @@ UNKNOWN_CUSTOMER = "olmayan-musteri.example.test"
 # --- fixture files, read without Frappe ---
 
 
-def load_fixture(name: str) -> list[dict]:
-	path = FIXTURES_DIR / name
+def load_fixture(name: str, folder: Path = FIXTURES_DIR) -> list[dict]:
+	path = folder / name
 	if not path.exists():
 		return []
 	return json.loads(path.read_text(encoding="utf-8"))
 
 
-def hook_fixtures() -> list:
-	"""The literal value of `fixtures` in `hooks.py`. The last assignment wins, as in Python."""
+def load_setup(name: str) -> list[dict]:
+	"""A data file of the setup step: `setup/role.json` or `setup/role_profile.json`."""
+	return load_fixture(name, SETUP_DIR)
+
+
+def hook_value(name: str) -> list:
+	"""The literal value of a list in `hooks.py`. The last assignment wins, as in Python."""
 	tree = ast.parse(HOOKS_FILE.read_text(encoding="utf-8"))
 	value = []
 	for node in tree.body:
 		if isinstance(node, ast.Assign) and any(
-			isinstance(target, ast.Name) and target.id == "fixtures" for target in node.targets
+			isinstance(target, ast.Name) and target.id == name for target in node.targets
 		):
 			value = ast.literal_eval(node.value)
 	return value
+
+
+def hook_fixtures() -> list:
+	return hook_value("fixtures")
 
 
 def filter_matches(filters, name: str) -> bool:
@@ -135,48 +147,61 @@ def hook_exports(doctype: str, name: str) -> bool:
 
 
 class RoleFixtureContract:
-	"""Fixture tests of one panel role. A subclass sets `ROLE`. No Frappe is needed."""
+	"""Setup tests of one panel role. A subclass sets `ROLE`. No Frappe is needed.
+
+	AJA-899: Frappe loads every file of `fixtures/` on each migrate and rewrites the record.
+	A Role Profile write then leaves a lock (AJA-857). The roles and profiles are therefore
+	set up by `platform_core.setup.panel_roles.ensure`, which opens only a missing record.
+	"""
 
 	ROLE = ""
 
 	def role_record(self) -> dict | None:
-		return next((row for row in load_fixture("role.json") if row.get("name") == self.ROLE), None)
+		return next((row for row in load_setup("role.json") if row.get("name") == self.ROLE), None)
 
 	def profile_record(self) -> dict | None:
-		return next((row for row in load_fixture("role_profile.json") if row.get("name") == self.ROLE), None)
+		return next((row for row in load_setup("role_profile.json") if row.get("name") == self.ROLE), None)
 
-	def test_role_is_a_fixture_without_desk_access(self):
+	def test_role_is_set_up_without_desk_access(self):
 		record = self.role_record()
-		self.assertIsNotNone(record, f"fixtures/role.json has no {self.ROLE!r} role")
+		self.assertIsNotNone(record, f"setup/role.json has no {self.ROLE!r} role")
 		self.assertEqual(record.get("role_name"), self.ROLE)
 		# A role without desk access keeps its holder a Website User.
 		self.assertEqual(record.get("desk_access"), 0)
-		self.assertTrue(hook_exports("Role", self.ROLE), f"hooks.py fixtures do not export {self.ROLE!r}")
 
-	def test_role_profile_is_a_fixture_with_only_its_own_role(self):
+	def test_role_and_profile_are_not_fixtures(self):
+		self.assertFalse(hook_exports("Role", self.ROLE), f"hooks.py fixtures export {self.ROLE!r}")
+		self.assertFalse(hook_exports("Role Profile", self.ROLE), f"hooks.py fixtures export the {self.ROLE!r} profile")
+		# Frappe loads every file of `fixtures/`, not only the exported ones.
+		for name in ("role.json", "role_profile.json"):
+			names = {row.get("name") for row in load_fixture(name)}
+			self.assertNotIn(self.ROLE, names, f"fixtures/{name} still holds {self.ROLE!r}")
+
+	def test_setup_step_runs_after_install_and_after_migrate(self):
+		for hook in ("after_install", "after_migrate"):
+			self.assertIn(SETUP_HOOK, hook_value(hook), hook)
+
+	def test_role_profile_is_set_up_with_only_its_own_role(self):
 		record = self.profile_record()
-		self.assertIsNotNone(record, f"fixtures/role_profile.json has no {self.ROLE!r} profile")
+		self.assertIsNotNone(record, f"setup/role_profile.json has no {self.ROLE!r} profile")
 		self.assertEqual(record.get("role_profile"), self.ROLE)
 		self.assertEqual([row.get("role") for row in record.get("roles", [])], [self.ROLE])
-		self.assertTrue(
-			hook_exports("Role Profile", self.ROLE),
-			f"hooks.py fixtures do not export the {self.ROLE!r} profile",
-		)
 
 	def test_no_system_manager_in_the_role_or_the_profile(self):
 		record = self.profile_record()
 		# A missing profile must not pass as a profile without “System Manager”.
-		self.assertIsNotNone(record, f"fixtures/role_profile.json has no {self.ROLE!r} profile")
-		self.assertIsNotNone(self.role_record(), f"fixtures/role.json has no {self.ROLE!r} role")
+		self.assertIsNotNone(record, f"setup/role_profile.json has no {self.ROLE!r} profile")
+		self.assertIsNotNone(self.role_record(), f"setup/role.json has no {self.ROLE!r} role")
 		roles = {row.get("role") for row in record.get("roles", [])}
 		for protected in PROTECTED_ROLES:
 			self.assertNotIn(protected, roles)
 		self.assertNotIn(self.ROLE, PROTECTED_ROLES)
-		# No panel profile may hold a protected role, not only this one.
-		for profile in load_fixture("role_profile.json"):
-			if profile.get("name") in PANEL_ROLES:
-				held = {row.get("role") for row in profile.get("roles", [])}
-				self.assertFalse(held & set(PROTECTED_ROLES), profile.get("name"))
+		# No role and no profile of the setup step may hold or be a protected role.
+		for role in load_setup("role.json"):
+			self.assertNotIn(role.get("name"), PROTECTED_ROLES)
+		for profile in load_setup("role_profile.json"):
+			held = {row.get("role") for row in profile.get("roles", [])}
+			self.assertFalse(held & set(PROTECTED_ROLES), profile.get("name"))
 
 
 # --- HTTP tests through the WSGI application of Frappe ---

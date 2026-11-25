@@ -125,15 +125,21 @@ class TestResellerEndpoints(unittest.TestCase):
 		# The operator works in Desk. Its endpoint stays off the Website User list.
 		self.assertNotIn("platform_core.api.reseller.approve_customer_request", allowed)
 
-	def test_platform_operator_is_a_desk_role_fixture(self):
-		roles = json.loads((APP_DIR / "fixtures" / "role.json").read_text(encoding="utf-8"))
+	def test_platform_operator_is_a_desk_role_of_the_setup_step(self):
+		# AJA-899: the role is not a fixture. The setup step opens it only when it is missing.
+		roles = json.loads((APP_DIR / "setup" / "role.json").read_text(encoding="utf-8"))
 		record = next((row for row in roles if row.get("name") == OPERATOR), None)
-		self.assertIsNotNone(record, "fixtures/role.json has no Platform Operator role")
+		self.assertIsNotNone(record, "setup/role.json has no Platform Operator role")
 		self.assertEqual(record.get("desk_access"), 1)
-		exported = next(entry for entry in hook_value("fixtures") if entry.get("dt") == "Role")
-		self.assertIn(OPERATOR, exported["filters"][0][2])
+		for entry in hook_value("fixtures"):
+			if isinstance(entry, dict) and entry.get("dt") == "Role":
+				self.assertNotIn(OPERATOR, json.dumps(entry.get("filters")))
+		fixture = APP_DIR / "fixtures" / "role.json"
+		if fixture.exists():
+			names = {row.get("name") for row in json.loads(fixture.read_text(encoding="utf-8"))}
+			self.assertNotIn(OPERATOR, names)
 		# No panel profile holds the operator role.
-		profiles = json.loads((APP_DIR / "fixtures" / "role_profile.json").read_text(encoding="utf-8"))
+		profiles = json.loads((APP_DIR / "setup" / "role_profile.json").read_text(encoding="utf-8"))
 		for profile in profiles:
 			self.assertNotIn(OPERATOR, {row.get("role") for row in profile.get("roles", [])})
 

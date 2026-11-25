@@ -155,29 +155,32 @@ class TestTenantAdmin(IntegrationTestCase):
 	# --- installation ---
 
 	def test_role_is_set_up_on_install_and_migrate(self):
-		# The role is a fixture. Frappe syncs fixtures after `after_install` and before `after_migrate`,
-		# so the permission rows are set from `after_sync` and `after_migrate`.
+		# AJA-899: the setup step opens the role when it is missing. The permission rows follow.
+		setup = "platform_core.setup.panel_roles.ensure"
 		hook = "platform_core.access.tenant_admin.ensure_permissions"
-		self.assertIn(hook, frappe.get_hooks("after_sync"))
-		self.assertIn(hook, frappe.get_hooks("after_migrate"))
-		self.assertNotIn(hook, frappe.get_hooks("after_install"))
+		for name in ("after_install", "after_migrate"):
+			hooks = frappe.get_hooks(name)
+			self.assertIn(setup, hooks, name)
+			self.assertIn(hook, hooks, name)
+			self.assertLess(hooks.index(setup), hooks.index(hook), name)
 		self.assertTrue(frappe.db.exists("Role", tenant_admin.ROLE))
 		# The panel's users stay Website Users. A desk role would make them System Users.
 		self.assertEqual(frappe.db.get_value("Role", tenant_admin.ROLE, "desk_access"), 0)
 
-	def test_role_is_defined_only_in_the_fixture(self):
-		# AJA-887: one definition. The role fixture holds the role, no hook opens it again.
+	def test_role_is_defined_only_in_the_setup_step(self):
+		# One definition: `setup/role.json`. Neither a fixture nor this module opens the role.
 		self.assertFalse(hasattr(tenant_admin, "ensure_role"))
-		for hooks in ("after_install", "after_sync", "after_migrate"):
-			self.assertNotIn("platform_core.access.tenant_admin.ensure_role", frappe.get_hooks(hooks))
 		self.assertNotIn('doctype="Role"', inspect.getsource(tenant_admin))
 		fixture = Path(frappe.get_app_path("platform_core", "fixtures", "role.json"))
-		rows = [row for row in json.loads(fixture.read_text()) if row["name"] == tenant_admin.ROLE]
+		fixture_rows = json.loads(fixture.read_text()) if fixture.exists() else []
+		self.assertNotIn(tenant_admin.ROLE, {row["name"] for row in fixture_rows})
+		setup = Path(frappe.get_app_path("platform_core", "setup", "role.json"))
+		rows = [row for row in json.loads(setup.read_text()) if row["name"] == tenant_admin.ROLE]
 		self.assertEqual(len(rows), 1)
 		self.assertEqual(rows[0]["desk_access"], 0)
 
 	def test_permission_rows_wait_for_the_role(self):
-		# A migrate with skipped fixtures has no role yet. The function then writes nothing.
+		# Without the role the function writes nothing.
 		exists = frappe.db.exists
 
 		def no_role(doctype, *args, **kwargs):
