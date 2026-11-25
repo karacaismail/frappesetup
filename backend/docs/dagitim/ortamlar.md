@@ -70,7 +70,7 @@ Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bild
 2. Giriş adresi `api.login.<ortam tabanı>` biçimindedir. Bu biçim öteki adların kuralını korur. Eski `id.` adları kalkar. Ürün canlıda olmadığı için yönlendirme gerekmez (O-51).
 3. Kiracı adları karar sitesindeki K-2 biçimini korur. K-2'de kiracılar `<kiracı>.app.<marka>` biçimindedir.
 4. Panel her kiracının kendi adresinde `/panel` yolundadır. Ayrı bir `panel.` adı açılmaz. Nedeni şudur: panel Frappe çerezini ve CSRF belirtecini aynı kökten okur (SZ-7). CSRF belirteci, sahte istekleri engelleyen tek kullanımlık koddur.
-5. `press.` adı DNS'te geneldir. Kenar vekil bu adı yalnız Tailscale ağına tam açar. Müşteri yalnız hesap silme akışının yollarına ulaşır. Öteki her istek 404 alır. Yol listesi O-55 kararındadır. Bu kural G-6, G-13 ve G-119 ile uyumludur.
+5. `press.` adı DNS'te geneldir. Kenar vekil bu adı yalnız Tailscale ağına tam açar. Müşteri yalnız hesap silme akışının yollarına ve hesap kurtarma isteğine ulaşır. Öteki her istek 404 alır. Yol listesi O-55 kararındadır. Bu kural G-6, G-13 ve G-119 ile uyumludur.
 6. Prod temel adı `atonota.net` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
 
 Bir kural daha geçerlidir. Hiçbir servis `Domain=atonota.net` çerezi yazmaz. Yazarsa prod çerezi alpha'ya da gider. Frappe ve Keycloak çerezleri yalnız kendi adlarında geçerlidir.
@@ -521,7 +521,9 @@ Jenkins sırları görmez. Bu yüzden denetimi sunucudaki `remote/apply` betiği
 4. Betik yeni kiracı imajıyla her sitenin `site_config.json` dosyasını okur. Bunu `remote/site-probe.py` yapar.
 5. Bir site ayarı eksikse ya da `[sabit]` değerden farklıysa betik durur. Eski sürüm durdurulmaz ve çalışmaya devam eder.
 
-Site ayarlarında iki `[sabit]` değer vardır: `developer_mode` ve `mobile_allow_development_http`. İkisi de üretimde yazılmaz ya da 0 olur. Değer 1 olursa bazı yollar HTTP adresi kabul eder.
+Üretimde dört ayar kapalı kalır. Bunlar `developer_mode`, `mobile_allow_development_http`, `server_script_enabled` ve `allow_tests` ayarlarıdır. Ayarları hiç eklemeyin veya sayı olarak `0` yazın. Sunucu betikleri için bu kural ortak bench ayarına da uygulanır. Ortak bench ayarı, aynı kurulumu paylaşan siteleri etkiler. Frappe bazı denetimlerde metin olarak yazılan `"0"` değerini açık sayar.
+
+Kiracı uygulaması, geliştirme kipi kapalıyken sistem konsolu isteklerini reddeder. Test izni kapalıyken uygulama test modüllerine giden istekleri reddeder.
 
 Site denetimi imajın giriş betiğini çalıştırmaz. Giriş betiği ortak birimdeki `assets` bağını yeniden kurar. Eski sürüm o birimi kullanır.
 

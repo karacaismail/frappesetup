@@ -14,12 +14,6 @@ Bu bölüm, önceki bölümlerde ray ray gerekçelendirilen tüm gereksinimleri 
 - **Güven:** "(doğrulandı)" = Press/Frappe/Keycloak kaynak kodunda, resmi dokümanda veya sürüm notunda teyit edildi ve [kaynak defterinde](/frappesetup/izlenebilirlik/#kaynak-defteri) sürüm/commit ile kayıtlıdır (G-128); "(doğrulanacak)" = olası veya hukuk/mali müşavir/kurulum teyidi bekleyen iddia.
 - **Faz:** gereksinimin kabulünün ilk kanıtlanması gereken fazdır; sonraki fazdaki genişleme ayrıntıda yazılır. Faz hedefleri ve çıkış ölçütleri [yol haritasındadır](/frappesetup/yol-haritasi/).
 
-## Dağılım özeti
-
-Sayılar derleme anında `requirements.json` dosyasından hesaplanır.
-
-<div data-embed="req-summary"></div>
-
 ## Görev panosu kuralları
 
 Yukarıdaki pano her gereksinimi bir görev olarak gösterir. Gereksinim kaydı değişmez. Görevin durumu, olgunluk düzeyi ve epiği ayrı bir dosyadadır. Bu dosya `src/data/task-board.json` dosyasıdır. Aşağıdaki tablolar bu dosyadan derleme anında üretilir.

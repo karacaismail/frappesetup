@@ -384,6 +384,25 @@ Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/session
 - Yeni kiracı eklerken istemcisini bu listeye de yazın. Yazmazsanız o kiracı oturum kapatamaz.
 - Bu istemciler öteki uçları çağıramaz.
 
+## AtonotA Login okumaları
+
+Kiracı sitesi bu iki ucu giriş ekranı ve hesap sayfası için çağırır (AJA-459).
+
+1. `GET /v1/login-providers` giriş platformlarını listeler. İstek kişi adlandırmaz.
+2. `POST /v1/linked-accounts` bir üyenin bağlı platformlarını listeler. Gövde `{"subject": "..."}` biçimindedir.
+
+Kurallar şunlardır:
+
+- Yalnız kiracı sitesinin servis istemcisi çağırabilir. Liste `IDENTITY_SYNC_SESSION_AZP` ayarıdır.
+- Servis kiracıyı belirtecin `azp` değerinden bulur. Gövde kiracıyı seçemez.
+- Liste genel platformları ve kiracının kendi kurumsal platformunu taşır.
+- Sırrı olmayan, kapalı ya da gizli genel platform listeye girmez.
+- Yanıt yalnız `alias`, `display_name`, `linked` ve yerel giriş sayısını taşır.
+- Servis platform listesini 30 saniye tutar. Bağlı hesap listesini hiç tutmaz.
+- Kayıt yalnız uç adını, `azp` değerini ve sonucu yazar.
+
+Servis bu iş için Keycloak'ta `view-identity-providers` rolünü taşır.
+
 ## Yetki tablosu
 
 Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_matrix.py` dosyası gerçek HTTP girişinden sınar. Reddedilen hiçbir çağıran hedefe yazmaz. Test bunu da denetler.
@@ -400,6 +419,8 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 | `POST /v1/invitations`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/invitations`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
 | `POST /v1/sessions/revoke` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `GET /v1/login-providers` | 401 | 401 | 403 | 401 | 401 | 200, kendi listesi | 200 |
+| `POST /v1/linked-accounts` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/account-deletions` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/events` | 401 | 401 | 401 | 401 | 401 | 401 | 202, imzayla |
 | `GET /healthz` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
@@ -410,6 +431,8 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 - Yanlış `aud` ve süresi dolmuş belirteç sütunları gerçek `oidc_verify` kitaplığını ister. Kitaplık yoksa bu iki sütunun testi atlanır.
 - Olay ucu belirteç kabul etmez. Yalnız imzayı kabul eder. Bozuk imza, eski zaman damgası ve ikinci kez kullanılan imza 401 alır.
 - Sağlık ucu kimlik istemez. Yanıt yalnız servisin ayakta olduğunu söyler.
+- Platform listesi ucunda her kiracı kendi listesini alır. Başka kiracının istemcisi de 200 alır. Ama yanıtta yalnız o kiracının platformları olur. Başka kiracının kurumsal platformu yanıta girmez.
+- Bağlı hesap ucunda kişi çağıran kiracının üyesi olmalıdır. Üye değilse ya da kişi yoksa yanıt 403 olur.
 - Mutabakat, kuyruk yeniden işletme ve işlem listesi bütün platformu kapsar. Bu yüzden tek kiracıya bağlı değildir. Bu uçlar yalnız operatör listesindeki istemciye açıktır. Kiracı ve önizleme istemcileri 403 alır.
 
 ## İstek sınırı

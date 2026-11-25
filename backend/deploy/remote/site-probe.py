@@ -42,6 +42,18 @@ def same(value, expected):
     return type(value) is type(wanted) and value == wanted
 
 
+def differs(key, expected, merged, common):
+    if key in ("developer_mode", "server_script_enabled", "allow_tests"):
+        # Frappe treats non-empty strings as enabled in some settings checks.
+        # Server scripts also read bench config directly, ignoring the site override.
+        configs = (common, merged) if key == "server_script_enabled" else (merged,)
+        return any(
+            key in config and (bool(config[key]) or not same(config[key], expected))
+            for config in configs
+        )
+    return key in merged and is_set(merged[key]) and not same(merged[key], expected)
+
+
 common = read(os.path.join(root, "common_site_config.json"))
 found = {}
 for site in sys.argv[3:]:
@@ -51,6 +63,6 @@ for site in sys.argv[3:]:
         found[site] = {
             "set": sorted(key for key, value in merged.items() if is_set(value)),
             "differs": sorted(key for key, expected in fixed.items()
-                              if key in merged and is_set(merged[key]) and not same(merged[key], expected)),
+                              if differs(key, expected, merged, common)),
         }
 print(json.dumps(found, sort_keys=True))

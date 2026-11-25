@@ -73,6 +73,10 @@ ROWS = (
     Row("invitation preview", "POST", "/v1/invitations", {**INVITATION, "dry_run": True}, SITE, 200, PRESS, 403),
     Row("invitation execute", "POST", "/v1/invitations", {**INVITATION, **STALE}, SITE, 409, AGENT, 403),
     Row("session revoke", "POST", "/v1/sessions/revoke", {"sid": SID, "subject": SUBJECT}, SITE, 200, AGENT, 403),
+    # AtonotA Login reads (AJA-459). Each tenant reads its own platform list, so the other tenant gets 200.
+    Row("login providers", "GET", "/v1/login-providers", None, SITE, 200, AGENT, 200),
+    Row("linked accounts", "POST", "/v1/linked-accounts", {"subject": SUBJECT}, SITE, 200, AGENT, 403),
+    # Last: the right client of this row deletes the sample user that the rows above read.
     Row("account deletion", "POST", "/v1/account-deletions", None, PRESS, 200, SITE, 403),
 )
 

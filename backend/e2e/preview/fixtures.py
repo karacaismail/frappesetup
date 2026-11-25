@@ -19,7 +19,15 @@ else:
 
 LOGIN_EMAIL = "e2e-user@example.test"
 SYNC_CLIENT = "e2e-sync-fixture"
-SYNC_ROLES = ("view-users", "query-users", "manage-users", "view-organizations", "manage-organizations")
+SYNC_ROLES = (
+    "view-users",
+    "query-users",
+    "manage-users",
+    "view-organizations",
+    "manage-organizations",
+    # AJA-459: the AtonotA Login platform list. manage-identity-providers is not given.
+    "view-identity-providers",
+)
 BENCH = "/home/frappe/frappe-bench"
 PRESS_BENCH = "/home/frappe/benches/frappe-bench"
 DOCKER_PATH = shutil.which("docker")

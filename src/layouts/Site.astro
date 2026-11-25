@@ -64,6 +64,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
         #site-nav .nav-wrapper-panel[hidden] { display: block; }
       </style>
     </noscript>
+    <slot name="head" />
   </head>
   <body>
     <Shell

@@ -373,7 +373,8 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
     4. `press_tr.api.auth.keycloak_callback` Keycloak'tan dönüşü karşılar.
     5. `press_tr.api.keycloak_backchannel_logout` Keycloak'ın oturum kapatma bildirimini alır. Bildirim imzalıdır. Keycloak bu bildirimi genel adresten gönderir.
     6. `press_tr.api.account.request_deletion` silme isteğini alır.
-  - Üç API yolu `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
+    7. `press_tr.api.account.request_recovery` hesap kurtarma isteğini alır (G-163). Bu yol 24 Kasım 2026 Salı günü eklendi. Gerekçe şudur. Anahtarını kaybeden kişi giriş yapamaz ve Tailscale ağında değildir. Yol kapalı kalırsa kurtarma akışı başlayamaz. Yöntem yalnız POST kabul eder. Bir adresten saatte en çok 5 istek gelebilir. Yöntem yalnız e-posta adresi alır ve her adrese aynı yanıtı verir. Yöntem yalnız bir inceleme kaydı açar. Anahtar değiştirmez, oturum açmaz, bağlantı göndermez. Bu sınırın IPv6 için bir açığı var. Caddy, IPv6 ile gelen kişiyi Docker ağ geçidi adresinden görür. Bu yüzden bütün IPv6 kullanıcıları aynı 5 isteklik sınırı paylaşır. Bir saldırgan bu 5 isteği harcarsa IPv6 kullanıcıları bir saat kurtarma isteği gönderemez. Bu açığı `docs/decisions/0003-keycloak-extensions.md` dosyası da yazar. Düzeltme bu kararın parçası değildir. Düzeltme ayrı bir altyapı işidir. DevOps sorumlusu bu işi AJA-507 görevinde yapar.
+  - API yolları `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
   - Öteki bütün yollar yalnız Tailscale adreslerinden açılır. Örneğin `/app`, `/desk`, `/dashboard` ve `/api/resource/` böyledir. Tailscale adresleri `100.64.0.0/10` ve `fd7a:115c:a1e0::/48` aralıklarıdır. Başka istek 404 alır.
   - Yerel ağ aralıkları özel sayılmaz. Gerekçe şudur. Docker, IPv6 ile gelen genel isteği `172.16.0.0/12` içinden bir adresle gösterebilir.
   - Tailscale dışından gelen istekte iki ek ret vardır. Birincisi `cmd` sorgu alanıdır. Frappe 16 `cmd` alanını yoldan önce işler. Bu alan açık bir yoldan her yönteme ulaşırdı. İkincisi ham yoldaki `..`, `//`, `%2e`, `%2f` ve `%5c` dizileridir.
@@ -404,6 +405,23 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Üç parça ürün klasöründe Frappe kullanmadan yazıldı. Bunlar işlem kararı (G-161), değer bekleyen kurallar (G-167) ve dış doğrulama gelen kutusudur (G-164). Frappe bağlantısı ilgili klasörlerin sahiplerine devredildi. Borç tablosunda yazılıdır.
   - Tanıtım sayfası (G-165) site işidir. Bu iş site dosyalarına dokunmadı.
   - Bu karar önce O-54 numarasını taşıyordu. O-54 ve O-55 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-56 oldu.
+
+- **O-57. Press'e gidecek öneri depoda hazırdır ve gönderilmez.** Karar 23 Kasım 2026 Pazartesi günü alındı.
+  - Öneri `docs/upstream/press-python314/` klasöründedir. Klasörde bir yama dizisi ve İngilizce PR metni vardır.
+  - Yama dizisi üç kaynak engelini kaldırır. Bunlar `TypedDict`, telemetri ve çerez import'udur.
+  - Bağımlılık sürümleri ve Telegram öneriye girmez. Her sürüm değişikliği ayrı tartışma ister. Press'in `develop` dalı Telegram'ı kendisi çözdü.
+  - `CommandOutput` önerisi sınıf biçimini kullanır. Press, ruff `UP` kurallarını açık tutar. Bu kurallar sözlük biçimini de sınıf biçimine çevirir. Üretim imajındaki `0001` yaması sözlük biçiminde kalır. İki biçim aynı alanları ve türleri tanımlar.
+  - Öneri üç ayrı commit taşır. Press'in commit kuralı her commit'e kapsam adı ister.
+  - Gönderim dış bir depoya yazar. Gönderim proje sahibinin hesabını ve onayını ister. Ajanlar öneriyi göndermez.
+  - Gönderim adımları [devir notundadır](docs/handoff/press-upstream-proposal.md).
+  - Bu karar önce O-55 numarasını taşıyordu. O-55 ve O-56 numaraları başka kararlara verildi. Karar 23 Kasım 2026 Pazartesi günü O-57 oldu.
+
+- **O-62. Press TR test paketi Press çekirdek dosyalarını karşılaştırır.**
+  - Test, yerel koşudan önce ve sonra dosyaları karşılaştırır.
+  - Test, dosya eklenirse, silinirse veya değişirse başarısız olur.
+  - Test, kurulumda uygulanmış uyum yamalarını ilk ölçüme dahil eder.
+  - Eklerin listesi ve test adımları [devir notundadır](docs/handoff/press-tr-extension-test.md).
+  - Bu karar önce O-54 numarasını taşıyordu. O-54 ile O-61 arasındaki numaralar başka kararlara verildi. Karar 25 Kasım 2026 Çarşamba günü O-62 oldu.
 
 ## Karar sitesine işlenecek farklar
 
@@ -458,7 +476,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
-| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18). Üretim imajı da beş yamayla derlenir (O-52) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Üretim imajında bu üç engel ve Telegram engeli `deploy/images/press-patches/` yamalarıyla aşıldı. Bağımlılıklar kilitle kuruldu. `uv pip check` yalnız frappe-mcp'nin iki bilinen satırını bildiriyor. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Gönderilmeyen öneri kabul edilmez. Sonraki adım önerileri Press deposuna göndermektir. Bu adımın sahibi proje sahibidir. Gönderim dış bir depoya yazar ve proje sahibinin hesabını ister. Öneri metnini press-tr işi yamalarla güncel tutar. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Kabul edilen her düzeltmenin yaması silinir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
+| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18). Üretim imajı da beş yamayla derlenir (O-52) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Üretim imajında bu üç engel ve Telegram engeli `deploy/images/press-patches/` yamalarıyla aşıldı. Bağımlılıklar kilitle kuruldu. `uv pip check` yalnız frappe-mcp'nin iki bilinen satırını bildiriyor. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Gönderilmeyen öneri kabul edilmez. Üç kaynak engelinin yama dizisi ve PR metni `docs/upstream/press-python314/` klasöründe hazırdır (O-57). Sonraki adım önerileri Press deposuna göndermektir. Bu adımın sahibi proje sahibidir. Gönderim dış bir depoya yazar ve proje sahibinin hesabını ister. Öneri metnini press-tr işi yamalarla güncel tutar. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Kabul edilen her düzeltmenin yaması silinir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | Telefon paketi yok (O-26). Bu borç MVP'yi engellemez (O-49) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |

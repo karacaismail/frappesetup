@@ -1,5 +1,5 @@
 /*
- * MODIFIED FILE. Changed by Atonota for G-162 on 24 November 2026.
+ * MODIFIED FILE. Changed by Atonota for G-162 on 24 November 2026 (AJA-412, AJA-440).
  * Original: cloudflightio/keycloak-magic-link, commit 7b4ee949a39a7ee953987162479ae1da2c57c3cb,
  * keycloak-magic-link/src/main/java/io/cloudflight/keycloak/magiclink/authenticators/AbstractMagicLinkAuthenticator.java
  * Licensed under the Apache License, Version 2.0. The change notice is in magic-link-fork/NOTICE.
@@ -14,6 +14,10 @@
  *   The row is written before the mail, so a link never arrives before its row.
  * - The job sends only within the per-address send limit (MagicLinkSendLimiter).
  * - A failed mail is logged without the link or the key. The answer is not a 500 error any more.
+ * - AJA-440 (design "G-162 ek iş" in 0003): the request reads the client source and gives it to the
+ *   job. The job checks the source ceiling, the source share and then the address limit, so one
+ *   source cannot use up another person's mails. scheduleSend() counts the waiting jobs and queues
+ *   none above the queue ceiling. The answer and its time stay the same in every case.
  */
 package io.cloudflight.keycloak.magiclink.authenticators;
 
@@ -155,21 +159,38 @@ public abstract class AbstractMagicLinkAuthenticator implements MagicLinkAuthent
         final String realmId = context.getRealm().getId();
         final AuthenticatorConfigModel config = context.getAuthenticatorConfig();
         final MagicLinkSendLimiter limiter = MagicLinkSendLimiter.fromConfig(config == null ? null : config.getConfig());
+        // AJA-440: the client address Keycloak read from X-Forwarded-For. Null for a private address.
+        final String source = MagicLinkSendLimiter.sourceOf(context.getConnection().getRemoteAddr());
         session.getTransactionManager().enlistAfterCompletion(new AfterRequest(() -> {
+            if (!limiter.tryEnterQueue()) {
+                logger.warn("Magic link mail not queued: too many mail jobs wait");
+                return;
+            }
             try {
-                executor.execute(() -> sendInBackground(factory, realmId, userId, magicLinkSession, magicLink, limiter));
+                executor.execute(() -> {
+                    try {
+                        sendInBackground(factory, realmId, userId, source, magicLinkSession, magicLink, limiter);
+                    } finally {
+                        limiter.leaveQueue();
+                    }
+                });
             } catch (RejectedExecutionException e) {
+                limiter.leaveQueue();
                 logger.warn("Magic link mail not queued: the executor refused the job");
             }
         }));
     }
 
-    private void sendInBackground(KeycloakSessionFactory factory, String realmId, String userId,
+    private void sendInBackground(KeycloakSessionFactory factory, String realmId, String userId, String source,
                                   MagicLinkSession magicLinkSession, String magicLink, MagicLinkSendLimiter limiter) {
-        if (userId == null) {
-            return;
-        }
         try {
+            // The source ceiling counts unknown addresses too, so it comes before the user check.
+            if (source != null && !limiter.tryAcquireSourceRequest(factory, realmId, source)) {
+                return;
+            }
+            if (userId == null) {
+                return;
+            }
             String address = KeycloakModelUtils.runJobInTransactionWithResult(factory, s -> {
                 UserModel user = findUser(s, realmId, userId);
                 if (user == null) {
@@ -177,7 +198,14 @@ public abstract class AbstractMagicLinkAuthenticator implements MagicLinkAuthent
                 }
                 return ObjectUtil.isBlank(user.getEmail()) ? user.getUsername() : user.getEmail();
             });
-            if (address == null || !limiter.tryAcquire(factory, realmId, address)) {
+            if (address == null) {
+                return;
+            }
+            // The source share comes first: a source whose share is full must not spend an address slot.
+            if (source != null && !limiter.tryAcquireSourceShare(factory, realmId, address, source)) {
+                return;
+            }
+            if (!limiter.tryAcquire(factory, realmId, address)) {
                 return;
             }
             if (magicLinkSession != null) {
