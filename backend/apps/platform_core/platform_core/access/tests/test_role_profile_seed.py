@@ -44,7 +44,7 @@ class TestRoleProfileSeed(IntegrationTestCase):
 		# Outside tests Frappe queues the profile job. Act as a real migrate does.
 		self.not_in_test = mock.patch.object(frappe, "in_test", False)
 		self.not_in_test.start()
-		self.no_install = mock.patch.object(frappe.local.flags, "in_install", None)
+		self.no_install = mock.patch.dict(frappe.local.flags, {"in_install": None})
 		self.no_install.start()
 
 	def tearDown(self):
@@ -87,6 +87,14 @@ class TestRoleProfileSeed(IntegrationTestCase):
 		# The step restores the install flag it borrowed.
 		self.assertIsNone(frappe.local.flags.in_install)
 
+	def test_install_flag_keeps_its_value_during_install(self):
+		name = panel_roles.RESELLER_ASSISTANT
+		frappe.delete_doc(PROFILE, name, force=True, ignore_permissions=True)
+		frappe.local.flags.in_install = "platform_core"
+		seed()
+		self.assertEqual(frappe.local.flags.in_install, "platform_core")
+		self.assertFalse(lock_exists(name), name)
+
 	def test_seeding_three_times_never_raises_a_lock_error(self):
 		name = panel_roles.TENANT_ADMIN_ASSISTANT
 		frappe.delete_doc(PROFILE, name, force=True, ignore_permissions=True)
@@ -96,6 +104,28 @@ class TestRoleProfileSeed(IntegrationTestCase):
 				frappe.db.commit()  # nosemgrep: frappe-request-commit
 		for profile in PANEL_ROLES:
 			self.assertFalse(lock_exists(profile), profile)
+
+	def test_missing_roles_are_loaded_before_the_profiles(self):
+		# On install Frappe runs `after_install` before it loads the fixtures, so the roles are missing.
+		name = panel_roles.RESELLER_ADMIN
+		frappe.delete_doc(PROFILE, name, force=True, ignore_permissions=True)
+		real_exists = frappe.db.exists
+		calls = []
+
+		def exists(doctype, *args, **kwargs):
+			if doctype == "Role" and not calls:
+				return None
+			return real_exists(doctype, *args, **kwargs)
+
+		with (
+			mock.patch.object(frappe.db, "exists", side_effect=exists),
+			mock.patch("platform_core.setup.role_profiles.sync_fixtures", side_effect=calls.append) as sync,
+			mock.patch("frappe.utils.background_jobs.get_queue"),
+		):
+			seed()
+		sync.assert_called_once_with("platform_core")
+		self.assertTrue(frappe.db.exists(PROFILE, name))
+		self.assertFalse(lock_exists(name), name)
 
 	def test_no_profile_holds_a_protected_role(self):
 		for name in PANEL_ROLES:
