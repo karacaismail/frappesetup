@@ -106,12 +106,32 @@ def get_leave_request_context(
 	if result["employee_name"] is not None:
 		sources["employee_name"] = "Employee"
 
-	selected_type = leave_type if leave_type is not None else "Annual Leave"
-	if not frappe.db.exists("Leave Type", selected_type):
-		return result
-	result["leave_type"] = selected_type
-	sources["leave_type"] = "Leave Type"
 	date = today()
+	if leave_type is not None:
+		selected_type = leave_type
+		if not frappe.db.exists("Leave Type", selected_type):
+			return result
+		sources["leave_type"] = "Leave Type"
+	else:
+		# Self-service access is limited to the employee resolved from this session above.
+		allocated_types = frappe.get_all(
+			"Leave Allocation",
+			filters={
+				"employee": employee.name,
+				"docstatus": 1,
+				"from_date": ["<=", date],
+				"to_date": [">=", date],
+			},
+			pluck="leave_type",
+			distinct=True,
+			order_by="leave_type",
+			limit_page_length=2,
+		)
+		if len(allocated_types) != 1:
+			return result
+		selected_type = allocated_types[0]
+		sources["leave_type"] = "Leave Allocation"
+	result["leave_type"] = selected_type
 	native_module = "hrms.hr.doctype.leave_application.leave_application"
 	get_leave_allocation_records = frappe.get_attr(f"{native_module}.get_leave_allocation_records")
 	get_leave_balance_on = frappe.get_attr(f"{native_module}.get_leave_balance_on")

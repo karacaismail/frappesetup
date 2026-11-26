@@ -46,7 +46,14 @@ Yöneticiler de bu yoldan başka kişiyi seçemez.
 Yol, genel personel okuma yetkisi vermez.
 
 İsteğe bağlı `leave_type` alanı, izin türünün tam kayıt adını alır.
-Alan verilmezse yol `Annual Leave` kaydını arar.
+Alan verilmezse yol personelin bugün geçerli, onaylanmış izin tahsislerine bakar.
+İzin tahsisi, personele ayrılan izin hakkını gösterir.
+Bu kayıtlarda tek izin türü varsa yol bu türü seçer.
+Bu durumda `sources.leave_type` değeri `Leave Allocation` olur.
+Tahsis yoksa veya birden çok tür varsa tür ve bakiye `null` olur.
+`null`, değerin bulunmadığını gösterir.
+İstekte izin türü verilirse mevcut davranış korunur.
+Bu durumda `sources.leave_type` değeri `Leave Type` olur.
 Yol, çevrilmiş addan veya benzer kayıttan izin türü tahmin etmez.
 
 Yanıt, personel kimliğini, görünen adı, izin türünü ve kalan günü verir.

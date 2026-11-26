@@ -295,9 +295,12 @@ paths:
         - in: query
           name: leave_type
           required: false
-          schema: {type: string, minLength: 1, maxLength: 140, default: Annual Leave}
+          schema: {type: string, minLength: 1, maxLength: 140}
           description: |
-            Exact Leave Type record name. Omission selects Annual Leave only if that record exists.
+            Exact Leave Type record name. An explicit name is resolved from Leave Type.
+            If omitted, use the signed-in employee's submitted Leave Allocation records valid today.
+            Select the type only when those allocations contain exactly one distinct leave type.
+            The source is Leave Allocation. No allocation or multiple types yields null type and balance.
             No translated-name matching or alternate leave type is inferred.
           example: Annual Leave
       responses:
@@ -316,7 +319,7 @@ paths:
                   sources:
                     employee: Employee
                     employee_name: Employee
-                    leave_type: Leave Type
+                    leave_type: Leave Allocation
                     leave_balance: Leave Ledger Entry
         "401":
           $ref: "#/components/responses/AuthenticationFailed"
@@ -518,7 +521,7 @@ components:
               description: Display name from that Employee record, or null.
             leave_type:
               type: [string, "null"]
-              description: Resolved Leave Type record name, or null when employee or type is missing.
+              description: Explicit Leave Type or the single type allocated today. Null when employee or type is missing, or omitted type has no unique allocation.
             leave_balance:
               type: [number, "null"]
               description: Remaining days from HRMS for today's site date, or null without balance data.
@@ -538,8 +541,8 @@ components:
                   description: Employee record, or null when its display name is missing.
                 leave_type:
                   type: [string, "null"]
-                  enum: [Leave Type, null]
-                  description: Leave Type record, or null when no type was resolved.
+                  enum: [Leave Type, Leave Allocation, null]
+                  description: Leave Type for an explicit name, Leave Allocation for the single allocated type, or null when no type was resolved.
                 leave_balance:
                   type: [string, "null"]
                   enum: [Leave Ledger Entry, null]
