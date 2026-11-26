@@ -34,7 +34,7 @@ const expected = {
     ink: 'rgb(27, 31, 36)', // --color-text #1b1f24
     link: 'rgb(0, 111, 134)', // --color-link #006f86
     action: 'rgb(0, 170, 204)', // --color-primary #00aacc
-    tint: 'rgb(224, 245, 249)', // --color-tint rgba(0,170,204,.12) on the panel
+    tint: 'rgba(0, 170, 204, 0.12)', // --color-tint
   },
   dark: {
     page: 'rgb(23, 23, 26)', // #17171A
@@ -42,7 +42,7 @@ const expected = {
     ink: 'rgb(236, 236, 240)', // #ececf0
     link: 'rgb(22, 177, 208)', // #16b1d0
     action: 'rgb(20, 44, 51)', // --primary-bg #142c33
-    tint: 'rgb(27, 50, 59)', // --color-tint rgba(0,170,204,.14) on the panel
+    tint: 'rgba(0, 170, 204, 0.14)', // --color-tint
   },
 } as const;
 

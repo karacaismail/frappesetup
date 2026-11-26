@@ -7,12 +7,18 @@
  * Rules take their values from the tokens.
  */
 
-/*
- * Design tokens and the self-hosted Outfit font (SIL OFL 1.1, fonts/OFL.txt).
- * This block is a copy of the token block in login/resources/css/atonota.css.
- * A test fails when the two blocks differ. Change both files together.
- */
 /* tokens:start */
+/*
+ * Ortak tasarım tokenları. Giriş ve hesap temaları bu bölümü birebir aynı taşır. Bir test iki bölümü karşılaştırır.
+ * Kaynak: atonota-web deposu, src/design/ klasörü, dal pc/aja997-tokenlar, commit d21799c (AJA-997).
+ * Keycloak teması o dosyayı içe aktaramaz. Değerler aynı adla, başına "at-" eklenerek buraya taşındı.
+ * Örneğin kaynaktaki --color-primary burada --at-color-primary olur.
+ * Kaynak değerler hesaplanır. Buradaki sayılar d21799c commit'inde css-variables.ts çıktısıdır.
+ * "taslak" yazan değerler kaynakta yoktur. Onlar onaylı taslaktan gelir: AJA-880, 3. sürüm.
+ */
+
+/* ---------- Yazı tipi: Outfit kendi sunucumuzdan gelir (SIL OFL 1.1, fonts/OFL.txt) ---------- */
+
 @font-face {
   font-family: "Outfit Variable";
   font-style: normal;
@@ -33,195 +39,201 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/*
- * Token values come from the atonota-web design source: AJA-997, branch pc/aja997-tokenlar, commit d21799c,
- * folder src/design/. The comment after a value names the CSS variable that the source produces.
- * "draft" means the approved interface draft AJA-880, version 3. It is used only where the source has no value.
- * "derived" means a value worked out from the source for a reason that the comment gives.
- */
 :root {
-  /* Colours: light theme */
-  --at-color-page: #f4f5f7; /* --color-bg-layout */
-  --at-color-surface: #ffffff; /* --color-bg-panel */
-  --at-color-surface-sunken: #eef0f3; /* --color-bg-panel-alt */
-  --at-color-surface-sunken-hover: #e2e5ea; /* --color-bg-button-hover */
-  --at-color-button: #eef0f3; /* --color-bg-button */
-  --at-color-input: #ffffff; /* --color-bg-input */
-  --at-color-elevated: #ffffff; /* --color-bg-elevated: menus and dialogs */
-  --at-color-button-hover: #e2e5ea; /* --color-bg-button-hover */
-  --at-color-ink: #1b1f24; /* --color-text */
-  --at-color-ink-soft: #4b5563; /* --color-text-quiet */
-  --at-color-line: #cfd4dc; /* --color-line */
-  /* derived: a field border needs 3:1 against its surface (WCAG 1.4.11). --color-line gives 1.5:1, --color-text-quiet gives 7.6:1. */
-  --at-color-line-strong: #4b5563; /* --color-text-quiet */
-  /* #00aacc is a background colour only. It is never a text colour in the light theme. */
-  --at-color-action: #00aacc; /* --color-primary */
-  --at-color-action-hover: #00b2dd; /* --color-primary-hover */
-  --at-color-action-active: #00baee; /* --color-primary-active */
-  --at-color-on-action: rgb(0 0 0 / 0.85); /* --primary-text */
-  --at-color-on-action-hover: rgb(0 0 0 / 1); /* --primary-text-hover */
-  --at-color-link: #006f86; /* --color-link */
-  --at-color-link-hover: #006e89; /* --color-link-hover */
-  --at-color-link-active: #006e8e; /* --color-link-active */
-  /* derived: --color-tint rgba(0, 170, 204, 0.12) laid on --color-bg-panel. A solid colour keeps the focus gap exact. */
-  --at-color-tint: #e0f5f9;
-  --at-color-seal: #00aacc; /* --color-primary */
-  --at-color-danger: #ab3335; /* tokens.ts danger.light.color */
-  --at-color-danger-action: #d44042; /* --danger-bg */
-  --at-color-danger-action-hover: #c13a3c; /* --danger-bg-hover */
-  --at-color-danger-action-active: #b13537; /* --danger-bg-active */
-  --at-color-on-danger-action: #ffffff; /* --danger-text */
-  --at-color-danger-surface: #fff2f0; /* tokens.ts danger.light.surfaces, colorErrorBg */
-  /* derived: draft --warn-tint and --ok-tint laid on --color-bg-panel */
-  --at-color-warning-surface: #f6eae1;
-  --at-color-success-surface: #e3f0e8;
-  --at-color-info-surface: #e0f5f9; /* same as --at-color-tint */
-  --at-color-focus: #006f86; /* --focus-indicator-color */
-  /* draft: the top bar (.idstrip) is a surface with normal text, not a dark band */
-  --at-color-masthead: #ffffff; /* --color-bg-panel */
-  --at-color-on-masthead: #1b1f24; /* --color-text */
-  --at-shadow-card: /* --shadow-card */
-    0.13px 0.13px 0.19px 0 rgb(11 18 32 / 0.01), 0.27px 0.27px 0.38px 0 rgb(11 18 32 / 0.01),
-    0.53px 0.53px 0.75px 0 rgb(11 18 32 / 0.01), 1.06px 1.06px 1.5px 0 rgb(11 18 32 / 0.01),
-    2.12px 2.12px 3px 0 rgb(11 18 32 / 0.01), 4.24px 4.24px 6px 0 rgb(11 18 32 / 0.01),
-    8.49px 8.49px 12px 0 rgb(11 18 32 / 0.01);
-  --at-shadow-float: /* --shadow-dropdown */
-    0 0.06px 0.14px 0 rgb(11 18 32 / 0.02), 0 0.13px 0.28px 0 rgb(11 18 32 / 0.02), 0 0.25px 0.56px 0 rgb(11 18 32 / 0.02),
-    0 0.5px 1.13px 0 rgb(11 18 32 / 0.02), 0 1px 2.25px 0 rgb(11 18 32 / 0.02), 0 2px 4.5px 0 rgb(11 18 32 / 0.02),
-    0 4px 9px 0 rgb(11 18 32 / 0.02), 0 8px 18px 0 rgb(11 18 32 / 0.02), 0 16px 36px 0 rgb(11 18 32 / 0.02);
+  /* Yazı. Kaynak: tokens.ts fontFamily ve typography. Boyutlar kaynakta px'tir.
+     Burada aynı değer rem ile yazılır: kullanıcının tarayıcı yazı boyutu korunur. 1rem = 16px. */
+  --at-font-ui: "Outfit Variable", Outfit, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --at-font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --at-font-min: 0.875rem; /* 14px */
+  --at-font-body: 1rem; /* 16px */
+  --at-font-h1: 1.625rem; /* 26px */
+  --at-font-h2: 1.25rem; /* 20px */
+  --at-font-h3: 1.125rem; /* 18px */
+  --at-line-height: 1.5; /* taslak --lh-body */
+  --at-line-height-tight: 1.25; /* taslak --lh-tight */
+  --at-font-weight-sm: 400;
+  --at-font-weight-md: 500;
+  --at-font-weight-lg: 600;
 
-  /* Type */
-  --at-font-text: "Outfit Variable", Outfit, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* --font-ui */
-  --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; /* --font-code without the font file that the theme does not ship */
-  --at-text-sm: 0.875rem; /* --font-min 14px */
-  --at-text-md: 1rem; /* --font-body 16px */
-  --at-text-lg: 1.125rem; /* --font-h3 18px */
-  --at-text-heading: 1.25rem; /* --font-h2 20px */
-  --at-text-title: 1.625rem; /* --font-h1 26px */
-  --at-text-brand: 1.25rem; /* draft .login-brand, --font-h2 */
-  --at-leading: 1.5; /* draft --lh-body */
-  --at-leading-tight: 1.25; /* draft --lh-tight */
-  --at-weight-regular: 400; /* --font-weight-sm */
-  --at-weight-medium: 500; /* --font-weight-md */
-  --at-weight-bold: 600; /* --font-weight-lg */
+  /* Kontrol yüksekliği. Kaynak: tokens.ts sizes.button. */
+  --at-control-h-sm: 36px;
+  --at-control-h-md: 42px;
+  --at-control-h-lg: 48px;
 
-  /* Space */
-  --at-space-1: 0.25rem; /* --space-xxs 4px */
-  --at-space-2: 0.5rem; /* --space-xs 8px */
-  --at-space-3: 0.75rem; /* --space-sm 12px */
-  --at-space-4: 1rem; /* --space-md 16px */
-  --at-space-5: 1.5rem; /* --space-lg 24px */
-  --at-space-6: 2rem; /* --space-xl 32px */
-  --at-page-gutter: 1rem; /* draft --gutter */
-  --at-card-padding: 1rem; /* draft .login-card on a narrow screen */
-  --at-card-width: 26.25rem; /* --form-max-width 420px */
+  /* Boşluk. Kaynak: tokens.ts space. */
+  --at-space-xxs: 4px;
+  --at-space-xs: 8px;
+  --at-space-sm: 12px;
+  --at-space-md: 16px;
+  --at-space-lg: 24px;
+  --at-space-xl: 32px;
+  --at-space-xxl: 48px;
 
-  /* Shape */
-  --at-radius-card: 10px; /* --card-radius */
-  --at-radius-control: 5px; /* --radius */
-  --at-border-control: 1px; /* tokens.ts border.width */
+  /* Yerleşim. Kaynak: tokens.ts layout ve radius. */
+  --at-form-max-width: 420px;
+  --at-card-padding: 24px;
+  --at-icon-size: 20px;
+  --at-radius: 5px;
+  --at-card-radius: 10px;
+  --at-border-width: 1px; /* tokens.ts border.width */
 
-  /* Touch target */
-  --at-hit: 2.75rem; /* --hit-target 44px */
-  --at-control-height: 2.625rem; /* --control-h-md 42px */
+  /* Dokunma alanı. Kaynak: tokens.ts hitTarget. Görünen boyuttan ayrıdır. */
+  --at-hit-target: 44px;
 
-  /* Focus: one straight line under the element. draft --focus-w is 3px. */
-  --at-focus-thickness: 3px;
-  --at-focus-gap: 2px;
-  --at-focus-underline-offset: 4px;
-  --at-link-underline-offset: 3px;
-  --at-brand-mark-size: 1.75rem; /* draft --mark-sm */
-  --at-focus-bar:
-    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
-    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
+  /* Odak göstergesi. Kaynak: tokens.ts focusIndicator. Çevreleyen halka değildir, alt kenarda tek çizgidir. */
+  --at-focus-indicator-size: 2px;
 
-  /* Motion */
-  --at-motion-duration: 200ms; /* --motion-duration-mid, draft --dur */
-  --at-motion-ease: cubic-bezier(.65, 0, .35, 1); /* --motion-easing-standard */
-  --at-motion-none: 0s;
+  /* Hareket. Kaynak: motion.ts. */
+  --at-motion-easing-standard: cubic-bezier(.65, 0, .35, 1);
+  --at-motion-duration-fast: 100ms;
+  --at-motion-duration-mid: 200ms;
+  --at-motion-duration-instant: 0ms;
+
+  /* Birincil renk. Kaynak: tokens.ts primary. #00aacc açık temada yazı rengi olmaz, yalnız düğme zeminidir. */
+  --at-color-primary: #00aacc;
+  --at-color-primary-hover: #00b2dd;
+  --at-color-primary-active: #00baee;
+  /* Açık temada birincil düğme zemini birincil renktir. Koyu temada kaynak ayrı bir düz zemin verir. */
+  --at-primary-bg: var(--at-color-primary);
+  --at-primary-bg-hover: var(--at-color-primary-hover);
+  --at-primary-bg-active: var(--at-color-primary-active);
+  --at-primary-text: rgba(0, 0, 0, 0.85);
+  --at-primary-text-hover: rgba(0, 0, 0, 1);
+
+  /* Zemin, metin ve çizgi: açık tema. Kaynak: tokens.ts palette.light ve link.light. */
+  --at-color-bg-layout: #f4f5f7;
+  --at-color-bg-panel: #ffffff;
+  --at-color-bg-panel-alt: #eef0f3;
+  --at-color-bg-elevated: #ffffff;
+  --at-color-bg-input: #ffffff;
+  --at-color-bg-button: #eef0f3;
+  --at-color-bg-button-hover: #e2e5ea;
+  --at-color-text: #1b1f24;
+  --at-color-text-quiet: #4b5563;
+  --at-color-line: #cfd4dc;
+  --at-color-ink: #006f86;
+  --at-color-tint: rgba(0, 170, 204, 0.12);
+  --at-color-ok: #166534;
+  --at-color-warn: #92400e;
+  --at-color-link: #006f86;
+  --at-color-link-hover: #006e89;
+  --at-color-link-active: #006e8e;
+  --at-focus-indicator-color: #006f86;
+  /* Hata yazısı. Kaynak: tokens.ts danger.light.color (antd colorError, 4.5:1 için koyulaştırılmış). */
+  --at-color-error: #ab3335;
+  /* Durum zeminleri. Kaynakta yok. Değerler taslaktan: --ok-tint, --warn-tint, --danger-tint. */
+  --at-color-ok-tint: rgba(21, 128, 61, 0.12);
+  --at-color-warn-tint: rgba(180, 83, 9, 0.12);
+  --at-color-error-tint: rgba(185, 28, 28, 0.1);
+
+  /* Gölge. Kaynak: tokens.ts shadows.light. */
+  --at-shadow-card: 0.13px 0.13px 0.19px 0 rgba(11, 18, 32, 0.01), 0.27px 0.27px 0.38px 0 rgba(11, 18, 32, 0.01),
+    0.53px 0.53px 0.75px 0 rgba(11, 18, 32, 0.01), 1.06px 1.06px 1.5px 0 rgba(11, 18, 32, 0.01),
+    2.12px 2.12px 3px 0 rgba(11, 18, 32, 0.01), 4.24px 4.24px 6px 0 rgba(11, 18, 32, 0.01),
+    8.49px 8.49px 12px 0 rgba(11, 18, 32, 0.01);
+  --at-shadow-dropdown: 0px 0.06px 0.14px 0 rgba(11, 18, 32, 0.02), 0px 0.13px 0.28px 0 rgba(11, 18, 32, 0.02),
+    0px 0.25px 0.56px 0 rgba(11, 18, 32, 0.02), 0px 0.5px 1.13px 0 rgba(11, 18, 32, 0.02),
+    0px 1px 2.25px 0 rgba(11, 18, 32, 0.02), 0px 2px 4.5px 0 rgba(11, 18, 32, 0.02),
+    0px 4px 9px 0 rgba(11, 18, 32, 0.02), 0px 8px 18px 0 rgba(11, 18, 32, 0.02),
+    0px 16px 36px 0 rgba(11, 18, 32, 0.02);
 }
 
+/* Koyu tema. Keycloak bu sınıfı işletim sistemi koyu temadayken ekler. Kaynak: tokens.ts darkVariables. */
 :root.pf-v5-theme-dark {
-  --at-color-page: #17171a; /* --color-bg-layout */
-  --at-color-surface: #1f1f23; /* --color-bg-panel */
-  --at-color-surface-sunken: #2a2a30; /* --color-bg-panel-alt */
-  --at-color-surface-sunken-hover: #3f3f47; /* --color-bg-button-hover */
-  --at-color-button: #34343b; /* --color-bg-button */
-  --at-color-input: #141418; /* --color-bg-input */
-  --at-color-elevated: #2a2a30; /* --color-bg-elevated */
-  --at-color-button-hover: #3f3f47; /* --color-bg-button-hover */
-  --at-color-ink: #ececf0; /* --color-text */
-  --at-color-ink-soft: #a8a8b3; /* --color-text-quiet */
-  --at-color-line: #3a3a42; /* --color-line */
-  --at-color-line-strong: #a8a8b3; /* --color-text-quiet, see the light theme */
-  /* The dark primary button is a solid tone of #00aacc with #00aacc text (tokens.ts primary.dark). */
-  --at-color-action: #142c33; /* --primary-bg */
-  --at-color-action-hover: #123741; /* --primary-bg-hover */
-  --at-color-action-active: #123943; /* --primary-bg-active */
-  --at-color-on-action: rgb(0 170 204 / 0.89); /* --primary-text */
-  --at-color-on-action-hover: rgb(0 170 204 / 1); /* --primary-text-hover */
-  --at-color-link: #16b1d0; /* --color-link */
-  --at-color-link-hover: #00b2dd; /* --color-link-hover */
-  --at-color-link-active: #00baee; /* --color-link-active */
-  --at-color-tint: #1b323b; /* derived: --color-tint rgba(0, 170, 204, 0.14) laid on --color-bg-panel */
-  --at-color-seal: #00aacc; /* --color-primary */
-  --at-color-danger: #e88182; /* tokens.ts danger.dark.color */
-  --at-color-danger-action: #cf4042; /* --danger-bg */
-  --at-color-danger-action-hover: #c33c3e; /* --danger-bg-hover */
-  --at-color-danger-action-active: #b23739; /* --danger-bg-active */
-  --at-color-on-danger-action: #ffffff; /* --danger-text */
-  --at-color-danger-surface: #2c1618; /* tokens.ts danger.dark.surfaces, colorErrorBg */
-  --at-color-warning-surface: #393223; /* derived: draft --warn-tint on --color-bg-panel */
-  --at-color-success-surface: #24362e; /* derived: draft --ok-tint on --color-bg-panel */
-  --at-color-info-surface: #1b323b; /* same as --at-color-tint */
-  --at-color-focus: #16b1d0; /* --focus-indicator-color */
-  --at-color-masthead: #1f1f23; /* --color-bg-panel */
-  --at-color-on-masthead: #ececf0; /* --color-text */
-  --at-shadow-card: /* --shadow-card */
-    0.13px 0.13px 0.19px 0 rgb(0 0 0 / 0.03), 0.27px 0.27px 0.38px 0 rgb(0 0 0 / 0.03),
-    0.53px 0.53px 0.75px 0 rgb(0 0 0 / 0.03), 1.06px 1.06px 1.5px 0 rgb(0 0 0 / 0.03),
-    2.12px 2.12px 3px 0 rgb(0 0 0 / 0.03), 4.24px 4.24px 6px 0 rgb(0 0 0 / 0.03),
-    8.49px 8.49px 12px 0 rgb(0 0 0 / 0.03);
-  --at-shadow-float: /* --shadow-dropdown */
-    0 0.06px 0.14px 0 rgb(0 0 0 / 0.05), 0 0.13px 0.28px 0 rgb(0 0 0 / 0.05), 0 0.25px 0.56px 0 rgb(0 0 0 / 0.05),
-    0 0.5px 1.13px 0 rgb(0 0 0 / 0.05), 0 1px 2.25px 0 rgb(0 0 0 / 0.05), 0 2px 4.5px 0 rgb(0 0 0 / 0.05),
-    0 4px 9px 0 rgb(0 0 0 / 0.05), 0 8px 18px 0 rgb(0 0 0 / 0.05), 0 16px 36px 0 rgb(0 0 0 / 0.05);
+  /* Koyu temada birincil düğme düz zemindir. Kaynak: tokens.ts primary.dark. */
+  --at-primary-bg: #142c33;
+  --at-primary-bg-hover: #123741;
+  --at-primary-bg-active: #123943;
+  --at-primary-text: rgba(0, 170, 204, 0.89);
+  --at-primary-text-hover: rgba(0, 170, 204, 1);
+
+  --at-color-bg-layout: #17171a;
+  --at-color-bg-panel: #1f1f23;
+  --at-color-bg-panel-alt: #2a2a30;
+  --at-color-bg-elevated: #2a2a30;
+  --at-color-bg-input: #141418;
+  --at-color-bg-button: #34343b;
+  --at-color-bg-button-hover: #3f3f47;
+  --at-color-text: #ececf0;
+  --at-color-text-quiet: #a8a8b3;
+  --at-color-line: #3a3a42;
+  --at-color-ink: #16b1d0;
+  --at-color-tint: rgba(0, 170, 204, 0.14);
+  --at-color-ok: #4ade80;
+  --at-color-warn: #fbbf24;
+  --at-color-link: #16b1d0;
+  --at-color-link-hover: #00b2dd;
+  --at-color-link-active: #00baee;
+  --at-focus-indicator-color: #16b1d0;
+  /* Kaynak: tokens.ts danger.dark.color. */
+  --at-color-error: #e88182;
+  /* Taslaktaki koyu tema değerleri. */
+  --at-color-ok-tint: rgba(74, 222, 128, 0.12);
+  --at-color-warn-tint: rgba(251, 191, 36, 0.12);
+  --at-color-error-tint: rgba(248, 113, 113, 0.12);
+
+  /* Kaynak: tokens.ts shadows.dark. */
+  --at-shadow-card: 0.13px 0.13px 0.19px 0 rgba(0, 0, 0, 0.03), 0.27px 0.27px 0.38px 0 rgba(0, 0, 0, 0.03),
+    0.53px 0.53px 0.75px 0 rgba(0, 0, 0, 0.03), 1.06px 1.06px 1.5px 0 rgba(0, 0, 0, 0.03),
+    2.12px 2.12px 3px 0 rgba(0, 0, 0, 0.03), 4.24px 4.24px 6px 0 rgba(0, 0, 0, 0.03),
+    8.49px 8.49px 12px 0 rgba(0, 0, 0, 0.03);
+  --at-shadow-dropdown: 0px 0.06px 0.14px 0 rgba(0, 0, 0, 0.05), 0px 0.13px 0.28px 0 rgba(0, 0, 0, 0.05),
+    0px 0.25px 0.56px 0 rgba(0, 0, 0, 0.05), 0px 0.5px 1.13px 0 rgba(0, 0, 0, 0.05),
+    0px 1px 2.25px 0 rgba(0, 0, 0, 0.05), 0px 2px 4.5px 0 rgba(0, 0, 0, 0.05),
+    0px 4px 9px 0 rgba(0, 0, 0, 0.05), 0px 8px 18px 0 rgba(0, 0, 0, 0.05),
+    0px 16px 36px 0 rgba(0, 0, 0, 0.05);
 }
 
-@media (min-width: 30rem) {
+/* Dokunmatik ekranda dokunma alanı büyür. Kaynak: tokens.ts hitTarget.coarse. Görünen kontrol boyutu değişmez. */
+@media (any-pointer: coarse) {
   :root {
-    --at-page-gutter: 1.5rem; /* draft main padding, --space-lg */
-    --at-card-padding: 1.5rem; /* --card-padding 24px */
+    --at-hit-target: 48px;
   }
 }
 
-@media (any-pointer: coarse) {
+/* Azaltılmış hareket: süreler sıfır olur. Kaynak: motion.ts instantMs. */
+@media (prefers-reduced-motion: reduce) {
   :root {
-    --at-hit: 3rem; /* draft --hit with a coarse pointer, 48px */
-    --at-control-height: 3rem; /* --control-h-lg 48px */
+    --at-motion-duration-fast: 0ms;
+    --at-motion-duration-mid: 0ms;
   }
 }
 /* tokens:end */
 
+/*
+ * Account console tokens. They are not part of the shared block, so the login theme does not need them.
+ * Each value is derived from a shared token or comes from the draft (AJA-880, version 3).
+ */
+:root {
+  /* derived: a field border needs 3:1 against its surface (WCAG 1.4.11). --at-color-line gives 1.5:1. */
+  --at-color-field-border: var(--at-color-text-quiet);
+  /* The focus line sits this far below the element, so it never touches the rounded corners. */
+  --at-focus-gap: 2px;
+  --at-focus-underline-offset: 4px;
+  --at-link-underline-offset: 3px;
+  --at-brand-mark-size: 1.75rem; /* draft --mark-sm */
+}
+
+
 /* PatternFly variables are bound to the Atonota tokens, so stock components carry the same identity. */
 :root,
 :root.pf-v5-theme-dark {
-  --pf-v5-global--FontFamily--text: var(--at-font-text);
-  --pf-v5-global--FontFamily--heading: var(--at-font-text);
-  --pf-v5-global--FontFamily--text--vf: var(--at-font-text);
-  --pf-v5-global--FontFamily--heading--vf: var(--at-font-text);
-  --pf-v5-global--FontFamily--monospace: var(--at-font-mono);
-  --pf-v5-global--FontFamily--monospace--vf: var(--at-font-mono);
-  --pf-v5-global--FontSize--xs: var(--at-text-sm);
-  --pf-v5-global--FontSize--sm: var(--at-text-sm);
-  --pf-v5-global--FontSize--md: var(--at-text-md);
-  --pf-v5-global--FontSize--lg: var(--at-text-lg);
-  --pf-v5-global--FontSize--xl: var(--at-text-heading);
-  --pf-v5-global--FontSize--2xl: var(--at-text-title);
-  --pf-v5-global--Color--100: var(--at-color-ink);
-  --pf-v5-global--Color--200: var(--at-color-ink-soft);
-  --pf-v5-global--BackgroundColor--100: var(--at-color-surface);
-  --pf-v5-global--BackgroundColor--200: var(--at-color-page);
+  --pf-v5-global--FontFamily--text: var(--at-font-ui);
+  --pf-v5-global--FontFamily--heading: var(--at-font-ui);
+  --pf-v5-global--FontFamily--text--vf: var(--at-font-ui);
+  --pf-v5-global--FontFamily--heading--vf: var(--at-font-ui);
+  --pf-v5-global--FontFamily--monospace: var(--at-font-code);
+  --pf-v5-global--FontFamily--monospace--vf: var(--at-font-code);
+  --pf-v5-global--FontSize--xs: var(--at-font-min);
+  --pf-v5-global--FontSize--sm: var(--at-font-min);
+  --pf-v5-global--FontSize--md: var(--at-font-body);
+  --pf-v5-global--FontSize--lg: var(--at-font-h3);
+  --pf-v5-global--FontSize--xl: var(--at-font-h2);
+  --pf-v5-global--FontSize--2xl: var(--at-font-h1);
+  --pf-v5-global--Color--100: var(--at-color-text);
+  --pf-v5-global--Color--200: var(--at-color-text-quiet);
+  --pf-v5-global--BackgroundColor--100: var(--at-color-bg-panel);
+  --pf-v5-global--BackgroundColor--200: var(--at-color-bg-layout);
   --pf-v5-global--BorderColor--100: var(--at-color-line);
   --pf-v5-global--BorderColor--200: var(--at-color-line);
   --pf-v5-global--BorderColor--300: var(--at-color-line);
@@ -231,57 +243,57 @@
   --pf-v5-global--active-color--100: var(--at-color-link);
   --pf-v5-global--link--Color: var(--at-color-link);
   --pf-v5-global--link--Color--hover: var(--at-color-link-hover);
-  --pf-v5-global--danger-color--100: var(--at-color-danger);
-  --pf-v5-global--danger-color--200: var(--at-color-danger);
-  --pf-v5-global--BorderRadius--sm: var(--at-radius-control);
-  --pf-v5-global--BorderRadius--lg: var(--at-radius-card);
+  --pf-v5-global--danger-color--100: var(--at-color-error);
+  --pf-v5-global--danger-color--200: var(--at-color-error);
+  --pf-v5-global--BorderRadius--sm: var(--at-radius);
+  --pf-v5-global--BorderRadius--lg: var(--at-card-radius);
   /* The stock "transition: all" and its 250 ms duration are replaced by the central tokens. */
-  --pf-v5-global--TransitionDuration: var(--at-motion-duration);
-  --pf-v5-global--TimingFunction: var(--at-motion-ease);
-  --pf-v5-global--Transition: background-color var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-global--TransitionDuration: var(--at-motion-duration-mid);
+  --pf-v5-global--TimingFunction: var(--at-motion-easing-standard);
+  --pf-v5-global--Transition: background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
   /* Components that move or rotate name the property they animate. */
-  --pf-v5-c-page__sidebar--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-alert__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-jump-links__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-form__field-group-toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-card__header-toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-table__toggle--c-button__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-table__toggle__icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-tabs__link-toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-tabs__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-data-list__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-expandable-section__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
-  --pf-v5-c-nav__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-page__sidebar--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-alert__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-jump-links__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-form__field-group-toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-card__header-toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-table__toggle--c-button__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-table__toggle__icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-tabs__link-toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-tabs__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-data-list__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-expandable-section__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
+  --pf-v5-c-nav__toggle-icon--Transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* ---------- Page ---------- */
 
 body[data-page-id="account"] {
-  background: var(--at-color-page);
-  color: var(--at-color-ink);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  line-height: var(--at-leading);
+  background: var(--at-color-bg-layout);
+  color: var(--at-color-text);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  line-height: var(--at-line-height);
   overflow-wrap: break-word;
 }
 
 [data-page-id="account"] .keycloak__loading-container {
-  background: var(--at-color-page);
-  color: var(--at-color-ink);
-  font-family: var(--at-font-text);
+  background: var(--at-color-bg-layout);
+  color: var(--at-color-text);
+  font-family: var(--at-font-ui);
 }
 
 [data-page-id="account"] .pf-v5-c-page {
-  --pf-v5-c-page--BackgroundColor: var(--at-color-page);
-  --pf-v5-c-page__main-section--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-page__main-section--m-light--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-page__sidebar--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-page--BackgroundColor: var(--at-color-bg-layout);
+  --pf-v5-c-page__main-section--BackgroundColor: var(--at-color-bg-panel);
+  --pf-v5-c-page__main-section--m-light--BackgroundColor: var(--at-color-bg-panel);
+  --pf-v5-c-page__sidebar--BackgroundColor: var(--at-color-bg-panel);
   --pf-v5-c-page__sidebar--BoxShadow: none;
 }
 
 /* The menu is a surface beside the grey page, like the side menu of the draft. */
 [data-page-id="account"] .pf-v5-c-page__sidebar {
-  --at-focus-gap-local: var(--at-color-surface);
+  --at-focus-gap-local: var(--at-color-bg-panel);
 }
 
 /*
@@ -290,37 +302,37 @@ body[data-page-id="account"] {
  */
 [data-page-id="account"] .pf-v5-c-page__main-section {
   min-inline-size: 0;
-  margin: var(--at-space-2);
-  border-radius: var(--at-radius-card);
+  margin: var(--at-space-xs);
+  border-radius: var(--at-card-radius);
 }
 
 @media (min-width: 30rem) {
   [data-page-id="account"] .pf-v5-c-page__main-section {
-    margin: var(--at-space-4);
+    margin: var(--at-space-md);
   }
 }
 
 [data-page-id="account"] .pf-v5-c-title {
-  color: var(--at-color-ink);
-  font-weight: var(--at-weight-bold);
-  line-height: var(--at-leading-tight);
+  color: var(--at-color-text);
+  font-weight: var(--at-font-weight-lg);
+  line-height: var(--at-line-height-tight);
 }
 
 /* ---------- Masthead ---------- */
 
 [data-page-id="account"] .pf-v5-c-masthead {
-  --pf-v5-c-masthead--BackgroundColor: var(--at-color-masthead);
+  --pf-v5-c-masthead--BackgroundColor: var(--at-color-bg-panel);
   /* The focus bar must contrast with the masthead, not with the page surface. */
-  --at-focus-local: var(--at-color-on-masthead);
-  --at-focus-gap-local: var(--at-color-masthead);
-  color: var(--at-color-on-masthead);
+  --at-focus-local: var(--at-color-text);
+  --at-focus-gap-local: var(--at-color-bg-panel);
+  color: var(--at-color-text);
   /* A thin line under the bar separates it from the page, like the draft. It runs the full width and has no corners. */
-  box-shadow: 0 var(--at-border-control) 0 var(--at-color-line);
+  box-shadow: 0 var(--at-border-width) 0 var(--at-color-line);
 }
 
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-button,
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle {
-  color: var(--at-color-on-masthead);
+  color: var(--at-color-text);
 }
 
 /*
@@ -332,7 +344,7 @@ body[data-page-id="account"] {
   /* The row wraps only when the root font size is enlarged far enough. */
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--at-space-2);
+  gap: var(--at-space-xs);
   min-block-size: 3.5rem;
 }
 
@@ -342,7 +354,7 @@ body[data-page-id="account"] {
    * is cut with an ellipsis and never pushes the controls onto a second row.
    */
   flex: 1 1 0;
-  min-inline-size: var(--at-hit);
+  min-inline-size: var(--at-hit-target);
   min-block-size: 0;
   padding: 0;
   border: 0;
@@ -373,9 +385,9 @@ body[data-page-id="account"] {
 /* On a narrow screen the side padding is smaller, so the brand name keeps its room. */
 @media (max-width: 29.99rem) {
   [data-page-id="account"] .pf-v5-c-masthead {
-    --pf-v5-c-masthead--PaddingLeft: var(--at-space-2);
-    --pf-v5-c-masthead--PaddingRight: var(--at-space-2);
-    gap: var(--at-space-1);
+    --pf-v5-c-masthead--PaddingLeft: var(--at-space-xs);
+    --pf-v5-c-masthead--PaddingRight: var(--at-space-xs);
+    gap: var(--at-space-xxs);
   }
 
   /* The stock toggle pulls itself into the side padding with a negative margin. */
@@ -385,11 +397,11 @@ body[data-page-id="account"] {
 
   /* The body prefix lets these two rules win over the general brand rules further down. */
   body[data-page-id="account"] .pf-v5-c-masthead__brand {
-    gap: var(--at-space-1);
+    gap: var(--at-space-xxs);
   }
 
   body[data-page-id="account"] .pf-v5-c-masthead__brand::after {
-    font-size: var(--at-text-md);
+    font-size: var(--at-font-body);
   }
 }
 
@@ -404,32 +416,32 @@ body[data-page-id="account"] {
    * and never pushes the controls onto a second row.
    */
   max-inline-size: 100%;
-  min-inline-size: var(--at-hit);
+  min-inline-size: var(--at-hit-target);
   flex: 1 1 0;
   justify-content: flex-start;
   display: inline-flex;
   align-items: center;
-  min-block-size: var(--at-hit);
-  min-inline-size: var(--at-hit);
-  border-radius: var(--at-radius-control);
+  min-block-size: var(--at-hit-target);
+  min-inline-size: var(--at-hit-target);
+  border-radius: var(--at-radius);
 }
 
 /* The brand name next to the mark. The script fills --at-brand-name from the page title. */
 [data-page-id="account"] .pf-v5-c-masthead__brand {
-  gap: var(--at-space-2);
-  color: var(--at-color-on-masthead);
+  gap: var(--at-space-xs);
+  color: var(--at-color-text);
   text-decoration: none;
 }
 
 [data-page-id="account"] .pf-v5-c-masthead__brand::after {
   content: var(--at-brand-name, "");
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-lg);
-  font-weight: var(--at-weight-bold);
-  line-height: var(--at-leading-tight);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-h3);
+  font-weight: var(--at-font-weight-lg);
+  line-height: var(--at-line-height-tight);
   min-inline-size: 0;
   /* The box clips a long name. The padding keeps room for the focus underline inside the clip area. */
-  padding-block: var(--at-space-2);
+  padding-block: var(--at-space-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -447,12 +459,12 @@ body[data-page-id="account"] {
 /* ---------- Navigation ---------- */
 
 [data-page-id="account"] .pf-v5-c-nav {
-  --pf-v5-c-nav__link--Color: var(--at-color-ink);
-  --pf-v5-c-nav__link--hover--Color: var(--at-color-ink);
-  --pf-v5-c-nav__link--focus--Color: var(--at-color-ink);
+  --pf-v5-c-nav__link--Color: var(--at-color-text);
+  --pf-v5-c-nav__link--hover--Color: var(--at-color-text);
+  --pf-v5-c-nav__link--focus--Color: var(--at-color-text);
   --pf-v5-c-nav__link--active--Color: var(--at-color-link);
   --pf-v5-c-nav__link--m-current--Color: var(--at-color-link);
-  --pf-v5-c-nav__link--hover--BackgroundColor: var(--at-color-button);
+  --pf-v5-c-nav__link--hover--BackgroundColor: var(--at-color-bg-button);
   --pf-v5-c-nav__link--focus--BackgroundColor: transparent;
   --pf-v5-c-nav__link--active--BackgroundColor: var(--at-color-tint);
   --pf-v5-c-nav__link--m-current--BackgroundColor: var(--at-color-tint);
@@ -471,18 +483,18 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-nav__link {
-  min-block-size: var(--at-hit);
-  margin-inline: var(--at-space-2);
-  border-radius: var(--at-radius-control);
-  font-size: var(--at-text-md);
+  min-block-size: var(--at-hit-target);
+  margin-inline: var(--at-space-xs);
+  border-radius: var(--at-radius);
+  font-size: var(--at-font-body);
   text-decoration: none;
   transition:
-    background-color var(--at-motion-duration) var(--at-motion-ease),
-    color var(--at-motion-duration) var(--at-motion-ease);
+    background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 [data-page-id="account"] .pf-v5-c-nav__link.pf-m-current {
-  font-weight: var(--at-weight-medium);
+  font-weight: var(--at-font-weight-md);
 }
 
 /* The current page keeps its tone under the pointer. */
@@ -491,7 +503,7 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-nav__subnav .pf-v5-c-nav__link {
-  font-size: var(--at-text-md);
+  font-size: var(--at-font-body);
 }
 
 /* The stock sub-navigation is a scroll container. Browsers put scroll containers in the Tab order. It never needs to scroll. */
@@ -503,31 +515,31 @@ body[data-page-id="account"] {
 [data-page-id="account"] .pf-v5-c-data-list__toggle-icon,
 [data-page-id="account"] .pf-v5-c-expandable-section__toggle-icon,
 [data-page-id="account"] .pf-v5-c-nav__toggle-icon {
-  transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  transition: transform var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 [data-page-id="account"] .pf-v5-c-jump-links__link {
-  min-block-size: var(--at-hit);
+  min-block-size: var(--at-hit-target);
   align-items: center;
 }
 
 /* ---------- Buttons ---------- */
 
 [data-page-id="account"] .pf-v5-c-button {
-  border: var(--at-border-control) solid transparent;
-  border-radius: var(--at-radius-control);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  font-weight: var(--at-weight-medium);
-  line-height: var(--at-leading-tight);
-  min-block-size: var(--at-hit);
-  min-inline-size: var(--at-hit);
+  border: var(--at-border-width) solid transparent;
+  border-radius: var(--at-radius);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  font-weight: var(--at-font-weight-md);
+  line-height: var(--at-line-height-tight);
+  min-block-size: var(--at-hit-target);
+  min-inline-size: var(--at-hit-target);
   max-inline-size: 100%;
   white-space: normal;
   transition:
-    background-color var(--at-motion-duration) var(--at-motion-ease),
-    border-color var(--at-motion-duration) var(--at-motion-ease),
-    color var(--at-motion-duration) var(--at-motion-ease);
+    background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* An inline link button is part of a sentence. It keeps the size of the text around it. */
@@ -535,7 +547,7 @@ body[data-page-id="account"] {
   border: 0;
   min-block-size: 0;
   min-inline-size: 0;
-  font-weight: var(--at-weight-medium);
+  font-weight: var(--at-font-weight-md);
 }
 
 /* The stock theme draws the button border with a pseudo-element and thickens it on focus. That drawing is switched off. */
@@ -544,49 +556,40 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-primary {
-  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action);
-  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-color-action-hover);
-  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-color-action);
-  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-color-action-active);
-  --pf-v5-c-button--m-primary--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-on-action-hover);
-  --pf-v5-c-button--m-primary--focus--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--active--Color: var(--at-color-on-action-hover);
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-primary-bg);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-primary-bg-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-primary-bg);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-primary-bg-active);
+  --pf-v5-c-button--m-primary--Color: var(--at-primary-text);
+  --pf-v5-c-button--m-primary--hover--Color: var(--at-primary-text-hover);
+  --pf-v5-c-button--m-primary--focus--Color: var(--at-primary-text);
+  --pf-v5-c-button--m-primary--active--Color: var(--at-primary-text-hover);
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-secondary,
 [data-page-id="account"] .pf-v5-c-button.pf-m-tertiary,
 [data-page-id="account"] .pf-v5-c-button.pf-m-control {
   /* The draft draws a plain button as a grey tone without a border. */
-  background: var(--at-color-button);
+  background: var(--at-color-bg-button);
   border-color: transparent;
-  color: var(--at-color-ink);
+  color: var(--at-color-text);
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-secondary:hover,
 [data-page-id="account"] .pf-v5-c-button.pf-m-tertiary:hover,
 [data-page-id="account"] .pf-v5-c-button.pf-m-control:hover {
-  background: var(--at-color-button-hover);
+  background: var(--at-color-bg-button-hover);
 }
 
-[data-page-id="account"] .pf-v5-c-button.pf-m-danger {
-  background: var(--at-color-danger-action);
-  color: var(--at-color-on-danger-action);
-}
-
-[data-page-id="account"] .pf-v5-c-button.pf-m-danger:hover {
-  background: var(--at-color-danger-action-hover);
-}
-
-[data-page-id="account"] .pf-v5-c-button.pf-m-danger:active {
-  background: var(--at-color-danger-action-active);
-}
-
-/* draft .btn.danger: a light red tone with red text */
+/*
+ * draft .btn.danger: a light red tone with red text. The shared tokens have no solid red surface.
+ * The red text gives at least 4.5:1 on the tone in both themes.
+ */
+[data-page-id="account"] .pf-v5-c-button.pf-m-danger,
 [data-page-id="account"] .pf-v5-c-button.pf-m-secondary.pf-m-danger {
-  background: var(--at-color-danger-surface);
+  background: var(--at-color-error-tint);
   border-color: transparent;
-  color: var(--at-color-danger);
+  color: var(--at-color-error);
 }
 
 /*
@@ -597,14 +600,14 @@ body[data-page-id="account"] {
 [data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain,
 [data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain .pf-v5-c-menu-toggle__toggle-icon,
 [data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain .pf-v5-c-menu-toggle__icon {
-  color: var(--at-color-ink);
+  color: var(--at-color-text);
 }
 
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-button.pf-m-plain,
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle,
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle .pf-v5-c-menu-toggle__toggle-icon,
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle .pf-v5-c-menu-toggle__icon {
-  color: var(--at-color-on-masthead);
+  color: var(--at-color-text);
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-link {
@@ -621,29 +624,29 @@ body[data-page-id="account"] {
 
 [data-page-id="account"] .pf-v5-c-button:disabled,
 [data-page-id="account"] .pf-v5-c-button.pf-m-aria-disabled {
-  background: var(--at-color-surface-sunken);
+  background: var(--at-color-bg-panel-alt);
   border-color: transparent;
-  color: var(--at-color-ink-soft);
+  color: var(--at-color-text-quiet);
 }
 
 /* ---------- Form fields ---------- */
 
 [data-page-id="account"] .pf-v5-c-form__label {
-  font-size: var(--at-text-sm);
+  font-size: var(--at-font-min);
 }
 
 [data-page-id="account"] .pf-v5-c-form__label-text {
-  color: var(--at-color-ink);
-  font-weight: var(--at-weight-medium);
+  color: var(--at-color-text);
+  font-weight: var(--at-font-weight-md);
 }
 
 [data-page-id="account"] .pf-v5-c-form-control {
-  background: var(--at-color-input);
-  border: var(--at-border-control) solid var(--at-color-line-strong);
-  border-radius: var(--at-radius-control);
-  color: var(--at-color-ink);
-  min-block-size: var(--at-hit);
-  transition: border-color var(--at-motion-duration) var(--at-motion-ease);
+  background: var(--at-color-bg-input);
+  border: var(--at-border-width) solid var(--at-color-field-border);
+  border-radius: var(--at-radius);
+  color: var(--at-color-text);
+  min-block-size: var(--at-hit-target);
+  transition: border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* The stock theme draws the field border with pseudo-elements and thickens the bottom line on focus. That drawing is switched off. */
@@ -653,39 +656,39 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-form-control:hover {
-  border-color: var(--at-color-ink);
+  border-color: var(--at-color-text);
 }
 
 /* The error border runs on all four sides. The :has() rule is separate, so an older browser keeps the first one. */
 [data-page-id="account"] .pf-v5-c-form-control.pf-m-error {
-  border-color: var(--at-color-danger);
+  border-color: var(--at-color-error);
 }
 
 [data-page-id="account"] .pf-v5-c-form-control:has(> [aria-invalid="true"]) {
-  border-color: var(--at-color-danger);
+  border-color: var(--at-color-error);
 }
 
 [data-page-id="account"] .pf-v5-c-form-control.pf-m-readonly,
 [data-page-id="account"] .pf-v5-c-form-control.pf-m-disabled {
-  background: var(--at-color-surface-sunken);
-  color: var(--at-color-ink-soft);
+  background: var(--at-color-bg-panel-alt);
+  color: var(--at-color-text-quiet);
 }
 
 [data-page-id="account"] .pf-v5-c-form-control > :is(input, textarea) {
-  border-radius: var(--at-radius-control);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  min-block-size: var(--at-hit);
-  padding-inline: var(--at-space-3);
+  border-radius: var(--at-radius);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  min-block-size: var(--at-hit-target);
+  padding-inline: var(--at-space-sm);
 }
 
 [data-page-id="account"] .pf-v5-c-helper-text__item-text {
-  font-size: var(--at-text-sm);
+  font-size: var(--at-font-min);
 }
 
 [data-page-id="account"] .pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text {
-  color: var(--at-color-danger);
-  font-weight: var(--at-weight-medium);
+  color: var(--at-color-error);
+  font-weight: var(--at-font-weight-md);
 }
 
 /* The stock action row clips its overflow. That would cut the focus line under the buttons. */
@@ -696,10 +699,10 @@ body[data-page-id="account"] {
 /* ---------- Expandable section (for example "Delete account") ---------- */
 
 [data-page-id="account"] .pf-v5-c-expandable-section__toggle {
-  min-block-size: var(--at-hit);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  font-weight: var(--at-weight-medium);
+  min-block-size: var(--at-hit-target);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  font-weight: var(--at-font-weight-md);
   color: var(--at-color-link);
 }
 
@@ -710,22 +713,22 @@ body[data-page-id="account"] {
 /* ---------- Menu toggle and menu ---------- */
 
 [data-page-id="account"] .pf-v5-c-menu-toggle {
-  --pf-v5-c-menu-toggle--BackgroundColor: var(--at-color-input);
-  --pf-v5-c-menu-toggle--hover--BackgroundColor: var(--at-color-input);
-  --pf-v5-c-menu-toggle--focus--BackgroundColor: var(--at-color-input);
-  --pf-v5-c-menu-toggle--active--BackgroundColor: var(--at-color-input);
-  --pf-v5-c-menu-toggle--m-expanded--BackgroundColor: var(--at-color-input);
-  --pf-v5-c-menu-toggle--Color: var(--at-color-ink);
-  --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-ink);
-  border: var(--at-border-control) solid var(--at-color-line-strong);
-  border-radius: var(--at-radius-control);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  min-block-size: var(--at-hit);
-  min-inline-size: var(--at-hit);
+  --pf-v5-c-menu-toggle--BackgroundColor: var(--at-color-bg-input);
+  --pf-v5-c-menu-toggle--hover--BackgroundColor: var(--at-color-bg-input);
+  --pf-v5-c-menu-toggle--focus--BackgroundColor: var(--at-color-bg-input);
+  --pf-v5-c-menu-toggle--active--BackgroundColor: var(--at-color-bg-input);
+  --pf-v5-c-menu-toggle--m-expanded--BackgroundColor: var(--at-color-bg-input);
+  --pf-v5-c-menu-toggle--Color: var(--at-color-text);
+  --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-text);
+  border: var(--at-border-width) solid var(--at-color-field-border);
+  border-radius: var(--at-radius);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  min-block-size: var(--at-hit-target);
+  min-inline-size: var(--at-hit-target);
   transition:
-    background-color var(--at-motion-duration) var(--at-motion-ease),
-    border-color var(--at-motion-duration) var(--at-motion-ease);
+    background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 [data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain,
@@ -740,12 +743,12 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle {
-  --pf-v5-c-menu-toggle--Color: var(--at-color-on-masthead);
-  --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-on-masthead);
+  --pf-v5-c-menu-toggle--Color: var(--at-color-text);
+  --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-text);
 }
 
 [data-page-id="account"] .pf-v5-c-menu__item {
-  --pf-v5-c-menu__item--Color: var(--at-color-ink);
+  --pf-v5-c-menu__item--Color: var(--at-color-text);
 }
 
 /* The stock theme draws the toggle border with pseudo-elements and adds a coloured bottom line on focus. That drawing is switched off. */
@@ -770,19 +773,19 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-menu {
-  --pf-v5-c-menu--BackgroundColor: var(--at-color-elevated);
+  --pf-v5-c-menu--BackgroundColor: var(--at-color-bg-elevated);
   /* A menu that opens from the masthead sits on the raised surface. */
-  --at-focus-local: var(--at-color-focus);
-  --at-focus-gap-local: var(--at-color-elevated);
-  border-radius: var(--at-radius-control);
-  box-shadow: var(--at-shadow-float);
+  --at-focus-local: var(--at-focus-indicator-color);
+  --at-focus-gap-local: var(--at-color-bg-elevated);
+  border-radius: var(--at-radius);
+  box-shadow: var(--at-shadow-dropdown);
   overflow: hidden;
 }
 
 [data-page-id="account"] .pf-v5-c-menu__item {
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  min-block-size: var(--at-hit);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  min-block-size: var(--at-hit-target);
 }
 
 /* draft: the item under the pointer gets the light tone */
@@ -797,15 +800,15 @@ body[data-page-id="account"] {
   --pf-v5-c-data-list__item--m-clickable--hover--item--BorderTopWidth: 0;
   --pf-v5-c-data-list__item--before--BackgroundColor: transparent;
   /* The stock list paints a thick top band and its own dark surface on narrow screens. */
-  --pf-v5-c-data-list--BorderTopWidth: var(--at-border-control);
-  --pf-v5-c-data-list--sm--BorderTopWidth: var(--at-border-control);
+  --pf-v5-c-data-list--BorderTopWidth: var(--at-border-width);
+  --pf-v5-c-data-list--sm--BorderTopWidth: var(--at-border-width);
   --pf-v5-c-data-list--BorderTopColor: var(--at-color-line);
   --pf-v5-c-data-list--sm--BorderTopColor: var(--at-color-line);
   --pf-v5-c-data-list__item--BackgroundColor: transparent;
   --pf-v5-c-data-list__item--BorderBottomColor: var(--at-color-line);
-  --pf-v5-c-data-list__item--BorderBottomWidth: var(--at-border-control);
+  --pf-v5-c-data-list__item--BorderBottomWidth: var(--at-border-width);
   --pf-v5-c-data-list__item--sm--BorderBottomColor: var(--at-color-line);
-  --pf-v5-c-data-list__item--sm--BorderBottomWidth: var(--at-border-control);
+  --pf-v5-c-data-list__item--sm--BorderBottomWidth: var(--at-border-width);
 }
 
 [data-page-id="account"] .pf-v5-c-data-list__item::before {
@@ -814,17 +817,17 @@ body[data-page-id="account"] {
 
 /* Rows keep the same inset and vertical rhythm at every width. */
 [data-page-id="account"] .pf-v5-c-data-list__item-row {
-  padding-inline: var(--at-space-3);
-  padding-block: var(--at-space-2);
+  padding-inline: var(--at-space-sm);
+  padding-block: var(--at-space-xs);
 }
 
 [data-page-id="account"] .pf-v5-c-data-list__cell {
-  padding-block: var(--at-space-2);
+  padding-block: var(--at-space-xs);
 }
 
 [data-page-id="account"] .pf-v5-c-data-list__item-action {
   margin-inline-start: 0;
-  padding-block: var(--at-space-2);
+  padding-block: var(--at-space-xs);
 }
 
 [data-page-id="account"] .pf-v5-c-data-list__item-row,
@@ -851,48 +854,48 @@ body[data-page-id="account"] {
 
 [data-page-id="account"] .pf-v5-c-alert {
   --pf-v5-c-alert--BoxShadow: none;
-  --at-focus-gap-local: var(--at-color-info-surface);
-  background: var(--at-color-info-surface);
+  --at-focus-gap-local: var(--at-color-tint);
+  background: var(--at-color-tint);
   border: 0;
-  border-radius: var(--at-radius-control);
+  border-radius: var(--at-radius);
   box-shadow: none;
-  color: var(--at-color-ink);
+  color: var(--at-color-text);
 }
 
 [data-page-id="account"] .pf-v5-c-alert.pf-m-danger {
-  --at-focus-gap-local: var(--at-color-danger-surface);
-  background: var(--at-color-danger-surface);
+  --at-focus-gap-local: var(--at-color-error-tint);
+  background: var(--at-color-error-tint);
 }
 
 [data-page-id="account"] .pf-v5-c-alert.pf-m-warning {
-  --at-focus-gap-local: var(--at-color-warning-surface);
-  background: var(--at-color-warning-surface);
+  --at-focus-gap-local: var(--at-color-warn-tint);
+  background: var(--at-color-warn-tint);
 }
 
 [data-page-id="account"] .pf-v5-c-alert.pf-m-success {
-  --at-focus-gap-local: var(--at-color-success-surface);
-  background: var(--at-color-success-surface);
+  --at-focus-gap-local: var(--at-color-ok-tint);
+  background: var(--at-color-ok-tint);
 }
 
 [data-page-id="account"] .pf-v5-c-alert__title,
 [data-page-id="account"] .pf-v5-c-alert__icon {
-  color: var(--at-color-ink);
+  color: var(--at-color-text);
 }
 
 [data-page-id="account"] .pf-v5-c-label {
-  font-size: var(--at-text-sm);
+  font-size: var(--at-font-min);
 }
 
 [data-page-id="account"] .pf-v5-c-modal-box {
-  --at-focus-gap-local: var(--at-color-elevated);
-  background: var(--at-color-elevated);
-  border-radius: var(--at-radius-card);
-  box-shadow: var(--at-shadow-float);
+  --at-focus-gap-local: var(--at-color-bg-elevated);
+  background: var(--at-color-bg-elevated);
+  border-radius: var(--at-card-radius);
+  box-shadow: var(--at-shadow-dropdown);
 }
 
 [data-page-id="account"] a:not([class]) {
   color: var(--at-color-link);
-  font-weight: var(--at-weight-medium);
+  font-weight: var(--at-font-weight-md);
   text-decoration: underline;
   text-underline-offset: var(--at-link-underline-offset);
 }
@@ -917,16 +920,16 @@ body[data-page-id="account"] > #app {
 
 .at-account-deletion {
   /* The section sits on the page colour, so the gap above the focus line uses that colour. */
-  --at-focus-gap-local: var(--at-color-page);
+  --at-focus-gap-local: var(--at-color-bg-layout);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 var(--at-space-3);
-  padding: var(--at-space-1) var(--at-card-padding);
-  background: var(--at-color-page);
-  color: var(--at-color-ink-soft);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-sm);
+  gap: 0 var(--at-space-sm);
+  padding: var(--at-space-xxs) var(--at-card-padding);
+  background: var(--at-color-bg-layout);
+  color: var(--at-color-text-quiet);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-min);
 }
 
 .at-account-deletion__text {
@@ -964,13 +967,13 @@ body[data-page-id="account"] > #app {
 [data-page-id="account"] a.at-account-deletion__link {
   display: inline-flex;
   align-items: center;
-  min-block-size: var(--at-hit);
+  min-block-size: var(--at-hit-target);
   color: var(--at-color-link);
-  font-size: var(--at-text-sm);
-  font-weight: var(--at-weight-medium);
+  font-size: var(--at-font-min);
+  font-weight: var(--at-font-weight-md);
   text-decoration: underline;
   text-underline-offset: var(--at-link-underline-offset);
-  transition: color var(--at-motion-duration) var(--at-motion-ease);
+  transition: color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 [data-page-id="account"] a.at-account-deletion__link:hover {
@@ -1012,8 +1015,8 @@ body[data-page-id="account"] > #app {
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   :focus-visible:not(a, button, input, select, textarea, summary, [role="button"]) {
   box-shadow:
-    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
-    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+    0 calc(var(--at-radius) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius)) var(--at-focus-gap-local, var(--at-color-bg-panel)),
+    0 calc(var(--at-radius) + var(--at-focus-gap) + var(--at-focus-indicator-size)) 0 calc(-1 * var(--at-radius)) var(--at-focus-local, var(--at-focus-indicator-color));
 }
 
 /*
@@ -1023,23 +1026,23 @@ body[data-page-id="account"] > #app {
  */
 html[data-at-focus="keyboard"] [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-visible::after {
   text-decoration-line: underline;
-  text-decoration-thickness: var(--at-focus-thickness);
-  text-decoration-color: var(--at-focus-local, var(--at-color-focus));
+  text-decoration-thickness: var(--at-focus-indicator-size);
+  text-decoration-color: var(--at-focus-local, var(--at-focus-indicator-color));
   text-underline-offset: var(--at-focus-underline-offset);
 }
 
 html:not([data-at-js]) [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-visible {
   box-shadow:
-    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
-    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+    0 calc(var(--at-radius) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius)) var(--at-focus-gap-local, var(--at-color-bg-panel)),
+    0 calc(var(--at-radius) + var(--at-focus-gap) + var(--at-focus-indicator-size)) 0 calc(-1 * var(--at-radius)) var(--at-focus-local, var(--at-focus-indicator-color));
 }
 
 /* A field inside its wrapper: the line goes under the wrapper. The rule is separate because :has() is not everywhere. */
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   :is(.pf-v5-c-form-control, .pf-v5-c-menu-toggle):has(> :is(input, select, textarea):focus-visible, .pf-v5-c-text-input-group input:focus-visible) {
   box-shadow:
-    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
-    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+    0 calc(var(--at-radius) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius)) var(--at-focus-gap-local, var(--at-color-bg-panel)),
+    0 calc(var(--at-radius) + var(--at-focus-gap) + var(--at-focus-indicator-size)) 0 calc(-1 * var(--at-radius)) var(--at-focus-local, var(--at-focus-indicator-color));
 }
 
 /* A browser without :has() draws the line under the field itself, so keyboard focus is never invisible. */
@@ -1047,8 +1050,8 @@ html:not([data-at-js]) [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-
   :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
     :is(input:not([type="checkbox"], [type="radio"]), select, textarea):focus-visible {
     box-shadow:
-      0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
-      0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+      0 calc(var(--at-radius) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius)) var(--at-focus-gap-local, var(--at-color-bg-panel)),
+      0 calc(var(--at-radius) + var(--at-focus-gap) + var(--at-focus-indicator-size)) 0 calc(-1 * var(--at-radius)) var(--at-focus-local, var(--at-focus-indicator-color));
   }
 }
 
@@ -1058,8 +1061,8 @@ html:not([data-at-js]) [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   .pf-v5-c-menu__item:focus-visible .pf-v5-c-menu__item-text {
   text-decoration-line: underline;
-  text-decoration-thickness: var(--at-focus-thickness);
-  text-decoration-color: var(--at-focus-local, var(--at-color-focus));
+  text-decoration-thickness: var(--at-focus-indicator-size);
+  text-decoration-color: var(--at-focus-local, var(--at-focus-indicator-color));
   text-underline-offset: var(--at-focus-underline-offset);
 }
 
@@ -1067,16 +1070,16 @@ html:not([data-at-js]) [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   input:is([type="checkbox"], [type="radio"]):focus-visible + label {
   text-decoration-line: underline;
-  text-decoration-thickness: var(--at-focus-thickness);
-  text-decoration-color: var(--at-color-focus);
+  text-decoration-thickness: var(--at-focus-indicator-size);
+  text-decoration-color: var(--at-focus-indicator-color);
   text-underline-offset: var(--at-focus-underline-offset);
 }
 
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   text-decoration-line: underline;
-  text-decoration-thickness: var(--at-focus-thickness);
-  text-decoration-color: var(--at-color-focus);
+  text-decoration-thickness: var(--at-focus-indicator-size);
+  text-decoration-color: var(--at-focus-indicator-color);
   text-underline-offset: var(--at-focus-underline-offset);
 }
 
@@ -1097,8 +1100,8 @@ html:not([data-at-js]) [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-
 body[data-page-id="account"] *,
 body[data-page-id="account"] *::before,
 body[data-page-id="account"] *::after {
-  transition-timing-function: var(--at-motion-ease);
-  animation-timing-function: var(--at-motion-ease);
+  transition-timing-function: var(--at-motion-easing-standard);
+  animation-timing-function: var(--at-motion-easing-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1106,7 +1109,7 @@ body[data-page-id="account"] *::after {
   body[data-page-id="account"] *::before,
   body[data-page-id="account"] *::after {
     /* !important: reduced motion must win over every transition in the base theme. */
-    transition-duration: var(--at-motion-none) !important;
-    animation-duration: var(--at-motion-none) !important;
+    transition-duration: var(--at-motion-duration-instant) !important;
+    animation-duration: var(--at-motion-duration-instant) !important;
   }
 }
