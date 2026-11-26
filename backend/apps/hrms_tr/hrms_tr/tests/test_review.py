@@ -16,6 +16,11 @@ def fixture(name):
 	return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def profiles():
+	# The Role Profiles are not fixtures (AJA-934). `hrms_tr.role_profiles` opens them from this file.
+	return json.loads((FIXTURES.parent / "role_profile.json").read_text(encoding="utf-8"))
+
+
 def raise_with_message(message, *args):
 	raise RuntimeError(message)
 
@@ -25,7 +30,7 @@ class RoleFixtureTest(unittest.TestCase):
 		self.assertTrue(all(role["desk_access"] == 0 for role in fixture("01_role.json")))
 
 	def test_manager_and_hr_profiles_keep_employee_role(self):
-		for profile in fixture("02_role_profile.json"):
+		for profile in profiles():
 			self.assertIn("HRT Employee", {row["role"] for row in profile["roles"]})
 
 	def test_hr_employee_permission_only_grants_read(self):

@@ -400,5 +400,7 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		h.login_with_keycloak(client, h.userinfo("sub-new", NEW))
 		self.assertEqual(h.logged_user(client), NEW)
 		for path in ("/desk", "/app"):
+			# G-53: the Desk request ends on the panel, not on the Desk.
 			response = h.request(client.get, path, follow_redirects=True)
-			self.assertEqual(response.status_code, 403, f"{path}: {response.status_code}")
+			self.assertEqual(response.request.path, "/panel", f"{path}: {response.status_code}")
+			self.assertNotIn(b"frappe.boot =", response.data)
