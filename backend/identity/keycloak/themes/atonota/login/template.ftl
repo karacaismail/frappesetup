@@ -2,7 +2,8 @@
   Atonota giriş şablonu. Kaynak: Keycloak 26.8.2, keycloak.v2/login/template.ftl.
   Temel şablondan farklar "ATONOTA" notuyla işaretlidir:
   1. Sayfa simgesi temanın kendi SVG dosyasıdır.
-  2. Başlıkta marka işareti ve realm'in görünen adı durur. Marka adı şablona yazılmaz.
+  2. Kartın en üstünde marka işareti ve realm'in görünen adı durur. Marka adı şablona yazılmaz.
+     Ayrı bir başlık bölgesi yoktur. Bütün içerik tek main bölgesindedir.
   3. Dil seçimi işletim sisteminin açılır listesi değildir. Kartın altında bağlantı listesidir.
   4. Girişi başlatan e-posta adresi düz metindir. Baştan başlama bağlantısı yazıyla görünür.
   Keycloak sürümü değişince bu dosyayı yeni temel şablonla karşılaştırın.
@@ -153,17 +154,15 @@
 <body id="keycloak-bg" class="${properties.kcBodyClass!}" data-page-id="login-${pageId}">
 <div class="${properties.kcLogin!}">
   <div class="${properties.kcLoginContainer!}">
-    <header id="kc-header" class="pf-v5-c-login__header">
-      <#-- ATONOTA 2 -->
-      <div id="kc-header-wrapper" class="at-brand">
-        <svg class="at-brand__mark" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" focusable="false">
-          <circle class="at-brand__ring" cx="16" cy="16" r="11.5" fill="none" stroke-width="4"/>
-          <circle class="at-brand__dot" cx="16" cy="16" r="4"/>
-        </svg>
-        <span class="at-brand__name"><#if realm.displayName?has_content>${realm.displayName}<#else>${realm.name}</#if></span>
-      </div>
-    </header>
     <main class="${properties.kcLoginMain!}">
+      <#-- ATONOTA 2: marka kartın en üstündedir. Bütün içerik tek main bölgesindedir (AJA-1125).
+           İşaret, marka adının ilk harfidir. Ad ve harf realm'in görünen adından gelir, şablona yazılmaz. -->
+      <#assign atBrandName = (realm.displayName!"")?trim>
+      <#if !atBrandName?has_content><#assign atBrandName = realm.name></#if>
+      <div id="kc-header-wrapper" class="at-brand">
+        <span class="at-brand__mark" aria-hidden="true">${atBrandName?substring(0, 1)?upper_case}</span>
+        <span class="at-brand__name">${atBrandName}</span>
+      </div>
       <div class="${properties.kcLoginMainHeader!}">
         <h1 class="${properties.kcLoginMainTitle!}" id="kc-page-title"><#nested "header"></h1>
       </div>

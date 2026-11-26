@@ -213,6 +213,17 @@ export const screens: Screen[] = [
     },
   },
   {
+    // Both fields are empty. Each field names its own empty state (AJA-1125).
+    name: 'sign-in-empty',
+    open: async (page) => {
+      await openLogin(page);
+      await page.waitForLoadState('load');
+      await page.locator('#kc-login').click();
+      await expect(page.locator('#input-error-username')).toBeVisible();
+      await expect(page.locator('#input-error-password')).toBeVisible();
+    },
+  },
+  {
     name: 'register',
     open: async (page) => {
       await openLogin(page);

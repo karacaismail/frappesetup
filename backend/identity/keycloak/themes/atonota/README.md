@@ -55,13 +55,20 @@ Deneme ortamı marka adını bilerek “Sample Brand” yapar. Böylece temaya s
 
 ## Görsel kimlik
 
-Atonota bir kimlik ve güven markasıdır. Tema üç şeye dayanır:
-
-- sakin bir kâğıt zemini,
-- koyu mürekkep rengi,
-- küçük bir mühür noktası.
+Giriş ekranı onaylı arayüz taslağına uyar. Taslak AJA-880 işinin 3. sürümüdür (AJA-1125).
 
 Bütün renk, yazı, boşluk, köşe ve hareket değerleri `login/resources/css/atonota.css` dosyasının başındadır. Değerler `--at-` ile başlayan CSS değişkenleridir. Kuralların içine sabit değer yazmayın. Örneğin yeni bir renk gerekiyorsa önce bir değişken ekleyin.
+
+Tokenların kaynağı `atonota-web` deposudur. Kaynak klasör `src/design/` olur. Değerler `d21799c` commit'inden alındı (AJA-997). Keycloak teması o dosyaları içe aktaramaz. Bu yüzden değerler aynı adla taşındı. Adın başına `at-` eklendi. Örneğin kaynaktaki `--color-primary` burada `--at-color-primary` olur. Kaynakta olmayan birkaç değer taslaktan gelir. Her değerin kaynağı CSS yorumunda yazar.
+
+Kaynak tokenlar değişince bu bölümü elle güncelleyin. Hesap temasındaki aynı bölümü de birlikte değiştirin.
+
+Görsel dilin ana kararları şunlardır:
+
+- Zemin açık gridir. Kart beyazdır. Koyu temada ikisi de koyu gridir.
+- Ana düğmenin zemini `#00aacc` rengidir. Bu renk açık temada yazı rengi olmaz.
+- Bağlantı ve odak çizgisi koyu mavidir.
+- Marka işareti, marka adının ilk harfini taşıyan küçük bir karedir.
 
 ## Arayüz kuralları
 
@@ -191,7 +198,7 @@ Tema, Keycloak 26.8.2 kaynağındaki on bir şablonun değiştirilmiş kopyasın
 
 | Dosya | Fark |
 | --- | --- |
-| `login/template.ftl` | Dört fark vardır: sayfa simgesi, marka başlığı, dil bağlantıları ve girişi başlatan adresin gösterimi. Farklar dosyada `ATONOTA` notuyla işaretlidir. |
+| `login/template.ftl` | Dört fark vardır: sayfa simgesi, kartın üstündeki marka, dil bağlantıları ve girişi başlatan adresin gösterimi. Ayrı bir başlık bölgesi yoktur. Bütün içerik tek `main` bölgesindedir. Farklar dosyada `ATONOTA` notuyla işaretlidir. |
 | `login/login-config-totp.ftl` | İki etiketin `for` değeri kendi giriş alanını gösterir. Temel şablonda bu değer yanlıştır. |
 | `login/select-authenticator.ftl` | Her giriş yolu gerçek bir düğmedir. Temel şablondaki satır Enter ve Space tuşuyla çalışmaz. |
 | `login/login-verify-email.ftl` | Yeniden gönderme bağlantısı tam bir cümledir. Temel şablon cümleyi parçalardan birleştirir. |
@@ -199,9 +206,25 @@ Tema, Keycloak 26.8.2 kaynağındaki on bir şablonun değiştirilmiş kopyasın
 | `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. |
 | `login/login-recovery-authn-code-config.ftl` | Uyarı çevrilir. Başlık sırası düzeltilir. Dosya ve çıktı tarihi ekranın dilini kullanır. |
 | `login/logout-confirm.ftl` | Onay düğmesi doğal Tab sırasını izler. |
-| `login/login.ftl` | E-posta yalnız yazı olarak görünüyorsa form gizli bir kullanıcı adı alanı taşır. |
+| `login/login.ftl` | E-posta yalnız yazı olarak görünüyorsa form gizli bir kullanıcı adı alanı taşır. Başlığın altında kısa bir açıklama vardır. “Parolamı unuttum” bağlantısı giriş düğmesinden sonra gelir. Boş alan kendi adıyla bildirilir. |
 | `login/login-password.ftl` | Form gizli bir kullanıcı adı alanı taşır. |
 | `login/login-update-password.ftl` | Form gizli bir kullanıcı adı alanı taşır. Tarayıcı yeni parolayı doğru hesaba kaydeder. |
+
+### Giriş ekranında boş alan
+
+Keycloak boş formu yanlış parola gibi bildirir. Ekran o zaman “E-posta ya da parola yanlış.” yazar. Bu metin boş form için yanlıştır. Tema boş alanı kendi adıyla bildirir.
+
+1. `login/resources/js/atonota-form.js` betiği formu göndermeden önce iki alana bakar.
+2. Alan boşsa betik formu göndermez.
+3. Betik hatayı o alanın altına yazar. Örneğin “E-posta alanı boş. E-posta adresinizi yazın.”
+4. Hata alanın erişilebilir açıklaması olur. Ekran okuyucu hatayı alanla birlikte okur.
+5. İlk boş alan odak alır.
+
+Metinler formun `data-at-empty-username` ve `data-at-empty-password` özniteliklerinden gelir. Öznitelikleri `login.ftl` ileti dosyasından doldurur.
+
+Betik çalışmazsa sunucu boş e-posta alanını yine adıyla bildirir. Boş parolayı sunucu ayırt edemez. Keycloak gönderilen parolayı şablona vermez. Bu durumda genel hata görünür.
+
+Dolu ama yanlış girişte genel hata kalır. Bu hata kullanıcının var olup olmadığını söylemez.
 
 ### Parola formları ve parola yöneticisi
 
@@ -258,6 +281,7 @@ npx playwright test
 | --- | --- |
 | `tests/layout.spec.ts` | Yatay taşma, yazı boyutu, yazı tipi, dış istek, dokunma alanı ve büyük kök yazı |
 | `tests/focus.spec.ts` | Tab sırası, klavye odak kipi, odak çizgisinin biçimi ve zorlanmış renkler |
+| `tests/login-screen.spec.ts` | Giriş ekranı taslağa uyar: tek `main` bölgesi, marka, bağlantı sırası, renkler, tokenlar ve boş alan hataları |
 | `tests/flow.spec.ts` | Kayıt, giriş, parola sıfırlama, doğrulama kodu ve geçiş anahtarı |
 | `tests/flow.spec.ts` | Kurtarma kodu kurulumu, oturum kapatma ve giriş yöntemi silme |
 | `tests/screens-text.spec.ts` | Yedi ekranda Türkçe metin, düğme adları ve bağlantı adları |
@@ -274,7 +298,7 @@ npx playwright test
 | `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
 | `tests/password-autocomplete.spec.ts` | Parola formlarında kullanıcı adı alanı ve `autocomplete` değerleri |
-| `tests/visual.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
+| `tests/visual.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi. Görüntü alınırken parola alanı boş olmalıdır. |
 
 Yerleşim testleri yedi görünümde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü. Öteki testler 320 ve masaüstü görünümünde koşar.
 
