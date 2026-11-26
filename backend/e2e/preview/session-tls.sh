@@ -38,5 +38,11 @@ docker_preview exec --user root "$sync" chown -R "$uid:$gid" "$relay_dir"
 docker_preview cp "$private/certificate.pem" "$tenant:/usr/local/share/ca-certificates/e2e-identity-sync.crt"
 docker_preview exec --user root "$tenant" chmod 0644 /usr/local/share/ca-certificates/e2e-identity-sync.crt
 docker_preview exec --user root "$tenant" update-ca-certificates > /dev/null
+# update-ca-certificates lasts only as long as this container. Compose recreates the tenant from
+# the image, so the certificate is also kept in the sites volume. The tenant entrypoint in
+# dev/compose.tenant.yaml adds it to the CA bundle at every start (AJA-936).
+docker_preview exec -i --user root "$tenant" sh -c \
+    'mkdir -p sites/.e2e-trust && cat > sites/.e2e-trust/identity-sync.crt && chmod 0644 sites/.e2e-trust/identity-sync.crt' \
+    < "$private/certificate.pem"
 docker_preview exec -d "$sync" "$sync_python" "$relay_dir/relay.py" sessions "$upstream_port"
 docker_preview exec -d "$sync" "$sync_python" "$relay_dir/relay.py" keycloak "$keycloak_port"
