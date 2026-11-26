@@ -3,7 +3,6 @@
 import json
 import re
 import runpy
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -189,10 +188,8 @@ class ReviewAccountListTest(unittest.TestCase):
                 self.assertNotIn("System Manager", row)
 
     def test_the_local_password_file_is_ignored_by_git(self):
-        ignored = subprocess.run(
-            ["git", "-C", str(E2E), "check-ignore", "-q", str(E2E / ".env")], check=False
-        )
-        self.assertEqual(ignored.returncode, 0)
+        # The stack's own check raises unless Git ignores the file.
+        stack()["assert_ignored"](E2E / ".env")
 
 
 class LocalStackTest(unittest.TestCase):
