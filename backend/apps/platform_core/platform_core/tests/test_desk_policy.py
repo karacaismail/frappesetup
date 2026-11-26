@@ -22,6 +22,14 @@ TENANT_ADMIN_ROLE = "Desk Policy Tenant Admin"
 TENANT_ADMIN = "desk-policy-admin@example.test"
 OPERATOR = "desk-policy-operator@example.test"
 PORTAL_USER = "desk-policy-portal@example.test"
+# AJA-963: the home page of these users is the Desk, so "/" would open the Desk.
+HOME_ROLE = "Desk Policy Home Role"
+HOME_ROLE_USER = "desk-policy-home-role@example.test"
+WORKSPACE_USER = "desk-policy-workspace@example.test"
+HOME_OPERATOR = "desk-policy-home-operator@example.test"
+HOME_PAGE_PATHS = ("/", "/index", "/index.html")
+DESK_HOME_USERS = (HOME_ROLE_USER, WORKSPACE_USER)
+RESOLVER_HOOK = "platform_core.config.desk_policy.resolve_website_path"
 SETTINGS_HOOK = "platform_core.config.desk_policy.apply"
 REQUEST_HOOK = "platform_core.config.desk_policy.before_request"
 AUTH_HOOK = "platform_core.config.desk_policy.after_auth"
@@ -94,9 +102,23 @@ class TestDeskPolicy(IntegrationTestCase):
 		_user(TENANT_ADMIN, [TENANT_ADMIN_ROLE])
 		_user(OPERATOR, [TENANT_ADMIN_ROLE, OPERATOR_ROLE])
 		_user(PORTAL_USER, [], user_type="Website User")
+		# Way 1: the "Home Page" field of a role is "desk". A "Tenant Admin" can write this field.
+		if not frappe.db.exists("Role", HOME_ROLE):
+			frappe.get_doc({"doctype": "Role", "role_name": HOME_ROLE, "desk_access": 1}).insert()
+		frappe.db.set_value("Role", HOME_ROLE, "home_page", "desk")
+		_user(HOME_ROLE_USER, [HOME_ROLE])
+		_user(HOME_OPERATOR, [HOME_ROLE, OPERATOR_ROLE])
+		# Way 2: the user writes a default workspace on the own record.
+		_user(WORKSPACE_USER, [TENANT_ADMIN_ROLE])
+		workspace = frappe.get_all("Workspace", filters={"public": 1}, pluck="name", limit=1)[0]
+		frappe.db.set_value("User", WORKSPACE_USER, "default_workspace", workspace)
 		frappe.db.commit()
-		cls.sids = {user: _sid(user) for user in (TENANT_ADMIN, OPERATOR, PORTAL_USER)}
-		cls.api_keys = {user: generate_keys(user) for user in (TENANT_ADMIN, OPERATOR)}
+		for user in (*DESK_HOME_USERS, HOME_OPERATOR):
+			frappe.clear_cache(user=user)
+			frappe.cache.hdel("home_page", user)
+		all_users = (TENANT_ADMIN, OPERATOR, PORTAL_USER, *DESK_HOME_USERS, HOME_OPERATOR)
+		cls.sids = {user: _sid(user) for user in all_users}
+		cls.api_keys = {user: generate_keys(user) for user in (TENANT_ADMIN, OPERATOR, *DESK_HOME_USERS)}
 		cls.bearer_tokens = {user: _bearer_token(user) for user in (TENANT_ADMIN, OPERATOR)}
 		frappe.db.commit()
 
@@ -258,6 +280,58 @@ class TestDeskPolicy(IntegrationTestCase):
 					and path != PANEL_PATH,
 					f"{path}: {response.status_code} {location}",
 				)
+
+	# --- The home page (AJA-963) -------------------------------------------------------------------
+
+	def test_desk_home_users_have_the_desk_as_home_page(self):
+		# The test data really makes Frappe pick the Desk, so the tests below test the open hole.
+		from frappe.website.utils import get_home_page
+
+		from platform_core.config.desk_policy import is_desk_path
+
+		for user in DESK_HOME_USERS:
+			with self.subTest(user=user):
+				frappe.set_user(user)
+				try:
+					self.assertTrue(is_desk_path(get_home_page()), get_home_page())
+				finally:
+					frappe.set_user("Administrator")
+
+	def test_resolver_hook_is_set(self):
+		self.assertEqual(hooks.website_path_resolver, [RESOLVER_HOOK])
+
+	def test_home_page_paths_send_desk_home_users_to_the_panel(self):
+		for user in DESK_HOME_USERS:
+			for path in HOME_PAGE_PATHS:
+				with self.subTest(user=user, path=path):
+					self.assert_sent_to_panel(path, user)
+
+	def test_home_page_paths_send_desk_home_users_to_the_panel_with_an_api_key(self):
+		for user in DESK_HOME_USERS:
+			for path in HOME_PAGE_PATHS:
+				with self.subTest(user=user, path=path):
+					self.assert_sent_to_panel(path, headers=self.api_key_header(user))
+
+	def test_platform_operator_with_desk_home_opens_the_desk(self):
+		for path in HOME_PAGE_PATHS:
+			with self.subTest(path=path):
+				response = self.get(path, HOME_OPERATOR)
+				self.assertEqual(response.status_code, 200, path)
+				self.assertIn(b"frappe.boot =", response.data, path)
+
+	def test_other_website_pages_still_open(self):
+		# The resolver keeps Frappe's own answer for pages that are not the Desk.
+		for path in ("/login", "/panel"):
+			with self.subTest(path=path):
+				response = self.get(path, TENANT_ADMIN)
+				self.assertNotEqual(response.status_code, 500, path)
+				location = urlsplit(response.headers.get("Location") or "").path
+				self.assertFalse(response.status_code == 302 and location == PANEL_PATH and path != PANEL_PATH, path)
+
+	def test_resolver_keeps_frappe_route_redirects(self):
+		# Frappe sends /app/x to /desk/x. The check then sends the Desk address to the panel.
+		response = self.get("/app/user", TENANT_ADMIN, follow_redirects=True)
+		self.assertEqual(response.request.path, PANEL_PATH)
 
 	# --- Settings -----------------------------------------------------------------------------------
 
