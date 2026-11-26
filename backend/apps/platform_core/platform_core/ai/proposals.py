@@ -12,7 +12,17 @@ from frappe.utils import add_to_date, get_datetime, now_datetime
 from frappe.utils.response import json_handler
 from pydantic import Field
 
-from platform_core.ai import access, policy, registry, risk, schema_check, store, timestamps, versioning
+from platform_core.ai import (
+	access,
+	fields,
+	policy,
+	registry,
+	risk,
+	schema_check,
+	store,
+	timestamps,
+	versioning,
+)
 from platform_core.ai.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
 from platform_core.ai.tools import results
 
@@ -311,7 +321,7 @@ def second_approver_problem(doc, tools: dict | None = None) -> str | None:
 
 	The rule is in the decision note, section 7, "Second approval of R3". The second person is
 	an enabled user of this site, is not the owner, may use the tool and may write the target
-	record. Without a target record the person needs the permission on the target DocType.
+	record. The person may also read every field the preview shows (AJA-1077). Without a target record the person needs the permission on the target DocType.
 	A create, submit, cancel or delete needs that permission, not only write.
 	Nobody holds write permission on the layer's own records. For those the tool's own role
 	check decides. `tools` maps tool names to tools, so a list reads the registry only once.
@@ -328,17 +338,58 @@ def second_approver_problem(doc, tools: dict | None = None) -> str | None:
 	if doctype in policy.LAYER_DOCTYPES:
 		return None
 	target = name if name and store.document_exists(doctype, name) else None
-	ptype = ACTION_PERMISSION.get(json.loads(doc.preview_json or "{}").get("action"), "write")
+	preview = json.loads(doc.preview_json or "{}")
+	ptype = ACTION_PERMISSION.get(preview.get("action"), "write")
 	if not frappe.has_permission(doctype, ptype, doc=target, user=user):
 		return "not_second_approver"
+	if not _preview_readable(doctype, preview):
+		# The owner built the preview. It may show a field this person may not read (AJA-1077).
+		return "not_second_approver"
 	return None
+
+
+def _preview_readable(doctype: str, preview: dict) -> bool:
+	"""Whether the session user may read every field of `doctype` the preview shows.
+
+	A change that names a field of the target DocType needs read permission on it, permission
+	level and secret fields included. For a child table field every row field counts too.
+	A name that is no field of the DocType (for example `title.bold` of a field property) shows
+	no record value.
+	"""
+	meta = fields.get_meta(doctype)
+	can_read = fields.readable(meta)
+	for change in preview.get("changes") or []:
+		if not isinstance(change, dict):
+			return False
+		field = meta.get_field(change.get("fieldname") or "")
+		if field is None:
+			continue
+		if field.fieldname not in can_read:
+			return False
+		if field.fieldtype in ("Table", "Table MultiSelect") and not _rows_readable(
+			frappe.get_meta(field.options), doctype, change
+		):
+			return False
+	return True
+
+
+def _rows_readable(child_meta, parenttype: str, change: dict) -> bool:
+	can_read = fields.readable(child_meta, parenttype)
+	for value in (change.get("old"), change.get("new")):
+		for row in value if isinstance(value, list) else []:
+			if not isinstance(row, dict):
+				continue
+			if any(child_meta.get_field(key) is not None and key not in can_read for key in row):
+				return False
+	return True
 
 
 def list_second_approvals_for_human(limit: int = 20, start: int = 0) -> dict:
 	"""R3 proposals of other users that the session user may approve as the second person.
 
 	Each row carries the digest. The second person sends it back with the approval, as the owner
-	does. A row is shown only to a person who may write the target, so that person may read it too.
+	does. A row is shown only to a person who may write the target and read every field the
+	preview shows (AJA-1077).
 	"""
 
 	def page() -> dict:

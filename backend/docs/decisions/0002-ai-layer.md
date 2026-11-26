@@ -399,6 +399,21 @@ Akış şu sırayla ilerler:
 - Kişi öneriyi açan kişi değildir.
 - Kişi aracı kullanabilir. Örneğin yönetim araçları “System Manager” rolünü ister.
 
+İkinci kişi önizlemedeki her alanı okuyabilmelidir. Bu kural 26 Kasım 2026 Perşembe günü eklendi (AJA-1077).
+
+Frappe bazı alanları izin düzeyiyle gizler. Bu ayarın adı “permlevel” olur. Permlevel, alanı kayıt izni olan kişiden de gizler. Önizlemeyi öneriyi açan kişi kurar. Bu yüzden önizleme ikinci kişinin göremediği değeri taşıyabilir.
+
+Sunucu önizlemedeki her değişikliğe bakar. Değişiklik hedef kayıt türünün bir alanını adlandırabilir. Bu durumda ikinci kişi o alanı okuyabilmelidir. Alan bir alt tablo da olabilir. Bu durumda kişi satırlardaki her alanı da okuyabilmelidir. Gizli alanlar da bu kurala girer. Örneğin parola alanı böyledir.
+
+Kişi bir alanı okuyamazsa ikinci onay veremez. Bu durumda sunucu şunları yapar:
+
+1. Sunucu öneriyi `list_second_approvals` listesine koymaz.
+2. Kişi `approve_proposal` ucunu çağırırsa sunucu 403 döndürür. Kayıt `not_second_approver` nedenini taşır.
+3. Sunucu bu ret yanıtında öneriyi göstermez. Bu ret özet ve süre denetiminden önce gelir. Bu yüzden `digest_mismatch` ve `expired` yanıtları da bu kişiye dönmez.
+4. Öneri beklemeyi sürdürür. Alanı okuyabilen başka bir kişi ikinci onayı verebilir.
+
+Önizlemeyi ikinci kişiye göre yeniden kurmak da mümkündü. O yolda kişi değerin bir kısmını görmeden onay verirdi. Bu yüzden bu yol seçilmedi. Önizlemenin `details` bölümü alan değeri taşımaz. Bu bölüm yalnız aracın kendi bilgilerini taşır. Örneğin silinecek satır sayısı böyledir.
+
 Bazı işler yazma izninden fazlasını ister. Önizlemedeki iş oluşturma, gönderme, iptal ya da silme olabilir. Bu durumda kişi o işin iznine sahip olur. Örneğin silme önerisinde kişinin silme izni vardır.
 
 Katmanın kendi kayıtlarında kimsenin yazma izni yoktur. Örneğin “PLT AI Action Log” kaydı böyledir. Bu kayıtlarda aracın kendi rol denetimi karar verir.

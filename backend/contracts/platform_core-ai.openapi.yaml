@@ -214,6 +214,7 @@ paths:
         The person also has write permission on the target record. Without a target record, the DocType permission counts.
         A preview with the action `create`, `submit`, `cancel` or `delete` needs that permission instead of write permission.
         Nobody holds write permission on the layer's own records, for example the PLT AI Action Log. For those the tool's own role check decides.
+        The person may also read every field of the target DocType that the preview changes. Frappe hides some fields by their permission level (permlevel). A proposal whose preview changes such a hidden field is not in this list. `approve_proposal` refuses that person with 403 and returns nothing of the proposal.
         The session user's own proposals are never in this list. An expired proposal is not in this list.
         Each row carries the `digest` value. The second person sends it with `approve_proposal`.
         The newest proposal comes first. For the next page, increase `start` by `limit`.
@@ -300,6 +301,7 @@ paths:
         Then the action runs with the second person's permissions, and `second_approver` and `second_approved_at` are stored.
         If the owner approves again, the deny reason is `second_approver_required` and the proposal keeps waiting.
         A person without write permission gets 403 and the deny reason `not_second_approver` is written to the log.
+        A person who may not read a field the preview changes gets the same 403. The response shows no value of the preview.
         R0, R1 and R2 proposals need only the owner's approval. Another person gets 403 with `not_owner`.
 
         Before executing, the server records the result as `unknown`. If the process is cut off midway, the result stays `unknown`.

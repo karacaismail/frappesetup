@@ -8,11 +8,14 @@ and runs the action. The owner's second approval counts as one approval.
 import frappe
 from frappe.utils import add_to_date, now_datetime
 
-from platform_core.ai.tests.base import DOCTYPE, MANAGER, USER_A, USER_B, AiTestCase
+from platform_core.ai.tests.base import DOCTYPE, MANAGER, SECOND_MANAGER, USER_A, USER_B, AiTestCase
 from platform_core.ai.tests.test_risk_level import with_risk_tools
 
 AWAITING = "awaiting_second_approval"
 PROPOSAL = "PLT AI Action Proposal"
+# The value of a permlevel 1 field. Only System Managers may read it (AJA-1077).
+HIDDEN_OLD = "Gizli-eski-not-4821"
+HIDDEN_NEW = "Gizli-yeni-not-9364"
 
 
 class TestSecondApproval(AiTestCase):
@@ -318,6 +321,72 @@ class TestSecondApproval(AiTestCase):
 
 		self.assertEqual(listed.status_code, 200, listed.get_data(as_text=True))
 		self.assertIn(proposal_id, [row["proposal_id"] for row in listed.json["message"]["proposals"]])
+
+	# --- fields the second person may not read (AJA-1077) ---
+
+	def hidden_field_proposal(self) -> tuple[str, str, str]:
+		"""A record of user A with a permlevel 1 value and a manager's first-approved R3 proposal.
+
+		User A may write the record as its owner. User A may not read the permlevel 1 field.
+		"""
+		name = self.make_record(USER_A, title="Eski")
+		frappe.db.set_value(DOCTYPE, name, "internal_note", HIDDEN_OLD)
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+		owner = self.login(MANAGER)
+		result = self.call_tool(owner, "plt_high_internal_note", {"name": name, "internal_note": HIDDEN_NEW})
+		self.assertFalse(result["isError"], result)
+		proposal_id = result["structuredContent"]["proposal_id"]
+		digest = self.digest_of(owner, proposal_id)
+		response = self.approve(owner, proposal_id, digest)
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(self.stored(proposal_id).status, AWAITING)
+		return name, proposal_id, digest
+
+	def assert_hidden(self, text: str) -> None:
+		self.assertNotIn(HIDDEN_OLD, text)
+		self.assertNotIn(HIDDEN_NEW, text)
+
+	def test_waiting_list_hides_a_proposal_with_a_field_the_reader_may_not_read(self):
+		_name, proposal_id, _digest = self.hidden_field_proposal()
+
+		response = self.human(self.login(USER_A), "GET", "list_second_approvals")
+
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assert_hidden(response.get_data(as_text=True))
+		listed = [row["proposal_id"] for row in response.json["message"]["proposals"]]
+		self.assertNotIn(proposal_id, listed)
+
+	def test_refused_second_approval_does_not_show_a_field_the_person_may_not_read(self):
+		name, proposal_id, digest = self.hidden_field_proposal()
+		second = self.login(USER_A)
+
+		wrong = self.approve(second, proposal_id, "0" * 64)
+		frappe.db.set_value(PROPOSAL, proposal_id, "expires_at", add_to_date(now_datetime(), seconds=-5))
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+		late = self.approve(second, proposal_id, digest)
+
+		for response in (wrong, late):
+			self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+			self.assert_hidden(response.get_data(as_text=True))
+		self.assertEqual(self.stored(proposal_id).status, AWAITING)
+		self.assertIsNone(self.stored(proposal_id).second_approver)
+		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "internal_note"), HIDDEN_OLD)
+		log = self.last_log(stage="approve", proposal=proposal_id, user=USER_A)
+		self.assertEqual(log.deny_reason, "not_second_approver")
+
+	def test_second_person_who_may_read_the_field_still_sees_and_runs_it(self):
+		name, proposal_id, _digest = self.hidden_field_proposal()
+		second = self.login(SECOND_MANAGER)
+
+		row = next(row for row in self.waiting_for(second) if row["proposal_id"] == proposal_id)
+		self.assertEqual(
+			row["preview"]["changes"], [{"fieldname": "internal_note", "old": HIDDEN_OLD, "new": HIDDEN_NEW}]
+		)
+		response = self.approve(second, proposal_id, row["digest"])
+
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertTrue(response.json["message"]["executed"], response.json)
+		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "internal_note"), HIDDEN_NEW)
 
 	# --- R0, R1 and R2 stay as they were ---
 
