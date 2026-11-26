@@ -146,6 +146,61 @@ class TestApprovalContract(unittest.TestCase):
                 )
 
 
+class TestHomeContract(unittest.TestCase):
+    """The reject endpoint and the home page summary (AJA-1165)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+        cls.schemas = cls.contract["components"]["schemas"]
+
+    def test_reject_endpoint_takes_the_approval_request(self):
+        path = self.contract["paths"]["/method/hrms_tr.api.reject_leave"]
+        self.assertEqual(set(path), {"post"})
+        body = path["post"]["requestBody"]["content"]["application/json"]["schema"]
+        self.assertEqual(body, {"$ref": "#/components/schemas/ApproveLeaveRequest"})
+        self.assertEqual(set(path["post"]["responses"]), {"200", "401", "403", "404", "417", "429"})
+
+    def test_summary_endpoint_takes_get_only(self):
+        path = self.contract["paths"]["/method/hrms_tr.api.get_home_summary"]
+        self.assertEqual(set(path), {"get"})
+        self.assertEqual(set(path["get"]["responses"]), {"200", "401", "403", "429"})
+
+    def test_summary_parts_match_the_request_test(self):
+        from hrms_tr.tests import test_home_summary as runtime
+
+        for schema, fields in (
+            ("HomeSummary", runtime.SUMMARY_PARTS),
+            ("PendingApproval", runtime.PENDING_FIELDS),
+            ("RecentChange", runtime.RECENT_FIELDS),
+            ("HomeCounts", runtime.COUNT_FIELDS),
+        ):
+            with self.subTest(schema=schema):
+                self.assertEqual(set(self.schemas[schema]["required"]), fields)
+                self.assertFalse(self.schemas[schema].get("additionalProperties", True))
+
+    def test_summary_states_the_team_rule(self):
+        # The orchestrator approved this rule on 26 November 2026 (AJA-1165).
+        operation = self.contract["paths"]["/method/hrms_tr.api.get_home_summary"]["get"]
+        text = " ".join(operation["description"].split())
+        for sentence in (
+            "The team is the department of the leave application.",
+            "An application without a department is never an overlap.",
+            "Only applications that end today or later count.",
+            "Two applications of the same employee also count.",
+        ):
+            with self.subTest(sentence=sentence):
+                self.assertIn(sentence, text)
+
+    def test_problem_kinds_and_change_actions_are_listed(self):
+        kinds = {item["properties"]["kind"]["const"] for item in self.schemas["HomeProblem"]["oneOf"]}
+        self.assertEqual(kinds, {"overlap", "missing_joining_date"})
+        self.assertEqual(
+            set(self.schemas["RecentChange"]["properties"]["action"]["enum"]),
+            {"created", "updated", "approved", "rejected", "cancelled"},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
 

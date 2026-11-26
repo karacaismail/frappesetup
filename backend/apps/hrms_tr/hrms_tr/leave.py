@@ -1,6 +1,6 @@
 """Use Frappe and HRMS permissions and validation for leave approvals."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import uuid7
 
 import frappe
@@ -21,6 +21,9 @@ APPROVER_ROLES = (*TOOL_APPROVER_ROLES, TENANT_ADMIN_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 HRMS_APPROVER_METHOD = "hrms.hr.doctype.leave_application.leave_application.get_leave_approver"
 
+# Approving and rejecting follow the same rules. Only the messages differ.
+Decision = Literal["approve", "reject"]
+
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
 LeaveVersion = Annotated[str, StringConstraints(min_length=1, max_length=40)]
 
@@ -33,16 +36,22 @@ def name_portal_leave(doc, method=None):
 		doc.name = str(uuid7())
 
 
-def check_approver_role():
+def check_approver_role(decision: Decision = "approve"):
 	if not set((*APPROVER_ROLES, *OPERATIONS_ROLES)).intersection(frappe.get_roles()):
-		frappe.throw(
-			_("You do not have permission to approve leave.", context="hrms_tr"), frappe.PermissionError
-		)
+		if decision == "reject":
+			message = _("You do not have permission to reject leave.", context="hrms_tr")
+		else:
+			message = _("You do not have permission to approve leave.", context="hrms_tr")
+		frappe.throw(message, frappe.PermissionError)
 
 
-def check_not_own_leave(doc):
+def check_not_own_leave(doc, decision: Decision = "approve"):
 	if frappe.db.get_value("Employee", doc.employee, "user_id") == frappe.session.user:
-		frappe.throw(_("You cannot approve your own leave.", context="hrms_tr"), frappe.PermissionError)
+		if decision == "reject":
+			message = _("You cannot reject your own leave.", context="hrms_tr")
+		else:
+			message = _("You cannot approve your own leave.", context="hrms_tr")
+		frappe.throw(message, frappe.PermissionError)
 
 
 def check_hr_role():
@@ -108,25 +117,44 @@ def validate_approval(doc, method=None):
 		check_not_own_leave(doc)
 
 
-def pending_leave(name: str, *, expected_version: str | None = None, lock: bool = False):
-	check_approver_role()
+def pending_leave(
+	name: str,
+	*,
+	expected_version: str | None = None,
+	lock: bool = False,
+	decision: Decision = "approve",
+):
+	check_approver_role(decision)
 	doc = frappe.get_doc(DOCTYPE, name, for_update=lock)
 	for operation in ("read", "write", "submit"):
 		doc.check_permission(operation)
-	check_not_own_leave(doc)
+	check_not_own_leave(doc, decision)
 	if expected_version is not None and str(doc.modified) != expected_version:
-		frappe.throw(
-			_("The leave application changed. Open it again before approving.", context="hrms_tr"),
-			frappe.TimestampMismatchError,
-		)
+		if decision == "reject":
+			message = _("The leave application changed. Open it again before rejecting.", context="hrms_tr")
+		else:
+			message = _("The leave application changed. Open it again before approving.", context="hrms_tr")
+		frappe.throw(message, frappe.TimestampMismatchError)
 	if doc.docstatus != DocStatus.draft() or doc.status != "Open":
-		frappe.throw(_("Only open draft leave applications can be approved.", context="hrms_tr"))
+		if decision == "reject":
+			message = _("Only open draft leave applications can be rejected.", context="hrms_tr")
+		else:
+			message = _("Only open draft leave applications can be approved.", context="hrms_tr")
+		frappe.throw(message)
 	return doc
 
 
 def approve(name: str, *, expected_version: str | None = None) -> dict[str, str]:
 	doc = pending_leave(name, lock=True, expected_version=expected_version)
 	doc.status = "Approved"
+	doc.submit()
+	return {"name": doc.name}
+
+
+def reject(name: str, *, expected_version: str) -> dict[str, str]:
+	"""HRMS submits a rejected leave with the status "Rejected"."""
+	doc = pending_leave(name, lock=True, expected_version=expected_version, decision="reject")
+	doc.status = "Rejected"
 	doc.submit()
 	return {"name": doc.name}
 

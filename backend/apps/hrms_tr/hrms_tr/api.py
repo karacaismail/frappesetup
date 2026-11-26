@@ -7,7 +7,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from pydantic import StringConstraints
 
-from hrms_tr import leave
+from hrms_tr import home_summary, leave
 from hrms_tr.leave import LeaveName, LeaveVersion
 
 
@@ -23,6 +23,20 @@ def approve_leave(name: LeaveName | None = None, version: LeaveVersion | None = 
 			frappe.ValidationError,
 		)
 	return leave.approve(name, expected_version=version)
+
+
+# leave.reject locks the target and checks its read, write, and submit rights.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+@rate_limit(limit=60, seconds=60, methods=["POST"], ip_based=False, user_based=True)
+def reject_leave(name: LeaveName | None = None, version: LeaveVersion | None = None) -> dict[str, str]:
+	if name is None:
+		frappe.throw(_("Select a leave application.", context="hrms_tr"), frappe.ValidationError)
+	if version is None:
+		frappe.throw(
+			_("Read the leave application version before rejecting.", context="hrms_tr"),
+			frappe.ValidationError,
+		)
+	return leave.reject(name, expected_version=version)
 
 
 # leave.cancel locks the target and checks HR, read, and cancel permissions.
@@ -47,3 +61,10 @@ def get_leave_approver(
 	if employee is None:
 		frappe.throw(_("Select an employee.", context="hrms_tr"), frappe.ValidationError)
 	return {"approver": leave.get_approver(employee)}
+
+
+# home_summary reads through frappe.get_list, so each part holds only records the user can read.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+@rate_limit(limit=120, seconds=60, methods=["GET"], ip_based=False, user_based=True)
+def get_home_summary() -> dict:
+	return home_summary.get_summary()
