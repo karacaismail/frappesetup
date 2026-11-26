@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "0be8c452e3f6be7e8c833c7321b34c23fe1b020d6001026f8a76e2f09bdcf15a",
+      "sha256": "5e94ad60311ca9ad2823275bd73863f113154fcbc7903d5b7b68f015d596dbf5",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -236,6 +236,7 @@
         "backend/apps/platform_core/platform_core/access/subject.py",
         "backend/apps/platform_core/platform_core/api/access.py",
         "backend/apps/platform_core/platform_core/api/atonota_login.py",
+        "backend/apps/platform_core/platform_core/api/help.py",
         "backend/apps/platform_core/platform_core/hooks.py",
         "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
         "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py"
