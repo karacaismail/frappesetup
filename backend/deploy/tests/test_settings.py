@@ -675,20 +675,72 @@ class WorkerSizingProposal(unittest.TestCase):
 
     def test_proposal_explains_cpu_and_shared_memory_limits(self):
         # Independent budget: reserve half of 128 GB, split the rest across four
-        # environments. Per environment: 8 GB web, 4 GB Press, 4 GB queue workers.
+        # environments. Deduct scheduler and backup reserves before sizing workers.
         for path in self.proposal_sources():
             with self.subTest(path=path.name):
                 text = path.read_text(encoding="utf-8")
                 for calculation in (
                     "(128 - 64) / 4 = 16 GB",
-                    "8 / 1 = 8", "4 / 1 = 4", "4 / 2 = 2",
-                    "min(2 * C_t + 1, 8)",
-                    "min(2 * C_p + 1, 4)",
+                    "16 - 1 - 3 = 12 GB",
+                    "6 / 1 = 6", "2 / 1 = 2", "4 / 2 = 2",
+                    "min(2 * C_t + 1, 6)",
+                    "min(2 * C_p + 1, 2)",
                     "min(C_q, 2)",
                 ):
                     self.assertTrue(calculation in text, f"{path.name}: missing {calculation}")
                 self.assertIn("1 GB", text)
                 self.assertIn("2 GB", text)
+
+    def all_proposal_sources(self):
+        return self.proposal_sources() + tuple(
+            DEPLOY / "environments" / f"{name}.env" for name in release.ORDER
+        )
+
+    def test_scheduler_reserves_memory_and_cpu_on_servers(self):
+        for path in self.all_proposal_sources():
+            with self.subTest(path=str(path.relative_to(BACKEND))):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("Sunucularda zamanlayıcı ve düzenli yedek açık kabul edilir.", text)
+                self.assertRegex(text, r"tenant-scheduler`? için 1 GB ayrılır\. Bu pay doğrulanmadı\.")
+                self.assertIn("C_s > 0", text)
+                self.assertIn("C_t + C_p + C_q <= C_env - C_s - C_b", text)
+                self.assertNotIn("Bu öneri zamanlayıcı açmaz.", text)
+
+    def test_backup_reserve_is_unverified_and_deducted_from_both_budgets(self):
+        for path in self.all_proposal_sources():
+            with self.subTest(path=str(path.relative_to(BACKEND))):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("Yedek işi için 3 GB ayrılır. Bu pay doğrulanmadı.", text)
+                self.assertIn("C_b > 0", text)
+                self.assertIn("C_t + C_p + C_q <= C_env - C_s - C_b", text)
+                self.assertIn("16 - 1 - 3 = 12 GB", text)
+
+    def test_peak_memory_totals_include_both_reserves(self):
+        for path in self.proposal_sources():
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                # Read the published operands. Catch stale totals and allocations
+                # that exceed the host budget when all four backups overlap.
+                match = re.search(
+                    r"\(4 \+ 2\) \* 1 \+ 2 \* 2 \+ (\d+) \+ (\d+) = (\d+) GB", text
+                )
+                self.assertIsNotNone(match, "missing concurrent scheduler/backup peak")
+                scheduler, backup, per_environment = map(int, match.groups())
+                self.assertEqual(per_environment, (4 + 2) + 2 * 2 + scheduler + backup)
+                self.assertIn(f"64 + 4 * {per_environment} = 120 GB", text)
+                self.assertLessEqual(64 + 4 * per_environment, 128)
+                limits = re.search(r"\(6 \+ 2\) \* 1 \+ 2 \* 2 \+ 1 \+ 3 = (\d+) GB", text)
+                self.assertIsNotNone(limits, "missing peak at worker memory limits")
+                self.assertEqual(int(limits.group(1)), 6 + 2 + 2 * 2 + scheduler + backup)
+                self.assertLessEqual(64 + 4 * int(limits.group(1)), 128)
+
+    def test_prod_proposal_is_limited_to_test_data(self):
+        document = (BACKEND / "docs" / "dagitim" / "ortamlar.md").read_text(encoding="utf-8")
+        proposal = document.split("### İşçi ve kuyruk önerisi", 1)[1].split("### ", 1)[0]
+        prod = (DEPLOY / "environments" / "prod.env").read_text(encoding="utf-8")
+        for text in (proposal, prod):
+            self.assertIn("prod ortamına yalnız deneme verisi girer.", text)
+            self.assertIn("Öneri gerçek müşteri yükünü kapsamaz.", text)
 
     def test_environment_proposals_preserve_readable_settings(self):
         environments = release.load_environments()
