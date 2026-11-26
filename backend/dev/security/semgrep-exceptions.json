@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "f1d8971068b9be8de7998a47b69f7b98d8254cb1f9209b26e32a41f290fc0ae9",
+      "sha256": "25838310b8d4cb3b0e1866ddee939ea43dd10128c0e562f81f12adac48cfa8db",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -378,8 +378,8 @@
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/setup/panel_roles.py",
-          "line": 65,
-          "reason": "Install and migrate step, not a request path; inserts only a missing profile from the bundled role_profile.json."
+          "line": 73,
+          "reason": "Install and migrate step, not a request path; inserts only a missing profile from a bundled role_profile.json (platform_core or hrms_tr, AJA-934)."
         }
       ],
       "files": [
