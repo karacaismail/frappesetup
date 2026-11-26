@@ -235,7 +235,7 @@ class ScannerSelfTest(unittest.TestCase):
 
     def test_new_rules_fire_on_synthetic_samples(self):
         """Samples for the 26 November 2026 rules. Values are assembled at run time."""
-        self.assertEqual(self.kinds("Grup: https://" + "t.me/" + "ornekgrup"), {"telegram-link"})
+        self.assertEqual(self.kinds("Grup: https://" + "t" + ".me/" + "ornekgrup"), {"telegram-link"})
         self.assertEqual(self.kinds("tg:" + "//join?invite=abc"), {"telegram-link"})
         self.assertEqual(self.kinds("Sunucu " + ".".join(["5", "9", "40", "11"])), {"public-ip"})
         self.assertEqual(self.kinds("ssh root@" + ".".join(["88", "99", "12", "3"])), {"public-ip"})
