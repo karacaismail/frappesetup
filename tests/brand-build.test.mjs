@@ -21,7 +21,7 @@ test('one setting change reaches a fresh production build without regenerating s
   ].map(path => [path, readFileSync(join(root, path))]);
   const out = mkdtempSync(join(tmpdir(), 'site-brand-'));
   const suffix = randomUUID().slice(0, 8);
-  const first = { name: `İlk ${suffix}`, domain: `first-${suffix}.test` };
+  const first = { name: 'Kimlik Merkezi', domain: `first-${suffix}.test` };
   const second = { name: `Kurumsal; Kimlik ve Güvenli Giriş Merkezi ${suffix}`, domain: `brand-${suffix}.test` };
   const escapedName = second.name.replaceAll('&', '&amp;');
   const { NODE_TEST_CONTEXT: _, ...buildEnv } = process.env;
@@ -32,8 +32,10 @@ test('one setting change reaches a fresh production build without regenerating s
     // A second build with unchanged Markdown must invalidate cached rendered content.
     writeFileSync(setting, `PRODUCT_NAME=${first.name}\nBRAND_DOMAIN=${first.domain}\n`);
     build();
+    checkBrandGrammar(out, first.name);
     writeFileSync(setting, `PRODUCT_NAME=${second.name}\nBRAND_DOMAIN=${second.domain}\n`);
     build();
+    checkBrandGrammar(out, second.name);
     const login = readFileSync(join(out, 'atonota-login/index.html'), 'utf8');
     assert.ok(login.includes(`${escapedName}: bağımsız giriş ürünü</h1>`), 'document heading');
     assert.ok(login.includes(`api.login.${second.domain}`), 'document body domain');
@@ -52,6 +54,22 @@ test('one setting change reaches a fresh production build without regenerating s
     rmSync(out, { recursive: true, force: true });
   }
 });
+
+function checkBrandGrammar(directory, name) {
+  const phrases = {
+    'atonota-login/index.html': [`${name} ürününü satın alabilir`, `${name} ürününün kodu`],
+    'index.html': [`${name} ürününü bağımsız ve ücretli`],
+    'yol-haritasi/index.html': [`${name} ürününü bağımsız ve ücretli`],
+    'gereksinimler/index.html': [`${name} ürününün bir tanıtım sayfası`, `Müşteri ${name} ürününü ücret karşılığında`],
+  };
+  for (const [path, expected] of Object.entries(phrases)) {
+    const html = readFileSync(join(directory, path), 'utf8');
+    for (const phrase of expected) assert.ok(html.includes(phrase), `${path}: ${phrase}`);
+    for (const quote of ["'", '’', 'ʼ']) {
+      assert.ok(!html.includes(name + quote), `${path}: no name-dependent suffix`);
+    }
+  }
+}
 
 async function checkDiagrams(directory, name) {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
