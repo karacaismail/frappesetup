@@ -10,7 +10,7 @@ import frappe
 from frappe.mcp.tools import CompactJsonSchema, ToolArguments
 from pydantic import BaseModel
 
-from platform_core.ai import policy
+from platform_core.ai import policy, risk
 
 APP_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
 DECLARATION_KEYS = frozenset(
@@ -26,6 +26,7 @@ DECLARATION_KEYS = frozenset(
 		"preview",
 		"prepare",
 		"versioned",
+		"risk_level",
 	}
 )
 
@@ -49,6 +50,8 @@ class AiTool:
 	prepare: Callable[..., Any] | None = None
 	# JSON Schema of a successful result. Published as `outputSchema`.
 	output_schema: dict | None = None
+	# Level the app declares (R0-R3). `risk.level` keeps the higher of it and the computed level.
+	risk_level: str | None = None
 
 	@cached_property
 	def input_schema(self) -> dict:
@@ -342,6 +345,8 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 		raise ValueError(f"{name}: the arguments model must forbid unknown fields")
 	if set(arguments.model_fields) & policy.FORBIDDEN_ARGUMENT_NAMES:
 		raise ValueError(f"{name}: approval-like argument names are not allowed")
+	if set(arguments.model_fields) & policy.SERVER_SET_ARGUMENT_NAMES:
+		raise ValueError(f"{name}: the server sets the risk level, not an argument")
 
 	preview = declaration.get("preview")
 	if kind == "write" and not preview:
@@ -351,6 +356,9 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 		raise ValueError(f"{name}: prepare and versioned belong to write tools")
 	if prepare is not None and not isinstance(prepare, str):
 		raise ValueError(f"{name}: prepare must be a dotted path")
+	risk_level = declaration.get("risk_level")
+	if risk_level is not None and risk_level not in risk.LEVELS:
+		raise ValueError(f"{name}: risk_level must be one of {', '.join(risk.LEVELS)}")
 	roles = declaration.get("roles") or ()
 	if not all(isinstance(role, str) for role in roles):
 		raise ValueError(f"{name}: roles must be a list of role names")
@@ -370,6 +378,7 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 		# Optional for a write tool: its own pre-check, and a version check done by the layer.
 		prepare=frappe.get_attr(prepare) if prepare else None,
 		versioned=bool(declaration.get("versioned")),
+		risk_level=risk_level,
 	)
 
 

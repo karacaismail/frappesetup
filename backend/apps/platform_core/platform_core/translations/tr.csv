@@ -771,6 +771,8 @@ Destructive,Yıkıcı,PLT AI Action Proposal
 Set when the tool may destroy or overwrite data.,Araç veriyi silebiliyor ya da üstüne yazabiliyorsa işaretlenir.,PLT AI Action Proposal
 Billable,Ücretli,PLT AI Action Proposal
 Set when the tool may cost money.,Araç ücret doğurabiliyorsa işaretlenir.,PLT AI Action Proposal
+Risk Level,Risk düzeyi,PLT AI Action Proposal
+"Risk level from R0 to R3. The server sets it from the tool when the proposal opens. The model cannot set it.","R0 ile R3 arasındaki risk düzeyi. Sunucu düzeyi öneri açılırken araçtan belirler. Model düzeyi belirleyemez.",PLT AI Action Proposal
 Expires At,Son geçerlilik zamanı,PLT AI Action Proposal
 Moment after which the proposal can no longer be approved.,Bu andan sonra öneri onaylanamaz.,PLT AI Action Proposal
 Status,Durum,PLT AI Action Proposal

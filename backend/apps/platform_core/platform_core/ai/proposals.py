@@ -12,7 +12,7 @@ from frappe.utils import add_to_date, get_datetime, now_datetime
 from frappe.utils.response import json_handler
 from pydantic import Field
 
-from platform_core.ai import access, registry, schema_check, store, timestamps, versioning
+from platform_core.ai import access, registry, risk, schema_check, store, timestamps, versioning
 from platform_core.ai.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
 from platform_core.ai.tools import results
 
@@ -178,6 +178,8 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 			"digest": _digest(frappe.session.user, tool.name, target_key, version, args_json, preview_json),
 			"destructive": int(tool.destructive),
 			"billable": int(tool.billable),
+			# From the tool only. The model's arguments never reach this value.
+			"risk_level": risk.level(tool),
 			"expires_at": add_to_date(now_datetime(), seconds=TTL_SECONDS),
 			"status": "pending",
 		}
@@ -185,6 +187,7 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 	result = {
 		"status": "approval_required",
 		"proposal_id": doc.name,
+		"risk_level": doc.risk_level,
 		"preview": json.loads(preview_json),
 		"expires_at": timestamps.iso(doc.expires_at),
 		"created_at": timestamps.iso(doc.creation),
@@ -206,6 +209,7 @@ def public(doc, *, with_digest: bool = True) -> dict:
 		"target_name": doc.target_name,
 		"destructive": bool(doc.destructive),
 		"billable": bool(doc.billable),
+		"risk_level": doc.risk_level,
 		"preview": json.loads(doc.preview_json),
 		"expires_at": timestamps.iso(doc.expires_at),
 		"created_at": timestamps.iso(doc.creation),
