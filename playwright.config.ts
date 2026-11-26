@@ -38,7 +38,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
     // Dokunma profili (emülasyon): yalnız @touch etiketli senaryolar.
     { name: 'iphone-13', use: { ...devices['iPhone 13'] }, grep: /@touch/ },

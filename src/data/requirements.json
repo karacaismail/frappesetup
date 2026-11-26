@@ -2082,7 +2082,7 @@
  {
   "id": "G-165",
   "title": "Tanıtım sayfası değer önerilerini anlatır",
-  "detail": "{{PRODUCT_NAME}}'in bir tanıtım sayfası olur. Sayfa ürünün değer önerilerini anlatır. Sayfa yalnız var olan yeteneği anlatır. Yapılmamış özellik \"yakında\" diye ayrı gösterilir. Fiyat kararı kapanmadan sayfada fiyat yazmaz. Sayfa oturumsuz bir adresten sunulur. Rıza yokken ölçüm satıcısına istek gitmez (G-134). Sayfa sitenin arayüz kurallarına uyar. Örneğin metin en az 1rem olur ve sayfa 320 pikselde taşmaz. İçerik ve kurallar ürün sayfasındadır. Kabul: sayfadaki her değer önerisi bir gereksinime bağlıdır.",
+  "detail": "{{PRODUCT_NAME}} ürününün bir tanıtım sayfası olur. Sayfa ürünün değer önerilerini anlatır. Sayfa yalnız var olan yeteneği anlatır. Yapılmamış özellik \"yakında\" diye ayrı gösterilir. Fiyat kararı kapanmadan sayfada fiyat yazmaz. Sayfa oturumsuz bir adresten sunulur. Rıza yokken ölçüm satıcısına istek gitmez (G-134). Sayfa sitenin arayüz kurallarına uyar. Örneğin metin en az 1rem olur ve sayfa 320 pikselde taşmaz. İçerik ve kurallar ürün sayfasındadır. Kabul: sayfadaki her değer önerisi bir gereksinime bağlıdır.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P7",
@@ -2092,7 +2092,7 @@
  {
   "id": "G-166",
   "title": "Ücretli kullanım: plan ve fiyat açık karar",
-  "detail": "Müşteri {{PRODUCT_NAME}}'i ücret karşılığında kullanır. Plan, fiyat ve ölçü birimi açık karardır (K-61). Bu kararlar ürün sahibinindir. Belgede ve kodda fiyat uydurulmaz. Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapısı kurulmaz. Ödeme yapılmayan müşteri hesabının ne olacağı da aynı kararın parçasıdır. Kabul: fiyat kararı kapanmadan ücretli plan açılamaz.",
+  "detail": "Müşteri {{PRODUCT_NAME}} ürününü ücret karşılığında kullanır. Plan, fiyat ve ölçü birimi açık karardır (K-61). Bu kararlar ürün sahibinindir. Belgede ve kodda fiyat uydurulmaz. Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapısı kurulmaz. Ödeme yapılmayan müşteri hesabının ne olacağı da aynı kararın parçasıdır. Kabul: fiyat kararı kapanmadan ücretli plan açılamaz.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P7",

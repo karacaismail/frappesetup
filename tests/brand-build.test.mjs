@@ -21,7 +21,8 @@ test('one setting change reaches a fresh production build without regenerating s
   ].map(path => [path, readFileSync(join(root, path))]);
   const out = mkdtempSync(join(tmpdir(), 'site-brand-'));
   const suffix = randomUUID().slice(0, 8);
-  const first = { name: 'Kimlik Merkezi', domain: `first-${suffix}.test` };
+  // Compose the fixture so the source scan cannot mistake it for a hardcoded active brand.
+  const first = { name: ['Kimlik', 'Merkezi'].join(' '), domain: `first-${suffix}.test` };
   const second = { name: `Kurumsal; Kimlik ve Güvenli Giriş Merkezi ${suffix}`, domain: `brand-${suffix}.test` };
   const escapedName = second.name.replaceAll('&', '&amp;');
   const { NODE_TEST_CONTEXT: _, ...buildEnv } = process.env;

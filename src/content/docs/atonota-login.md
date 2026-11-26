@@ -19,7 +19,7 @@ Bugünkü durum sayfanın sonundaki [Bugünkü durum](#bugünkü-durum) bölüm�
 Ürün üç gruba hizmet eder:
 
 - **Platformun kendi uygulamaları.** Panel, kiracı siteleri ve sonraki uygulamalar bu kapıyı kullanır.
-- **Ücretli müşteriler.** Bir şirket kendi uygulaması için {{PRODUCT_NAME}}'i satın alabilir.
+- **Ücretli müşteriler.** Bir şirket kendi uygulaması için {{PRODUCT_NAME}} ürününü satın alabilir.
 - **Son kullanıcılar.** Kullanıcı tek hesapla birçok uygulamaya girer.
 
 Ürün bağımsızdır. Bunun üç nedeni vardır:
@@ -270,7 +270,7 @@ Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapı
 
 | Parça | Lisans |
 | --- | --- |
-| {{PRODUCT_NAME}}'in kodu: tema, eklentiler, Frappe uygulaması ve kurulum dosyaları | MIT |
+| {{PRODUCT_NAME}} ürününün kodu: tema, eklentiler, Frappe uygulaması ve kurulum dosyaları | MIT |
 | Keycloak | Apache-2.0 |
 
 Keycloak'ın kodu ürüne kopyalanmaz ve değiştirilmez. Ürün Keycloak'ın eklenti yollarını kullanır. Bu kuralın gereksinimi G-157'dir.
