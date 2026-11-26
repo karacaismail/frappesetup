@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 STACK = Path(__file__).resolve().parents[1] / "stack"
 PREVIEW = STACK.parent / "preview"
 PORT = "43820"
+PRODUCT_NAME = runpy.run_path(str(STACK.parents[1] / "deploy/brand.py"))["load_brand"]()["PRODUCT_NAME"]
 
 
 def stack_environment():
@@ -27,7 +28,7 @@ def stack_environment():
         "ATONOTA_SITE_TENANT1_SERVICE_SECRET": secrets.token_urlsafe(16),
         "ATONOTA_PRESS_SECRET": secrets.token_urlsafe(16),
         "ATONOTA_PRESS_SERVICE_SECRET": secrets.token_urlsafe(16),
-        "IDENTITY_BRAND_NAME": "AtonotA Login",
+        "IDENTITY_BRAND_NAME": PRODUCT_NAME,
         "KC_BOOTSTRAP_ADMIN_USERNAME": secrets.token_hex(8),
         "KC_BOOTSTRAP_ADMIN_PASSWORD": secrets.token_urlsafe(16),
         "ATONOTA_IDENTITY_SYNC_SECRET": secrets.token_urlsafe(16),
@@ -58,7 +59,7 @@ class StackTenantTest(unittest.TestCase):
         self.assertEqual(
             config["keycloak_service_client_secret"], environment["ATONOTA_SITE_TENANT1_SERVICE_SECRET"]
         )
-        self.assertEqual(config["identity_brand_name"], "AtonotA Login")
+        self.assertEqual(config["identity_brand_name"], PRODUCT_NAME)
         self.assertEqual(config["platform_panel_url"], environment["ATONOTA_SITE_TENANT1_URL"] + "/panel")
         # The deletion key is made inside the site, so it never leaves the sites volume.
         self.assertNotIn("kimlik_deletion_hmac_key", config)
@@ -127,7 +128,7 @@ class StackTenantTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, missing) as caught:
                         namespace["up"](["docker"], ["compose"], environment)
                 for value in environment.values():
-                    if value not in ("AtonotA Login", PORT):
+                    if value not in (PRODUCT_NAME, PORT):
                         self.assertNotIn(value, str(caught.exception))
 
 

@@ -1,5 +1,9 @@
 # Bileşenler arası sözleşmeler
 
+Ürün adı `PRODUCT_NAME` ayarından gelir. Alan adı `BRAND_DOMAIN` ayarından gelir.
+İki değer [ortak marka dosyasında](../brand.env) tutulur.
+Bu belgedeki `<PRODUCT_NAME>` ve `<BRAND_DOMAIN>` alanlarını bu değerlerle doldurun.
+
 Bu dosya backend bileşenlerinin ortak adlarını tutar. İşler paralel yürür. Bu yüzden herkes aynı adları kullanmalıdır. Bir adı değiştirmek gerekirse raporda isteyin. Orkestratör bu dosyayı günceller.
 
 Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyalarındadır. OpenAPI, uçları tarif eden belge biçimidir. Her uç sahibi kendi dosyasını yazar:
@@ -15,9 +19,9 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 ## 1. Marka
 
-- Kimlik ürününün adı “AtonotA Login”dir. Ad tam olarak böyle yazılır (Proje kaydı O-51).
-- Düğme metni “AtonotA Login ile oturum aç” olur.
-- Giriş adresi üretimde `https://api.login.atonota.net` olur. alpha, beta ve rc ortamlarında adres `https://api.login.<ortam>.atonota.net` olur (Proje kaydı O-51).
+- Kimlik ürününün adı `PRODUCT_NAME` ayarından gelir.
+- Düğme metni `<PRODUCT_NAME> ile oturum aç` olur.
+- Giriş adresi üretimde `https://api.login.<BRAND_DOMAIN>` olur. alpha, beta ve rc ortamlarında adres `https://api.login.<ortam>.<BRAND_DOMAIN>` olur (Proje kaydı O-51).
 - Kod marka adını ve alan adını ayardan okur. Kodda sabit yazmayın.
 
 ## 2. Keycloak
@@ -28,7 +32,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 - Tarayıcının gördüğü adres `keycloak_public_url` ayarıdır.
 - Belirteçteki `iss` değeri `<keycloak_public_url>/realms/platform` olur.
 - Sunucu Keycloak'a başka adresten ulaşacaksa `keycloak_internal_url` ayarını kullanın. Bu ayar boşsa genel adres kullanılır.
-- Realm'in görünen adı “AtonotA Login” olur. Realm adı, istemci kimlikleri ve tema adı değişmez. Giriş ve e-posta teması `atonota` adını taşır.
+- Realm'in görünen adı `PRODUCT_NAME` ayarından gelir. Realm adı, istemci kimlikleri ve tema adı değişmez. Giriş ve e-posta teması `atonota` adını taşır.
 - Tema Keycloak'ın kendi tema yapısıyla kurulur (Proje kaydı O-4).
 - Varsayılan dil Türkçedir. İkinci dil İngilizcedir.
 
@@ -423,7 +427,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_service_client_id` | `site-tenant1-service` ya da `press-service` | Servis belirteci için |
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `mobile_allow_development_http` | Kapalı | Yalnız geliştirmede açılır. `developer_mode` da açık olmalıdır. Mobil iptal isteği yalnız yerel kimlik servisine HTTP ile gider. Keycloak belirteç adresi HTTPS kalır. |
-| `kimlik_marka_adi` | `AtonotA Login` | Düğme metni bundan üretilir |
+| `identity_brand_name` | `<PRODUCT_NAME>` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
 

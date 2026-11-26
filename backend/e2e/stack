@@ -8,6 +8,7 @@ import ipaddress
 import json
 import os
 import re
+import runpy
 import secrets
 import shutil
 import stat
@@ -17,6 +18,7 @@ import urllib.parse
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
+load_brand = runpy.run_path(str(BACKEND / "deploy/brand.py"))["load_brand"]
 # Tests may move BACKEND. The trusted credential root stays this checkout.
 REPOSITORY = Path(__file__).resolve().parents[2]
 CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
@@ -174,6 +176,7 @@ def setup():
             "IDENTITY_SYNC_EVENTS_URL": "http://identity-sync.localhost:6115/v1/events",
             "KC_PORT": str(port),
             "KC_PUBLIC_URL": f"http://identity.localhost:{port}",
+            "IDENTITY_BRAND_NAME": load_brand()["PRODUCT_NAME"],
             "MAILPIT_UI_PORT": str(port + 6),
             "ATONOTA_SITE_TENANT1_URL": f"http://tenant1.localhost:{port + 1}",
             "ATONOTA_PRESS_URL": f"http://press.localhost:{port + 3}",
@@ -537,7 +540,7 @@ def tenant_login_settings(environment):
         "keycloak_internal_url": environment["KC_PUBLIC_URL"],
         "keycloak_client_id": "site-tenant1",
         "keycloak_client_secret": environment["ATONOTA_SITE_TENANT1_SECRET"],
-        "identity_brand_name": "AtonotA Login",
+        "identity_brand_name": environment["IDENTITY_BRAND_NAME"],
         "platform_panel_url": origin + "/panel",
     }
     if environment.get("FS_STACK_VITE") == "1":
