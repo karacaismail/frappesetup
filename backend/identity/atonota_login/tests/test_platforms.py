@@ -7,6 +7,7 @@ docs/dagitim/ortamlar.md. The tests apply one rule to every record, never a fixe
 import json
 import re
 import secrets
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,9 @@ from tests.brand_values import BRAND_DOMAIN, LOGIN_HOST
 
 PRODUCT = Path(__file__).resolve().parents[1]
 BACKEND = PRODUCT.parents[1]
+sys.path.insert(0, str(BACKEND / "deploy"))
+from release import load_environments  # noqa: E402
+
 REALM_FILE = BACKEND / "identity" / "keycloak" / "realm" / "platform-realm.json"
 ENVIRONMENTS = BACKEND / "deploy" / "environments"
 DEV_ENV_EXAMPLE = BACKEND / "identity" / "keycloak" / ".env.example"
@@ -267,8 +271,9 @@ class RedirectTest(unittest.TestCase):
         # docs/dagitim/ortamlar.md: the login host is api.login.<environment base>.
         files = sorted(ENVIRONMENTS.glob("*.env"))
         self.assertEqual({f.stem for f in files}, {"alpha", "beta", "rc", "prod"})
+        environments = load_environments(ENVIRONMENTS)
         for path in files:
-            values = platforms.read_env_file(path)
+            values = environments[path.stem]
             with self.subTest(environment=path.stem):
                 self.assertEqual(values["ATONOTA_ID_HOST"], "api.login." + values["ATONOTA_BASE_HOST"])
                 table = platforms.environment_redirects(values)

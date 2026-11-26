@@ -116,6 +116,7 @@ class DeployScript(unittest.TestCase):
         # rc and prod got the compose files of the newest main, not of the release (review 2, Ö8).
         source = self.folder / "deploy-at-release-commit"
         shutil.copytree(DEPLOY, source, ignore=shutil.ignore_patterns("__pycache__", "tests"))
+        shutil.copy(DEPLOY.parent / "brand.env", source.parent / "brand.env")
         (source / "compose" / "stack.yaml").write_text("# stack.yaml of the release commit\n")
         packed = self.pack(manifest(), source)
         self.assertEqual(packed.returncode, 0, packed.stderr)

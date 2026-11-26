@@ -51,7 +51,14 @@ Platform işini bitirince tarayıcıyı şu adrese döndürür:
 https://<giriş adresi>/realms/platform/broker/<platform>/endpoint
 ```
 
-Giriş adresi prod'da `api.login.<BRAND_DOMAIN>` olur. alpha, beta ve rc ortamlarında adres `api.login.<ortam>.<BRAND_DOMAIN>` olur. `<BRAND_DOMAIN>` değeri `backend/brand.env` dosyasındadır. Her ortamın adreslerini şu komut yazar:
+Komut, alan adını `backend/brand.env` dosyasındaki `BRAND_DOMAIN` değerinden okur.
+Komut, ortam adını `backend/deploy/environments/` dosyalarındaki `ATONOTA_HOST_LABEL` değerinden alır.
+Komut bu değerleri `backend/deploy/release.py` içindeki `load_environments` işleviyle okur.
+Giriş adresi prod'da `api.login.<alan adı>` olur.
+alpha, beta ve rc ortamlarında adres `api.login.<ortam>.<alan adı>` olur.
+Eksik veya geçersiz ayarda komut hata verir.
+`--public-url` seçeneği yerel geliştirme adresini kullanır. Bu seçenek marka dosyasını okumaz.
+Her ortamın adreslerini şu komut yazar:
 
 ```bash
 bin/atonota-login redirects --env all
