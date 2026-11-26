@@ -4,6 +4,7 @@ import json
 from urllib.parse import urlencode
 
 import frappe
+from frappe.defaults import get_defaults_for, set_user_default
 
 from platform_core.tests.shell_http_fixture import DOCTYPE, ShellHTTPFixture
 
@@ -18,18 +19,25 @@ class TestHelpHTTP(ShellHTTPFixture):
 		super().setUpClass()
 		frappe.set_user("Administrator")
 		frappe.db.delete("PLT Help Topic", {"document_type": DOCTYPE})
-		frappe.get_doc(
-			{
-				"doctype": "PLT Help Topic",
-				"title": "Private note",
-				"layer": "Tenant",
-				"target_type": "Field",
-				"document_type": DOCTYPE,
-				"fieldname": "private_note",
-				"status": "Published",
-				"content": PRIVATE_HELP,
-			}
-		).insert()
+		previous_language = get_defaults_for("Administrator").get("language")
+		set_user_default("language", "tr", user="Administrator")
+		frappe.local.new_doc_templates.pop("PLT Help Topic", None)
+		try:
+			frappe.get_doc(
+				{
+					"doctype": "PLT Help Topic",
+					"title": "Private note",
+					"layer": "Tenant",
+					"target_type": "Field",
+					"document_type": DOCTYPE,
+					"fieldname": "private_note",
+					"status": "Published",
+					"content": PRIVATE_HELP,
+				}
+			).insert()
+		finally:
+			set_user_default("language", previous_language, user="Administrator")
+			frappe.local.new_doc_templates.pop("PLT Help Topic", None)
 		frappe.db.commit()
 
 	@classmethod
@@ -66,6 +74,19 @@ class TestHelpHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 200)
 		message = json.loads(body)["message"]
 		self.assertEqual((message["source"], message["content"]), ("description", "Public title."))
+
+	def test_language_neutral_topic_is_returned_for_another_language(self):
+		for language in ("en", "tr"):
+			with self.subTest(language=language):
+				status, _unused_headers, body = self.request(
+					FIELD_HELP
+					+ "?"
+					+ urlencode({"doctype": DOCTYPE, "fieldname": "private_note", "language": language}),
+					self.desk_sid,
+				)
+				self.assertEqual(status, 200)
+				message = json.loads(body)["message"]
+				self.assertEqual((message["source"], message["content"]), ("tenant", PRIVATE_HELP))
 
 	def test_unknown_parameters_are_rejected(self):
 		status, _unused_headers, _unused_body = self.request(

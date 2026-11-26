@@ -1,6 +1,7 @@
 """G-138: field help on a real site, with Frappe's own field permission levels."""
 
 import frappe
+from frappe.defaults import get_defaults_for, set_user_default
 from frappe.tests import IntegrationTestCase
 
 from platform_core.shell.help import get_field_help, get_help_coverage
@@ -49,7 +50,7 @@ class TestFieldHelp(IntegrationTestCase):
 	def tearDown(self):
 		frappe.set_user("Administrator")
 
-	def add_topic(self, fieldname, status="Published"):
+	def add_topic(self, fieldname, status="Published", **values):
 		return frappe.get_doc(
 			{
 				"doctype": "PLT Help Topic",
@@ -60,6 +61,7 @@ class TestFieldHelp(IntegrationTestCase):
 				"fieldname": fieldname,
 				"status": status,
 				"content": f"Tenant help for {fieldname}.",
+				**values,
 			}
 		).insert()
 
@@ -78,6 +80,34 @@ class TestFieldHelp(IntegrationTestCase):
 		self.assertEqual(answer["source"], "tenant")
 		self.assertEqual(answer["topic"], record.name)
 		self.assertEqual(answer["content"], f"Tenant help for {OPEN_FIELD}.")
+
+	def test_empty_language_does_not_inherit_a_default(self):
+		# The help contract defines an empty language as applying to every language.
+		previous_language = get_defaults_for("Administrator").get("language")
+		self.addCleanup(set_user_default, "language", previous_language, user="Administrator")
+		set_user_default("language", "tr", user="Administrator")
+		frappe.local.new_doc_templates.pop("PLT Help Topic", None)
+		self.addCleanup(frappe.local.new_doc_templates.pop, "PLT Help Topic", None)
+		for values in ({}, {"language": None}, {"language": ""}):
+			with self.subTest(values=values):
+				record = self.add_topic(OPEN_FIELD, **values)
+				record.reload()
+				self.assertFalse(record.language)
+				frappe.set_user(USER)
+				try:
+					for language in ("en", "tr"):
+						answer = get_field_help(DOCTYPE, OPEN_FIELD, USER, language)
+						self.assertEqual(answer["source"], "tenant")
+				finally:
+					frappe.set_user("Administrator")
+
+	def test_explicit_language_keeps_its_selection(self):
+		record = self.add_topic(OPEN_FIELD, language="en")
+		record.reload()
+		self.assertEqual(record.language, "en")
+		frappe.set_user(USER)
+		self.assertEqual(get_field_help(DOCTYPE, OPEN_FIELD, USER, "en")["source"], "tenant")
+		self.assertEqual(get_field_help(DOCTYPE, OPEN_FIELD, USER, "tr")["source"], "description")
 
 	def test_readable_field_falls_back_to_its_description(self):
 		frappe.set_user(USER)

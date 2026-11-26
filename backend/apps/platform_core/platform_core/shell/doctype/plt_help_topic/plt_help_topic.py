@@ -18,6 +18,11 @@ MESSAGES = {
 
 
 class PLTHelpTopic(Document):
+	def __setup__(self):
+		# An empty language applies to every language, not the user's or site's default.
+		# Frappe calls this before insert copies defaults into missing fields.
+		self.dont_update_if_missing.append("language")
+
 	def validate(self):
 		field = None
 		if self.target_type == FIELD and self.document_type and self.fieldname:
