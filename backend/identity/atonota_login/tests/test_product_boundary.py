@@ -18,7 +18,6 @@ from tests.brand_values import PRODUCT_NAME
 
 PRODUCT = Path(__file__).resolve().parents[1]
 KEYCLOAK = PRODUCT.parent / "keycloak"
-# The examples may hold the brand.env value or the placeholder (AJA-1059 plan, section 2).
 
 
 class ProductBoundaryTest(unittest.TestCase):
