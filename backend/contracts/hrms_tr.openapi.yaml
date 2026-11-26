@@ -391,6 +391,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/FrappeError"
               example: {exc_type: ValidationError}
+  /method/hrms_tr.api.get_leave_request_context:
+    get:
+      operationId: getLeaveRequestContext
+      summary: Read the signed-in employee's defaults for a new leave application.
+      description: |
+        Returns only the active Employee linked to the authenticated session user.
+        Employee and user selectors are unsupported and ignored by Frappe, including for administrators.
+        Missing employee, display name, leave type, allocation, or balance data is null.
+        Each available value has its source DocType in sources. Missing values have null sources.
+        HRMS calculates the balance for today's site date, through that date only.
+        Existing legacy balance routes remain blocked. This route does not create or change records.
+        POST and other non-GET methods are rejected with Frappe's 403 PermissionError.
+      parameters:
+        - in: query
+          name: leave_type
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 140}
+          description: |
+            Exact Leave Type record name. An explicit name is resolved from Leave Type.
+            If omitted, use the signed-in employee's submitted Leave Allocation records valid today.
+            Select the type only when those allocations contain exactly one distinct leave type.
+            The source is Leave Allocation. No allocation or multiple types yields null type and balance.
+            No translated-name matching or alternate leave type is inferred.
+          example: Annual Leave
+      responses:
+        "200":
+          description: Available defaults and their sources. A missing allocation is null, not zero.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveRequestContextResponse"
+              example:
+                message:
+                  employee: HR-EMP-TEST-01
+                  employee_name: Örnek Kişi 1
+                  leave_type: Annual Leave
+                  leave_balance: 8.5
+                  sources:
+                    employee: Employee
+                    employee_name: Employee
+                    leave_type: Leave Allocation
+                    leave_balance: Leave Ledger Entry
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+        "417":
+          description: Invalid leave_type input. Empty strings, objects, and names over 140 characters are rejected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
+              example: {exc_type: FrappeTypeError}
   /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
     get:
       operationId: denyLegacyLeaveQueryGet
@@ -561,6 +614,51 @@ components:
             errors:
               - type: DoesNotExistError
   schemas:
+    LeaveRequestContextResponse:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          description: Available defaults for the signed-in employee.
+          type: object
+          additionalProperties: false
+          required: [employee, employee_name, leave_type, leave_balance, sources]
+          properties:
+            employee:
+              type: [string, "null"]
+              description: Active Employee record name linked to the session user, or null.
+            employee_name:
+              type: [string, "null"]
+              description: Display name from that Employee record, or null.
+            leave_type:
+              type: [string, "null"]
+              description: Explicit Leave Type or the single type allocated today. Null when employee or type is missing, or omitted type has no unique allocation.
+            leave_balance:
+              type: [number, "null"]
+              description: Remaining days from HRMS for today's site date, or null without balance data.
+            sources:
+              description: Source DocType for each available value. Null means the value is missing.
+              type: object
+              additionalProperties: false
+              required: [employee, employee_name, leave_type, leave_balance]
+              properties:
+                employee:
+                  type: [string, "null"]
+                  enum: [Employee, null]
+                  description: Employee record, or null when employee is missing.
+                employee_name:
+                  type: [string, "null"]
+                  enum: [Employee, null]
+                  description: Employee record, or null when its display name is missing.
+                leave_type:
+                  type: [string, "null"]
+                  enum: [Leave Type, Leave Allocation, null]
+                  description: Leave Type for an explicit name, Leave Allocation for the single allocated type, or null when no type was resolved.
+                leave_balance:
+                  type: [string, "null"]
+                  enum: [Leave Ledger Entry, null]
+                  description: Leave ledger records evaluated by HRMS, or null without balance data.
     LeaveName:
       type: object
       additionalProperties: false
