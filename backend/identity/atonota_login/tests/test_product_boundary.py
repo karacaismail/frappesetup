@@ -48,7 +48,8 @@ class ProductBoundaryTest(unittest.TestCase):
         example = (KEYCLOAK / ".env.example").read_text(encoding="utf-8")
         production = (KEYCLOAK / "production.env.example").read_text(encoding="utf-8")
         for text in (example, production):
-            self.assertRegex(text, rf"(?m)^IDENTITY_BRAND_NAME={BRAND}$")
+            # AJA-1062: the value comes from PRODUCT_NAME in backend/brand.env; examples hold a placeholder.
+            self.assertRegex(text, r"(?m)^IDENTITY_BRAND_NAME=<PRODUCT_NAME>$")
 
 
 if __name__ == "__main__":
