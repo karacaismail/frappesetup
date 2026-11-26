@@ -227,8 +227,8 @@ class Jenkinsfiles(unittest.TestCase):
         text = jenkinsfile("backend.Jenkinsfile")
         stages = re.findall(r"stage\('([^']+)'\)", text)
         self.assertLess(stages.index("Checkout"), stages.index("Security tools"))
-        self.assertEqual(stages.index("Security tools") + 1, stages.index("Gates"))
-        block = text.split("stage('Security tools')", 1)[1].split("stage('Gates')", 1)[0]
+        self.assertEqual(stages.index("Security tools") + 1, stages.index("Gate: deploy tests"))
+        block = text.split("stage('Security tools')", 1)[1].split("stage('Gate: ", 1)[0]
         self.assertIn("sh 'backend/dev/security/osv-setup --if-stale'", block)
         self.assertLess(text.index("osv-setup --if-stale"), text.index("backend/dev/bin/security-audit"))
         # The setup comment (comments are stripped above) names what the agent needs.

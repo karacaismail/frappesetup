@@ -10,8 +10,8 @@
 // Pipeline, Git, GitHub, SSH Agent, Lockable Resources, Pipeline: Milestone Step, Credentials
 // Binding, Copy Artifact, Timestamper. Credentials of the folder "atonota-delivery":
 // atonota-deploy-ssh-alpha and atonota-deploy-ssh-beta (one key per environment and server user),
-// atonota-registry (GHCR user and token). Agents with label atonota-build: Docker, Python 3.9+, uv,
-// curl, ssh on the Tailscale network, and HTTPS access to github.com and
+// atonota-registry (GHCR user and token). The list is in backend/docs/handoff/jenkins-credentials.md. Agents with label atonota-build: Docker, Python 3.9+, uv,
+// curl, ssh on the Tailscale network, Python 3.12 and 3.14 prepared with uv for the gates, and HTTPS access to github.com and
 // osv-vulnerabilities.storage.googleapis.com for the stage "Security tools".
 //
 // Every stage after the first one starts from an empty workspace and takes the scripts and the
@@ -94,12 +94,41 @@ pipeline {
                         sh 'backend/dev/security/osv-setup --if-stale'
                     }
                 }
-                stage('Gates') {
+                // Each gate is its own stage, so the build page shows which gate failed. The list
+                // equals the table "Jenkins kapıları" in backend/docs/handoff/ci-security.md
+                // (test_jenkins_gates.py).
+                stage('Gate: deploy tests') {
                     steps {
-                        sh 'python3 -I -m unittest discover -s backend/deploy/tests'
+                        sh 'uv run --no-project --offline --python 3.14 python -I -m unittest discover -s backend/deploy/tests'
+                    }
+                }
+                stage('Gate: dev tests') {
+                    steps {
+                        sh 'uv run --no-project --offline --python 3.14 python -I -m unittest discover -s backend/dev/tests'
+                    }
+                }
+                stage('Gate: security tool tests') {
+                    steps {
+                        sh 'uv run --no-project --offline --python 3.12 python -B -m unittest discover -s backend/dev/security'
+                    }
+                }
+                stage('Gate: module boundaries') {
+                    steps {
                         sh 'backend/dev/bin/module-boundaries'
+                    }
+                }
+                stage('Gate: security audit') {
+                    steps {
                         sh 'backend/dev/bin/security-audit'
+                    }
+                }
+                stage('Gate: platform_core tests') {
+                    steps {
                         sh 'backend/dev/bin/test platform_core'
+                    }
+                }
+                stage('Gate: hrms_tr tests') {
+                    steps {
                         sh 'backend/dev/bin/test hrms_tr'
                     }
                 }
