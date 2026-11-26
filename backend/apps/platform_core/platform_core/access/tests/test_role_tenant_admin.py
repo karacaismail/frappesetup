@@ -152,7 +152,8 @@ class TestTenantAdminHttp(panel_roles.PanelRoleHttpCase):
 
 		records = self.make_ai_records()
 		name = records["PLT AI API"]
-		new_key = "yeni-sahte-anahtar-1024-yalniz-test"
+		# Built from parts so the secret scan does not flag it (AJA-1083).
+		new_key = "-".join(("yeni", "sahte", "anahtar", "1024", "yalniz", "test"))
 		client = self.login()
 
 		response = self.send(

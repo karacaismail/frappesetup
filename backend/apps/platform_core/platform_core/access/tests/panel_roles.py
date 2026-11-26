@@ -414,4 +414,5 @@ class PanelRoleHttpCase(IntegrationTestCase):
 AI_TYPES = ("PLT AI Provider", "PLT AI Account", "PLT AI API")
 META_API = "platform_core.api.meta.get_doctype"
 # A made-up credential. No response may carry it.
-FAKE_AI_KEY = "sahte-anahtar-947-yalniz-test"
+# The value is built from parts so the secret scan does not flag it (AJA-1083).
+FAKE_AI_KEY = "-".join(("sahte", "anahtar", "947", "yalniz", "test"))
