@@ -22,10 +22,13 @@
   "destructive",
   "billable",
   "risk_level",
+  "source_proposal",
   "expires_at",
   "status",
   "result",
   "result_document",
+  "revert_json",
+  "applied_version",
   "error",
   "decided_at"
  ],
@@ -153,6 +156,14 @@
    "read_only": 1
   },
   {
+   "description": "The applied proposal this proposal reverts. Empty on an ordinary proposal.",
+   "fieldname": "source_proposal",
+   "fieldtype": "Link",
+   "label": "Source Proposal",
+   "options": "PLT AI Action Proposal",
+   "read_only": 1
+  },
+  {
    "description": "Moment after which the proposal can no longer be approved.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
@@ -186,6 +197,20 @@
    "read_only": 1
   },
   {
+   "description": "Old values of the fields the applied action changed. A revert proposal is built from them.",
+   "fieldname": "revert_json",
+   "fieldtype": "Long Text",
+   "label": "Revert Values",
+   "read_only": 1
+  },
+  {
+   "description": "The target's version right after the applied action. A revert is refused if the target changed since.",
+   "fieldname": "applied_version",
+   "fieldtype": "Data",
+   "label": "Applied Version",
+   "read_only": 1
+  },
+  {
    "description": "Why the proposal was rejected or the execution failed.",
    "fieldname": "error",
    "fieldtype": "Small Text",
@@ -203,7 +228,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-26 12:00:00.000000",
+ "modified": "2026-11-26 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI",
  "name": "PLT AI Action Proposal",

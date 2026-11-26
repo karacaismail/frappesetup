@@ -107,6 +107,18 @@ EXPECTED = {
     "press_tr.api.identity.anonymize_user": SERVICE,
     "press_tr.api.identity.list_identities": SERVICE,
     "press_tr.api.maintenance.cleanup_expired_sessions": ADMIN,
+    # AI access layer (platform_core.api.ai, AJA-1002). The MCP endpoint and its metadata take
+    # a bearer credential, so Frappe sees a guest. The panel user decides on their own proposals.
+    "platform_core.api.ai.mcp": PUBLIC,
+    "platform_core.api.ai.mcp_resource_metadata": PUBLIC,
+    "platform_core.api.ai.issue_agent_token": PANEL,
+    "platform_core.api.ai.list_proposals": PANEL,
+    "platform_core.api.ai.get_proposal": PANEL,
+    "platform_core.api.ai.approve_proposal": PANEL,
+    "platform_core.api.ai.reject_proposal": PANEL,
+    "platform_core.api.ai.resolve_proposal": PANEL,
+    "platform_core.api.ai.propose_revert": PANEL,
+    "platform_core.api.ai.purge_logs": ADMIN,
 }
 
 # Methods that other open branches add. The test checks them once they are in the tree.
@@ -125,7 +137,7 @@ SCANNED = (
 # list, so its methods must be named in EXPECTED.
 NOT_LOGIN_MODULES = frozenset(
     f"platform_core.api.{name}"
-    for name in ("access", "ai", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
+    for name in ("access", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
 )
 
 # Guest methods without a `rate_limit` decorator, each with its reason.

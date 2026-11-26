@@ -133,6 +133,7 @@ website_user_allowed_methods = [
 	"platform_core.api.ai.approve_proposal",
 	"platform_core.api.ai.reject_proposal",
 	"platform_core.api.ai.resolve_proposal",
+	"platform_core.api.ai.propose_revert",
 	"platform_core.api.mobile.v1_activity",
 	"platform_core.api.mobile.v1_list_installations",
 	"platform_core.api.mobile.v1_pull",

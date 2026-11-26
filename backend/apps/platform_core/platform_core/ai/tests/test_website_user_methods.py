@@ -18,6 +18,7 @@ OPEN = {
 	"platform_core.api.ai.approve_proposal",
 	"platform_core.api.ai.reject_proposal",
 	"platform_core.api.ai.resolve_proposal",
+	"platform_core.api.ai.propose_revert",
 }
 
 

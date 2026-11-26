@@ -71,6 +71,7 @@ PROPOSAL_LIST_FIELDS = (
 	"destructive",
 	"billable",
 	"risk_level",
+	"source_proposal",
 	"preview_json",
 	"digest",
 	"expires_at",

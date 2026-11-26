@@ -30,7 +30,8 @@ info:
 
     - every tool call on the MCP endpoint, allowed or denied;
     - every denial of a request whose user is known, on every endpoint;
-    - every approval, rejection, execution and resolution.
+    - every approval, rejection, execution and resolution;
+    - every revert proposal, opened or refused.
 
     What is not written to the AI Action Log:
 
@@ -345,6 +346,48 @@ paths:
                   message: {$ref: "#/components/schemas/Proposal"}
         "403": {description: The request did not come from a human session or the proposal belongs to another user.}
 
+  /platform_core.api.ai.propose_revert:
+    post:
+      tags: [proposal]
+      operationId: proposeRevert
+      summary: Opens a proposal that writes the old values of an applied proposal back.
+      description: |
+        This endpoint does not write to the document. It opens a new `pending` proposal. That proposal goes through the normal approval.
+        When an update succeeds, the server stores the old values of the fields it changed. The new proposal writes those values back.
+        The new proposal names the applied proposal in `source_proposal`. Its `risk_level` is at least the level of the applied proposal.
+        Nothing is opened in these cases. The answer is 200 with `opened` false and one of these codes in `deny_reason`:
+
+        - `not_applied`: the proposal is pending, rejected or expired, or its result is not `succeeded`.
+        - `not_revertable`: the action has no stored old values. Only `plt_update_document` stores them. An update of an unreadable field or of a child table stores none.
+        - `record_changed`: the document changed or was deleted after the proposal was applied.
+
+        A refusal of the new proposal's preview comes back the same way, for example `permission` or `unresolved_unknown`.
+        Every outcome is written to the AI Action Log with the stage `revert`.
+      security: [{humanSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id]
+              properties:
+                proposal_id: {type: string, description: The applied proposal to revert.}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: The new revert proposal, or the reason it was not opened.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/RevertOutcome"}
+        "403": {description: "The request did not come from a human session, the session has no CSRF token or the proposal belongs to another user. Another user's proposal is not returned in the response."}
+        "404": {description: The proposal does not exist.}
+
   /platform_core.api.ai.purge_logs:
     post:
       tags: [admin]
@@ -536,6 +579,9 @@ components:
         - unresolved_unknown
         - execution_failed
         - internal_error
+        - not_applied
+        - not_revertable
+        - record_changed
 
     AgentToken:
       type: object
@@ -582,6 +628,7 @@ components:
         destructive: {type: boolean}
         billable: {type: boolean}
         risk_level: {$ref: "#/components/schemas/RiskLevel"}
+        source_proposal: {type: [string, "null"], description: "The applied proposal this proposal reverts. Null on an ordinary proposal."}
         preview: {$ref: "#/components/schemas/Preview"}
         digest: {type: string, pattern: "^[0-9a-f]{64}$"}
         expires_at: {type: string, format: date-time, description: "Expiry time. ISO 8601, with a UTC offset."}
@@ -618,6 +665,16 @@ components:
         deny_reason:
           oneOf: [{$ref: "#/components/schemas/DenyReason"}, {type: "null"}]
         proposal: {$ref: "#/components/schemas/Proposal"}
+
+    RevertOutcome:
+      type: object
+      required: [opened, deny_reason, proposal]
+      properties:
+        opened: {type: boolean, description: True when a new pending revert proposal was opened.}
+        deny_reason:
+          oneOf: [{$ref: "#/components/schemas/DenyReason"}, {type: "null"}]
+        proposal:
+          oneOf: [{$ref: "#/components/schemas/Proposal"}, {type: "null"}]
 
     PurgeResult:
       type: object
@@ -1042,6 +1099,8 @@ x-mcp-results:
         type: string
         enum: [R0, R1, R2, R3]
         description: Set by the server from the tool. The model cannot set it.
+      source_proposal:
+        type: [string, 'null']
       preview:
         type: object
         required: [action, summary]

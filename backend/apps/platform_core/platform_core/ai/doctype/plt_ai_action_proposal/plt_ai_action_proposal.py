@@ -23,7 +23,11 @@ FROZEN_FIELDS = (
 	"digest",
 	"preview_digest",
 	"risk_level",
+	"source_proposal",
 )
+# Written once, when the action succeeds (AJA-1002). A revert proposal is built from them, so
+# they never change after that.
+WRITE_ONCE_FIELDS = ("revert_json", "applied_version")
 # A proposal in one of these states is decided. Its state does not change again.
 DECIDED_STATES = ("rejected", "expired", "consumed")
 
@@ -35,6 +39,11 @@ class PLTAIActionProposal(Document):
 		if self.is_new() or before is None:
 			return
 		changed = [field for field in FROZEN_FIELDS if cstr(before.get(field)) != cstr(self.get(field))]
+		changed += [
+			field
+			for field in WRITE_ONCE_FIELDS
+			if cstr(before.get(field)) and cstr(before.get(field)) != cstr(self.get(field))
+		]
 		if changed or (before.status in DECIDED_STATES and self.status != before.status):
 			frappe.throw(
 				_("A proposal cannot change after it is opened or decided.", context=CONTEXT),

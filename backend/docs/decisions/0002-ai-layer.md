@@ -339,6 +339,44 @@ Bu işten önce açılmış öneriler de düzey alır. Bunu `platform_core.ai.pa
 
 Kod `ai/risk.py` dosyasındadır. Testler `ai/tests/test_risk_level.py` dosyasındadır.
 
+### Geri alma önerisi (AJA-1002)
+
+Bu bölüm 26 Kasım 2026 Perşembe günü eklendi.
+
+İnsan uygulanmış bir öneriyi geri alabilir. Bunun için `propose_revert` ucu vardır. Uç kaydı kendisi değiştirmez. Uç yeni bir bekleyen öneri açar. Yeni öneri normal onay akışından geçer. Kayıt ancak insan yeni öneriyi onaylayınca eski değerlerine döner.
+
+Sunucu eski değerleri öneri uygulanırken saklar. Akış şöyledir:
+
+1. Katman kaydı yazmadan hemen önce kilitli kayıttan alanların değerini okur.
+2. Yazma başarılı olursa katman yalnız değeri değişen alanları tutar.
+3. Katman bu eski değerleri önerinin `revert_json` alanına yazar.
+4. Katman yazmadan sonraki kayıt sürümünü `applied_version` alanına yazar.
+
+İki alan bir kez yazılır. Sonra değişmez. Öneri kaydının denetleyicisi değişikliği reddeder.
+
+Yalnız `plt_update_document` aracı eski değer saklar. Öteki araçların geri yazılacak alan değeri yoktur. Örneğin oluşturma, silme, gönderme ve yönetim işleri bu gruptadır. İki durumda güncelleme de eski değer saklamaz:
+
+- Güncelleme kullanıcının okuyamadığı bir alanı değiştirdi. Geri alma önizlemesi eski değeri yeni değer olarak gösterir. Okunamayan değer bu yolla sızardı.
+- Güncelleme bir alt tabloyu değiştirdi. Alt tablo bütün olarak değişir ve satırların kendi adı vardır.
+
+Uç şu sırayla denetler:
+
+1. Öneri oturumdaki kullanıcıya ait olmalıdır. Başka kişinin önerisi 403 alır.
+2. Öneri uygulanmış olmalıdır. Durum `consumed`, sonuç `succeeded` olmalıdır. Değilse yanıt `not_applied` olur.
+3. Öneride saklı eski değer olmalıdır. Yoksa yanıt `not_revertable` olur.
+4. Kaydın bugünkü sürümü `applied_version` ile aynı olmalıdır. Kayıt arada değiştiyse ya da silindiyse yanıt `record_changed` olur.
+5. Yeni öneri her zamanki önizlemeden geçer. Önizleme yazma iznini yeniden denetler.
+
+Ret yanıtı 200 kodunu taşır. Gövdede `opened` değeri `false` olur ve `deny_reason` nedeni verir. Bu biçim `approve_proposal` ucunun biçimine benzer. Her sonuç günlüğe `revert` adımıyla yazılır.
+
+Yeni öneri kaynak öneriyi `source_proposal` alanında gösterir. Bu alan donmuş alanlar arasındadır.
+
+Geri alma önerisinin risk düzeyini sunucu atar. Sunucu aracın düzeyini ve kaynak önerinin düzeyini karşılaştırır. Yüksek olan düzey geçerli olur. Örneğin kaynak öneri R3 ise geri alma önerisi de R3 olur.
+
+Uç `website_user_allowed_methods` listesindedir. Panel kullanıcısı ucu çağırabilir. Uç ayrıca `dev/tests/test_login_method_allowlists.py` dosyasındaki `EXPECTED` listesindedir. Bu iş için `ai` modülü o testin dışarıda bıraktığı modüller listesinden çıkarıldı. Artık her yapay zekâ ucu bu listede bir çağıranla adlandırılır.
+
+Kod `ai/revert.py` dosyasındadır. Testler `ai/tests/test_revert.py` ve `api/test_ai.py` dosyalarındadır.
+
 ## 8. “PLT AI Action Log” hangi alanları tutar (G-64)
 
 Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürütme adımları da ayrı kayıt açar.

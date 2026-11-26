@@ -210,6 +210,7 @@ PROPOSAL_STATE = {
 		"destructive": _BOOLEAN,
 		"billable": _BOOLEAN,
 		"risk_level": RISK_LEVEL,
+		"source_proposal": _NULLABLE_STRING,
 		"preview": PREVIEW,
 		"expires_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 		"created_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},

@@ -773,6 +773,12 @@ Billable,Ücretli,PLT AI Action Proposal
 Set when the tool may cost money.,Araç ücret doğurabiliyorsa işaretlenir.,PLT AI Action Proposal
 Risk Level,Risk düzeyi,PLT AI Action Proposal
 "Risk level from R0 to R3. The server sets it from the tool when the proposal opens. The model cannot set it.","R0 ile R3 arasındaki risk düzeyi. Sunucu düzeyi öneri açılırken araçtan belirler. Model düzeyi belirleyemez.",PLT AI Action Proposal
+Source Proposal,Kaynak öneri,PLT AI Action Proposal
+The applied proposal this proposal reverts. Empty on an ordinary proposal.,Bu önerinin geri aldığı uygulanmış öneri. Sıradan öneride boştur.,PLT AI Action Proposal
+Revert Values,Geri alma değerleri,PLT AI Action Proposal
+Old values of the fields the applied action changed. A revert proposal is built from them.,Uygulanan işlemin değiştirdiği alanların eski değerleri. Geri alma önerisi bu değerlerden kurulur.,PLT AI Action Proposal
+Applied Version,Uygulama sonrası sürüm,PLT AI Action Proposal
+"The target's version right after the applied action. A revert is refused if the target changed since.","Uygulanan işlemden hemen sonraki kayıt sürümü. Kayıt o andan sonra değiştiyse geri alma reddedilir.",PLT AI Action Proposal
 Expires At,Son geçerlilik zamanı,PLT AI Action Proposal
 Moment after which the proposal can no longer be approved.,Bu andan sonra öneri onaylanamaz.,PLT AI Action Proposal
 Status,Durum,PLT AI Action Proposal

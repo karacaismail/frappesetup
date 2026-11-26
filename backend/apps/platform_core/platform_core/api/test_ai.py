@@ -189,6 +189,36 @@ class TestAiEndpoints(AiTestCase):
 		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.status_of(proposal_id), ("consumed", "unknown"))
 
+	# --- propose_revert ---
+
+	def applied_proposal_of_a(self) -> tuple[str, str]:
+		"""Apply an update as user A. Return the record and the applied proposal's id."""
+		name, proposal_id, digest = self.proposal_of_a()
+		response = self.approve(self.login(USER_A), proposal_id, digest)
+		self.assertTrue(response.json["message"]["executed"], response.json)
+		return name, proposal_id
+
+	def test_propose_revert_guest_denied(self):
+		name, proposal_id = self.applied_proposal_of_a()
+		before = frappe.db.count("PLT AI Action Proposal")
+
+		status = self.guest("POST", "propose_revert", body={"proposal_id": proposal_id})
+
+		self.assertEqual(status, 403)
+		self.assertEqual(frappe.db.count("PLT AI Action Proposal"), before)
+		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "title"), "New")
+
+	def test_propose_revert_foreign_data_denied(self):
+		name, proposal_id = self.applied_proposal_of_a()
+		before = frappe.db.count("PLT AI Action Proposal")
+
+		response = self.human(self.login(USER_B), "POST", "propose_revert", body={"proposal_id": proposal_id})
+
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("Old", response.get_data(as_text=True))
+		self.assertEqual(frappe.db.count("PLT AI Action Proposal"), before)
+		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "title"), "New")
+
 	# --- purge_logs ---
 
 	def test_purge_logs_guest_denied(self):

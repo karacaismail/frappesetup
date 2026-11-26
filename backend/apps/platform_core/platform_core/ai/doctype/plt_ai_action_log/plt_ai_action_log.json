@@ -65,7 +65,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Stage",
-   "options": "call\npreview\napprove\nreject\nexecute\nresolve\nauth",
+   "options": "call\npreview\napprove\nreject\nexecute\nresolve\nrevert\nauth",
    "read_only": 1
   },
   {
@@ -173,7 +173,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 19:00:00.000000",
+ "modified": "2026-11-26 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI",
  "name": "PLT AI Action Log",

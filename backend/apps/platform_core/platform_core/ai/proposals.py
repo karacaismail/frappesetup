@@ -40,6 +40,10 @@ def _json(value: Any) -> str:
 	return json.dumps(value, sort_keys=True, default=json_handler, ensure_ascii=False)
 
 
+# The canonical JSON form the layer stores and compares.
+canonical = _json
+
+
 def _target_key(doctype: str | None, name: str | None) -> str | None:
 	if not doctype or not name:
 		return None
@@ -137,8 +141,12 @@ def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 	return spec
 
 
-def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
-	"""Build the preview and open the proposal record. Nothing is written to the target record."""
+def open_proposal(tool: registry.AiTool, arguments: dict, *, source=None) -> tuple[dict, Any]:
+	"""Build the preview and open the proposal record. Nothing is written to the target record.
+
+	`source` is the applied proposal a revert proposal undoes (AJA-1002). The revert's level is
+	at least the source's level.
+	"""
 	# The stored input is canonical JSON. The preview is built from that same form, so the
 	# preview made at approval, from the stored input, lists its changes in the same order.
 	args_json = _json(arguments)
@@ -161,6 +169,9 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 	preview = {key: spec[key] for key in PREVIEW_KEYS if spec.get(key) is not None}
 	preview_json = _json(preview)
 	version = spec.get("target_version")
+	level = risk.level(tool)
+	if source is not None:
+		level = risk.higher(level, source.risk_level or "R0")
 	doc = store.insert_proposal(
 		{
 			"user": frappe.session.user,
@@ -178,8 +189,9 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 			"digest": _digest(frappe.session.user, tool.name, target_key, version, args_json, preview_json),
 			"destructive": int(tool.destructive),
 			"billable": int(tool.billable),
-			# From the tool only. The model's arguments never reach this value.
-			"risk_level": risk.level(tool),
+			# From the tool and the source proposal only. The model's arguments never reach this value.
+			"risk_level": level,
+			"source_proposal": source.name if source else None,
 			"expires_at": add_to_date(now_datetime(), seconds=TTL_SECONDS),
 			"status": "pending",
 		}
@@ -210,6 +222,7 @@ def public(doc, *, with_digest: bool = True) -> dict:
 		"destructive": bool(doc.destructive),
 		"billable": bool(doc.billable),
 		"risk_level": doc.risk_level,
+		"source_proposal": doc.get("source_proposal") or None,
 		"preview": json.loads(doc.preview_json),
 		"expires_at": timestamps.iso(doc.expires_at),
 		"created_at": timestamps.iso(doc.creation),
@@ -236,6 +249,10 @@ def _own(proposal_id: str, *, for_update: bool = False):
 	if doc.user != frappe.session.user:
 		raise frappe.PermissionError(_("This proposal belongs to another user.", context=CONTEXT))
 	return doc
+
+
+# The owner check, for the revert endpoint of `platform_core.ai.revert`.
+own = _own
 
 
 def read_for_model(proposal_id: str) -> dict:
@@ -417,17 +434,22 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	# its own `prepare` included. Such code may reach another system or commit. Every error
 	# below this line is `unknown`, whatever its type, `ToolDenied` included. A human resolves it.
 	# ---------------------------------------------------------------------------------------
+	from platform_core.ai import revert
+
 	try:
+		# The old values are read from the locked record just before the write (AJA-1002).
+		captured = revert.capture(tool, prepared) if tool.tool_class != "app" else None
 		if tool.tool_class == "app":
 			result = tool.handler(tool.prepare(**arguments)) if tool.prepare else tool.handler(**arguments)
 		else:
 			result = tool.handler(prepared)
+		touched = result.get("name") if isinstance(result, dict) else None
+		doc.result = "succeeded"
+		doc.result_document = str(touched) if touched else doc.target_name
+		revert.record_applied(doc, captured)
 	except Exception as error:
 		return _execution_error(doc, tool, error, result="unknown")
 
-	touched = result.get("name") if isinstance(result, dict) else None
-	doc.result = "succeeded"
-	doc.result_document = str(touched) if touched else doc.target_name
 	store.save_proposal(doc)
 	_log(
 		"execute",
