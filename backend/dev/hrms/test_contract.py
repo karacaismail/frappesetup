@@ -179,6 +179,19 @@ class TestHomeContract(unittest.TestCase):
                 self.assertEqual(set(self.schemas[schema]["required"]), fields)
                 self.assertFalse(self.schemas[schema].get("additionalProperties", True))
 
+    def test_summary_states_the_team_rule(self):
+        # The orchestrator approved this rule on 26 November 2026 (AJA-1165).
+        operation = self.contract["paths"]["/method/hrms_tr.api.get_home_summary"]["get"]
+        text = " ".join(operation["description"].split())
+        for sentence in (
+            "The team is the department of the leave application.",
+            "An application without a department is never an overlap.",
+            "Only applications that end today or later count.",
+            "Two applications of the same employee also count.",
+        ):
+            with self.subTest(sentence=sentence):
+                self.assertIn(sentence, text)
+
     def test_problem_kinds_and_change_actions_are_listed(self):
         kinds = {item["properties"]["kind"]["const"] for item in self.schemas["HomeProblem"]["oneOf"]}
         self.assertEqual(kinds, {"overlap", "missing_joining_date"})
