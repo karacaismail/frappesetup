@@ -295,6 +295,21 @@ class EmployeeAnonymizationTest(IntegrationTestCase):
 		self.assertEqual(employee.status, "Active")
 
 
+class LeaveRequestContextCleanupTest(TestCase):
+	def test_cleanup_preserves_runner_flags(self):
+		previous_flags = getattr(frappe.local, "flags", None)
+		self.addCleanup(setattr, frappe.local, "flags", previous_flags)
+		runner_flags = frappe._dict(in_test=True, mute_emails=True)
+		frappe.local.flags = runner_flags
+
+		case = LeaveRequestContextTest("test_no_employee_returns_null_values_and_sources")
+		result = case.run()
+
+		self.assertTrue(result.wasSuccessful(), (result.errors, result.failures))
+		self.assertIs(frappe.local.flags, runner_flags)
+		self.assertEqual(runner_flags, {"in_test": True, "mute_emails": True})
+
+
 class LeaveRequestContextTest(TestCase):
 	"""The request context exposes only the signed-in employee's data."""
 
@@ -302,7 +317,9 @@ class LeaveRequestContextTest(TestCase):
 		from hrms_tr import api
 
 		self.api = api
-		self.enterContext(patch.object(frappe.local, "flags", frappe._dict(), create=True))
+		previous_flags = getattr(frappe.local, "flags", None)
+		frappe.local.flags = frappe._dict()
+		self.addCleanup(setattr, frappe.local, "flags", previous_flags)
 		self.fake = self.enterContext(patch.object(api, "frappe"))
 		self.fake.session.user = "employee@example.test"
 		self.fake.db.get_value.return_value = frappe._dict(
