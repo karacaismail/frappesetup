@@ -59,6 +59,14 @@ class RoleFixtureTest(unittest.TestCase):
 				self.assertEqual(
 					setters.get(("Employee", field, "permlevel")), str(setup.EMPLOYEE_PERSONAL_LEVEL)
 				)
+		# The preferred address can be a copy of the personal address.
+		self.assertIn("prefered_email", setup.EMPLOYEE_PERSONAL_FIELDS)
+		for child, fields in setup.EMPLOYEE_PERSONAL_CHILD_FIELDS.items():
+			for field in fields:
+				with self.subTest(child=child, field=field):
+					self.assertEqual(
+						setters.get((child, field, "permlevel")), str(setup.EMPLOYEE_PERSONAL_LEVEL)
+					)
 		# Names stay on level 0: the leave list shows who asked for the leave.
 		for field in ("first_name", "employee_name", "company", "department"):
 			self.assertNotIn(("Employee", field, "permlevel"), setters)
