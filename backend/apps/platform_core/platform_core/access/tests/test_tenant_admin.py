@@ -37,6 +37,8 @@ CUSTOM_TYPE = "TA Ozel Tur"
 RULE_TYPE = "ToDo"
 PROTECTED = ("System Manager", "Administrator")
 RESELLER_ROLES = ("Reseller Admin", "Reseller Assistant")
+# press_tr opens this role on the Press site (AJA-421). Only Administrator gives it.
+RECOVERY_REVIEWER = "Recovery Reviewer"
 
 
 def _user(email: str, roles: list[str]) -> None:
@@ -621,6 +623,32 @@ class TestTenantAdmin(IntegrationTestCase):
 			frappe.set_user("Administrator")
 			self.assertNotIn(role, frappe.get_roles(PLAIN))
 			self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
+
+	def test_holder_cannot_give_the_recovery_reviewer_role(self):
+		"""AJA-421: the holder gives the recovery reviewer role neither to itself nor to another user.
+
+		The role is opened here without desk access, so only the closed role list stops the holder.
+		"""
+		if not frappe.db.exists("Role", RECOVERY_REVIEWER):
+			frappe.get_doc(doctype="Role", role_name=RECOVERY_REVIEWER, desk_access=0).insert()
+		self.assertIn(RECOVERY_REVIEWER, tenant_admin.CLOSED_ROLES)
+		self.assertFalse(tenant_admin.grantable_role(RECOVERY_REVIEWER))
+		for email in (HOLDER, PLAIN):
+			frappe.set_user(HOLDER)
+			doc = frappe.get_doc("User", email)
+			doc.append("roles", {"role": RECOVERY_REVIEWER})
+			with self.subTest(user=email), self.assertRaises(frappe.PermissionError):
+				doc.save(ignore_permissions=True)
+			frappe.set_user("Administrator")
+			self.assertNotIn(RECOVERY_REVIEWER, frappe.get_roles(email))
+		frappe.set_user(HOLDER)
+		profile = frappe.get_doc(
+			doctype="Role Profile", role_profile=PROFILE, roles=[{"role": RECOVERY_REVIEWER}]
+		)
+		with self.assertRaises(frappe.PermissionError):
+			profile.insert(ignore_permissions=True)
+		frappe.set_user("Administrator")
+		self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
 
 	def test_holder_cannot_change_or_delete_its_own_role(self):
 		client = self.login()

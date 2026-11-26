@@ -31,7 +31,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "12ab8e200ec5e465100f3b8b876e0ac5a791ca30fbfd922eb3b367f768af5003",
+  "sha256": "6f2f2ccdd6e22545b78abbf947b9b4c41b6b1f6c1f6fe62abfc28379282735a8",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -108,7 +108,7 @@
     {
       "rule": "frappe-ignore-permissions",
       "path": "backend/apps/press_tr/press_tr/press_identity/accounts.py",
-      "line": 16,
+      "line": 34,
       "reason": "Internal callers save only the linked account or the site selected during authorized anonymization."
     },
     {
@@ -156,14 +156,20 @@
     {
       "rule": "frappe-ignore-permissions",
       "path": "backend/apps/press_tr/press_tr/press_identity/recovery.py",
-      "line": 41,
+      "line": 43,
       "reason": "The background job runs as Guest, who cannot create records, so it inserts one Open review only for an existing identity link with no open review. The controller freezes the record and a non-owner reviewer decides."
+    },
+    {
+      "rule": "frappe-ignore-permissions",
+      "path": "backend/apps/press_tr/press_tr/press_identity/recovery.py",
+      "line": 88,
+      "reason": "Runs only from the after_install and after_migrate hooks, not from any request. It inserts the fixed Recovery Reviewer role only when the role is missing and never changes an existing role (AJA-421)."
     }
   ],
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "0ba638174d10ea34a7246a09b4500c90abe6c92da9e06552cca2c94916e54bdc",
+      "sha256": "2a47983d66b5060e81afc080d06970e4129b657dc5d823f5fa1bfbdbd2dcf13e",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -186,25 +192,25 @@
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 351,
+          "line": 354,
           "reason": "Saves the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on save and refuses protected roles, standard roles and closed types."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 353,
+          "line": 356,
           "reason": "Inserts the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs before insert and refuses protected roles, standard roles and closed types."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 370,
+          "line": 373,
           "reason": "Deletes the Custom DocPerm row after require_manager, a type and role key check and _require_open (G-62). guard_custom_docperm still runs on trash."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/access/tenant_admin.py",
-          "line": 399,
+          "line": 402,
           "reason": "Saves the users of a Role Profile that guard_role_profile allowed to hold only plain roles (G-62). Administrator and users with any role that is not plain are skipped. guard_user still runs on each save."
         },
         {
