@@ -53,6 +53,8 @@ class TestPermissionLog(IntegrationTestCase):
 		super().setUpClass()
 		cls.site = frappe.local.site
 		frappe.set_user("Administrator")
+		# An interrupted run can leave the profile and its log rows behind.
+		cls.clean()
 		# The setup step makes the role on install. This call adds its permission rows.
 		tenant_admin.ensure_permissions()
 		if not frappe.db.exists("Role", PLAIN_ROLE):
@@ -72,6 +74,8 @@ class TestPermissionLog(IntegrationTestCase):
 	def clean():
 		if frappe.db.exists("Role Profile", PROFILE):
 			frappe.delete_doc("Role Profile", PROFILE, ignore_permissions=True, force=True)
+		# The rows of an earlier run would be counted with the row of this run.
+		frappe.db.delete("Permission Log", {"for_doctype": "Role Profile", "for_document": PROFILE})
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
