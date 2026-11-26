@@ -59,6 +59,8 @@ class TestFieldHelp(IntegrationTestCase):
 				"document_type": DOCTYPE,
 				"fieldname": fieldname,
 				"status": status,
+				# These tests request English help, regardless of the site default language.
+				"language": "en",
 				"content": f"Tenant help for {fieldname}.",
 			}
 		).insert()
