@@ -73,7 +73,7 @@ class TurkeySetupDefaultsTests(unittest.TestCase):
             methods = [
                 method
                 for method in getattr(hooks, event, [])
-                if method.startswith("platform_core.config.")
+                if method.startswith("platform_core.config.turkey_setup.")
             ]
             self.assertEqual(len(methods), 1, event)
             module, name = methods[0].rsplit(".", 1)

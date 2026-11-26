@@ -1,7 +1,7 @@
 """Create or update the local review accounts in the stack's Keycloak.
 
 Runs inside the stack network with `python -I`. Input on stdin: keycloak_url, admin_username,
-admin_password, password, relaxed_length, restore_policy and the accounts of
+admin_password, password, relaxed_length, restore_policy, organization and the accounts of
 backend/e2e/review-accounts.json.
 Output on stdout: the Keycloak subject of every platform realm account. It prints no password.
 
@@ -12,6 +12,10 @@ of platform-realm.json, never the rule read from the running Keycloak: a run kil
 restore leaves the relaxed rule behind, and the next run must not take that rule for the realm's. The password history
 rule is dropped for the same moment, so a repeated run may set the same password again.
 The realm file is never changed. Only a plain-HTTP local Keycloak is accepted.
+
+Every platform account with tenant roles becomes a member of the tenant's Keycloak organization
+(alias `organization`). identity-sync answers the linked accounts read only for such a member
+(G-160, AJA-950). The organization is created when it is missing. Other accounts join none.
 """
 
 import http.client
@@ -129,6 +133,26 @@ def ensure_user(call, realm, account, password):
     return location.rsplit("/", 1)[-1]
 
 
+def ensure_organization(call, alias):
+    """The ID of the platform organization with this alias. Creates it when it is missing."""
+    base = f"/admin/realms/{PLATFORM}/organizations"
+    _, found = expect(call, {200}, "list the organizations", "GET", f"{base}?first=0&max=1000")
+    for organization in found or []:
+        if organization.get("alias") == alias:
+            return organization["id"]
+    location, _ = expect(call, {201}, f"create the {alias} organization", "POST", base,
+                         {"name": f"Local tenant {alias}", "alias": alias, "enabled": True})
+    if not location:
+        raise SystemExit(f"Keycloak did not name the created {alias} organization.")
+    return location.rsplit("/", 1)[-1]
+
+
+def add_member(call, organization_id, subject, username):
+    """Add the user to the organization. 409 means the user is a member already."""
+    expect(call, {201, 204, 409}, f"add {username} to the tenant organization", "POST",
+           f"/admin/realms/{PLATFORM}/organizations/{organization_id}/members", subject)
+
+
 def apply(payload, caller_factory=http_caller):
     require_local(payload["keycloak_url"])
     length = payload["relaxed_length"]
@@ -136,6 +160,9 @@ def apply(payload, caller_factory=http_caller):
         raise SystemExit("The relaxed length must be from 8 to 11.")
     policy = payload.get("restore_policy")
     require_production_policy(policy)
+    alias = payload.get("organization")
+    if not isinstance(alias, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", alias):
+        raise SystemExit("The tenant organization alias is missing or invalid.")
     call = caller_factory(payload["keycloak_url"], payload["admin_username"], payload["admin_password"])
     password = payload["password"]
     accounts = payload["accounts"]
@@ -149,6 +176,12 @@ def apply(payload, caller_factory=http_caller):
                 subjects[account["username"]] = ensure_user(call, PLATFORM, account, password)
     finally:
         expect(call, {204}, "restore the password rule", "PUT", realm_path, {"passwordPolicy": policy})
+    members = [account["username"] for account in accounts
+               if account["realm"] == PLATFORM and account.get("tenant_roles")]
+    if members:
+        organization_id = ensure_organization(call, alias)
+        for username in members:
+            add_member(call, organization_id, subjects[username], username)
     for account in accounts:
         if account["realm"] != MASTER:
             continue

@@ -14,6 +14,8 @@ before_request = [
 	"platform_core.identity.login_policy.before_request",
 	"platform_core.identity.session_policy.before_request",
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
+	# G-53: users without the Platform Operator role go from /app and /desk to the panel.
+	"platform_core.config.desk_policy.before_request",
 ]
 on_session_creation = ["platform_core.identity.session_policy.on_session_creation"]
 # Keep the idle clock across site cache clears. Frappe matches prefixes.
@@ -24,6 +26,8 @@ auth_hooks = [
 	"platform_core.ai.agent_token.authenticate_request",
 	"platform_core.ai.oauth.authenticate_request",
 	"platform_core.shell.native_metadata.guard_native_metadata",
+	# G-53: the Desk check again, after API keys and OAuth tokens named the user.
+	"platform_core.config.desk_policy.after_auth",
 ]
 # AU-19: local sign-in functions are replaced by gated wrappers (identity/login_policy.py).
 override_whitelisted_methods = {
@@ -64,6 +68,8 @@ after_install = [
 	"platform_core.setup.panel_roles.ensure",
 	# G-62: the permission rows of the "Tenant Admin" role.
 	"platform_core.access.tenant_admin.ensure_permissions",
+	# G-53: Desk notices off, the panel is the home page.
+	"platform_core.config.desk_policy.apply",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
@@ -73,6 +79,7 @@ after_migrate = [
 	"platform_core.config.turkey_setup.apply",
 	"platform_core.setup.panel_roles.ensure",
 	"platform_core.access.tenant_admin.ensure_permissions",
+	"platform_core.config.desk_policy.apply",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
@@ -314,6 +321,9 @@ after_request = ["platform_core.shell.headers.add_security_headers"]
 
 # Panel client routes (platform-core-kabuk): every /panel/<path> renders the /panel page.
 website_route_rules = [{"from_route": "/panel/<path:app_path>", "to_route": "panel"}]
+# G-53: the Desk check on the page Frappe resolves, such as the home page of "/" (AJA-963).
+# Frappe uses only the last resolver hook, so this list keeps one entry.
+website_path_resolver = ["platform_core.config.desk_policy.resolve_website_path"]
 
 after_build = ["platform_core.shell.assets.remove_panel_source_maps"]
 
