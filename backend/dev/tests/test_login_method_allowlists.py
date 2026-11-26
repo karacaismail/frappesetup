@@ -107,6 +107,19 @@ EXPECTED = {
     "press_tr.api.identity.anonymize_user": SERVICE,
     "press_tr.api.identity.list_identities": SERVICE,
     "press_tr.api.maintenance.cleanup_expired_sessions": ADMIN,
+    # AI access layer (platform_core.api.ai, AJA-1002). The MCP endpoint and its metadata take
+    # a bearer credential, so Frappe sees a guest. The panel user decides on their own proposals.
+    "platform_core.api.ai.mcp": PUBLIC,
+    "platform_core.api.ai.mcp_resource_metadata": PUBLIC,
+    "platform_core.api.ai.issue_agent_token": PANEL,
+    "platform_core.api.ai.list_proposals": PANEL,
+    "platform_core.api.ai.list_second_approvals": PANEL,
+    "platform_core.api.ai.get_proposal": PANEL,
+    "platform_core.api.ai.approve_proposal": PANEL,
+    "platform_core.api.ai.reject_proposal": PANEL,
+    "platform_core.api.ai.resolve_proposal": PANEL,
+    "platform_core.api.ai.propose_revert": PANEL,
+    "platform_core.api.ai.purge_logs": ADMIN,
     # G-138 field help. A signed-in panel account reads the help of one field.
     "platform_core.api.help.get_field_help": PANEL,
     # G-138 help coverage report. `frappe.only_for("System Manager")` guards it, so only an
@@ -130,7 +143,7 @@ SCANNED = (
 # list, so its methods must be named in EXPECTED.
 NOT_LOGIN_MODULES = frozenset(
     f"platform_core.api.{name}"
-    for name in ("access", "ai", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
+    for name in ("access", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
 )
 
 # Guest methods without a `rate_limit` decorator, each with its reason.
@@ -286,7 +299,9 @@ class LoginMethodAllowListTests(unittest.TestCase):
 
     def test_every_whitelisted_login_method_has_a_named_caller(self):
         unknown = sorted(set(self.methods) - set(EXPECTED))
-        self.assertEqual(unknown, [], "Name the caller of each new method in EXPECTED and add it to its list.")
+        self.assertEqual(
+            unknown, [], "Name the caller of each new method in EXPECTED and add it to its list."
+        )
 
     def test_every_expected_method_exists_or_waits_for_its_branch(self):
         missing = sorted(set(EXPECTED) - set(self.methods) - set(PENDING))

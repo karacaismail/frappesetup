@@ -315,8 +315,9 @@ class TestAdminVersion(AiTestCase):
 			return original(*args, **kwargs)
 
 		digest = self.digest_of(client, proposal_id)
-		with patch.object(admin, function_name, raced):
-			return self.approve(client, proposal_id, digest).json["message"]
+		# The proposal is R3. The rival runs at the second approval, where the action executes.
+		around = patch.object(admin, function_name, raced)
+		return self.approve_both(client, proposal_id, digest, around_second=around).json["message"]
 
 	def test_field_property_is_not_overwritten(self):
 		manager = self.login(MANAGER)

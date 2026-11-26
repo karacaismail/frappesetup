@@ -48,7 +48,9 @@ class PurgeRequests:
 	def old_proposal(self, client) -> str:
 		name = self.make_record(MANAGER)
 		arguments = {"doctype": DOCTYPE, "name": name, "data": {"title": "New"}}
-		proposal_id = self.call_tool(client, "plt_update_document", arguments)["structuredContent"]["proposal_id"]
+		proposal_id = self.call_tool(client, "plt_update_document", arguments)["structuredContent"][
+			"proposal_id"
+		]
 		values = {"status": "rejected", "decided_at": add_days(now_datetime(), -31)}
 		frappe.db.set_value("PLT AI Action Proposal", proposal_id, values, update_modified=False)
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
@@ -116,7 +118,7 @@ class TestUsageSelection(PurgeRequests, AiTestCase):
 
 		with installed(gateway):
 			proposal = self.call_tool(manager, "plt_purge_action_log", {})["structuredContent"]
-			outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
+			outcome = self.approve_both(manager, proposal["proposal_id"]).json["message"]
 
 		self.assertFalse(outcome["executed"], outcome)
 		self.assertNotEqual(outcome["proposal"]["result"], "succeeded")
@@ -135,11 +137,11 @@ class TestUsageSelection(PurgeRequests, AiTestCase):
 
 		with installed(gateway):
 			proposal = self.call_tool(manager, "plt_purge_action_log", {})["structuredContent"]
-			outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
+			outcome = self.approve_both(manager, proposal["proposal_id"]).json["message"]
 		with installed(Gateway(["u-1", "u-2"])) as moved:
 			second = self.call_tool(manager, "plt_purge_action_log", {})["structuredContent"]
 			moved.names = ["u-9", "u-2"]
-			changed = self.approve(manager, second["proposal_id"]).json["message"]
+			changed = self.approve_both(manager, second["proposal_id"]).json["message"]
 
 		self.assertTrue(outcome["executed"], outcome)
 		self.assertEqual(gateway.deletes, [["u-1", "u-2"]])

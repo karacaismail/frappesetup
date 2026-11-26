@@ -22,16 +22,22 @@
   "destructive",
   "billable",
   "risk_level",
+  "source_proposal",
   "expires_at",
   "status",
   "result",
   "result_document",
+  "revert_json",
+  "applied_version",
   "error",
-  "decided_at"
+  "decided_at",
+  "first_approved_at",
+  "second_approver",
+  "second_approved_at"
  ],
  "fields": [
   {
-   "description": "User who asked for the write and who alone may approve it.",
+   "description": "User who asked for the write. Only this user gives the first approval.",
    "fieldname": "user",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -153,6 +159,14 @@
    "read_only": 1
   },
   {
+   "description": "The applied proposal this proposal reverts. Empty on an ordinary proposal.",
+   "fieldname": "source_proposal",
+   "fieldtype": "Link",
+   "label": "Source Proposal",
+   "options": "PLT AI Action Proposal",
+   "read_only": 1
+  },
+  {
    "description": "Moment after which the proposal can no longer be approved.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
@@ -160,12 +174,12 @@
    "read_only": 1
   },
   {
-   "description": "Where the proposal stands. Consumed means execution has started.",
+   "description": "Where the proposal stands. An R3 proposal waits for a second approval after the owner approves it. Consumed means execution has started.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending\nrejected\nexpired\nconsumed",
+   "options": "pending\nawaiting_second_approval\nrejected\nexpired\nconsumed",
    "read_only": 1,
    "search_index": 1
   },
@@ -186,6 +200,20 @@
    "read_only": 1
   },
   {
+   "description": "Old values of the fields the applied action changed. A revert proposal is built from them.",
+   "fieldname": "revert_json",
+   "fieldtype": "Long Text",
+   "label": "Revert Values",
+   "read_only": 1
+  },
+  {
+   "description": "The target's version right after the applied action. A revert is refused if the target changed since.",
+   "fieldname": "applied_version",
+   "fieldtype": "Data",
+   "label": "Applied Version",
+   "read_only": 1
+  },
+  {
    "description": "Why the proposal was rejected or the execution failed.",
    "fieldname": "error",
    "fieldtype": "Small Text",
@@ -198,12 +226,34 @@
    "fieldtype": "Datetime",
    "label": "Decided At",
    "read_only": 1
+  },
+  {
+   "description": "When the owner gave the first approval of an R3 proposal. Nothing runs at that moment.",
+   "fieldname": "first_approved_at",
+   "fieldtype": "Datetime",
+   "label": "First Approved At",
+   "read_only": 1
+  },
+  {
+   "description": "Second person who approved an R3 proposal. Not the owner. Has write permission on the target.",
+   "fieldname": "second_approver",
+   "fieldtype": "Link",
+   "label": "Second Approver",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "When the second person approved the R3 proposal.",
+   "fieldname": "second_approved_at",
+   "fieldtype": "Datetime",
+   "label": "Second Approved At",
+   "read_only": 1
   }
  ],
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-26 12:00:00.000000",
+ "modified": "2026-11-26 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI",
  "name": "PLT AI Action Proposal",

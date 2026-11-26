@@ -23,9 +23,16 @@ FROZEN_FIELDS = (
 	"digest",
 	"preview_digest",
 	"risk_level",
+	"source_proposal",
 )
+# Written once, when the action succeeds (AJA-1002). A revert proposal is built from them, so
+# they never change after that.
+WRITE_ONCE_FIELDS = ("revert_json", "applied_version")
+# Who approved an R3 proposal and when (AJA-1003). Once written, these do not change.
+APPROVAL_FIELDS = ("first_approved_at", "second_approver", "second_approved_at")
 # A proposal in one of these states is decided. Its state does not change again.
 DECIDED_STATES = ("rejected", "expired", "consumed")
+AWAITING = "awaiting_second_approval"
 
 
 class PLTAIActionProposal(Document):
@@ -35,8 +42,34 @@ class PLTAIActionProposal(Document):
 		if self.is_new() or before is None:
 			return
 		changed = [field for field in FROZEN_FIELDS if cstr(before.get(field)) != cstr(self.get(field))]
-		if changed or (before.status in DECIDED_STATES and self.status != before.status):
+		changed += [
+			field
+			for field in (*WRITE_ONCE_FIELDS, *APPROVAL_FIELDS)
+			if cstr(before.get(field)) and cstr(before.get(field)) != cstr(self.get(field))
+		]
+		# A first approval is never taken back. The owner rejects the proposal instead.
+		back_to_pending = before.status == AWAITING and self.status == "pending"
+		if (
+			changed
+			or back_to_pending
+			or self._approval_out_of_step(before)
+			or (before.status in DECIDED_STATES and self.status != before.status)
+		):
 			frappe.throw(
 				_("A proposal cannot change after it is opened or decided.", context=CONTEXT),
 				frappe.PermissionError,
 			)
+
+	def _approval_out_of_step(self, before) -> bool:
+		"""An approval field may be written only at its own step (AJA-1003).
+
+		The first approval moves a pending proposal to waiting. The second approver is written
+		while the proposal waits, and is never the owner.
+		"""
+		first = not before.first_approved_at and self.first_approved_at
+		if first and not (before.status == "pending" and self.status == AWAITING):
+			return True
+		second = (not before.second_approver and self.second_approver) or (
+			not before.second_approved_at and self.second_approved_at
+		)
+		return bool(second and (before.status != AWAITING or self.second_approver == self.user))

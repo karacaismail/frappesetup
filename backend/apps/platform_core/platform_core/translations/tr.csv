@@ -647,6 +647,7 @@ Your roles do not allow tool {0}.,Rolleriniz {0} aracını kullanmaya izin vermi
 An earlier action on this target has an unknown result. A human must resolve it first.,Bu hedefteki önceki işlemin sonucu bilinmiyor. Önce bir insan o işlemi kapatmalı.,platform_core.ai
 Proposal not found.,Öneri bulunamadı.,platform_core.ai
 This proposal belongs to another user.,Bu öneri başka bir kullanıcıya ait.,platform_core.ai
+You may not approve this proposal.,Bu öneriyi onaylama izniniz yok.,platform_core.ai
 Unknown status.,Bilinmeyen durum.,platform_core.ai
 start must be between 0 and {0}.,start değeri 0 ile {0} arasında olmalı.,platform_core.ai
 The target changed after the preview.,"Hedef, önizlemeden sonra değişti.",platform_core.ai
@@ -744,7 +745,7 @@ Duration (ms),Süre (ms),PLT AI Action Log
 How long the step took in milliseconds.,Adımın milisaniye cinsinden süresi.,PLT AI Action Log
 "A write that an AI asked for and that waits for a human. It holds the preview the human sees, the digest that binds the approval to that preview, and the outcome. Nothing is written to the target until the owner approves the proposal.","Yapay zekânın istediği ve insan kararını bekleyen yazma işidir. İnsanın gördüğü önizlemeyi, onayı o önizlemeye bağlayan özeti ve sonucu tutar. Sahibi öneriyi onaylayana kadar hedefe hiçbir şey yazılmaz.",PLT AI Action Proposal
 User,Kullanıcı,PLT AI Action Proposal
-User who asked for the write and who alone may approve it.,Yazmayı isteyen kullanıcı. Öneriyi yalnız bu kullanıcı onaylayabilir.,PLT AI Action Proposal
+User who asked for the write. Only this user gives the first approval.,Yazmayı isteyen kullanıcı. İlk onayı yalnız bu kullanıcı verir.,PLT AI Action Proposal
 Principal,Kimlik türü,PLT AI Action Proposal
 Identity type that opened the proposal.,Öneriyi açan kimlik türü.,PLT AI Action Proposal
 Session ID,Konuşma kimliği,PLT AI Action Proposal
@@ -773,10 +774,16 @@ Billable,Ücretli,PLT AI Action Proposal
 Set when the tool may cost money.,Araç ücret doğurabiliyorsa işaretlenir.,PLT AI Action Proposal
 Risk Level,Risk düzeyi,PLT AI Action Proposal
 "Risk level from R0 to R3. The server sets it from the tool when the proposal opens. The model cannot set it.","R0 ile R3 arasındaki risk düzeyi. Sunucu düzeyi öneri açılırken araçtan belirler. Model düzeyi belirleyemez.",PLT AI Action Proposal
+Source Proposal,Kaynak öneri,PLT AI Action Proposal
+The applied proposal this proposal reverts. Empty on an ordinary proposal.,Bu önerinin geri aldığı uygulanmış öneri. Sıradan öneride boştur.,PLT AI Action Proposal
+Revert Values,Geri alma değerleri,PLT AI Action Proposal
+Old values of the fields the applied action changed. A revert proposal is built from them.,Uygulanan işlemin değiştirdiği alanların eski değerleri. Geri alma önerisi bu değerlerden kurulur.,PLT AI Action Proposal
+Applied Version,Uygulama sonrası sürüm,PLT AI Action Proposal
+"The target's version right after the applied action. A revert is refused if the target changed since.","Uygulanan işlemden hemen sonraki kayıt sürümü. Kayıt o andan sonra değiştiyse geri alma reddedilir.",PLT AI Action Proposal
 Expires At,Son geçerlilik zamanı,PLT AI Action Proposal
 Moment after which the proposal can no longer be approved.,Bu andan sonra öneri onaylanamaz.,PLT AI Action Proposal
 Status,Durum,PLT AI Action Proposal
-Where the proposal stands. Consumed means execution has started.,"Önerinin durumu. consumed, yürütmenin başladığını gösterir.",PLT AI Action Proposal
+"Where the proposal stands. An R3 proposal waits for a second approval after the owner approves it. Consumed means execution has started.","Önerinin durumu. Sahibi R3 öneriyi onaylayınca öneri ikinci onayı bekler. consumed, yürütmenin başladığını gösterir.",PLT AI Action Proposal
 Result,Sonuç,PLT AI Action Proposal
 Outcome of the execution. Unknown blocks new proposals on the same target.,"Yürütmenin sonucu. unknown, aynı hedefte yeni öneriyi engeller.",PLT AI Action Proposal
 Result Document,Sonuç kaydı,PLT AI Action Proposal
@@ -785,6 +792,12 @@ Error,Hata,PLT AI Action Proposal
 Why the proposal was rejected or the execution failed.,Önerinin neden reddedildiği ya da yürütmenin neden hata verdiği.,PLT AI Action Proposal
 Decided At,Karar zamanı,PLT AI Action Proposal
 "When a human approved, rejected or resolved the proposal.","İnsanın öneriyi onayladığı, reddettiği ya da kapattığı zaman.",PLT AI Action Proposal
+First Approved At,İlk onay zamanı,PLT AI Action Proposal
+When the owner gave the first approval of an R3 proposal. Nothing runs at that moment.,Sahibin R3 öneriye ilk onayı verdiği zaman. Bu anda hiçbir şey çalışmaz.,PLT AI Action Proposal
+Second Approver,İkinci onaylayan,PLT AI Action Proposal
+Second person who approved an R3 proposal. Not the owner. Has write permission on the target.,R3 öneriyi onaylayan ikinci kişi. Bu kişi öneriyi açan kişi değildir. Hedefte yazma izni vardır.,PLT AI Action Proposal
+Second Approved At,İkinci onay zamanı,PLT AI Action Proposal
+When the second person approved the R3 proposal.,İkinci kişinin R3 öneriyi onayladığı zaman.,PLT AI Action Proposal
 Preview Digest,Önizleme özeti,PLT AI Action Proposal
 SHA-256 of the whole preview and its target. The server previews again at approval and compares.,Önizlemenin tamamının ve hedefinin SHA-256 özeti. Sunucu onayda önizlemeyi yeniden üretir ve karşılaştırır.,PLT AI Action Proposal
 You do not have permission for this action.,Bu işlem için izniniz yok.,platform_core.ai

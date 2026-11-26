@@ -339,6 +339,106 @@ Bu işten önce açılmış öneriler de düzey alır. Bunu `platform_core.ai.pa
 
 Kod `ai/risk.py` dosyasındadır. Testler `ai/tests/test_risk_level.py` dosyasındadır.
 
+### Geri alma önerisi (AJA-1002)
+
+Bu bölüm 26 Kasım 2026 Perşembe günü eklendi.
+
+İnsan uygulanmış bir öneriyi geri alabilir. Bunun için `propose_revert` ucu vardır. Uç kaydı kendisi değiştirmez. Uç yeni bir bekleyen öneri açar. Yeni öneri normal onay akışından geçer. Kayıt ancak insan yeni öneriyi onaylayınca eski değerlerine döner.
+
+Sunucu eski değerleri öneri uygulanırken saklar. Akış şöyledir:
+
+1. Katman kaydı yazmadan hemen önce kilitli kayıttan alanların değerini okur.
+2. Yazma başarılı olursa katman yalnız değeri değişen alanları tutar.
+3. Katman bu eski değerleri önerinin `revert_json` alanına yazar.
+4. Katman yazmadan sonraki kayıt sürümünü `applied_version` alanına yazar.
+
+İki alan bir kez yazılır. Sonra değişmez. Öneri kaydının denetleyicisi değişikliği reddeder.
+
+Yalnız `plt_update_document` aracı eski değer saklar. Öteki araçların geri yazılacak alan değeri yoktur. Örneğin oluşturma, silme, gönderme ve yönetim işleri bu gruptadır. İki durumda güncelleme de eski değer saklamaz:
+
+- Güncelleme kullanıcının okuyamadığı bir alanı değiştirdi. Geri alma önizlemesi eski değeri yeni değer olarak gösterir. Okunamayan değer bu yolla sızardı.
+- Güncelleme bir alt tabloyu değiştirdi. Alt tablo bütün olarak değişir ve satırların kendi adı vardır.
+
+Uç şu sırayla denetler:
+
+1. Öneri oturumdaki kullanıcıya ait olmalıdır. Başka kişinin önerisi 403 alır.
+2. Öneri uygulanmış olmalıdır. Durum `consumed`, sonuç `succeeded` olmalıdır. Değilse yanıt `not_applied` olur.
+3. Öneride saklı eski değer olmalıdır. Yoksa yanıt `not_revertable` olur.
+4. Kaydın bugünkü sürümü `applied_version` ile aynı olmalıdır. Kayıt arada değiştiyse ya da silindiyse yanıt `record_changed` olur.
+5. Yeni öneri her zamanki önizlemeden geçer. Önizleme yazma iznini yeniden denetler.
+
+Ret yanıtı 200 kodunu taşır. Gövdede `opened` değeri `false` olur ve `deny_reason` nedeni verir. Bu biçim `approve_proposal` ucunun biçimine benzer. Her sonuç günlüğe `revert` adımıyla yazılır.
+
+Yeni öneri kaynak öneriyi `source_proposal` alanında gösterir. Bu alan donmuş alanlar arasındadır.
+
+Geri alma önerisinin risk düzeyini sunucu atar. Sunucu aracın düzeyini ve kaynak önerinin düzeyini karşılaştırır. Yüksek olan düzey geçerli olur. Örneğin kaynak öneri R3 ise geri alma önerisi de R3 olur.
+
+Uç `website_user_allowed_methods` listesindedir. Panel kullanıcısı ucu çağırabilir. Uç ayrıca `dev/tests/test_login_method_allowlists.py` dosyasındaki `EXPECTED` listesindedir. Bu iş için `ai` modülü o testin dışarıda bıraktığı modüller listesinden çıkarıldı. Artık her yapay zekâ ucu bu listede bir çağıranla adlandırılır.
+
+Kod `ai/revert.py` dosyasındadır. Testler `ai/tests/test_revert.py` ve `api/test_ai.py` dosyalarındadır.
+### İkinci kişi onayı (AJA-1003)
+
+Bu bölüm 26 Kasım 2026 Perşembe günü eklendi.
+
+R3 düzeyindeki öneri iki kişinin onayıyla çalışır. Öneriyi açan kişi R3 öneriyi tek başına çalıştıramaz. R0, R1 ve R2 öneriler eskisi gibi çalışır. Bu önerileri yalnız öneriyi açan kişi onaylar.
+
+Akış şu sırayla ilerler:
+
+1. Öneriyi açan kişi ilk onayı verir. Sunucu bu anda bütün onay denetimlerini yapar. Önizleme de yeniden çalışır.
+2. Sunucu öneriyi çalıştırmaz. Önizlemenin yazdığı her şeyi geri alır.
+3. Sunucu durumu `awaiting_second_approval` yapar. İlk onay zamanı `first_approved_at` alanına yazılır.
+4. İkinci kişi bekleyen öneriyi `list_second_approvals` ucunda görür. Satır onay özetini de taşır.
+5. İkinci kişi `approve_proposal` ucunu aynı özetle çağırır.
+6. Sunucu onay anında kaydı ve özeti yeniden denetler. Önizleme ikinci kişinin oturumunda yeniden çalışır.
+7. Denetimler geçerse öneri çalışır. İkinci kişi `second_approver` alanına yazılır. Onay zamanı `second_approved_at` alanına yazılır.
+
+İkinci onaylayan kişi şu dört koşulu sağlar:
+
+- Kişi aynı sitenin etkin kullanıcısıdır. Her sitenin kendi veritabanı vardır. Bu yüzden başka sitenin kullanıcısı burada bulunmaz.
+- Kişi hedef kayıtta yazma iznine sahiptir. Hedef kayıt yoksa kişi hedef kayıt türünde bu izne sahip olur.
+- Kişi öneriyi açan kişi değildir.
+- Kişi aracı kullanabilir. Örneğin yönetim araçları “System Manager” rolünü ister.
+
+İkinci kişi önizlemedeki her alanı okuyabilmelidir. Bu kural 26 Kasım 2026 Perşembe günü eklendi (AJA-1077).
+
+Frappe bazı alanları izin düzeyiyle gizler. Bu ayarın adı “permlevel” olur. Permlevel, alanı kayıt izni olan kişiden de gizler. Önizlemeyi öneriyi açan kişi kurar. Bu yüzden önizleme ikinci kişinin göremediği değeri taşıyabilir.
+
+Sunucu önizlemedeki her değişikliğe bakar. Değişiklik hedef kayıt türünün bir alanını adlandırabilir. Bu durumda ikinci kişi o alanı okuyabilmelidir. Alan bir alt tablo da olabilir. Bu durumda kişi satırlardaki her alanı da okuyabilmelidir. Gizli alanlar da bu kurala girer. Örneğin parola alanı böyledir.
+
+Kişi bir alanı okuyamazsa ikinci onay veremez. Bu durumda sunucu şunları yapar:
+
+1. Sunucu öneriyi `list_second_approvals` listesine koymaz.
+2. Kişi `approve_proposal` ucunu çağırırsa sunucu 403 döndürür. Kayıt `not_second_approver` nedenini taşır.
+3. Sunucu bu ret yanıtında öneriyi göstermez. Bu ret özet ve süre denetiminden önce gelir. Bu yüzden `digest_mismatch` ve `expired` yanıtları da bu kişiye dönmez.
+4. Öneri beklemeyi sürdürür. Alanı okuyabilen başka bir kişi ikinci onayı verebilir.
+
+Önizlemeyi ikinci kişiye göre yeniden kurmak da mümkündü. O yolda kişi değerin bir kısmını görmeden onay verirdi. Bu yüzden bu yol seçilmedi. Önizlemenin `details` bölümü alan değeri taşımaz. Bu bölüm yalnız aracın kendi bilgilerini taşır. Örneğin silinecek satır sayısı böyledir.
+
+Bazı işler yazma izninden fazlasını ister. Önizlemedeki iş oluşturma, gönderme, iptal ya da silme olabilir. Bu durumda kişi o işin iznine sahip olur. Örneğin silme önerisinde kişinin silme izni vardır.
+
+Katmanın kendi kayıtlarında kimsenin yazma izni yoktur. Örneğin “PLT AI Action Log” kaydı böyledir. Bu kayıtlarda aracın kendi rol denetimi karar verir.
+
+Yazma işi ikinci kişinin yetkisiyle yapılır. Yürütme anındaki izin denetimi de ikinci kişiye göre yapılır. Bu seçimin nedeni şudur: Yazmayı onaylayan son kişi o anda oturumu açık olan kişidir. İlk kişinin izni ilk onayda yeniden denetlenmiştir.
+
+İkinci kişinin önizlemesi izin hatası verebilir. Bu durumda yanıt 403 olur. Öneri beklemeyi sürdürür. Böylece işi yapamayan kişi öneriyi bitiremez.
+
+Önizleme kişinin görebildiği alanlara göre değişebilir. İkinci kişi başka bir önizleme görürse özet uyuşmaz. Bu durumda öneri `document_changed` nedeniyle reddedilir. Öneri yine çalışmaz. Kayıt değişince de aynı ret olur. Sunucu bu iki durumu ayıramaz.
+
+Şu durumlarda öneri çalışmaz:
+
+- Öneriyi açan kişi ikinci kez onay verirse yanıt `second_approver_required` olur. Aynı kişinin iki onayı tek onay sayılır. Öneri beklemeyi sürdürür.
+- Koşulları sağlamayan kişi onay verirse yanıt 403 olur. Kayıt `not_second_approver` nedenini taşır. Yanıt önerinin içeriğini göstermez.
+- Başka bir kişi ilk onayı veremez. Bu kişi 403 alır. Kayıt `not_owner` nedenini taşır.
+- Süre dolduysa öneri `expired` olur. İkinci onay da ilk onayla aynı süreye bağlıdır. Süre öneri açıldığında başlar ve 600 saniyedir.
+
+Öneriyi açan kişi bekleyen öneriyi `reject_proposal` ucuyla reddedebilir. İlk onay geri alınmaz. Durum `pending` değerine dönmez. Onay alanları bir kez yazılınca değişmez. Kaydın denetleyicisi bu kuralı her yazma yolunda uygular.
+
+Her adım “PLT AI Action Log” kaydına düşer. İlk onay `approve` adımıdır ve `awaiting_second_approval` durumunu taşır. İkinci onay `approve` adımıdır. Yürütme `execute` adımıdır. Bu iki kayıt ikinci kişinin adını taşır. Ret de kayda düşer.
+
+`list_second_approvals` ucu en çok 500 bekleyen öneriyi okur. Sunucu bu önerilerden kişinin onaylayabildiklerini seçer. Bekleyen öneri en çok 600 saniye yaşar. Bu yüzden sınır yeterlidir. Kişinin kendi önerileri bu listede yoktur. Kişi kendi bekleyen önerilerini `list_proposals` ucunda `awaiting_second_approval` süzgeciyle görür.
+
+Kod `ai/proposals.py` dosyasındadır. Testler `ai/tests/test_second_approval.py` ve `api/test_ai.py` dosyalarındadır.
+
 ## 8. “PLT AI Action Log” hangi alanları tutar (G-64)
 
 Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürütme adımları da ayrı kayıt açar.
@@ -419,6 +519,7 @@ Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İ�
 | `platform_core.api.ai.mcp` | POST | İnsan oturumu ya da aracı belirteci | MCP ucu. Araç listesi ve araç çağrısı. |
 | `platform_core.api.ai.issue_agent_token` | POST | İnsan oturumu | Aracı belirteci üretir. |
 | `platform_core.api.ai.list_proposals` | GET | İnsan oturumu | Kullanıcının önerilerini listeler. |
+| `platform_core.api.ai.list_second_approvals` | GET | İnsan oturumu | Kişinin ikinci onay verebileceği R3 önerileri listeler. |
 | `platform_core.api.ai.get_proposal` | GET | İnsan oturumu | Bir önerinin önizlemesini ve özetini döner. |
 | `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. Yıkıcı olabilir. |
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
