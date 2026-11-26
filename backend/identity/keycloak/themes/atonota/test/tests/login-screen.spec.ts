@@ -210,3 +210,27 @@ test('the shared design tokens carry the values of atonota-web commit d21799c', 
   const rules = loginCss.slice(loginCss.indexOf('/* tokens:end */')).replace(/\/\*[\s\S]*?\*\//g, '');
   expect(rules.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [], 'fixed colour in a rule').toEqual([]);
 });
+
+// The approved draft says "Giriş yapın". The theme uses this phrase on every screen (orchestrator answer, AJA-1125).
+// Sign-out texts such as "Oturumu kapatın" and "oturum açık kalır" stay as they are.
+const SIGN_IN_OLD = /oturum a[çc](?!ık)/i;
+
+test('the Turkish texts of the login theme say "giriş yap", never "oturum aç"', () => {
+  const files = [`${themeRoot}login/messages/messages_tr.properties`, ...['login.ftl', 'template.ftl'].map((f) => `${themeRoot}login/${f}`)];
+  const hits: string[] = [];
+  for (const file of files) {
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .forEach((line, index) => {
+        if (!line.trim().startsWith('#') && SIGN_IN_OLD.test(line)) hits.push(`${file.replace(themeRoot, '')}:${index + 1}: ${line.trim()}`);
+      });
+  }
+  expect(hits).toEqual([]);
+});
+
+test('sign-in: the title is "Giriş yapın" and the button is "Giriş yap"', async ({ page }) => {
+  await openLogin(page, 'tr');
+  await expect(page.locator('#kc-page-title')).toHaveText('Giriş yapın');
+  await expect(page.locator('#kc-login')).toHaveText('Giriş yap');
+  await expect(page.locator('body')).not.toContainText(SIGN_IN_OLD);
+});
