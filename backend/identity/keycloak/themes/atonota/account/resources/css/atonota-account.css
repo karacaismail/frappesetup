@@ -33,120 +33,172 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/*
+ * Token values come from the atonota-web design source: AJA-997, branch pc/aja997-tokenlar, commit d21799c,
+ * folder src/design/. The comment after a value names the CSS variable that the source produces.
+ * "draft" means the approved interface draft AJA-880, version 3. It is used only where the source has no value.
+ * "derived" means a value worked out from the source for a reason that the comment gives.
+ */
 :root {
+  /* Colours: light theme */
+  --at-color-page: #f4f5f7; /* --color-bg-layout */
+  --at-color-surface: #ffffff; /* --color-bg-panel */
+  --at-color-surface-sunken: #eef0f3; /* --color-bg-panel-alt */
+  --at-color-surface-sunken-hover: #e2e5ea; /* --color-bg-button-hover */
+  --at-color-button: #eef0f3; /* --color-bg-button */
+  --at-color-input: #ffffff; /* --color-bg-input */
+  --at-color-elevated: #ffffff; /* --color-bg-elevated: menus and dialogs */
+  --at-color-button-hover: #e2e5ea; /* --color-bg-button-hover */
+  --at-color-ink: #1b1f24; /* --color-text */
+  --at-color-ink-soft: #4b5563; /* --color-text-quiet */
+  --at-color-line: #cfd4dc; /* --color-line */
+  /* derived: a field border needs 3:1 against its surface (WCAG 1.4.11). --color-line gives 1.5:1, --color-text-quiet gives 7.6:1. */
+  --at-color-line-strong: #4b5563; /* --color-text-quiet */
+  /* #00aacc is a background colour only. It is never a text colour in the light theme. */
+  --at-color-action: #00aacc; /* --color-primary */
+  --at-color-action-hover: #00b2dd; /* --color-primary-hover */
+  --at-color-action-active: #00baee; /* --color-primary-active */
+  --at-color-on-action: rgb(0 0 0 / 0.85); /* --primary-text */
+  --at-color-on-action-hover: rgb(0 0 0 / 1); /* --primary-text-hover */
+  --at-color-link: #006f86; /* --color-link */
+  --at-color-link-hover: #006e89; /* --color-link-hover */
+  --at-color-link-active: #006e8e; /* --color-link-active */
+  /* derived: --color-tint rgba(0, 170, 204, 0.12) laid on --color-bg-panel. A solid colour keeps the focus gap exact. */
+  --at-color-tint: #e0f5f9;
+  --at-color-seal: #00aacc; /* --color-primary */
+  --at-color-danger: #ab3335; /* tokens.ts danger.light.color */
+  --at-color-danger-action: #d44042; /* --danger-bg */
+  --at-color-danger-action-hover: #c13a3c; /* --danger-bg-hover */
+  --at-color-danger-action-active: #b13537; /* --danger-bg-active */
+  --at-color-on-danger-action: #ffffff; /* --danger-text */
+  --at-color-danger-surface: #fff2f0; /* tokens.ts danger.light.surfaces, colorErrorBg */
+  /* derived: draft --warn-tint and --ok-tint laid on --color-bg-panel */
+  --at-color-warning-surface: #f6eae1;
+  --at-color-success-surface: #e3f0e8;
+  --at-color-info-surface: #e0f5f9; /* same as --at-color-tint */
+  --at-color-focus: #006f86; /* --focus-indicator-color */
+  /* draft: the top bar (.idstrip) is a surface with normal text, not a dark band */
+  --at-color-masthead: #ffffff; /* --color-bg-panel */
+  --at-color-on-masthead: #1b1f24; /* --color-text */
+  --at-shadow-card: /* --shadow-card */
+    0.13px 0.13px 0.19px 0 rgb(11 18 32 / 0.01), 0.27px 0.27px 0.38px 0 rgb(11 18 32 / 0.01),
+    0.53px 0.53px 0.75px 0 rgb(11 18 32 / 0.01), 1.06px 1.06px 1.5px 0 rgb(11 18 32 / 0.01),
+    2.12px 2.12px 3px 0 rgb(11 18 32 / 0.01), 4.24px 4.24px 6px 0 rgb(11 18 32 / 0.01),
+    8.49px 8.49px 12px 0 rgb(11 18 32 / 0.01);
+  --at-shadow-float: /* --shadow-dropdown */
+    0 0.06px 0.14px 0 rgb(11 18 32 / 0.02), 0 0.13px 0.28px 0 rgb(11 18 32 / 0.02), 0 0.25px 0.56px 0 rgb(11 18 32 / 0.02),
+    0 0.5px 1.13px 0 rgb(11 18 32 / 0.02), 0 1px 2.25px 0 rgb(11 18 32 / 0.02), 0 2px 4.5px 0 rgb(11 18 32 / 0.02),
+    0 4px 9px 0 rgb(11 18 32 / 0.02), 0 8px 18px 0 rgb(11 18 32 / 0.02), 0 16px 36px 0 rgb(11 18 32 / 0.02);
 
-  --at-color-page: #f3f1ec;
-  --at-color-surface: #ffffff;
-  --at-color-surface-sunken: #eef0f5;
-  --at-color-surface-sunken-hover: #e1e5ee;
-  --at-color-ink: #161d33;
-  --at-color-ink-soft: #4a5268;
-  --at-color-line: #7d8496;
-  --at-color-line-strong: #4a5268;
-  --at-color-action: #1f2f63;
-  --at-color-action-hover: #16224a;
-  --at-color-action-active: #0f1836;
-  --at-color-on-action: #ffffff;
-  --at-color-link: #24397d;
-  --at-color-link-hover: #131f4a;
-  --at-color-seal: #c2452d;
-  --at-color-danger: #a8261b;
-  --at-color-danger-surface: #fbecea;
-  --at-color-warning-surface: #fbf1dc;
-  --at-color-success-surface: #e6f3ec;
-  --at-color-info-surface: #e9edf8;
-  --at-color-focus: #161d33;
-  --at-color-masthead: #161d33;
-  --at-color-on-masthead: #ffffff;
-  --at-shadow-card: 0 1px 2px rgb(22 29 51 / 0.06), 0 12px 32px rgb(22 29 51 / 0.1);
+  /* Type */
+  --at-font-text: "Outfit Variable", Outfit, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* --font-ui */
+  --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; /* --font-code without the font file that the theme does not ship */
+  --at-text-sm: 0.875rem; /* --font-min 14px */
+  --at-text-md: 1rem; /* --font-body 16px */
+  --at-text-lg: 1.125rem; /* --font-h3 18px */
+  --at-text-heading: 1.25rem; /* --font-h2 20px */
+  --at-text-title: 1.625rem; /* --font-h1 26px */
+  --at-text-brand: 1.25rem; /* draft .login-brand, --font-h2 */
+  --at-leading: 1.5; /* draft --lh-body */
+  --at-leading-tight: 1.25; /* draft --lh-tight */
+  --at-weight-regular: 400; /* --font-weight-sm */
+  --at-weight-medium: 500; /* --font-weight-md */
+  --at-weight-bold: 600; /* --font-weight-lg */
 
+  /* Space */
+  --at-space-1: 0.25rem; /* --space-xxs 4px */
+  --at-space-2: 0.5rem; /* --space-xs 8px */
+  --at-space-3: 0.75rem; /* --space-sm 12px */
+  --at-space-4: 1rem; /* --space-md 16px */
+  --at-space-5: 1.5rem; /* --space-lg 24px */
+  --at-space-6: 2rem; /* --space-xl 32px */
+  --at-page-gutter: 1rem; /* draft --gutter */
+  --at-card-padding: 1rem; /* draft .login-card on a narrow screen */
+  --at-card-width: 26.25rem; /* --form-max-width 420px */
 
-  --at-font-text: "Outfit Variable", "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --at-text-sm: 0.875rem;
-  --at-text-md: 1rem;
-  --at-text-lg: 1.125rem;
-  --at-text-title: 1.5rem;
-  --at-text-brand: 1.375rem;
-  --at-leading: 1.5;
-  --at-leading-tight: 1.25;
-  --at-weight-regular: 400;
-  --at-weight-medium: 500;
-  --at-weight-bold: 600;
+  /* Shape */
+  --at-radius-card: 10px; /* --card-radius */
+  --at-radius-control: 5px; /* --radius */
+  --at-border-control: 1px; /* tokens.ts border.width */
 
+  /* Touch target */
+  --at-hit: 2.75rem; /* --hit-target 44px */
+  --at-control-height: 2.625rem; /* --control-h-md 42px */
 
-  --at-space-1: 0.25rem;
-  --at-space-2: 0.5rem;
-  --at-space-3: 0.75rem;
-  --at-space-4: 1rem;
-  --at-space-5: 1.5rem;
-  --at-space-6: 2rem;
-  --at-page-gutter: 0.75rem;
-  --at-card-padding: 1.25rem;
-  --at-card-width: 27rem;
-
-
-  --at-radius-card: 1rem;
-  --at-radius-control: 0.625rem;
-  --at-border-control: 1px;
-
-
-  --at-hit: 2.75rem;
-
-
+  /* Focus: one straight line under the element. draft --focus-w is 3px. */
   --at-focus-thickness: 3px;
   --at-focus-gap: 2px;
   --at-focus-underline-offset: 4px;
   --at-link-underline-offset: 3px;
-  --at-brand-mark-size: 2rem;
+  --at-brand-mark-size: 1.75rem; /* draft --mark-sm */
   --at-focus-bar:
     0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
     0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
 
-
-  --at-motion-duration: 160ms;
-  --at-motion-ease: cubic-bezier(.65, 0, .35, 1);
+  /* Motion */
+  --at-motion-duration: 200ms; /* --motion-duration-mid, draft --dur */
+  --at-motion-ease: cubic-bezier(.65, 0, .35, 1); /* --motion-easing-standard */
   --at-motion-none: 0s;
 }
 
 :root.pf-v5-theme-dark {
-  --at-color-page: #0e1322;
-  --at-color-surface: #1a2036;
-  --at-color-surface-sunken: #262d47;
-  --at-color-surface-sunken-hover: #323a58;
-  --at-color-ink: #eef0f6;
-  --at-color-ink-soft: #b9bfd0;
-  --at-color-line: #8089a1;
-  --at-color-line-strong: #b9bfd0;
-  --at-color-action: #c9d3ff;
-  --at-color-action-hover: #dde3ff;
-  --at-color-action-active: #ffffff;
-  --at-color-on-action: #10172e;
-  --at-color-link: #bcc8ff;
-  --at-color-link-hover: #e0e6ff;
-  --at-color-seal: #ff8a6b;
-  --at-color-danger: #ffa799;
-  --at-color-danger-surface: #43201f;
-  --at-color-warning-surface: #3d3219;
-  --at-color-success-surface: #1b3a2c;
-  --at-color-info-surface: #252e52;
-  --at-color-focus: #ffffff;
-  --at-color-masthead: #1a2036;
-  --at-color-on-masthead: #eef0f6;
-  --at-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+  --at-color-page: #17171a; /* --color-bg-layout */
+  --at-color-surface: #1f1f23; /* --color-bg-panel */
+  --at-color-surface-sunken: #2a2a30; /* --color-bg-panel-alt */
+  --at-color-surface-sunken-hover: #3f3f47; /* --color-bg-button-hover */
+  --at-color-button: #34343b; /* --color-bg-button */
+  --at-color-input: #141418; /* --color-bg-input */
+  --at-color-elevated: #2a2a30; /* --color-bg-elevated */
+  --at-color-button-hover: #3f3f47; /* --color-bg-button-hover */
+  --at-color-ink: #ececf0; /* --color-text */
+  --at-color-ink-soft: #a8a8b3; /* --color-text-quiet */
+  --at-color-line: #3a3a42; /* --color-line */
+  --at-color-line-strong: #a8a8b3; /* --color-text-quiet, see the light theme */
+  /* The dark primary button is a solid tone of #00aacc with #00aacc text (tokens.ts primary.dark). */
+  --at-color-action: #142c33; /* --primary-bg */
+  --at-color-action-hover: #123741; /* --primary-bg-hover */
+  --at-color-action-active: #123943; /* --primary-bg-active */
+  --at-color-on-action: rgb(0 170 204 / 0.89); /* --primary-text */
+  --at-color-on-action-hover: rgb(0 170 204 / 1); /* --primary-text-hover */
+  --at-color-link: #16b1d0; /* --color-link */
+  --at-color-link-hover: #00b2dd; /* --color-link-hover */
+  --at-color-link-active: #00baee; /* --color-link-active */
+  --at-color-tint: #1b323b; /* derived: --color-tint rgba(0, 170, 204, 0.14) laid on --color-bg-panel */
+  --at-color-seal: #00aacc; /* --color-primary */
+  --at-color-danger: #e88182; /* tokens.ts danger.dark.color */
+  --at-color-danger-action: #cf4042; /* --danger-bg */
+  --at-color-danger-action-hover: #c33c3e; /* --danger-bg-hover */
+  --at-color-danger-action-active: #b23739; /* --danger-bg-active */
+  --at-color-on-danger-action: #ffffff; /* --danger-text */
+  --at-color-danger-surface: #2c1618; /* tokens.ts danger.dark.surfaces, colorErrorBg */
+  --at-color-warning-surface: #393223; /* derived: draft --warn-tint on --color-bg-panel */
+  --at-color-success-surface: #24362e; /* derived: draft --ok-tint on --color-bg-panel */
+  --at-color-info-surface: #1b323b; /* same as --at-color-tint */
+  --at-color-focus: #16b1d0; /* --focus-indicator-color */
+  --at-color-masthead: #1f1f23; /* --color-bg-panel */
+  --at-color-on-masthead: #ececf0; /* --color-text */
+  --at-shadow-card: /* --shadow-card */
+    0.13px 0.13px 0.19px 0 rgb(0 0 0 / 0.03), 0.27px 0.27px 0.38px 0 rgb(0 0 0 / 0.03),
+    0.53px 0.53px 0.75px 0 rgb(0 0 0 / 0.03), 1.06px 1.06px 1.5px 0 rgb(0 0 0 / 0.03),
+    2.12px 2.12px 3px 0 rgb(0 0 0 / 0.03), 4.24px 4.24px 6px 0 rgb(0 0 0 / 0.03),
+    8.49px 8.49px 12px 0 rgb(0 0 0 / 0.03);
+  --at-shadow-float: /* --shadow-dropdown */
+    0 0.06px 0.14px 0 rgb(0 0 0 / 0.05), 0 0.13px 0.28px 0 rgb(0 0 0 / 0.05), 0 0.25px 0.56px 0 rgb(0 0 0 / 0.05),
+    0 0.5px 1.13px 0 rgb(0 0 0 / 0.05), 0 1px 2.25px 0 rgb(0 0 0 / 0.05), 0 2px 4.5px 0 rgb(0 0 0 / 0.05),
+    0 4px 9px 0 rgb(0 0 0 / 0.05), 0 8px 18px 0 rgb(0 0 0 / 0.05), 0 16px 36px 0 rgb(0 0 0 / 0.05);
 }
 
 @media (min-width: 30rem) {
   :root {
-    --at-page-gutter: 1.5rem;
-    --at-card-padding: 2rem;
-    --at-text-title: 1.75rem;
+    --at-page-gutter: 1.5rem; /* draft main padding, --space-lg */
+    --at-card-padding: 1.5rem; /* --card-padding 24px */
   }
 }
 
 @media (any-pointer: coarse) {
   :root {
-    --at-hit: 3rem;
+    --at-hit: 3rem; /* draft --hit with a coarse pointer, 48px */
+    --at-control-height: 3rem; /* --control-h-lg 48px */
   }
 }
 /* tokens:end */
@@ -163,6 +215,9 @@
   --pf-v5-global--FontSize--xs: var(--at-text-sm);
   --pf-v5-global--FontSize--sm: var(--at-text-sm);
   --pf-v5-global--FontSize--md: var(--at-text-md);
+  --pf-v5-global--FontSize--lg: var(--at-text-lg);
+  --pf-v5-global--FontSize--xl: var(--at-text-heading);
+  --pf-v5-global--FontSize--2xl: var(--at-text-title);
   --pf-v5-global--Color--100: var(--at-color-ink);
   --pf-v5-global--Color--200: var(--at-color-ink-soft);
   --pf-v5-global--BackgroundColor--100: var(--at-color-surface);
@@ -170,14 +225,16 @@
   --pf-v5-global--BorderColor--100: var(--at-color-line);
   --pf-v5-global--BorderColor--200: var(--at-color-line);
   --pf-v5-global--BorderColor--300: var(--at-color-line);
-  --pf-v5-global--primary-color--100: var(--at-color-action);
-  --pf-v5-global--primary-color--200: var(--at-color-action-hover);
-  --pf-v5-global--active-color--100: var(--at-color-action);
+  /* Stock accents such as a checked box or the active tab line use the link colour. #00aacc is never a light text colour. */
+  --pf-v5-global--primary-color--100: var(--at-color-link);
+  --pf-v5-global--primary-color--200: var(--at-color-link-hover);
+  --pf-v5-global--active-color--100: var(--at-color-link);
   --pf-v5-global--link--Color: var(--at-color-link);
   --pf-v5-global--link--Color--hover: var(--at-color-link-hover);
   --pf-v5-global--danger-color--100: var(--at-color-danger);
   --pf-v5-global--danger-color--200: var(--at-color-danger);
   --pf-v5-global--BorderRadius--sm: var(--at-radius-control);
+  --pf-v5-global--BorderRadius--lg: var(--at-radius-card);
   /* The stock "transition: all" and its 250 ms duration are replaced by the central tokens. */
   --pf-v5-global--TransitionDuration: var(--at-motion-duration);
   --pf-v5-global--TimingFunction: var(--at-motion-ease);
@@ -218,17 +275,29 @@ body[data-page-id="account"] {
   --pf-v5-c-page--BackgroundColor: var(--at-color-page);
   --pf-v5-c-page__main-section--BackgroundColor: var(--at-color-surface);
   --pf-v5-c-page__main-section--m-light--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-page__sidebar--BackgroundColor: var(--at-color-page);
+  --pf-v5-c-page__sidebar--BackgroundColor: var(--at-color-surface);
   --pf-v5-c-page__sidebar--BoxShadow: none;
 }
 
-/* The sidebar sits on the paper-coloured page, so the gap above the focus line uses that colour. */
+/* The menu is a surface beside the grey page, like the side menu of the draft. */
 [data-page-id="account"] .pf-v5-c-page__sidebar {
-  --at-focus-gap-local: var(--at-color-page);
+  --at-focus-gap-local: var(--at-color-surface);
 }
 
+/*
+ * The content is one surface on the grey page, like a section of the draft.
+ * Space and tone separate it from the page. There is no border.
+ */
 [data-page-id="account"] .pf-v5-c-page__main-section {
   min-inline-size: 0;
+  margin: var(--at-space-2);
+  border-radius: var(--at-radius-card);
+}
+
+@media (min-width: 30rem) {
+  [data-page-id="account"] .pf-v5-c-page__main-section {
+    margin: var(--at-space-4);
+  }
 }
 
 [data-page-id="account"] .pf-v5-c-title {
@@ -245,6 +314,8 @@ body[data-page-id="account"] {
   --at-focus-local: var(--at-color-on-masthead);
   --at-focus-gap-local: var(--at-color-masthead);
   color: var(--at-color-on-masthead);
+  /* A thin line under the bar separates it from the page, like the draft. It runs the full width and has no corners. */
+  box-shadow: 0 var(--at-border-control) 0 var(--at-color-line);
 }
 
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-button,
@@ -379,12 +450,13 @@ body[data-page-id="account"] {
   --pf-v5-c-nav__link--Color: var(--at-color-ink);
   --pf-v5-c-nav__link--hover--Color: var(--at-color-ink);
   --pf-v5-c-nav__link--focus--Color: var(--at-color-ink);
-  --pf-v5-c-nav__link--active--Color: var(--at-color-ink);
-  --pf-v5-c-nav__link--m-current--Color: var(--at-color-ink);
-  --pf-v5-c-nav__link--hover--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-nav__link--active--Color: var(--at-color-link);
+  --pf-v5-c-nav__link--m-current--Color: var(--at-color-link);
+  --pf-v5-c-nav__link--hover--BackgroundColor: var(--at-color-button);
   --pf-v5-c-nav__link--focus--BackgroundColor: transparent;
-  --pf-v5-c-nav__link--active--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-nav__link--m-current--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-nav__link--active--BackgroundColor: var(--at-color-tint);
+  --pf-v5-c-nav__link--m-current--BackgroundColor: var(--at-color-tint);
+  --pf-v5-c-nav__link--m-current--hover--BackgroundColor: var(--at-color-tint);
   --pf-v5-c-nav__item--before--BorderColor: transparent;
   --pf-v5-c-nav__subnav__link--hover--after--BorderColor: transparent;
   --pf-v5-c-nav__subnav__link--focus--after--BorderColor: transparent;
@@ -392,7 +464,7 @@ body[data-page-id="account"] {
   --pf-v5-c-nav__subnav__link--m-current--after--BorderColor: transparent;
 }
 
-/* The current page is marked by weight and surface tone. The stock coloured edge line is switched off. */
+/* The current page is marked by a light tone and the link colour, like the draft. The stock coloured edge line is switched off. */
 [data-page-id="account"] .pf-v5-c-nav__link::before,
 [data-page-id="account"] .pf-v5-c-nav__link::after {
   content: none;
@@ -400,6 +472,8 @@ body[data-page-id="account"] {
 
 [data-page-id="account"] .pf-v5-c-nav__link {
   min-block-size: var(--at-hit);
+  margin-inline: var(--at-space-2);
+  border-radius: var(--at-radius-control);
   font-size: var(--at-text-md);
   text-decoration: none;
   transition:
@@ -408,7 +482,12 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-nav__link.pf-m-current {
-  font-weight: var(--at-weight-bold);
+  font-weight: var(--at-weight-medium);
+}
+
+/* The current page keeps its tone under the pointer. */
+[data-page-id="account"] .pf-v5-c-nav__link.pf-m-current:hover {
+  background: var(--at-color-tint);
 }
 
 [data-page-id="account"] .pf-v5-c-nav__subnav .pf-v5-c-nav__link {
@@ -439,7 +518,7 @@ body[data-page-id="account"] {
   border-radius: var(--at-radius-control);
   font-family: var(--at-font-text);
   font-size: var(--at-text-md);
-  font-weight: var(--at-weight-bold);
+  font-weight: var(--at-weight-medium);
   line-height: var(--at-leading-tight);
   min-block-size: var(--at-hit);
   min-inline-size: var(--at-hit);
@@ -470,34 +549,43 @@ body[data-page-id="account"] {
   --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-color-action);
   --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-color-action-active);
   --pf-v5-c-button--m-primary--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-on-action-hover);
   --pf-v5-c-button--m-primary--focus--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--active--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--active--Color: var(--at-color-on-action-hover);
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-secondary,
 [data-page-id="account"] .pf-v5-c-button.pf-m-tertiary,
 [data-page-id="account"] .pf-v5-c-button.pf-m-control {
-  background: transparent;
-  border-color: var(--at-color-line);
+  /* The draft draws a plain button as a grey tone without a border. */
+  background: var(--at-color-button);
+  border-color: transparent;
   color: var(--at-color-ink);
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-secondary:hover,
 [data-page-id="account"] .pf-v5-c-button.pf-m-tertiary:hover,
 [data-page-id="account"] .pf-v5-c-button.pf-m-control:hover {
-  background: var(--at-color-surface-sunken);
-  border-color: var(--at-color-line-strong);
+  background: var(--at-color-button-hover);
 }
 
 [data-page-id="account"] .pf-v5-c-button.pf-m-danger {
-  background: var(--at-color-danger);
-  color: var(--at-color-surface);
+  background: var(--at-color-danger-action);
+  color: var(--at-color-on-danger-action);
 }
 
+[data-page-id="account"] .pf-v5-c-button.pf-m-danger:hover {
+  background: var(--at-color-danger-action-hover);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-danger:active {
+  background: var(--at-color-danger-action-active);
+}
+
+/* draft .btn.danger: a light red tone with red text */
 [data-page-id="account"] .pf-v5-c-button.pf-m-secondary.pf-m-danger {
-  background: transparent;
-  border-color: var(--at-color-danger);
+  background: var(--at-color-danger-surface);
+  border-color: transparent;
   color: var(--at-color-danger);
 }
 
@@ -527,6 +615,10 @@ body[data-page-id="account"] {
   color: var(--at-color-link-hover);
 }
 
+[data-page-id="account"] .pf-v5-c-button.pf-m-link:active {
+  color: var(--at-color-link-active);
+}
+
 [data-page-id="account"] .pf-v5-c-button:disabled,
 [data-page-id="account"] .pf-v5-c-button.pf-m-aria-disabled {
   background: var(--at-color-surface-sunken);
@@ -546,8 +638,8 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-form-control {
-  background: var(--at-color-surface);
-  border: var(--at-border-control) solid var(--at-color-line);
+  background: var(--at-color-input);
+  border: var(--at-border-control) solid var(--at-color-line-strong);
   border-radius: var(--at-radius-control);
   color: var(--at-color-ink);
   min-block-size: var(--at-hit);
@@ -561,7 +653,7 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-form-control:hover {
-  border-color: var(--at-color-line-strong);
+  border-color: var(--at-color-ink);
 }
 
 /* The error border runs on all four sides. The :has() rule is separate, so an older browser keeps the first one. */
@@ -618,14 +710,14 @@ body[data-page-id="account"] {
 /* ---------- Menu toggle and menu ---------- */
 
 [data-page-id="account"] .pf-v5-c-menu-toggle {
-  --pf-v5-c-menu-toggle--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-menu-toggle--hover--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-menu-toggle--focus--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-menu-toggle--active--BackgroundColor: var(--at-color-surface);
-  --pf-v5-c-menu-toggle--m-expanded--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-menu-toggle--BackgroundColor: var(--at-color-input);
+  --pf-v5-c-menu-toggle--hover--BackgroundColor: var(--at-color-input);
+  --pf-v5-c-menu-toggle--focus--BackgroundColor: var(--at-color-input);
+  --pf-v5-c-menu-toggle--active--BackgroundColor: var(--at-color-input);
+  --pf-v5-c-menu-toggle--m-expanded--BackgroundColor: var(--at-color-input);
   --pf-v5-c-menu-toggle--Color: var(--at-color-ink);
   --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-ink);
-  border: var(--at-border-control) solid var(--at-color-line);
+  border: var(--at-border-control) solid var(--at-color-line-strong);
   border-radius: var(--at-radius-control);
   font-family: var(--at-font-text);
   font-size: var(--at-text-md);
@@ -678,12 +770,12 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-menu {
-  --pf-v5-c-menu--BackgroundColor: var(--at-color-surface);
-  /* A menu that opens from the masthead sits on the page surface again. */
+  --pf-v5-c-menu--BackgroundColor: var(--at-color-elevated);
+  /* A menu that opens from the masthead sits on the raised surface. */
   --at-focus-local: var(--at-color-focus);
-  --at-focus-gap-local: var(--at-color-surface);
+  --at-focus-gap-local: var(--at-color-elevated);
   border-radius: var(--at-radius-control);
-  box-shadow: var(--at-shadow-card);
+  box-shadow: var(--at-shadow-float);
   overflow: hidden;
 }
 
@@ -693,8 +785,9 @@ body[data-page-id="account"] {
   min-block-size: var(--at-hit);
 }
 
+/* draft: the item under the pointer gets the light tone */
 [data-page-id="account"] .pf-v5-c-menu__list-item:hover {
-  background: var(--at-color-surface-sunken);
+  background: var(--at-color-tint);
 }
 
 /* ---------- Lists, alerts, labels ---------- */
@@ -708,7 +801,7 @@ body[data-page-id="account"] {
   --pf-v5-c-data-list--sm--BorderTopWidth: var(--at-border-control);
   --pf-v5-c-data-list--BorderTopColor: var(--at-color-line);
   --pf-v5-c-data-list--sm--BorderTopColor: var(--at-color-line);
-  --pf-v5-c-data-list__item--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-data-list__item--BackgroundColor: transparent;
   --pf-v5-c-data-list__item--BorderBottomColor: var(--at-color-line);
   --pf-v5-c-data-list__item--BorderBottomWidth: var(--at-border-control);
   --pf-v5-c-data-list__item--sm--BorderBottomColor: var(--at-color-line);
@@ -791,8 +884,10 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-modal-box {
+  --at-focus-gap-local: var(--at-color-elevated);
+  background: var(--at-color-elevated);
   border-radius: var(--at-radius-card);
-  box-shadow: var(--at-shadow-card);
+  box-shadow: var(--at-shadow-float);
 }
 
 [data-page-id="account"] a:not([class]) {
