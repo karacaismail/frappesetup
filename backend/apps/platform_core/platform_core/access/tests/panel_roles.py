@@ -308,6 +308,20 @@ class PanelRoleHttpCase(IntegrationTestCase):
 		frappe.db.rollback()
 		super().tearDown()
 
+	def make_ai_records(self) -> dict[str, str]:
+		"""Inserts the three AI records for one test and removes them after it (AJA-947)."""
+		names = insert_ai_records(frappe.generate_hash(length=8))
+
+		def remove():
+			frappe.set_user("Administrator")
+			frappe.db.rollback()
+			remove_ai_records(names)
+			# Committed on purpose: the request committed the records.
+			frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+		self.addCleanup(remove)
+		return names
+
 	# --- request helpers ---
 
 	def send(self, client, method: str, path: str, *, body=None, query=None):
@@ -389,3 +403,41 @@ class PanelRoleHttpCase(IntegrationTestCase):
 		self.assert_denied(self.login(), "POST", RESELLER_API + "approve_customer_request", request=request)
 
 		self.assertEqual(frappe.db.get_value(REQUEST_DOCTYPE, request, "modified"), before)
+
+
+# --- AI provider types (AJA-947) ---
+
+# The panel page “Yapay zekâ sağlayıcıları” reads these three types.
+AI_TYPES = ("PLT AI Provider", "PLT AI Account", "PLT AI API")
+META_API = "platform_core.api.meta.get_doctype"
+# A made-up credential. No response may carry it.
+FAKE_AI_KEY = "sahte-anahtar-947-yalniz-test"
+
+
+def insert_ai_records(suffix: str) -> dict[str, str]:
+	"""Inserts one provider, account and API as the administrator. Returns the names by type."""
+	provider = frappe.get_doc(
+		doctype="PLT AI Provider", provider_name=f"PR Saglayici {suffix}", adapter="openai"
+	).insert(ignore_permissions=True)
+	account = frappe.get_doc(
+		doctype="PLT AI Account",
+		provider=provider.name,
+		account_name=f"PR Hesap {suffix}",
+		currency="USD",
+	).insert(ignore_permissions=True)
+	api = frappe.get_doc(
+		doctype="PLT AI API",
+		account=account.name,
+		api_name=f"PR API {suffix}",
+		base_url="https://saglayici.example.test",
+		auth_type="api_key",
+		api_key=FAKE_AI_KEY,
+	).insert(ignore_permissions=True)
+	return {"PLT AI Provider": provider.name, "PLT AI Account": account.name, "PLT AI API": api.name}
+
+
+def remove_ai_records(names: dict[str, str]) -> None:
+	for doctype in ("PLT AI API", "PLT AI Account", "PLT AI Provider"):
+		name = names.get(doctype)
+		if name and frappe.db.exists(doctype, name):
+			frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)

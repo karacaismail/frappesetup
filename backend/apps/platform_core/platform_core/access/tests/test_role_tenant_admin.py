@@ -109,3 +109,47 @@ class TestTenantAdminHttp(panel_roles.PanelRoleHttpCase):
 			contact_email="ornek.musteri@example.test",
 		)
 		self.assertFalse(frappe.db.exists(LINK_DOCTYPE, {"customer_tenant": "yeni-musteri.example.test"}))
+
+	# --- AI provider types (AJA-947) ---
+
+	def test_admin_reads_the_schema_of_the_three_ai_types(self):
+		client = self.login()
+		for doctype in panel_roles.AI_TYPES:
+			with self.subTest(doctype=doctype):
+				response = self.call(client, "GET", panel_roles.META_API, doctype=doctype)
+				self.assertEqual(response.status_code, 200, (doctype, response.data[:300]))
+				self.assertNotIn(panel_roles.FAKE_AI_KEY.encode(), response.data)
+
+	def test_admin_reads_the_ai_records_without_the_credential(self):
+		records = self.make_ai_records()
+		client = self.login()
+		for doctype, name in records.items():
+			with self.subTest(doctype=doctype):
+				response = self.send(client, "GET", panel_roles.REST + f"{doctype}/{name}")
+				self.assertEqual(response.status_code, 200, (doctype, response.data[:300]))
+				self.assertNotIn(panel_roles.FAKE_AI_KEY.encode(), response.data)
+
+	def test_admin_edits_the_ai_records(self):
+		records = self.make_ai_records()
+		client = self.login()
+		changes = {
+			"PLT AI Provider": {"provider_name": "PR Saglayici yeni"},
+			"PLT AI Account": {"account_name": "PR Hesap yeni"},
+			"PLT AI API": {"api_name": "PR API yeni"},
+		}
+		for doctype, body in changes.items():
+			name = records[doctype]
+			with self.subTest(doctype=doctype):
+				response = self.send(client, "PUT", panel_roles.REST + f"{doctype}/{name}", body=body)
+				self.assertEqual(response.status_code, 200, (doctype, response.data[:300]))
+				self.assertNotIn(panel_roles.FAKE_AI_KEY.encode(), response.data)
+				field, value = next(iter(body.items()))
+				self.assertEqual(frappe.db.get_value(doctype, name, field), value)
+
+	def test_admin_cannot_delete_the_ai_records(self):
+		records = self.make_ai_records()
+		client = self.login()
+		for doctype, name in records.items():
+			with self.subTest(doctype=doctype):
+				self.assert_rest_denied(client, "DELETE", doctype, name)
+				self.assertTrue(frappe.db.exists(doctype, name))
