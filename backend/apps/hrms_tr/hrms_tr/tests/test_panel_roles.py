@@ -354,6 +354,8 @@ class TenantAdminAssistantLeaveTest(PanelRoleLeaveCase):
 		"""The policy refuses a rejection by a role that does not approve, not only the submit right."""
 		frappe.set_user(self.user)
 		doc = frappe.get_doc(DOCTYPE, self.leaves[1])
+		# The policy compares the record with its stored version, as a save does.
+		doc.load_doc_before_save()
 		doc.status = "Rejected"
 
 		with self.assertRaises(frappe.PermissionError):
