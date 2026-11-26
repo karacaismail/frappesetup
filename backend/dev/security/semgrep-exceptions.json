@@ -169,7 +169,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "7f7c2bbbce461f8d1abca4d0f67495576a0b81ed63575854f650ae835959b25e",
+      "sha256": "09cd5ff5ad007ea6f48cc3d5b5808652806c4f7278fff007ebe915f8e1558093",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -411,6 +411,8 @@
         "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
         "backend/apps/platform_core/platform_core/reseller/customers.py",
         "backend/apps/platform_core/platform_core/setup/panel_roles.py",
+        "backend/apps/platform_core/platform_core/shell/doctype/plt_help_topic/plt_help_topic.json",
+        "backend/apps/platform_core/platform_core/shell/doctype/plt_help_topic/plt_help_topic.py",
         "backend/apps/platform_core/platform_core/shell/help.py",
         "backend/apps/platform_core/platform_core/shell/help_content.py"
       ]

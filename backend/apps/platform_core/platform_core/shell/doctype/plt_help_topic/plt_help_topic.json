@@ -19,7 +19,10 @@
   "language",
   "version",
   "target_roles",
-  "content"
+  "content",
+  "tour_url",
+  "doc_url",
+  "support_url"
  ],
  "fields": [
   {
@@ -137,11 +140,29 @@
    "fieldtype": "Text",
    "label": "Content",
    "reqd": 1
+  },
+  {
+   "description": "Optional HTTPS URL or same-site relative path. Leave blank when unavailable.",
+   "fieldname": "tour_url",
+   "fieldtype": "Data",
+   "label": "Tour URL"
+  },
+  {
+   "description": "Optional HTTPS URL or same-site relative path. Leave blank when unavailable.",
+   "fieldname": "doc_url",
+   "fieldtype": "Data",
+   "label": "Documentation URL"
+  },
+  {
+   "description": "Optional HTTPS URL or same-site relative path. Leave blank when unavailable.",
+   "fieldname": "support_url",
+   "fieldtype": "Data",
+   "label": "Support URL"
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-25 12:00:00.000000",
+ "modified": "2026-11-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Shell",
  "name": "PLT Help Topic",
