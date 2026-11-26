@@ -1,6 +1,5 @@
 {
-  "note": "Local review accounts for the development stack only. backend/e2e/stack review-accounts creates or updates them on a localhost stack. The project owner chose this shared password on 23 November 2026 for local development and review. It is not a service secret and is never used outside the local stack.",
-  "password": "Karaca.20",
+  "note": "Local review accounts for the development stack only. backend/e2e/stack review-accounts creates or updates them on a localhost stack. All accounts share one password. The password is never stored in this public file: the command reads it from E2E_REVIEW_PASSWORD in the Git-ignored backend/e2e/.env file.",
   "accounts": [
     {
       "username": "inceleme-panel@example.test",

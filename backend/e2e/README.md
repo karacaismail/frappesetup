@@ -1,4 +1,4 @@
-Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabıyla açın. Parola `backend/e2e/review-accounts.json` dosyasının `password` alanındadır.
+Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabıyla açın. Parola `backend/e2e/.env` dosyasındaki `E2E_REVIEW_PASSWORD` değeridir.
 
 # Uçtan uca entegrasyon testleri
 
@@ -15,9 +15,19 @@ PANE_PORT=<port> backend/e2e/stack review-accounts
 ```
 
 Bütün hesapların parolası aynıdır.
-Parola tek bir dosyada durur: `backend/e2e/review-accounts.json`.
-Parola o dosyanın `password` alanındadır.
-Hesap listesi de bu dosyadadır.
+Parola depoda durmaz, çünkü depo herkese açıktır.
+Parola `backend/e2e/.env` dosyasındaki `E2E_REVIEW_PASSWORD` değeridir.
+Git bu dosyayı yok sayar. Dosyayı yalnız siz okuyabilirsiniz.
+Yığın ilk açılışta bu dosyayı kendisi yazar.
+O sırada `E2E_REVIEW_PASSWORD` için rastgele bir parola üretir.
+Kendi parolanızı kullanmak isterseniz değeri bu dosyada değiştirin.
+Parola en az 8 karakter olmalıdır.
+Eski bir `.env` dosyasında bu satır yoksa satırı siz ekleyin.
+Satır yoksa komut durur. Komut o durumda hiçbir hesabı değiştirmez.
+Değeri değiştirince komutu yeniden çalıştırın.
+Komut parolayı hesaplara yeniden yazar.
+Hesap listesi `backend/e2e/review-accounts.json` dosyasındadır.
+Bu dosyaya parola yazmayın. Gizli bilgi testi dosyadaki parolayı yakalar.
 
 | Hesap | Nerede | Ne için |
 | --- | --- | --- |
