@@ -1,0 +1,181 @@
+"""Home page summary of the signed-in user (AJA-1165).
+
+Every part reads through `frappe.get_list`. Frappe applies the user's document, row and field
+permissions there, so each part holds only records the user can read.
+"""
+
+import frappe
+from frappe.utils import add_months, get_first_day, get_fullname, getdate, today
+
+from hrms_tr.access import DOCTYPE
+
+EMPLOYEE = "Employee"
+# Each list is cut at this length. The counts still count every record.
+LIST_LIMIT = 50
+RECENT_LIMIT = 5
+PENDING_FIELDS = [
+	"name",
+	"modified",
+	"employee_name",
+	"leave_type",
+	"from_date",
+	"to_date",
+	"total_leave_days",
+	"leave_balance",
+]
+# Open drafts and approved leaves take days off the team. Rejected and cancelled ones do not.
+ACTIVE_FILTERS = [["status", "in", ["Open", "Approved"]], ["docstatus", "in", [0, 1]]]
+
+
+def find_overlaps(rows) -> list[tuple]:
+	"""Pairs of leaves of one team (department) that share at least one day."""
+	teams = {}
+	for row in rows:
+		if row.get("department"):
+			teams.setdefault(row["department"], []).append(row)
+	pairs = []
+	for team in sorted(teams):
+		leaves = sorted(teams[team], key=lambda row: (getdate(row["from_date"]), row["name"]))
+		for index, first in enumerate(leaves):
+			for second in leaves[index + 1 :]:
+				# The list is sorted by the first day. A later leave cannot start sooner.
+				if getdate(second["from_date"]) > getdate(first["to_date"]):
+					break
+				pairs.append((first, second))
+	return pairs
+
+
+def change_action(row) -> str:
+	"""What the last change did to the leave application."""
+	if row.docstatus == 2 or row.status == "Cancelled":
+		return "cancelled"
+	if row.docstatus == 1 and row.status in ("Approved", "Rejected"):
+		return row.status.lower()
+	if row.creation == row.modified:
+		return "created"
+	return "updated"
+
+
+def _names(doctype: str, filters, field: str = "name") -> list:
+	return frappe.get_list(doctype, filters=filters, pluck=field, limit_page_length=0)
+
+
+def _pending() -> tuple[list[dict], int]:
+	filters = {"leave_approver": frappe.session.user, "status": "Open", "docstatus": 0}
+	rows = frappe.get_list(
+		DOCTYPE,
+		filters=filters,
+		fields=PENDING_FIELDS,
+		order_by="from_date asc, name asc",
+		limit_page_length=LIST_LIMIT,
+	)
+	items = [
+		{
+			"name": row.name,
+			"version": str(row.modified),
+			"employee_name": row.employee_name,
+			"leave_type": row.leave_type,
+			"from_date": str(row.from_date) if row.from_date else None,
+			"to_date": str(row.to_date) if row.to_date else None,
+			"total_leave_days": row.total_leave_days,
+			# Frappe leaves this field out when the user cannot read its level.
+			"leave_balance": row.get("leave_balance"),
+		}
+		for row in rows
+	]
+	count = len(items) if len(items) < LIST_LIMIT else len(_names(DOCTYPE, filters))
+	return items, count
+
+
+def _overlap_problems() -> list[dict]:
+	rows = frappe.get_list(
+		DOCTYPE,
+		# Past leaves cannot be fixed any more. Only leaves that end today or later count.
+		filters=[*ACTIVE_FILTERS, ["to_date", ">=", today()]],
+		fields=["name", "employee_name", "department", "from_date", "to_date"],
+		limit_page_length=0,
+	)
+	return [
+		{
+			"kind": "overlap",
+			"department": first.department,
+			"leaves": [
+				{
+					"name": row.name,
+					"employee_name": row.employee_name,
+					"from_date": str(row.from_date),
+					"to_date": str(row.to_date),
+				}
+				for row in (first, second)
+			],
+		}
+		for first, second in find_overlaps(rows)
+	]
+
+
+def _employee_problems() -> list[dict]:
+	# A user who cannot read employees sees no employee problem. The summary still answers.
+	if not frappe.has_permission(EMPLOYEE, "read"):
+		return []
+	rows = frappe.get_list(
+		EMPLOYEE,
+		filters={"date_of_joining": ["is", "not set"]},
+		fields=["name", "employee_name"],
+		order_by="name asc",
+		limit_page_length=0,
+	)
+	return [
+		{"kind": "missing_joining_date", "employee": row.name, "employee_name": row.employee_name}
+		for row in rows
+	]
+
+
+def _recent() -> list[dict]:
+	rows = frappe.get_list(
+		DOCTYPE,
+		fields=["name", "employee_name", "status", "docstatus", "creation", "modified", "modified_by"],
+		order_by="modified desc, name asc",
+		limit_page_length=RECENT_LIMIT,
+	)
+	return [
+		{
+			"name": row.name,
+			"employee_name": row.employee_name,
+			"actor": get_fullname(row.modified_by),
+			"action": change_action(row),
+			"at": str(row.modified),
+		}
+		for row in rows
+	]
+
+
+def get_summary() -> dict:
+	day = today()
+	month_start = get_first_day(day)
+	pending, pending_count = _pending()
+	problems = _overlap_problems() + _employee_problems()
+	on_leave = _names(
+		DOCTYPE,
+		[
+			["status", "=", "Approved"],
+			["docstatus", "=", 1],
+			["from_date", "<=", day],
+			["to_date", ">=", day],
+		],
+		field="employee",
+	)
+	opened = _names(
+		DOCTYPE,
+		[["creation", ">=", str(month_start)], ["creation", "<", str(add_months(month_start, 1))]],
+	)
+	return {
+		"pending_approvals": pending,
+		"problems": problems[:LIST_LIMIT],
+		"recent_changes": _recent(),
+		"counts": {
+			"pending_approvals": pending_count,
+			"on_leave_today": len(set(on_leave)),
+			"opened_this_month": len(opened),
+			"problems": len(problems),
+		},
+	}
