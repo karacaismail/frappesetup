@@ -224,6 +224,17 @@ class TestTenantAdmin(IntegrationTestCase):
 				)
 		self.assertEqual(frappe.db.get_value("User", HOLDER, "user_type"), "Website User")
 
+	def test_higher_level_rows_read_only_when_the_grant_says_so(self):
+		"""Frappe turns read on in every new row. A row without “read” in its grant keeps it off (AJA-1024)."""
+		tenant_admin.ensure_permissions()
+		tenant_admin.ensure_permissions()
+		for (doctype, level), ptypes in tenant_admin.LEVEL_GRANTS.items():
+			row = {"parent": doctype, "role": tenant_admin.ROLE, "permlevel": level, "if_owner": 0}
+			with self.subTest(doctype=doctype, level=level):
+				self.assertEqual(frappe.db.get_value("Custom DocPerm", row, "read"), int("read" in ptypes))
+		credential = {"parent": "PLT AI API", "role": tenant_admin.ROLE, "permlevel": 1, "if_owner": 0}
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", credential, ["read", "write"]), (0, 1))
+
 	# --- read endpoints ---
 
 	def test_holder_reads_role_and_permission_endpoints(self):

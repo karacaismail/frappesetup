@@ -42,9 +42,14 @@ GRANTS = {
 	"User Permission": _FULL,
 	rules.RULE_DOCTYPE: _FULL,
 	"User": ("read", "report"),
+	# AJA-947: the AI providers page of the panel. The admin reads and edits, never deletes.
+	"PLT AI Provider": ("read", "write", "create"),
+	"PLT AI Account": ("read", "write", "create"),
+	"PLT AI API": ("read", "write", "create"),
 }
 # Higher level permissions. The role list of a profile is at level 1.
-LEVEL_GRANTS = {("Role Profile", 1): ("read", "write")}
+# The credential of an API is at level 1. The admin writes it and never reads it back.
+LEVEL_GRANTS = {("Role Profile", 1): ("read", "write"), ("PLT AI API", 1): ("write",)}
 # Types of these applications hold scripts, sign-in, tokens, settings and the platform's own
 # records. Their permission rows are written by a System Manager only.
 CLOSED_APPS = frozenset({"frappe", "platform_core"})
@@ -73,6 +78,9 @@ def ensure_permissions() -> None:
 		# Installation reads its own permission row (exception to G-3).
 		name = frappe.db.get_value("Custom DocPerm", row)
 		missing = {ptype: 1 for ptype in ptypes if not frappe.db.get_value("Custom DocPerm", name, ptype)}
+		# Frappe turns read on in every new row. A grant without read keeps it off (AJA-1024).
+		if "read" not in ptypes and frappe.db.get_value("Custom DocPerm", name, "read"):
+			missing["read"] = 0
 		if missing:
 			# The row without “if owner” gets the rights. Each migrate gives back a removed right.
 			update_custom_docperm(name, missing)

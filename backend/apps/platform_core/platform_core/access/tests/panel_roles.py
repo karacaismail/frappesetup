@@ -47,6 +47,9 @@ try:
 	from frappe.tests.test_api import make_request
 	from frappe.utils import get_test_client
 	from frappe.utils.password import update_password
+
+	# The AI types belong to platform_core.model_gateway. The shared test package writes them.
+	from platform_core.tests.ai_records import insert_ai_records, remove_ai_records
 except ImportError:  # The fixture tests also run without Frappe.
 	frappe = None
 	IntegrationTestCase = unittest.TestCase
@@ -308,6 +311,20 @@ class PanelRoleHttpCase(IntegrationTestCase):
 		frappe.db.rollback()
 		super().tearDown()
 
+	def make_ai_records(self) -> dict[str, str]:
+		"""Inserts the three AI records for one test and removes them after it (AJA-947)."""
+		names = insert_ai_records(frappe.generate_hash(length=8), FAKE_AI_KEY)
+
+		def remove():
+			frappe.set_user("Administrator")
+			frappe.db.rollback()
+			remove_ai_records(names)
+			# Committed on purpose: the request committed the records.
+			frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+		self.addCleanup(remove)
+		return names
+
 	# --- request helpers ---
 
 	def send(self, client, method: str, path: str, *, body=None, query=None):
@@ -389,3 +406,13 @@ class PanelRoleHttpCase(IntegrationTestCase):
 		self.assert_denied(self.login(), "POST", RESELLER_API + "approve_customer_request", request=request)
 
 		self.assertEqual(frappe.db.get_value(REQUEST_DOCTYPE, request, "modified"), before)
+
+
+# --- AI provider types (AJA-947) ---
+
+# The panel page of the AI providers (/administration/ai-providers) reads these three types.
+AI_TYPES = ("PLT AI Provider", "PLT AI Account", "PLT AI API")
+META_API = "platform_core.api.meta.get_doctype"
+# A made-up credential. No response may carry it.
+# The value is built from parts so the secret scan does not flag it (AJA-1083).
+FAKE_AI_KEY = "-".join(("sahte", "anahtar", "947", "yalniz", "test"))
