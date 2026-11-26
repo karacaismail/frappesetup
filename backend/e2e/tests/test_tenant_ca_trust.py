@@ -18,7 +18,6 @@ BACKEND = Path(__file__).resolve().parents[2]
 COMPOSE = BACKEND / "dev/compose.tenant.yaml"
 SESSION_TLS = BACKEND / "e2e/preview/session-tls.sh"
 TRUST_FILE = "sites/.e2e-trust/identity-sync.crt"
-BUNDLE = "/tmp/fs-tenant-ca-bundle.crt"
 SYSTEM = "-----BEGIN CERTIFICATE-----\nSYSTEM\n-----END CERTIFICATE-----\n"
 RELAY = "-----BEGIN CERTIFICATE-----\nRELAY\n-----END CERTIFICATE-----\n"
 
@@ -52,8 +51,15 @@ def run_entrypoint(workdir, environment):
 class TenantCaTrustTest(unittest.TestCase):
     def test_tenant_services_point_python_and_openssl_at_the_built_bundle(self):
         block = anchor_block()
-        self.assertIn(f"REQUESTS_CA_BUNDLE: {BUNDLE}", block)
-        self.assertIn(f"SSL_CERT_FILE: {BUNDLE}", block)
+        values = {
+            key: re.search(rf"^    {key}: (\S+)$", block, re.M) for key in ("REQUESTS_CA_BUNDLE", "SSL_CERT_FILE")
+        }
+        self.assertTrue(all(values.values()), "Both CA settings must sit in the x-tenant environment.")
+        bundle = Path(values["REQUESTS_CA_BUNDLE"].group(1))
+        self.assertEqual(Path(values["SSL_CERT_FILE"].group(1)), bundle)
+        # The bundle is rebuilt in the container, outside the shared sites volume.
+        self.assertTrue(bundle.is_absolute())
+        self.assertEqual(bundle.parent.name, "tmp")
 
     def test_entrypoint_keeps_the_image_entrypoint_last(self):
         entrypoint = anchor_entrypoint()
