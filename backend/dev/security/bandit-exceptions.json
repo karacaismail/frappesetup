@@ -3423,5 +3423,23 @@
     "reason": "Test runs its own Python on a fixed audit script with temporary input files.",
     "owner": "dev-ortam",
     "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/e2e/tests/test_tenant_ca_trust.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import is used by the inspected subprocess call and does not execute a command itself.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/tests/test_tenant_ca_trust.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "616dceedc5f4bda7d0e1c835162f8d3074414d1b9026c7264a232ef9b2d6a2e3",
+    "reason": "The test runs the tenant entrypoint from compose.tenant.yaml with sh, without a shell string from outside, in a temporary directory.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-25"
   }
 ]
