@@ -53,7 +53,8 @@ class TestPermissionLog(IntegrationTestCase):
 		super().setUpClass()
 		cls.site = frappe.local.site
 		frappe.set_user("Administrator")
-		tenant_admin.ensure_role()
+		# The setup step makes the role on install. This call adds its permission rows.
+		tenant_admin.ensure_permissions()
 		if not frappe.db.exists("Role", PLAIN_ROLE):
 			frappe.get_doc(doctype="Role", role_name=PLAIN_ROLE, desk_access=0).insert()
 		_user(HOLDER, [tenant_admin.ROLE])

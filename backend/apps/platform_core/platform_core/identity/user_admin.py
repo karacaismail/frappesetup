@@ -57,15 +57,17 @@ def require_manager() -> None:
 	"""A System Manager or a “Tenant Admin” manages the tenant's users. Nobody else does."""
 	roles = set(frappe.get_roles())
 	if frappe.session.user != "Administrator" and not roles & {"System Manager", TENANT_ADMIN}:
-		frappe.throw(_("No permission to manage users."), frappe.PermissionError)
+		frappe.throw(
+			_("No permission to manage users.", context="platform_core.identity"), frappe.PermissionError
+		)
 
 
 def _deny(message: str) -> None:
-	frappe.throw(message, frappe.PermissionError, title=_("Not permitted"))
+	frappe.throw(message, frappe.PermissionError, title=_("Not allowed", context="platform_core.identity"))
 
 
 def _deny_user() -> None:
-	_deny(_("This user is not a user of this tenant."))
+	_deny(_("This user is not a user of this tenant.", context="platform_core.identity"))
 
 
 def tenant_user(user: object) -> str:
@@ -84,11 +86,17 @@ def _profile_names(value: object) -> list[str]:
 	if isinstance(value, str):
 		value = frappe.parse_json(value) if value.strip().startswith("[") else value
 	if not isinstance(value, list) or not all(isinstance(name, str) and name.strip() for name in value):
-		frappe.throw(_("role_profiles must be a list of role profile names."), InvalidInput)
+		frappe.throw(
+			_("role_profiles must be a list of role profile names.", context="platform_core.identity"),
+			InvalidInput,
+		)
 	names = sorted({name.strip() for name in value})
 	for name in names:
 		if not frappe.db.exists("Role Profile", name):
-			frappe.throw(_("Role profile {0} not found.").format(name), frappe.DoesNotExistError)
+			frappe.throw(
+				_("Role profile {0} not found.", context="platform_core.identity").format(name),
+				frappe.DoesNotExistError,
+			)
 	return names
 
 
@@ -110,13 +118,22 @@ def set_user_role_profiles(user: object, role_profiles: object) -> dict:
 		)
 	)
 	if roles & PROTECTED_ROLES:
-		_deny(_("Only a System Manager can give or change the System Manager and Administrator roles."))
+		_deny(
+			_(
+				"Only a System Manager can give the System Manager and Administrator roles.",
+				context="platform_core.identity",
+			)
+		)
 	# G-16: a panel user never gets a role with desk access.
 	desk = frappe.get_all(
 		"Role", filters={"name": ("in", sorted(roles) or [""]), "desk_access": 1}, pluck="name", limit=1
 	)
 	if desk:
-		_deny(_("Only a System Manager can give the role {0}.").format(desk[0]))
+		_deny(
+			_("Only a System Manager can give the role {0}.", context="platform_core.identity").format(
+				desk[0]
+			)
+		)
 	doc = frappe.get_doc("User", user)
 	doc.set("role_profiles", [{"role_profile": name} for name in names])
 	# The caller's right was checked above. `guard_user` of the access module still runs on save.
@@ -135,7 +152,9 @@ def set_user_role_profiles(user: object, role_profiles: object) -> dict:
 def _unavailable(reason: str) -> IdentityServiceUnavailable:
 	# The log names the reason. It never names the person, the address or the token.
 	frappe.logger("platform_core.identity").warning("invitation failed: outcome=%s", reason)
-	return IdentityServiceUnavailable(_("The invitation service is not available. Try again later."))
+	return IdentityServiceUnavailable(
+		_("The invitation service is not available. Try again later.", context="platform_core.identity")
+	)
 
 
 def _organization() -> str:
@@ -161,11 +180,23 @@ def _call(payload: dict) -> object:
 		if status == 200:
 			return body
 		if status == 403:
-			frappe.throw(_("This site cannot invite into this organization."), frappe.PermissionError)
+			frappe.throw(
+				_("This site cannot invite into this organization.", context="platform_core.identity"),
+				frappe.PermissionError,
+			)
 		if status == 409:
-			frappe.throw(_("The invitation changed after the preview. Preview it again."), InvitationChanged)
+			frappe.throw(
+				_(
+					"The invitation changed after the preview. Preview it again.",
+					context="platform_core.identity",
+				),
+				InvitationChanged,
+			)
 		if status == 400:
-			frappe.throw(_("The invitation service refused the invitation fields."), InvalidInput)
+			frappe.throw(
+				_("The invitation service refused the invitation fields.", context="platform_core.identity"),
+				InvalidInput,
+			)
 		failure = f"status_{status}"
 		if status != 401 or attempt:
 			break
@@ -182,7 +213,12 @@ def _name(value: object, field: str) -> str:
 	if value in (None, ""):
 		return ""
 	if not isinstance(value, str) or len(value) > MAX_NAME:
-		frappe.throw(_("{0} must be a text of at most {1} characters.").format(field, MAX_NAME), InvalidInput)
+		frappe.throw(
+			_("{0} must be a text of at most {1} characters.", context="platform_core.identity").format(
+				field, MAX_NAME
+			),
+			InvalidInput,
+		)
 	return value.strip()
 
 
@@ -194,7 +230,7 @@ def _flag(value: object) -> bool:
 		return True
 	if value in ("0", "false", 0):
 		return False
-	frappe.throw(_("dry_run must be true or false."), InvalidInput)
+	frappe.throw(_("dry_run must be true or false.", context="platform_core.identity"), InvalidInput)
 
 
 def _previews(value: object) -> list[dict]:
@@ -217,18 +253,24 @@ def invite_user(
 	"""Previews or runs the invitation of one person into the tenant's organization."""
 	require_manager()
 	if not isinstance(email, str) or len(email) > MAX_EMAIL or not _EMAIL.fullmatch(email.strip()):
-		frappe.throw(_("email must be an e-mail address."), InvalidInput)
+		frappe.throw(_("email must be an e-mail address.", context="platform_core.identity"), InvalidInput)
 	email = email.strip().lower()
 	if not validate_email_address(email):
-		frappe.throw(_("email must be an e-mail address."), InvalidInput)
+		frappe.throw(_("email must be an e-mail address.", context="platform_core.identity"), InvalidInput)
 	run = not _flag(dry_run)
 	if run and (not isinstance(preview_digest, str) or not _DIGEST.fullmatch(preview_digest)):
-		frappe.throw(_("A run needs the preview_digest of its preview."), InvalidInput)
+		frappe.throw(
+			_("A run needs the preview_digest of its preview.", context="platform_core.identity"),
+			InvalidInput,
+		)
 	first, last = _name(first_name, "first_name"), _name(last_name, "last_name")
 	# G-16: a desk account is never made a panel user (exception to G-3: a system check).
 	user_type = frappe.db.get_value("User", {"name": email}, "user_type")
 	if user_type and user_type != WEBSITE_USER:
-		frappe.throw(_("This e-mail belongs to a desk user and cannot be invited."), IdentityConflict)
+		frappe.throw(
+			_("This e-mail belongs to a desk user and cannot be invited.", context="platform_core.identity"),
+			IdentityConflict,
+		)
 	payload = {"email": email}
 	if first:
 		payload["first_name"] = first
