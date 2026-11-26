@@ -28,7 +28,11 @@ ACTIVE_FILTERS = [["status", "in", ["Open", "Approved"]], ["docstatus", "in", [0
 
 
 def find_overlaps(rows) -> list[tuple]:
-	"""Pairs of leaves of one team (department) that share at least one day."""
+	"""Pairs of leaves of one team that share at least one day.
+
+	The team is the department of the leave application (approved on 26 November 2026, AJA-1165).
+	A leave without a department is never an overlap. Two leaves of one employee also count.
+	"""
 	teams = {}
 	for row in rows:
 		if row.get("department"):
