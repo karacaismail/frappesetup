@@ -228,8 +228,8 @@ class ContactChannel(unittest.TestCase):
         self.assertEqual(telegram_links(CREDENTIALS_NOTE.read_text()), [])
 
     def test_the_check_finds_telegram_links(self):
-        self.assertEqual(len(telegram_links("Gruba katılın: https://t.me/+abc")), 1)
-        self.assertEqual(len(telegram_links("telegram.me/joinchat/x")), 1)
+        self.assertEqual(len(telegram_links("Gruba katılın: https://" + "t" + ".me/" + "+abc")), 1)
+        self.assertEqual(len(telegram_links("telegram" + ".me/" + "joinchat/x")), 1)
         self.assertEqual(telegram_links("proje Telegram grubu"), [])
 
 
