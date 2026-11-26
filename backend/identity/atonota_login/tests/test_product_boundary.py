@@ -19,7 +19,6 @@ from tests.brand_values import PRODUCT_NAME
 PRODUCT = Path(__file__).resolve().parents[1]
 KEYCLOAK = PRODUCT.parent / "keycloak"
 # The examples may hold the brand.env value or the placeholder (AJA-1059 plan, section 2).
-EXAMPLE_BRANDS = (PRODUCT_NAME, "<PRODUCT_NAME>")
 
 
 class ProductBoundaryTest(unittest.TestCase):
@@ -58,9 +57,8 @@ class ProductBoundaryTest(unittest.TestCase):
         example = (KEYCLOAK / ".env.example").read_text(encoding="utf-8")
         production = (KEYCLOAK / "production.env.example").read_text(encoding="utf-8")
         for text in (example, production):
-            value = re.search(r"(?m)^IDENTITY_BRAND_NAME=(.*)$", text)
-            self.assertIsNotNone(value)
-            self.assertIn(value.group(1), EXAMPLE_BRANDS)
+            # AJA-1062: the value comes from PRODUCT_NAME in backend/brand.env; examples hold a placeholder.
+            self.assertRegex(text, r"(?m)^IDENTITY_BRAND_NAME=<PRODUCT_NAME>$")
 
 
 class CommandBrandTest(unittest.TestCase):

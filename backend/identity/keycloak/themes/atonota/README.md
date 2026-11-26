@@ -30,6 +30,12 @@ Realm dosyası kimlik-realm işinindir. Bu klasör realm dosyasını değiştirm
 
 Marka adı temaya yazılmaz. Marka adı tek bir değişkenden gelir: `IDENTITY_BRAND_NAME`.
 
+Değişkenin değeri `backend/brand.env` dosyasındadır. Değer o dosyadaki `PRODUCT_NAME` satırıdır. Ad değişince yalnız o satırı değiştirin.
+
+- Geliştirmede `bin/kc-dev.sh` betiği değeri o dosyadan okur.
+- `.env` dosyasında başka bir ad yazılıysa betik durur. O satırı silin.
+- Örnek ortam dosyaları yalnız `<PRODUCT_NAME>` yer tutucusunu yazar.
+
 | Tema | Marka adını nereden okur |
 | --- | --- |
 | Giriş teması | Realm'in görünen adından (`displayName`) |
