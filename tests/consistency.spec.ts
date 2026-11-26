@@ -474,6 +474,45 @@ test.describe('content consistency', () => {
     expect(g169).toContain('Platform operatörü isteği onaylar.');
   });
 
+  test('26 November 2026 decisions are written in requirements and handoff notes (AJA-1070)', () => {
+    // Karar 5: her devir notu ortak kanalı "proje Telegram grubu" diye anar.
+    const handoffs = [
+      ...readdirSync(new URL('backend/docs/handoff/', root))
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => `backend/docs/handoff/${f}`),
+      'backend/dev/press/provisioning-handoff.md',
+    ];
+    expect(handoffs.length).toBeGreaterThan(5);
+    for (const file of handoffs) expect(read(file), file).toContain('proje Telegram grubu');
+    // Karar 1: Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar.
+    const social = read('backend/docs/handoff/atonota-login-platforms.md');
+    for (const platform of ['Google', 'Apple', 'LinkedIn']) {
+      const section = social.split(/^### /m).find((part) => part.startsWith(platform));
+      expect(section, platform).toBeTruthy();
+      expect(section!, platform).toContain('hesap sorumlusu');
+    }
+    expect(read('src/content/docs/atonota-login.md')).toContain('hesap sorumlusu');
+    // Karar 2: zamanlayıcı ve düzenli yedek yalnız sunucularda açılır.
+    for (const id of ['G-5', 'G-114']) {
+      const d = reqs.find((x) => x.id === id)!.detail;
+      expect(d, id).toContain('Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır');
+      expect(d, id).toContain("Geliştirme Mac'inde zamanlanmış iş kurulmaz.");
+    }
+    for (const file of ['backend/docs/dagitim/ortamlar.md', 'src/content/docs/rail-6-operasyon.md', 'backend/PROJECT-RECORD.md']) {
+      const text = read(file);
+      expect(text, file).toContain("Geliştirme Mac'inde zamanlanmış iş kurulmaz.");
+      expect(text, file).not.toContain('Düzenli yedek yoktur');
+    }
+    // Karar 3: prod ortamına yalnız deneme verisi girer.
+    const envs = read('backend/docs/dagitim/ortamlar.md');
+    expect(envs).toContain('prod ortamına yalnız deneme verisi girer.');
+    expect(envs).not.toMatch(/^\| prod \| Gerçek müşteri \|/m);
+    // Karar 4: IPv6 önce deneme sunucusunda, sonra prod'da (AJA-507).
+    for (const file of ['backend/docs/dagitim/ortamlar.md', 'backend/docs/handoff/canli-deneme-listesi.md']) {
+      expect(read(file), file).toContain('IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).');
+    }
+  });
+
   test('built pages have no table rows rendered as paragraphs', () => {
     // Tablo içindeki boş satır markdown tablosunu böler; kalan satırlar `<p>| …` olarak yayımlanır.
     const dist = new URL('dist/', root);

@@ -188,13 +188,15 @@ Belgedeki `stack exec -T tenant-web bench ...` komutları bu kısaltmayı kullan
 - Açık kayıtlar `google`, `apple` ve `linkedin` kayıtlarıdır. `facebook` ve `x` kayıtları kapalıdır (`"active": false`).
 - Platform panellerinin işi `backend/docs/handoff/atonota-login-platforms.md` belgesindedir.
 - Gerçek platform hesapları henüz yoktur. Kaynak görev panosunun notudur.
+- Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar. Bu karar 26 Kasım 2026 Perşembe günü verildi.
 
 ### DNS satırı (alan adı sorumlusu)
 
 1. Giriş adresinin DNS kaydını açın.
    - Ayar: `atonota.net` bölgesinde `api.login` adı. Kayıt türü A kaydıdır. Değer `atonota-prod` sunucusunun genel IP adresidir.
-   - Komut: DevOps sorumlusu IP adresini alan adı sorumlusuna yazar. Alan adı sorumlusu kaydı GoDaddy'de girer. IP adresi depoda yoktur: bilinmiyor. IPv6 kaydı gerekip gerekmediği de depoda yoktur: bilinmiyor.
+   - Komut: DevOps sorumlusu IP adresini alan adı sorumlusuna yazar. Alan adı sorumlusu kaydı GoDaddy'de girer. IP adresi depoya yazılmaz.
    - Kabul: `dig +short api.login.atonota.net A` komutu sunucunun IP adresini döner.
+   - IPv6: IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).
 
 2. rc için aynı kaydı açın.
    - Ayar: `api.login.rc` adı. Değer `atonota-rc` sunucusunun genel IP adresidir.
@@ -251,3 +253,7 @@ Belgedeki `stack exec -T tenant-web bench ...` komutları bu kısaltmayı kullan
 ## Teslim
 
 Her adımın sonucunu `pass`, `fail` ya da `not_run` olarak yazın. Sonucu ilgili Paperclip işine yorum olarak ekleyin. Yoruma parola, token ya da anahtar yazmayın.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

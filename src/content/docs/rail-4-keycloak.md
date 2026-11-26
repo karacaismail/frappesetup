@@ -176,7 +176,8 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 | İş | Sahip |
 | --- | --- |
 | 2 Keycloak düğümü (26.x, Docker Engine), Infinispan küme, PostgreSQL streaming replika (sürüm Keycloak uyumluluk matrisinden, doğrulanacak), nginx TLS, admin konsolu yalnızca Tailscale/özel ağ | DevOps sorumlusu |
-| `api.login.atonota.net` için A ve AAAA kaydı. alpha, beta ve rc için ad `api.login.<ortam>.atonota.net` olur (K-61). Değerleri DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı `atonota.net` bölgesine yazar. | DevOps sorumlusu / alan adı sorumlusu |
+| `api.login.atonota.net` için A ve AAAA kaydı. alpha, beta ve rc için ad `api.login.<ortam>.atonota.net` olur (K-61). Değerleri DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı `atonota.net` bölgesine yazar. IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (K-63). | DevOps sorumlusu / alan adı sorumlusu |
+| Google, Apple ve LinkedIn geliştirici hesapları (K-63). Hesaplar açılınca DevOps sorumlusu istemcileri bu hesaplarda açar. | Hesap sorumlusu |
 | Günlük şifreli PostgreSQL yedeği (fsn1 → nbg1), haftalık realm export, RPO ≤ 1 saat (WAL), çeyreklik geri yükleme tatbikatı (G-114) | DevOps sorumlusu |
 | Login/admin event'leri Log Server'a (KVKK/5651 saklama, G-117), metrikler Monitor Server'a (X-05) | DevOps sorumlusu |
 | identity-sync konteyneri, sırlar age/sops (G-112) | DevOps sorumlusu |

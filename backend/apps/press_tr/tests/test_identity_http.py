@@ -1294,6 +1294,14 @@ class IdentityHttpTest(
 		frappe.init("press.localhost")
 		frappe.connect()
 		try:
+			# AJA-421: the run copies app files without a migrate, so the setup step and the
+			# DocType permissions run here the same way a migrate runs them. The second call
+			# shows that an existing role raises no error.
+			from press_tr.press_identity.recovery import ensure_reviewer_role
+
+			ensure_reviewer_role()
+			ensure_reviewer_role()
+			frappe.reload_doc("press_identity", "doctype", "ptr_recovery_review", force=True)
 			frappe.get_doc(
 				{
 					"doctype": "User",
@@ -1301,7 +1309,7 @@ class IdentityHttpTest(
 					"first_name": "Reviewer",
 					"user_type": "System User",
 					"send_welcome_email": 0,
-					"roles": [{"role": "System Manager"}],
+					"roles": [{"role": "Recovery Reviewer"}],
 				}
 			).insert(ignore_permissions=True)
 			frappe.db.set_value("User", email, "api_key", key)

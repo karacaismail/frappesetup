@@ -158,3 +158,7 @@ Açık bulgu sayısını inceleme kaydından alın. Sayıyı `--open-findings` i
 Paket açığı sayısını tarama çıktısından alın. Sayıyı `--package-vulnerabilities` ile girin.
 Reddedilen istek sayısını test kaydından alın. Sayıyı `--rejected-requests` ile girin.
 Bir sayıyı girmediğinizde karne “Not measured” yazar.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.
