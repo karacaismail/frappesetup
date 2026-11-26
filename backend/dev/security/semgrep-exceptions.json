@@ -21,6 +21,7 @@
     "backend/apps/press_tr/press_tr/press_identity/machine_routes.py",
     "backend/apps/press_tr/press_tr/press_identity/oidc.py",
     "backend/apps/press_tr/press_tr/press_identity/recovery.py",
+    "backend/apps/press_tr/press_tr/press_identity/recovery_keys.py",
     "backend/apps/press_tr/press_tr/press_identity/request_policy.py",
     "backend/apps/press_tr/press_tr/press_identity/service.py",
     "backend/apps/press_tr/press_tr/press_identity/sessions.py",
@@ -31,7 +32,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "12ab8e200ec5e465100f3b8b876e0ac5a791ca30fbfd922eb3b367f768af5003",
+  "sha256": "5a3767fa4dc88ab29dd84288d65d439c99af12439118679ea233321a876db05b",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -48,7 +49,7 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/account.py",
-      "line": 21,
+      "line": 22,
       "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
     },
     {
@@ -150,13 +151,19 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/account.py",
-      "line": 49,
+      "line": 50,
       "reason": "Guest recovery request is POST-only and rate limited, rejects extra fields and non-text input, gives the same answer for every address and only queues one background job. The request never looks up the account."
+    },
+    {
+      "rule": "frappe-missing-permission",
+      "path": "backend/apps/press_tr/press_tr/api/account.py",
+      "line": 63,
+      "reason": "Desk-only reviewer step after an approved recovery (AJA-420). It requires a browser session without token or impersonation, checks CSRF, rejects extra fields, needs write permission on PTR Recovery Review and refuses the account owner. Only an Approved or Removal Failed record reaches identity-sync, under a row lock."
     },
     {
       "rule": "frappe-ignore-permissions",
       "path": "backend/apps/press_tr/press_tr/press_identity/recovery.py",
-      "line": 41,
+      "line": 51,
       "reason": "The background job runs as Guest, who cannot create records, so it inserts one Open review only for an existing identity link with no open review. The controller freezes the record and a non-owner reviewer decides."
     }
   ],
