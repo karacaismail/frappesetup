@@ -1,6 +1,7 @@
 """Check the local review accounts command of the shared stack (`stack review-accounts`)."""
 
 import json
+import re
 import runpy
 import unittest
 from pathlib import Path
@@ -13,6 +14,8 @@ STACK = E2E / "stack"
 ACCOUNTS = E2E / "review-accounts.json"
 KEYCLOAK_SCRIPT = E2E / "preview" / "stack-review-keycloak.py"
 REALM = E2E.parent / "identity/keycloak/realm/platform-realm.json"
+COMPOSE = E2E.parent / "dev/compose.identity-sync.yaml"
+COMPOSE_ORGANIZATION = re.search(r'"organization":"([a-z0-9-]+)"', COMPOSE.read_text()).group(1)
 # A fresh value per run, so no credential literal sits in the source.
 ADMIN_VALUE = uuid4().hex
 
@@ -252,6 +255,8 @@ class ReviewAccountsFlowTest(unittest.TestCase):
         self.assertEqual(keycloak["password"], password)
         self.assertEqual(keycloak["relaxed_length"], 8)
         self.assertEqual(keycloak["restore_policy"], json.loads(REALM.read_text())["passwordPolicy"])
+        # identity-sync of the stack binds tenant1 to this organization (dev/compose.identity-sync.yaml).
+        self.assertEqual(keycloak["organization"], COMPOSE_ORGANIZATION)
         tenant = json.loads(run.call_args_list[1].kwargs["input"])
         self.assertEqual(tenant["issuer"], LOCAL["KC_PUBLIC_URL"] + "/realms/platform")
         self.assertEqual(
@@ -278,6 +283,10 @@ class FakeKeycloak:
         self.users = {"platform": {}, "master": {}}
         self.passwords = []
         self.calls = []
+        # The stack's tenant organization. A test may remove it or seed earlier members.
+        self.organizations = {"org-tenant1": {"id": "org-tenant1", "alias": "tenant1", "name": "Yerel kiracı"},
+                              "org-other": {"id": "org-other", "alias": "other", "name": "Other"}}
+        self.members = {"org-tenant1": set(), "org-other": set()}
 
     def __call__(self, method, path, data=None):
         self.calls.append((method, path))
@@ -305,6 +314,19 @@ class FakeKeycloak:
             return 200, None, {"id": "role-admin", "name": "admin"}
         if rest.endswith("/role-mappings/realm"):
             return 204, None, None
+        if realm == "platform" and rest.startswith("/organizations?") and method == "GET":
+            return 200, None, list(self.organizations.values())
+        if realm == "platform" and rest == "/organizations" and method == "POST":
+            identifier = "org-" + data["alias"]
+            self.organizations[identifier] = {"id": identifier, **data}
+            self.members[identifier] = set()
+            return 201, f"http://x/organizations/{identifier}", None
+        if realm == "platform" and rest.startswith("/organizations/") and rest.endswith("/members") and method == "POST":
+            identifier = rest.split("/")[2]
+            if data in self.members[identifier]:
+                return 409, None, {"errorMessage": "User is already a member of the organization."}
+            self.members[identifier].add(data)
+            return 201, None, None
         raise AssertionError(f"Unexpected call {method} {path}")
 
 
@@ -322,6 +344,7 @@ class KeycloakScriptTest(unittest.TestCase):
             "relaxed_length": 8,
             "restore_policy": json.loads(REALM.read_text())["passwordPolicy"],
             "accounts": self.data["accounts"],
+            "organization": "tenant1",
         }
 
     def test_the_production_realm_file_keeps_its_twelve_character_rule(self):
@@ -360,6 +383,47 @@ class KeycloakScriptTest(unittest.TestCase):
         self.assertIn(("POST", "/admin/realms/master/users/id-inceleme-yerel-yonetici/role-mappings/realm"),
                       keycloak.calls)
         self.assertNotIn(self.data["password"], json.dumps(result))
+
+    def test_every_tenant_account_becomes_a_member_of_the_tenant_organization(self):
+        # AJA-950, G-160: identity-sync answers the linked accounts read only for a member of the
+        # tenant's organization. Without the membership the panel shows 403 LoginReadForbidden.
+        keycloak = FakeKeycloak(json.loads(REALM.read_text())["passwordPolicy"])
+        self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
+        self.assertEqual(keycloak.members["org-tenant1"], {"id-" + email for email in TENANT_ACCOUNTS})
+        self.assertEqual(keycloak.members["org-other"], set())
+
+    def test_an_account_without_tenant_roles_joins_no_organization(self):
+        keycloak = FakeKeycloak(json.loads(REALM.read_text())["passwordPolicy"])
+        self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
+        joined = set().union(*keycloak.members.values())
+        self.assertNotIn("id-inceleme-press@example.test", joined)
+        self.assertNotIn("id-inceleme-yerel-yonetici", joined)
+
+    def test_a_repeated_run_keeps_the_members_and_does_not_fail(self):
+        keycloak = FakeKeycloak(json.loads(REALM.read_text())["passwordPolicy"])
+        keycloak.members["org-tenant1"] = {"id-inceleme-yonetici@example.test"}
+        self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
+        self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
+        self.assertEqual(keycloak.members["org-tenant1"], {"id-" + email for email in TENANT_ACCOUNTS})
+
+    def test_a_missing_tenant_organization_is_created_with_the_tenant_alias(self):
+        keycloak = FakeKeycloak(json.loads(REALM.read_text())["passwordPolicy"])
+        del keycloak.organizations["org-tenant1"], keycloak.members["org-tenant1"]
+        self.script["apply"](self.payload(), caller_factory=lambda *_: keycloak)
+        self.assertEqual(keycloak.organizations["org-tenant1"]["alias"], "tenant1")
+        self.assertEqual(keycloak.members["org-tenant1"], {"id-" + email for email in TENANT_ACCOUNTS})
+
+    def test_a_failed_membership_stops_the_script(self):
+        keycloak = FakeKeycloak(json.loads(REALM.read_text())["passwordPolicy"])
+        original = keycloak.__call__
+
+        def failing(method, path, data=None):
+            if path.endswith("/members") and method == "POST":
+                return 403, None, {"error": "forbidden"}
+            return original(method, path, data)
+
+        with self.assertRaises(SystemExit):
+            self.script["apply"](self.payload(), caller_factory=lambda *_: failing)
 
     def test_a_rule_left_relaxed_by_a_killed_run_is_replaced_by_the_realm_file_rule(self):
         # A killed earlier run left the relaxed rule in the running Keycloak.
