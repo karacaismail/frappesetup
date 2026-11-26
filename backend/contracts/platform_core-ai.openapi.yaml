@@ -202,6 +202,53 @@ paths:
                       has_next_page: {type: boolean}
         "403": {description: The request did not come from a human session.}
 
+  /platform_core.api.ai.list_second_approvals:
+    get:
+      tags: [proposal]
+      operationId: listSecondApprovals
+      summary: Lists other users' R3 proposals that the session user may approve as the second person.
+      description: |
+        An R3 proposal needs two approvals. The owner gives the first one. Then the proposal waits with the status `awaiting_second_approval`.
+        This list shows such proposals to a second person. A row is shown only if the session user may give the second approval.
+        That person is an enabled user of this site, is not the owner and may use the tool.
+        The person also has write permission on the target record. Without a target record, the DocType permission counts.
+        A preview with the action `create`, `submit`, `cancel` or `delete` needs that permission instead of write permission.
+        Nobody holds write permission on the layer's own records, for example the PLT AI Action Log. For those the tool's own role check decides.
+        The session user's own proposals are never in this list. An expired proposal is not in this list.
+        Each row carries the `digest` value. The second person sends it with `approve_proposal`.
+        The newest proposal comes first. For the next page, increase `start` by `limit`.
+        A successful read is not written to the log. A denied read is written.
+      security: [{humanSession: []}]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+        - name: start
+          in: query
+          required: false
+          description: Number of proposals to skip.
+          schema: {type: integer, minimum: 0, maximum: 10000, default: 0}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: Proposals that wait for this user's second approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [proposals, has_next_page]
+                    properties:
+                      proposals:
+                        type: array
+                        items: {$ref: "#/components/schemas/Proposal"}
+                      has_next_page: {type: boolean}
+        "403": {description: The request did not come from a human session.}
+
   /platform_core.api.ai.get_proposal:
     get:
       tags: [proposal]
@@ -245,6 +292,16 @@ paths:
         an action with an unknown result on the same target.
         If a check fails, the action does not run and the response carries `executed: false` and the deny reason.
 
+        An R3 proposal needs two people. The owner gives the first approval. The action does not run then.
+        The response carries `executed: false`, a null `deny_reason` and the status `awaiting_second_approval`.
+        A second person gives the second approval with the same `digest`. The rule for that person is in `list_second_approvals`.
+        The server runs all checks again at that moment. The preview runs again in the second person's session.
+        If that preview refuses the second person's permission, the response is 403 and the proposal keeps waiting.
+        Then the action runs with the second person's permissions, and `second_approver` and `second_approved_at` are stored.
+        If the owner approves again, the deny reason is `second_approver_required` and the proposal keeps waiting.
+        A person without write permission gets 403 and the deny reason `not_second_approver` is written to the log.
+        R0, R1 and R2 proposals need only the owner's approval. Another person gets 403 with `not_owner`.
+
         Before executing, the server records the result as `unknown`. If the process is cut off midway, the result stays `unknown`.
         If execution raises an error, the result becomes `failed` only in this case: the error occurred in the layer's own check.
         Every error after the layer's check has finished becomes `unknown`. In this part Frappe's document methods
@@ -279,7 +336,7 @@ paths:
                 properties:
                   message: {$ref: "#/components/schemas/ApprovalOutcome"}
         "401": {description: "The request carries an agent token. The token is valid only on the MCP endpoint. The denial is written to the log with the code `token_out_of_scope`."}
-        "403": {description: "The request did not come from a human session, the session has no CSRF token or the proposal belongs to another user. Another user's proposal is not returned in the response."}
+        "403": {description: "The request did not come from a human session, the session has no CSRF token, or the proposal belongs to another user and the session user may not give its second approval. Another user's proposal is not returned in the response."}
         "404": {description: The proposal does not exist.}
 
   /platform_core.api.ai.reject_proposal:
@@ -287,7 +344,7 @@ paths:
       tags: [proposal]
       operationId: rejectProposal
       summary: Rejects a pending proposal.
-      description: Nothing is written to the document. A rejected proposal cannot be approved later. If the proposal is not `pending`, 417 is returned.
+      description: Nothing is written to the document. A rejected proposal cannot be approved later. The owner can also reject an R3 proposal that waits for its second approval. If the proposal is not `pending` or `awaiting_second_approval`, 417 is returned.
       security: [{humanSession: []}]
       requestBody:
         required: true
@@ -572,6 +629,8 @@ components:
         - preview_required
         - purge_failed
         - not_owner
+        - second_approver_required
+        - not_second_approver
         - not_pending
         - expired
         - digest_mismatch
@@ -594,9 +653,10 @@ components:
 
     ProposalStatus:
       type: string
-      enum: [pending, rejected, expired, consumed]
+      enum: [pending, awaiting_second_approval, rejected, expired, consumed]
       description: |
-        `pending`: waits for the human decision. `rejected`: the human rejected it or the approval check failed permanently.
+        `pending`: waits for the human decision. `awaiting_second_approval`: an R3 proposal the owner approved. It waits for a second person's approval and nothing has run yet.
+        `rejected`: the human rejected it or the approval check failed permanently.
         `expired`: the time ran out. `consumed`: it was approved and execution started. The outcome is in the `result` field.
 
     ProposalResult:
@@ -617,7 +677,7 @@ components:
 
     Proposal:
       type: object
-      required: [proposal_id, status, result, tool, preview, digest, expires_at, created_at, destructive, billable, risk_level]
+      required: [proposal_id, status, result, tool, preview, digest, expires_at, created_at, destructive, billable, risk_level, first_approved_at, second_approver, second_approved_at]
       properties:
         proposal_id: {type: string}
         status: {$ref: "#/components/schemas/ProposalStatus"}
@@ -637,6 +697,9 @@ components:
           type: [string, "null"]
           description: Name of the affected document if execution succeeded.
         error: {type: [string, "null"], description: "Fixed error code if execution failed, for example `validation_error`, `permission`, `document_changed` or `internal_error`. The text of a tool's error is never stored or returned."}
+        first_approved_at: {type: [string, "null"], format: date-time, description: "When the owner gave the first approval of an R3 proposal. Null for other levels."}
+        second_approver: {type: [string, "null"], description: "User who gave the second approval of an R3 proposal. Null until then and for other levels."}
+        second_approved_at: {type: [string, "null"], format: date-time, description: "When the second person approved the R3 proposal."}
 
     Preview:
       type: object
@@ -1084,7 +1147,7 @@ x-mcp-results:
       proposal_id: {type: string}
       status:
         type: string
-        enum: [pending, rejected, expired, consumed]
+        enum: [pending, awaiting_second_approval, rejected, expired, consumed]
       result:
         type: string
         enum: ['', unknown, succeeded, failed]
@@ -1126,6 +1189,12 @@ x-mcp-results:
       result_document:
         type: [string, 'null']
       error:
+        type: [string, 'null']
+      first_approved_at:
+        type: [string, 'null']
+      second_approver:
+        type: [string, 'null']
+      second_approved_at:
         type: [string, 'null']
 
 x-mcp-schemas:

@@ -109,6 +109,39 @@ class TestAiEndpoints(AiTestCase):
 
 		self.assertNotIn(proposal_id, [row["proposal_id"] for row in listed])
 
+	# --- list_second_approvals ---
+
+	def r3_awaiting_of_a(self) -> tuple[str, str]:
+		"""An R3 proposal of user A that waits for a second approval. Return its id and digest."""
+		from platform_core.ai.tests.test_risk_level import with_risk_tools
+
+		name = self.make_record(USER_A, title="Private to A")
+		client = self.login(USER_A)
+		with with_risk_tools():
+			result = self.call_tool(client, "plt_high_declared_note", {"name": name, "title": "New"})
+			proposal_id = result["structuredContent"]["proposal_id"]
+			digest = self.digest_of(client, proposal_id)
+			self.approve(client, proposal_id, digest)
+		self.assertEqual(self.status_of(proposal_id)[0], "awaiting_second_approval")
+		return proposal_id, digest
+
+	def test_list_second_approvals_guest_denied(self):
+		self.r3_awaiting_of_a()
+
+		self.assertEqual(self.guest("GET", "list_second_approvals"), 403)
+
+	def test_list_second_approvals_foreign_data_denied(self):
+		proposal_id, digest = self.r3_awaiting_of_a()
+
+		# User B has no write permission on A's record, so A's proposal is not B's to approve.
+		response = self.human(self.login(USER_B), "GET", "list_second_approvals", query={"limit": 100})
+
+		self.assertEqual(response.status_code, 200, "Second approvals request failed")
+		text = response.get_data(as_text=True)
+		self.assertNotIn(proposal_id, text)
+		self.assertNotIn(digest, text)
+		self.assertNotIn("Private to A", text)
+
 	# --- get_proposal ---
 
 	def test_get_proposal_guest_denied(self):

@@ -77,7 +77,11 @@ PROPOSAL_LIST_FIELDS = (
 	"expires_at",
 	"result_document",
 	"error",
+	"first_approved_at",
+	"second_approver",
+	"second_approved_at",
 )
+AWAITING = "awaiting_second_approval"
 
 
 def proposals_without_risk_level() -> list[dict]:
@@ -104,10 +108,10 @@ def proposals_of(user: str, status: str | None, start: int, limit: int) -> list[
 	filters: dict = {"user": user}
 	or_filters = None
 	now = now_datetime()
-	if status == "pending":
-		filters.update(status="pending", expires_at=(">=", now))
+	if status in ("pending", AWAITING):
+		filters.update(status=status, expires_at=(">=", now))
 	elif status == "expired":
-		filters["status"] = ("in", ("pending", "expired"))
+		filters["status"] = ("in", ("pending", AWAITING, "expired"))
 		or_filters = [["status", "=", "expired"], ["expires_at", "<", now]]
 	elif status:
 		filters["status"] = status
@@ -120,6 +124,29 @@ def proposals_of(user: str, status: str | None, start: int, limit: int) -> list[
 		limit_start=start,
 		limit=limit,
 	)
+
+
+def awaiting_second_approval(other_than: str, limit: int) -> list[dict]:
+	"""R3 proposals of other users that wait for a second approval and have not expired (AJA-1003).
+
+	Newest first. The caller keeps only the rows the reader may approve.
+	"""
+	return frappe.get_all(
+		PROPOSAL,
+		filters={"status": AWAITING, "expires_at": (">=", now_datetime()), "user": ("!=", other_than)},
+		fields=[*PROPOSAL_LIST_FIELDS, "user"],
+		order_by="creation desc, name desc",
+		limit=limit,
+	)
+
+
+def user_enabled(user: str) -> bool:
+	"""Is this an enabled user of this site? A user of another site has no row here."""
+	return bool(frappe.db.get_value("User", user, "enabled"))
+
+
+def document_exists(doctype: str, name: str) -> bool:
+	return bool(frappe.db.exists(doctype, name))
 
 
 def unresolved_unknown_exists(target_key: str, *, exclude: str | None = None) -> bool:

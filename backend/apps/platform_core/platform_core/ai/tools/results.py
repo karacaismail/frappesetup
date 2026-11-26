@@ -202,7 +202,10 @@ PROPOSAL_STATE = {
 	],
 	"properties": {
 		"proposal_id": _STRING,
-		"status": {"type": "string", "enum": ["pending", "rejected", "expired", "consumed"]},
+		"status": {
+			"type": "string",
+			"enum": ["pending", "awaiting_second_approval", "rejected", "expired", "consumed"],
+		},
 		"result": {"type": "string", "enum": ["", "unknown", "succeeded", "failed"]},
 		"tool": _STRING,
 		"target_doctype": _NULLABLE_STRING,
@@ -216,6 +219,9 @@ PROPOSAL_STATE = {
 		"created_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 		"result_document": _NULLABLE_STRING,
 		"error": _NULLABLE_STRING,
+		"first_approved_at": _NULLABLE_STRING,
+		"second_approver": _NULLABLE_STRING,
+		"second_approved_at": _NULLABLE_STRING,
 	},
 }
 

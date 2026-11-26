@@ -129,6 +129,7 @@ website_user_allowed_methods = [
 	"platform_core.api.ai.mcp_resource_metadata",
 	"platform_core.api.ai.issue_agent_token",
 	"platform_core.api.ai.list_proposals",
+	"platform_core.api.ai.list_second_approvals",
 	"platform_core.api.ai.get_proposal",
 	"platform_core.api.ai.approve_proposal",
 	"platform_core.api.ai.reject_proposal",

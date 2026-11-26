@@ -46,6 +46,13 @@ def list_proposals(status: str | None = None, limit: int = 20, start: int = 0) -
 	return proposals.list_for_human(status, limit, start)
 
 
+# Checked in `access.human_call` and per row in `proposals.second_approver_problem`: write permission on the target.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
+def list_second_approvals(limit: int = 20, start: int = 0) -> dict:
+	"""List other users' R3 proposals that the session user may approve as the second person."""
+	return proposals.list_second_approvals_for_human(limit, start)
+
+
 # Checked in `proposals._own`: the proposal must belong to the session user.
 @frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
 def get_proposal(proposal_id: str) -> dict:
@@ -53,7 +60,8 @@ def get_proposal(proposal_id: str) -> dict:
 	return proposals.read_for_human(proposal_id)
 
 
-# Checked in `proposals.approve`: human session, owner, digest, then the tool's permission again.
+# Checked in `proposals.approve`: human session, owner or a permitted second person for R3, digest,
+# then the tool's permission again.
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def approve_proposal(proposal_id: str, digest: str) -> dict:
 	"""Approve the proposal and execute the action in this request. May be destructive."""

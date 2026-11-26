@@ -113,6 +113,7 @@ EXPECTED = {
     "platform_core.api.ai.mcp_resource_metadata": PUBLIC,
     "platform_core.api.ai.issue_agent_token": PANEL,
     "platform_core.api.ai.list_proposals": PANEL,
+    "platform_core.api.ai.list_second_approvals": PANEL,
     "platform_core.api.ai.get_proposal": PANEL,
     "platform_core.api.ai.approve_proposal": PANEL,
     "platform_core.api.ai.reject_proposal": PANEL,
@@ -293,7 +294,9 @@ class LoginMethodAllowListTests(unittest.TestCase):
 
     def test_every_whitelisted_login_method_has_a_named_caller(self):
         unknown = sorted(set(self.methods) - set(EXPECTED))
-        self.assertEqual(unknown, [], "Name the caller of each new method in EXPECTED and add it to its list.")
+        self.assertEqual(
+            unknown, [], "Name the caller of each new method in EXPECTED and add it to its list."
+        )
 
     def test_every_expected_method_exists_or_waits_for_its_branch(self):
         missing = sorted(set(EXPECTED) - set(self.methods) - set(PENDING))
