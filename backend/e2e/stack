@@ -1058,6 +1058,8 @@ REVIEW_EMAIL = re.compile(r"inceleme-[a-z-]+@example\.test")
 # G-168, G-169, G-170: sample reseller links. The reseller review accounts sign in on the stack's
 # tenant site, so that site is one reseller. Every other tenant name is a synthetic example.test name.
 REVIEW_TENANT_SITE = "tenant1.localhost"
+# G-160: the Keycloak organization of that site. dev/compose.identity-sync.yaml binds tenant1 to it.
+REVIEW_ORGANIZATION = "tenant1"
 SAMPLE_TENANT = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.example\.test")
 SITE_STATUSES = ("Pending", "Active", "Suspended")
 # G-53: no review account holds the platform operator's desk role.
@@ -1144,6 +1146,7 @@ def review_accounts(compose, environment):
                     # The rule of the realm file, not of the running Keycloak, so a killed
                     # earlier run cannot leave the relaxed rule in place for good.
                     "restore_policy": json.loads(REALM_FILE.read_text())["passwordPolicy"],
+                    "organization": REVIEW_ORGANIZATION,
                     "accounts": accounts,
                 }
             ),
