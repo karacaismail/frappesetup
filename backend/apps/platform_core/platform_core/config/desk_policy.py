@@ -6,7 +6,9 @@ The settings below turn off Desk notices and make the panel the site's home page
 
 import frappe
 from frappe.core.doctype.system_settings.system_settings import clear_system_settings_cache
+from frappe.website.path_resolver import resolve_path
 from werkzeug.exceptions import HTTPException
+from werkzeug.routing.exceptions import RequestRedirect
 from werkzeug.utils import redirect
 
 OPERATOR_ROLE = "Platform Operator"
@@ -54,16 +56,39 @@ def after_auth() -> None:
 	_send_to_panel()
 
 
+def resolve_website_path(path: str) -> str:
+	"""The `website_path_resolver` hook. It checks the page Frappe really picks (AJA-963).
+
+	The request hooks only see the asked path. For /, /index and /index.html Frappe opens the
+	user's home page instead. The home page is the Desk when a role's "Home Page" is "desk" or
+	when the user has a default workspace. Route rules can also lead to the Desk.
+	Frappe uses this hook in place of `resolve_path`, so the hook calls `resolve_path` itself.
+	"""
+	try:
+		endpoint = resolve_path(path)
+	except RequestRedirect as e:
+		# Frappe handles this redirect only when no resolver hook is set, so it is done here.
+		frappe.flags.redirect_location = e.new_url
+		raise frappe.Redirect(e.code) from e
+	if is_desk_path(endpoint) and _must_leave_desk():
+		frappe.flags.redirect_location = PANEL_PATH
+		raise frappe.Redirect(302)
+	return endpoint
+
+
+def _must_leave_desk() -> bool:
+	"""The G-53 rule. A guest signs in first, and Frappe's sign-in redirect comes back here."""
+	user = frappe.session.user
+	return user != "Guest" and OPERATOR_ROLE not in frappe.get_roles(user)
+
+
 def _send_to_panel() -> None:
 	request = getattr(frappe.local, "request", None)
 	if request is None or request.method == "OPTIONS" or not is_desk_path(request.path):
 		return
-	user = frappe.session.user
-	# A guest signs in first. Frappe's sign-in redirect then reaches this hook again.
-	if user == "Guest" or OPERATOR_ROLE in frappe.get_roles(user):
-		return
-	# 302, not 301: the answer depends on the user's roles, and browsers keep a 301.
-	raise HTTPException(response=redirect(PANEL_PATH, 302))
+	if _must_leave_desk():
+		# 302, not 301: the answer depends on the user's roles, and browsers keep a 301.
+		raise HTTPException(response=redirect(PANEL_PATH, 302))
 
 
 def apply(_args=None) -> None:

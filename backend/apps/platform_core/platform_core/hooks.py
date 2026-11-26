@@ -321,6 +321,9 @@ after_request = ["platform_core.shell.headers.add_security_headers"]
 
 # Panel client routes (platform-core-kabuk): every /panel/<path> renders the /panel page.
 website_route_rules = [{"from_route": "/panel/<path:app_path>", "to_route": "panel"}]
+# G-53: the Desk check on the page Frappe resolves, such as the home page of "/" (AJA-963).
+# Frappe uses only the last resolver hook, so this list keeps one entry.
+website_path_resolver = ["platform_core.config.desk_policy.resolve_website_path"]
 
 after_build = ["platform_core.shell.assets.remove_panel_source_maps"]
 
