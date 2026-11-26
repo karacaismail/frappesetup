@@ -29,7 +29,7 @@ try:
 	from frappe.utils import get_test_client
 	from frappe.utils.password import update_password
 
-	from hrms_tr import leave
+	from hrms_tr import leave, setup
 except ImportError:  # Outside a bench the test is skipped.
 	frappe = None
 	IntegrationTestCase = unittest.TestCase
@@ -295,6 +295,13 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		values = {row["value"] for row in response.json["message"]}
 		self.assertIn(self.employee, values)
+
+	def test_personal_employee_fields_are_above_level_0_on_the_site(self):
+		meta = frappe.get_meta("Employee")
+		for field in setup.EMPLOYEE_PERSONAL_FIELDS:
+			with self.subTest(field=field):
+				self.assertIsNotNone(meta.get_field(field), field)
+				self.assertEqual(meta.get_field(field).permlevel, setup.EMPLOYEE_PERSONAL_LEVEL)
 
 	def test_holder_does_not_read_the_personal_fields_of_an_employee(self):
 		client = self.login()

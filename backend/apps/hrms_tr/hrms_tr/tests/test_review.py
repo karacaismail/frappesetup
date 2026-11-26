@@ -33,17 +33,52 @@ class RoleFixtureTest(unittest.TestCase):
 		for profile in profiles():
 			self.assertIn("HRT Employee", {row["role"] for row in profile["roles"]})
 
-	def test_employee_permissions_grant_read_or_select_only(self):
-		# The two panel roles choose the employee of a leave (AJA-947). They only select it:
-		# a read right would open the personal fields of every employee record (AJA-1024).
-		expected = {"HRT Admin": {"read"}, "Tenant Admin": {"select"}, "Tenant Admin Assistant": {"select"}}
-		permissions = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Employee"]
-		self.assertEqual({row["role"] for row in permissions}, set(expected))
+	def test_employee_permissions_only_grant_read(self):
+		# HRMS asks for Employee read before a leave is opened. The two panel roles open leaves (AJA-947).
+		permissions = [
+			row
+			for row in fixture("05_custom_docperm.json")
+			if row["parent"] == "Employee" and row["permlevel"] == 0
+		]
+		self.assertEqual(
+			{row["role"] for row in permissions}, {"HRT Admin", "Tenant Admin", "Tenant Admin Assistant"}
+		)
 		for permission in permissions:
 			with self.subTest(role=permission["role"]):
-				self.assertEqual(permission["permlevel"], 0)
-				granted = {key for key, value in permission.items() if value == 1}
-				self.assertEqual(granted, expected[permission["role"]])
+				self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
+
+	def test_personal_employee_fields_are_on_their_own_level(self):
+		# The two panel roles read level 0 of an employee. The personal fields are above it (AJA-1024).
+		setters = {
+			(row["doc_type"], row["field_name"], row["property"]): row["value"]
+			for row in fixture("04_property_setter.json")
+		}
+		self.assertTrue(setup.EMPLOYEE_PERSONAL_FIELDS)
+		for field in setup.EMPLOYEE_PERSONAL_FIELDS:
+			with self.subTest(field=field):
+				self.assertEqual(
+					setters.get(("Employee", field, "permlevel")), str(setup.EMPLOYEE_PERSONAL_LEVEL)
+				)
+		# Names stay on level 0: the leave list shows who asked for the leave.
+		for field in ("first_name", "employee_name", "company", "department"):
+			self.assertNotIn(("Employee", field, "permlevel"), setters)
+
+	def test_only_the_hr_roles_read_the_personal_employee_fields(self):
+		# Every role that read the whole employee record before keeps the personal fields.
+		expected = {
+			"Employee": {"read"},
+			"Employee Self Service": {"read", "write"},
+			"HR Manager": {"read", "write"},
+			"HR User": {"read", "write"},
+			"HRT Admin": {"read"},
+		}
+		rows = [
+			row
+			for row in fixture("05_custom_docperm.json")
+			if row["parent"] == "Employee" and row["permlevel"] == setup.EMPLOYEE_PERSONAL_LEVEL
+		]
+		self.assertEqual({row["role"]: {k for k, v in row.items() if v == 1} for row in rows}, expected)
+		self.assertEqual(len(rows), len(expected))
 
 	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
