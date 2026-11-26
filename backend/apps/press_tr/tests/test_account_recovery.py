@@ -16,7 +16,8 @@ from unittest.mock import Mock, patch
 
 APP = Path(__file__).resolve().parents[1] / "press_tr"
 DOCTYPE = APP / "press_identity/doctype/ptr_recovery_review/ptr_recovery_review.json"
-ROLE_FIXTURE = APP / "fixtures/role.json"
+FIXTURES = APP / "fixtures"
+SETUP_STEP = "press_tr.press_identity.recovery.ensure_reviewer_role"
 REVIEWER = "Recovery Reviewer"
 
 
@@ -456,13 +457,60 @@ class RecoveryRouteTest(unittest.TestCase):
 
 
 class ReviewerRoleSetupTest(unittest.TestCase):
-	def test_role_is_created_by_the_app_fixture(self):
-		# AJA-421, acceptance 4: Frappe imports every file in the app's fixtures folder on install and migrate.
-		records = json.loads(ROLE_FIXTURE.read_text(encoding="utf-8"))
-		roles = [record for record in records if record["doctype"] == "Role"]
-		self.assertEqual([role["name"] for role in roles], [REVIEWER])
-		self.assertEqual(roles[0]["role_name"], REVIEWER)
-		self.assertEqual(roles[0]["desk_access"], 1)
+	"""AJA-421, AJA-857: a setup step opens the role, not a fixture.
+
+	Frappe rewrites every fixture record on each migrate. The setup step opens the role
+	only when it is missing and leaves an existing role alone.
+	"""
+
+	def setUp(self):
+		from press_tr.press_identity import recovery
+
+		self.recovery = recovery
+
+	def _hooks(self):
+		tree = ast.parse((APP / "hooks.py").read_text(encoding="utf-8"))
+		return {
+			node.targets[0].id: node.value
+			for node in tree.body
+			if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+		}
+
+	def _ensure(self, existing):
+		framework = Mock()
+		framework.db.exists.return_value = existing
+		with patch.object(self.recovery, "frappe", framework):
+			self.recovery.ensure_reviewer_role()
+		return framework
+
+	def test_no_fixture_opens_the_role(self):
+		self.assertFalse((FIXTURES / "role.json").exists())
+		if FIXTURES.exists():
+			for path in FIXTURES.glob("*.json"):
+				records = json.loads(path.read_text(encoding="utf-8"))
+				self.assertNotIn(REVIEWER, {record.get("name") for record in records}, path.name)
+		self.assertNotIn("fixtures", self._hooks())
+
+	def test_setup_step_runs_after_install_and_migrate(self):
+		hooks = self._hooks()
+		for name in ("after_install", "after_migrate"):
+			with self.subTest(hook=name):
+				self.assertIn(SETUP_STEP, ast.literal_eval(hooks[name]))
+
+	def test_missing_role_is_opened(self):
+		framework = self._ensure(existing=None)
+		framework.db.exists.assert_called_once_with("Role", REVIEWER)
+		framework.get_doc.assert_called_once_with(
+			doctype="Role", role_name=REVIEWER, desk_access=1, is_custom=1
+		)
+		framework.get_doc.return_value.insert.assert_called_once_with(ignore_permissions=True)
+
+	def test_existing_role_is_left_alone(self):
+		# A second install or migrate finds the role and changes nothing, so it raises no error.
+		for _ in range(2):
+			framework = self._ensure(existing=REVIEWER)
+			framework.get_doc.assert_not_called()
+			framework.db.set_value.assert_not_called()
 
 	def test_user_validate_hook_guards_the_role(self):
 		hooks = ast.literal_eval(
