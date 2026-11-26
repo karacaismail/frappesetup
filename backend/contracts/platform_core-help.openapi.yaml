@@ -1,12 +1,16 @@
 openapi: 3.1.0
 info:
   title: Platform Core help API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Field help for the signed-in tenant user (G-138). The G-137 help panel reads this contract.
     Help topics are "PLT Help Topic" records. Only published topics are returned.
     Fallback order is tenant content, application content, the Frappe field description,
     then a generic answer with the request_help action.
+    Each selected topic supplies its own optional tour_url, doc_url and support_url.
+    Missing or blank links are null. Links never come from tenant settings or another fallback topic.
+    Only HTTPS URLs or same-site relative paths can be saved. Other schemes, network-path
+    references (//host), backslashes, credentials and control characters are rejected.
 servers:
   - url: /api/method
     description: Frappe endpoint root of the tenant site
@@ -78,6 +82,9 @@ paths:
                       content: Enter the date the customer must pay by.
                       message: null
                       actions: []
+                      tour_url: /tours/invoice
+                      doc_url: https://docs.example.test/invoice
+                      support_url: null
                 none:
                   value:
                     message:
@@ -89,6 +96,9 @@ paths:
                       content: null
                       message: No help is available for this field.
                       actions: [request_help]
+                      tour_url: null
+                      doc_url: null
+                      support_url: null
         '401':
           description: The supplied session has expired or is invalid.
           content:
@@ -122,6 +132,55 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 exc_type: RateLimitExceededError
+  /platform_core.api.help.get_component_help:
+    get:
+      operationId: getComponentHelp
+      summary: Read the help of one component on the current tenant site
+      description: |
+        Requires a browser session on the current site. Reads only published Component
+        topics with this component_id from that site's database. No tenant, site, user,
+        role or version override is accepted. Topic roles must match the current user.
+        Uses the field-help ranking: tenant before application, exact language before base
+        language before language-neutral, exact installed app version before unversioned,
+        then most recent modification. Versioned topics compare against their app's
+        server-observed installed version. Unmatched or role-restricted components return
+        message null. Components have no Frappe field description to fall back to.
+        Content and links are returned only from the selected topic. Changes no record.
+      parameters:
+        - name: component_id
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 140
+        - name: language
+          in: query
+          schema:
+            type: string
+            maxLength: 20
+      responses:
+        '200':
+          description: The selected component help, or null when no topic applies.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                additionalProperties: false
+                properties:
+                  message:
+                    anyOf:
+                      - $ref: '#/components/schemas/ComponentHelp'
+                      - type: 'null'
+        '401':
+          description: The supplied session has expired or is invalid.
+        '403':
+          description: A browser session on the current site is required.
+        '417':
+          description: A parameter is missing, invalid or not supported.
+        '429':
+          description: The account exceeded 240 requests per 60 seconds.
   /platform_core.api.help.get_help_coverage:
     get:
       operationId: getHelpCoverage
@@ -202,13 +261,19 @@ components:
   schemas:
     FieldHelp:
       type: object
-      required: [doctype, fieldname, source, topic, title, content, message, actions]
+      required: [doctype, fieldname, source, topic, title, content, message, actions, tour_url, doc_url, support_url]
       additionalProperties: false
       properties:
         doctype:
           type: string
         fieldname:
           type: string
+        tour_url:
+          $ref: '#/components/schemas/HelpURL'
+        doc_url:
+          $ref: '#/components/schemas/HelpURL'
+        support_url:
+          $ref: '#/components/schemas/HelpURL'
         source:
           type: string
           enum: [tenant, app, description, none, unavailable]
@@ -233,6 +298,37 @@ components:
             type: string
             enum: [request_help]
           description: request_help appears only for none.
+    HelpURL:
+      type: [string, 'null']
+      description: Optional HTTPS URL or same-site relative path. Blank values are null.
+    ComponentHelp:
+      type: object
+      required: [component_id, source, topic, title, content, message, actions, tour_url, doc_url, support_url]
+      additionalProperties: false
+      properties:
+        component_id:
+          type: string
+        source:
+          type: string
+          enum: [tenant, app]
+        topic:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+          description: Plain text, never markup.
+        message:
+          type: 'null'
+        actions:
+          type: array
+          maxItems: 0
+        tour_url:
+          $ref: '#/components/schemas/HelpURL'
+        doc_url:
+          $ref: '#/components/schemas/HelpURL'
+        support_url:
+          $ref: '#/components/schemas/HelpURL'
     Coverage:
       type: object
       required: [app, total, with_topic, with_description_only, covered, without_help, ratio, topic_ratio, missing]

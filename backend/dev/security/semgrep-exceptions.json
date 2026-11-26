@@ -163,7 +163,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "5e94ad60311ca9ad2823275bd73863f113154fcbc7903d5b7b68f015d596dbf5",
+      "sha256": "30925ce001aa53a67c73a6e7fd48698c927facd94cef0a07f5881cef595b10c6",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -239,7 +239,11 @@
         "backend/apps/platform_core/platform_core/api/help.py",
         "backend/apps/platform_core/platform_core/hooks.py",
         "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
-        "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py"
+        "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
+        "backend/apps/platform_core/platform_core/shell/doctype/plt_help_topic/plt_help_topic.json",
+        "backend/apps/platform_core/platform_core/shell/doctype/plt_help_topic/plt_help_topic.py",
+        "backend/apps/platform_core/platform_core/shell/help.py",
+        "backend/apps/platform_core/platform_core/shell/help_content.py"
       ]
     }
   ]

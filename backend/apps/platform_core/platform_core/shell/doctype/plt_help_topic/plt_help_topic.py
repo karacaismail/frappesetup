@@ -4,7 +4,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from platform_core.shell.help_content import FIELD, target_errors
+from platform_core.shell.help_content import FIELD, HELP_URL_FIELDS, is_safe_help_url, target_errors
 
 MESSAGES = {
 	"document_type": "Select the document type of the field.",
@@ -19,6 +19,13 @@ MESSAGES = {
 
 class PLTHelpTopic(Document):
 	def validate(self):
+		for fieldname in HELP_URL_FIELDS:
+			value = self.get(fieldname)
+			if not is_safe_help_url(value):
+				frappe.throw(
+					_("Help links must use HTTPS or a same-site relative path."), frappe.ValidationError
+				)
+			self.set(fieldname, value.strip() or None if value else None)
 		field = None
 		if self.target_type == FIELD and self.document_type and self.fieldname:
 			if frappe.db.exists("DocType", self.document_type):
