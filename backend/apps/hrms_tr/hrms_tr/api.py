@@ -1,6 +1,6 @@
 """HTTP entry points for leave application actions."""
 
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 import frappe
 from frappe import _
@@ -47,3 +47,78 @@ def get_leave_approver(
 	if employee is None:
 		frappe.throw(_("Select an employee.", context="hrms_tr"), frappe.ValidationError)
 	return {"approver": leave.get_approver(employee)}
+
+
+class LeaveRequestSources(TypedDict):
+	"""Record types supplying the available request defaults."""
+
+	employee: str | None
+	employee_name: str | None
+	leave_type: str | None
+	leave_balance: str | None
+
+
+class LeaveRequestContext(TypedDict):
+	"""Minimal self-service data for a new leave application."""
+
+	employee: str | None
+	employee_name: str | None
+	leave_type: str | None
+	leave_balance: float | None
+	sources: LeaveRequestSources
+
+
+# The employee filter is bound to the session, never request input. HRMS also checks balance access.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+def get_leave_request_context(
+	leave_type: Annotated[str, StringConstraints(min_length=1, max_length=140)] | None = None,
+) -> LeaveRequestContext:
+	"""Return available defaults for the signed-in employee, without inventing missing data."""
+	from frappe.utils import today
+
+	user = frappe.session.user
+	if not user or user == "Guest":
+		frappe.throw(_("Not permitted", context="hrms_tr"), frappe.PermissionError)
+
+	sources: LeaveRequestSources = {
+		"employee": None,
+		"employee_name": None,
+		"leave_type": None,
+		"leave_balance": None,
+	}
+	result: LeaveRequestContext = {
+		"employee": None,
+		"employee_name": None,
+		"leave_type": None,
+		"leave_balance": None,
+		"sources": sources,
+	}
+	# Portal employees need no broad Employee read permission to read these two own fields.
+	employee = frappe.db.get_value(
+		"Employee", {"user_id": user, "status": "Active"}, ["name", "employee_name"], as_dict=True
+	)
+	if not employee:
+		return result
+
+	result["employee"] = employee.name
+	sources["employee"] = "Employee"
+	result["employee_name"] = employee.employee_name or None
+	if result["employee_name"] is not None:
+		sources["employee_name"] = "Employee"
+
+	selected_type = leave_type if leave_type is not None else "Annual Leave"
+	if not frappe.db.exists("Leave Type", selected_type):
+		return result
+	result["leave_type"] = selected_type
+	sources["leave_type"] = "Leave Type"
+	date = today()
+	native_module = "hrms.hr.doctype.leave_application.leave_application"
+	get_leave_allocation_records = frappe.get_attr(f"{native_module}.get_leave_allocation_records")
+	get_leave_balance_on = frappe.get_attr(f"{native_module}.get_leave_balance_on")
+	# HRMS returns zero without an allocation. Preserve the distinction between absent data and zero.
+	if selected_type not in get_leave_allocation_records(employee.name, date, selected_type):
+		return result
+	result["leave_balance"] = get_leave_balance_on(employee.name, selected_type, date)
+	if result["leave_balance"] is not None:
+		sources["leave_balance"] = "Leave Ledger Entry"
+	return result

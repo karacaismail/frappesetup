@@ -293,3 +293,180 @@ class EmployeeAnonymizationTest(IntegrationTestCase):
 		self.assertEqual(application.employee, employee.name)
 		self.assertEqual(application.employee_name, personal_fields["employee_name"])
 		self.assertEqual(employee.status, "Active")
+
+
+class LeaveRequestContextTest(TestCase):
+	"""The request context exposes only the signed-in employee's data."""
+
+	def setUp(self):
+		from hrms_tr import api
+
+		self.api = api
+		self.enterContext(patch.object(frappe.local, "flags", frappe._dict(), create=True))
+		self.fake = self.enterContext(patch.object(api, "frappe"))
+		self.fake.session.user = "employee@example.test"
+		self.fake.db.get_value.return_value = frappe._dict(
+			name="EMP-SELF-0001", employee_name="Synthetic Employee"
+		)
+		self.fake.db.exists.return_value = "Annual Leave"
+		self.fake.PermissionError = frappe.PermissionError
+		self.fake.get_attr.side_effect = frappe.get_attr
+		self.enterContext(
+			patch.object(frappe, "get_installed_apps", return_value=["frappe", "hrms", "hrms_tr"])
+		)
+		self.fake.throw.side_effect = raise_permission_error
+		self.enterContext(patch.object(api, "_", side_effect=lambda message, **kwargs: message))
+		self.enterContext(patch("frappe.utils.today", return_value="2026-11-26"))
+		native = "hrms.hr.doctype.leave_application.leave_application"
+		self.allocations = self.enterContext(patch(f"{native}.get_leave_allocation_records"))
+		self.allocations.return_value = {"Annual Leave": {"total_leaves_allocated": 14}}
+		self.balance = self.enterContext(patch(f"{native}.get_leave_balance_on", return_value=8.5))
+
+	def test_context_returns_self_and_native_balance_with_sources(self):
+		result = self.api.get_leave_request_context()
+		self.assertEqual(
+			result,
+			{
+				"employee": "EMP-SELF-0001",
+				"employee_name": "Synthetic Employee",
+				"leave_type": "Annual Leave",
+				"leave_balance": 8.5,
+				"sources": {
+					"employee": "Employee",
+					"employee_name": "Employee",
+					"leave_type": "Leave Type",
+					"leave_balance": "Leave Ledger Entry",
+				},
+			},
+		)
+		self.fake.db.get_value.assert_called_once_with(
+			"Employee",
+			{"user_id": "employee@example.test", "status": "Active"},
+			["name", "employee_name"],
+			as_dict=True,
+		)
+		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26", "Annual Leave")
+		self.balance.assert_called_once_with("EMP-SELF-0001", "Annual Leave", "2026-11-26")
+
+	def test_no_employee_returns_null_values_and_sources(self):
+		self.fake.db.get_value.return_value = None
+		result = self.api.get_leave_request_context()
+		fields = ("employee", "employee_name", "leave_type", "leave_balance")
+		self.assertEqual({key: result[key] for key in fields}, dict.fromkeys(fields))
+		self.assertEqual(result["sources"], dict.fromkeys(fields))
+		self.allocations.assert_not_called()
+		self.balance.assert_not_called()
+
+	def test_missing_display_name_has_no_invented_value_or_source(self):
+		self.fake.db.get_value.return_value.employee_name = None
+		result = self.api.get_leave_request_context()
+		self.assertIsNone(result["employee_name"])
+		self.assertIsNone(result["sources"]["employee_name"])
+		self.assertEqual(result["employee"], "EMP-SELF-0001")
+
+	def test_requested_leave_type_uses_its_native_balance(self):
+		self.fake.db.exists.return_value = "Study Leave"
+		self.allocations.return_value = {"Study Leave": {"total_leaves_allocated": 5}}
+		self.balance.return_value = 2.5
+		result = self.api.get_leave_request_context(leave_type="Study Leave")
+		self.assertEqual((result["leave_type"], result["leave_balance"]), ("Study Leave", 2.5))
+		self.fake.db.exists.assert_called_once_with("Leave Type", "Study Leave")
+		self.balance.assert_called_once_with("EMP-SELF-0001", "Study Leave", "2026-11-26")
+
+	def test_missing_leave_type_returns_null_type_and_balance(self):
+		self.fake.db.exists.return_value = None
+		result = self.api.get_leave_request_context()
+		for key in ("leave_type", "leave_balance"):
+			self.assertIsNone(result[key])
+			self.assertIsNone(result["sources"][key])
+		self.allocations.assert_not_called()
+		self.balance.assert_not_called()
+
+	def test_missing_allocation_does_not_invent_a_zero_balance(self):
+		self.allocations.return_value = {}
+		result = self.api.get_leave_request_context()
+		self.assertEqual(result["leave_type"], "Annual Leave")
+		self.assertIsNone(result["leave_balance"])
+		self.assertIsNone(result["sources"]["leave_balance"])
+		self.balance.assert_not_called()
+
+	def test_real_zero_balance_is_preserved(self):
+		self.balance.return_value = 0
+		result = self.api.get_leave_request_context()
+		self.assertEqual(result["leave_balance"], 0)
+		self.assertEqual(result["sources"]["leave_balance"], "Leave Ledger Entry")
+
+	def test_native_missing_balance_has_no_source(self):
+		self.balance.return_value = None
+		result = self.api.get_leave_request_context()
+		self.assertIsNone(result["leave_balance"])
+		self.assertIsNone(result["sources"]["leave_balance"])
+
+	def test_native_permission_error_is_not_hidden(self):
+		self.balance.side_effect = frappe.PermissionError("Denied")
+		with self.assertRaises(frappe.PermissionError):
+			self.api.get_leave_request_context()
+
+	def test_get_leave_request_context_foreign_data_denied(self):
+		# Frappe discards unsupported arguments. Neither identifier may select another employee.
+		result = frappe.call(
+			self.api.get_leave_request_context, employee="EMP-FOREIGN-0001", user="other@example.test"
+		)
+		self.assertEqual(result["employee"], "EMP-SELF-0001")
+		self.assertEqual(self.fake.db.get_value.call_args.args[1]["user_id"], "employee@example.test")
+		self.assertEqual(self.balance.call_args.args[0], "EMP-SELF-0001")
+
+	def test_get_leave_request_context_guest_denied(self):
+		with (
+			patch.object(frappe, "session", {"user": "Guest"}),
+			patch.object(frappe, "response", {}),
+			patch.object(frappe, "_", side_effect=lambda message: message),
+			patch.object(frappe, "throw", side_effect=raise_permission_error),
+		):
+			with self.assertRaises(frappe.PermissionError):
+				frappe.is_whitelisted(self.api.get_leave_request_context)
+		self.fake.db.get_value.assert_not_called()
+
+	def test_guest_cannot_call_context_internally(self):
+		self.fake.session.user = "Guest"
+		with self.assertRaises(frappe.PermissionError):
+			self.api.get_leave_request_context()
+		self.fake.db.get_value.assert_not_called()
+
+	def test_http_post_is_rejected_before_reading_data(self):
+		from types import SimpleNamespace
+
+		from frappe.handler import is_valid_http_method
+
+		with (
+			patch.object(frappe.local, "request", SimpleNamespace(method="POST"), create=True),
+			patch.object(frappe, "throw_permission_error", side_effect=frappe.PermissionError),
+		):
+			with self.assertRaises(frappe.PermissionError):
+				is_valid_http_method(self.api.get_leave_request_context)
+		self.fake.db.get_value.assert_not_called()
+		self.assertEqual(
+			frappe.allowed_http_methods_for_whitelisted_func[self.api.get_leave_request_context], ["GET"]
+		)
+
+	def test_invalid_leave_type_is_rejected_before_lookup(self):
+		from types import SimpleNamespace
+
+		with (
+			patch.object(frappe.local, "request", SimpleNamespace(method="GET"), create=True),
+			patch.object(frappe, "_", side_effect=lambda message, *args, **kwargs: message),
+		):
+			for value in ("", "x" * 141, {"name": "Annual Leave"}, ["Annual Leave"]):
+				with self.subTest(value=value), self.assertRaises(frappe.FrappeTypeError):
+					self.api.get_leave_request_context(leave_type=value)
+		self.fake.db.get_value.assert_not_called()
+
+	def test_http_get_accepts_the_typed_query(self):
+		from types import SimpleNamespace
+
+		from frappe.handler import is_valid_http_method
+
+		with patch.object(frappe.local, "request", SimpleNamespace(method="GET"), create=True):
+			is_valid_http_method(self.api.get_leave_request_context)
+			result = self.api.get_leave_request_context(leave_type="Annual Leave")
+		self.assertEqual(result["leave_balance"], 8.5)

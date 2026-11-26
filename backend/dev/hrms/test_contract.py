@@ -189,3 +189,40 @@ class TestFrappeResponses(unittest.TestCase):
                     self.contract["paths"][route][method]["responses"]["404"],
                     {"$ref": "#/components/responses/NotFoundV2"},
                 )
+
+
+class TestLeaveRequestContextContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+
+    def test_context_is_get_only_and_accepts_only_leave_type(self):
+        route = self.contract["paths"]["/method/hrms_tr.api.get_leave_request_context"]
+        self.assertEqual(set(route), {"get"})
+        (parameter,) = route["get"]["parameters"]
+        self.assertEqual((parameter["name"], parameter["in"]), ("leave_type", "query"))
+        self.assertFalse(parameter["required"])
+        self.assertEqual(parameter["schema"]["default"], "Annual Leave")
+        self.assertEqual(parameter["schema"]["maxLength"], 140)
+
+    def test_context_accepts_absent_data_and_real_zero(self):
+        route = self.contract["paths"]["/method/hrms_tr.api.get_leave_request_context"]["get"]
+        response = route["responses"]["200"]["content"]["application/json"]
+        validator = Draft202012Validator({**response["schema"], "components": self.contract["components"]})
+        validator.validate(response["example"])
+        fields = ("employee", "employee_name", "leave_type", "leave_balance")
+        validator.validate({"message": {**dict.fromkeys(fields), "sources": dict.fromkeys(fields)}})
+        example = response["example"]["message"].copy()
+        example["leave_balance"] = 0
+        validator.validate({"message": example})
+        self.assertEqual(set(example["sources"]), set(fields))
+        self.assertEqual(example["employee_name"], "Örnek Kişi 1")
+
+    def test_existing_balance_routes_remain_denied(self):
+        operation = self.contract["paths"]["/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"]["get"]
+        for path in [
+            "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
+            "hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on",
+            "hrms.api.get_leave_balance_map",
+        ]:
+            self.assertIn(path, operation["x-frappe-original"])
