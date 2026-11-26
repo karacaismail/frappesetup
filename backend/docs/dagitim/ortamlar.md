@@ -1,5 +1,9 @@
 # Canlı ortamlar ve dağıtım hattı
 
+Ürün adı `PRODUCT_NAME` ayarından gelir. Alan adı `BRAND_DOMAIN` ayarından gelir.
+İki değer [ortak marka dosyasında](../../brand.env) tutulur.
+Bu belgedeki `<PRODUCT_NAME>` ve `<BRAND_DOMAIN>` alanlarını bu değerlerle doldurun.
+
 Bu belge ürünün Hetzner sunucularına nasıl çıkacağını anlatır. Belge 23 Kasım 2026 Pazartesi günü yazıldı.
 
 Kod `backend/deploy/` klasöründedir. Bu belge o kodun tasarımıdır.
@@ -15,8 +19,8 @@ Proje sahibi şu kararları 23 Kasım 2026 Pazartesi günü verdi:
 3. GitHub Actions yalnız pull request test kapısı olarak kalır.
 4. Ana dal güncellenince alpha ortamı kendiliğinden güncellenir.
 5. Sonraki ortamlara geçiş Jenkins'te elle basılan düğmeyle olur. Sıra alpha, beta, rc ve prod şeklindedir.
-6. alpha, beta ve rc birer alt alan adıdır. Prod ana alan adındadır: `atonota.net`.
-7. AtonotA Login giriş adresi prod'da `api.login.atonota.net` olur. AtonotA Login, Keycloak üzerinde çalışan giriş ürünüdür. Bu adres proje kaydındaki O-51 kararıdır.
+6. alpha, beta ve rc birer alt alan adıdır. Prod ana alan adındadır: `<BRAND_DOMAIN>`.
+7. Giriş adresi prod'da `api.login.<BRAND_DOMAIN>` olur. Giriş ürünü Keycloak üzerinde çalışır. Ürünün görünen adı `PRODUCT_NAME` ayarından gelir. Bu adres proje kaydındaki O-51 kararıdır.
 
 ## Sözlük
 
@@ -61,14 +65,14 @@ Kararım şudur: her ortamın bir temel adı vardır. Öteki adlar bu temel adı
 
 | Ad | alpha | beta | rc | prod |
 | --- | --- | --- | --- | --- |
-| Temel ad | `alpha.atonota.net` | `beta.atonota.net` | `rc.atonota.net` | `atonota.net` |
-| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.beta.atonota.net` | `api.login.rc.atonota.net` | `api.login.atonota.net` |
-| Press | `press.alpha.atonota.net` | `press.beta.atonota.net` | `press.rc.atonota.net` | `press.atonota.net` |
-| Kiracı bölgesi | `*.app.alpha.atonota.net` | `*.app.beta.atonota.net` | `*.app.rc.atonota.net` | `*.app.atonota.net` |
-| İlk kiracı | `demo.app.alpha.atonota.net` | `demo.app.beta.atonota.net` | `demo.app.rc.atonota.net` | `demo.app.atonota.net` |
+| Temel ad | `alpha.<BRAND_DOMAIN>` | `beta.<BRAND_DOMAIN>` | `rc.<BRAND_DOMAIN>` | `<BRAND_DOMAIN>` |
+| Giriş ürünü (Keycloak) | `api.login.alpha.<BRAND_DOMAIN>` | `api.login.beta.<BRAND_DOMAIN>` | `api.login.rc.<BRAND_DOMAIN>` | `api.login.<BRAND_DOMAIN>` |
+| Press | `press.alpha.<BRAND_DOMAIN>` | `press.beta.<BRAND_DOMAIN>` | `press.rc.<BRAND_DOMAIN>` | `press.<BRAND_DOMAIN>` |
+| Kiracı bölgesi | `*.app.alpha.<BRAND_DOMAIN>` | `*.app.beta.<BRAND_DOMAIN>` | `*.app.rc.<BRAND_DOMAIN>` | `*.app.<BRAND_DOMAIN>` |
+| İlk kiracı | `demo.app.alpha.<BRAND_DOMAIN>` | `demo.app.beta.<BRAND_DOMAIN>` | `demo.app.rc.<BRAND_DOMAIN>` | `demo.app.<BRAND_DOMAIN>` |
 | Panel | `https://<kiracı>/panel` | aynı | aynı | aynı |
 
-Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bildirimini alır.
+Jenkins için ayrıca `ci.<BRAND_DOMAIN>` adı açılır. Bu ad yalnız GitHub bildirimini alır.
 
 ### Gerekçe
 
@@ -77,9 +81,9 @@ Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bild
 3. Kiracı adları karar sitesindeki K-2 biçimini korur. K-2'de kiracılar `<kiracı>.app.<marka>` biçimindedir.
 4. Panel her kiracının kendi adresinde `/panel` yolundadır. Ayrı bir `panel.` adı açılmaz. Nedeni şudur: panel Frappe çerezini ve CSRF belirtecini aynı kökten okur (SZ-7). CSRF belirteci, sahte istekleri engelleyen tek kullanımlık koddur.
 5. `press.` adı DNS'te geneldir. Kenar vekil bu adı yalnız Tailscale ağına tam açar. Müşteri yalnız hesap silme akışının yollarına ve hesap kurtarma isteğine ulaşır. Öteki her istek 404 alır. Yol listesi O-55 kararındadır. Bu kural G-6, G-13 ve G-119 ile uyumludur.
-6. Prod temel adı `atonota.net` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
+6. Prod temel adı `<BRAND_DOMAIN>` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
 
-Bir kural daha geçerlidir. Hiçbir servis `Domain=atonota.net` çerezi yazmaz. Yazarsa prod çerezi alpha'ya da gider. Frappe ve Keycloak çerezleri yalnız kendi adlarında geçerlidir.
+Bir kural daha geçerlidir. Hiçbir servis `Domain=<BRAND_DOMAIN>` çerezi yazmaz. Yazarsa prod çerezi alpha'ya da gider. Frappe ve Keycloak çerezleri yalnız kendi adlarında geçerlidir.
 
 ## Hetzner yerleşimi
 
@@ -256,7 +260,7 @@ Dosyalar şunlardır:
 1. Hetzner güvenlik duvarı yalnız 80 ve 443 portlarını internete açar.
 2. SSH portu internete kapalıdır. Jenkins sunuculara Tailscale ağı üzerinden bağlanır. Tailscale, sunucuları özel bir ağda birleştiren araçtır.
 3. Jenkins arayüzü yalnız Tailscale ağında açılır.
-4. `ci.atonota.net` adresi yalnız `/github-webhook/` yolunu Jenkins'e iletir. GitHub bildirimi gizli bir paylaşılan anahtarla imzalanır.
+4. `ci.<BRAND_DOMAIN>` adresi yalnız `/github-webhook/` yolunu Jenkins'e iletir. GitHub bildirimi gizli bir paylaşılan anahtarla imzalanır.
 5. Keycloak yönetim konsolu herkese açık adreste kapalıdır. Ön vekil `/admin` ve `master` realm yollarına 404 yanıtı verir.
 
 ## Bir kez derle, aynı paketi taşı
@@ -737,7 +741,7 @@ Proje kaydı karar sitesinden önce gelir. Şu çelişkileri buldum:
 | --- | --- | --- | --- |
 | Ç-1 | P0: Press Frappe v15 ve Python 3.11 üzerinde | Backend Frappe 16 ve Python 3.14 kullanır (D-15) | P0 metni Frappe 16 ve Python 3.14 olarak düzeltilir |
 | Ç-2 | P0 ve Rail 1: Route 53 bölgesi, NS devri ve joker sertifika | DNS GoDaddy'dedir. MVP'de Route 53 yoktur | MVP'de GoDaddy kaydı ve ad başına sertifika kullanılır. Route 53 kararı Press sunucu kurma akışı çalışınca yeniden açılır |
-| Ç-3 | Adlar `<marka>.com.tr`. `panel.` Press'in adıdır | Marka adı `atonota.net`. Panel kiracının `/panel` yoludur | Rail 1 tablosu bu belgedeki harita ile değiştirilir |
+| Ç-3 | Adlar `<marka>.com.tr`. `panel.` Press'in adıdır | Marka adı `<BRAND_DOMAIN>`. Panel kiracının `/panel` yoludur | Rail 1 tablosu bu belgedeki harita ile değiştirilir |
 | Ç-4 | P0: "Press staging ve prod" | Dört ortam vardır: alpha, beta, rc ve prod | "staging" yerine beta ve rc yazılır |
 | Ç-5 | Yol haritası X-02 üç ortam sayar: Colima geliştirme, staging ve prod | Colima yalnız geliştirme içindir. Canlıda dört ortam vardır | X-02 dört ortamla yazılır |
 | Ç-6 | Dağıtım hattı P1 içinde kurulur | Jenkins hattı canlıya çıkıştan önce gerekir | Dağıtım hattı P0'a alınır |

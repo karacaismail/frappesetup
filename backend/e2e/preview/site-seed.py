@@ -151,7 +151,7 @@ def main():
             keycloak_client_secret=os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
             keycloak_service_client_id="site-tenant1-service",
             extra_config="preview_site_config.tenant_service_config",
-            identity_brand_name="AtonotA Login",
+            identity_brand_name=os.environ["PRODUCT_NAME"],
             kimlik_mobil_azp=["mobile-app", "e2e-expired-mobile"] if
             os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1" else ["mobile-app"],
             kimlik_deletion_hmac_key=token_urlsafe(32),
