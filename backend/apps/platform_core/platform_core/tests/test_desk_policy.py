@@ -5,8 +5,6 @@ HTTP requests run through Frappe's test client in a separate thread, like `frapp
 Test data is synthetic and committed, because each request opens its own database connection.
 """
 
-import json
-from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 import frappe
@@ -30,6 +28,8 @@ AUTH_HOOK = "platform_core.config.desk_policy.after_auth"
 OAUTH_CLIENT = "desk-policy-oauth-client"
 # Frappe resolves these to the Desk (`frappe/website/path_resolver.py`). AJA-846 found them.
 DESK_PATH_SPELLINGS = ("/desk/..", "/desk/x/../..", "/desk%20", "/desk.html")
+# A "." or ".." part reaches `www/desk.html` through the file lookup of Frappe. AJA-849 found them.
+DOT_PART_PATHS = ("/./desk", "/../www/desk", "/%2e/desk", "/./desk.html", "/./app", "/%20/api/../desk")
 
 
 def _user(email, roles, user_type="System User"):
@@ -124,16 +124,14 @@ class TestDeskPolicy(IntegrationTestCase):
 	def test_platform_operator_role_exists_with_desk_access(self):
 		self.assertEqual(frappe.db.get_value("Role", OPERATOR_ROLE, "desk_access"), 1)
 
-	def test_role_is_shipped_as_a_fixture_for_new_tenants(self):
-		fixture = Path(frappe.get_app_path("platform_core", "fixtures", "role.json"))
-		roles = {row["name"]: row for row in json.loads(fixture.read_text())}
+	def test_role_is_created_for_new_tenants(self):
+		# The panel role step opens the role on install and on every migrate (AJA-899).
+		from platform_core.setup import panel_roles
+
+		roles = {row["name"]: row for row in panel_roles.load_roles()}
 		self.assertEqual(roles[OPERATOR_ROLE]["desk_access"], 1)
-		names = set()
-		for entry in hooks.fixtures:
-			if entry["dt"] == "Role":
-				for _field, operator, value in entry["filters"]:
-					names.update(value if operator == "in" else [value])
-		self.assertIn(OPERATOR_ROLE, names)
+		self.assertIn("platform_core.setup.panel_roles.ensure", hooks.after_install)
+		self.assertIn("platform_core.setup.panel_roles.ensure", hooks.after_migrate)
 
 	# --- The request hook ---------------------------------------------------------------------------
 
@@ -160,13 +158,34 @@ class TestDeskPolicy(IntegrationTestCase):
 			with self.subTest(path=path):
 				self.assert_sent_to_panel(path)
 
+	def test_paths_with_dot_parts_are_redirected(self):
+		for path in DOT_PART_PATHS:
+			with self.subTest(path=path):
+				self.assert_sent_to_panel(path)
+
+	def test_paths_with_dot_parts_are_redirected_with_an_api_key(self):
+		for path in DOT_PART_PATHS:
+			with self.subTest(path=path):
+				self.assert_sent_to_panel(path, headers=self.api_key_header(TENANT_ADMIN))
+
+	def test_desk_path_check_treats_dot_parts_as_desk(self):
+		from platform_core.config.desk_policy import is_desk_path
+
+		for path in ("/./desk", "/../www/desk", "/./desk.html", "/./app", "/x/../desk", "/panel/.", "/a/./b", "/ /api/../desk", "//api/../desk"):
+			with self.subTest(path=path):
+				self.assertTrue(is_desk_path(path))
+		# The API handler of Frappe takes every /api/ path, so these never reach the Desk.
+		for path in ("/api/method/./x", "/api/../desk"):
+			with self.subTest(path=path):
+				self.assertFalse(is_desk_path(path))
+
 	def test_desk_path_check_follows_frappe_path_rules(self):
 		from platform_core.config.desk_policy import is_desk_path
 
 		for path in ("/desk", "/desk/..", "/desk/x/../..", "/desk ", " /desk/ ", "/desk.html", "/app.html"):
 			with self.subTest(path=path):
 				self.assertTrue(is_desk_path(path))
-		for path in ("/", "/desktop", "/apple", "/panel", "/api/method/x", "/x/../desk", "/desk.htm"):
+		for path in ("/", "/desktop", "/apple", "/panel", "/api/method/x", "/desk.htm", "/x.y/z"):
 			with self.subTest(path=path):
 				self.assertFalse(is_desk_path(path))
 
