@@ -6,6 +6,7 @@ cannot read gets no help from any step.
 """
 
 from collections.abc import Iterable, Mapping
+from urllib.parse import urlsplit
 
 TENANT = "Tenant"
 APP = "App"
@@ -16,6 +17,7 @@ ROUTE = "Route"
 LAYERS = ((TENANT, "tenant"), (APP, "app"))
 NO_HELP_MESSAGE = "No help is available for this field."
 REQUEST_HELP = "request_help"
+HELP_URL_FIELDS = ("tour_url", "doc_url", "support_url")
 
 
 def _text(value) -> str:
@@ -24,6 +26,35 @@ def _text(value) -> str:
 
 def _base_language(language: str) -> str:
 	return language.split("-", 1)[0]
+
+
+def is_safe_help_url(value: str | None) -> bool:
+	"""Allow HTTPS and site-relative paths, without browser URL normalization tricks."""
+	if value is None:
+		return True
+	if not isinstance(value, str):
+		return False
+	if not value.strip():
+		return True
+	if "\\" in value or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value):
+		return False
+	if value.startswith("//"):
+		return False
+	try:
+		parts = urlsplit(value)
+		# Accessing hostname and port also rejects malformed authority values.
+		host, _port = parts.hostname, parts.port
+	except ValueError:
+		return False
+	if parts.scheme:
+		return (
+			value.lower().startswith("https://")
+			and parts.scheme == "https"
+			and bool(host)
+			and parts.username is None
+			and parts.password is None
+		)
+	return not parts.netloc and bool(parts.path) and ":" not in parts.path.split("/", 1)[0]
 
 
 def _matches_field(topic: Mapping, doctype: str, fieldname: str) -> bool:
@@ -63,6 +94,10 @@ def _answer(source: str, *, topic: Mapping | None = None, content=None, message=
 		"content": content,
 		"message": message,
 		"actions": list(actions),
+		**{
+			key: (_text(topic.get(key)) or None) if topic and is_safe_help_url(topic.get(key)) else None
+			for key in HELP_URL_FIELDS
+		},
 	}
 
 
@@ -95,6 +130,35 @@ def resolve_field_help(
 	if _text(description):
 		return _answer("description", content=description.strip())
 	return _answer("none", message=NO_HELP_MESSAGE, actions=(REQUEST_HELP,))
+
+
+def resolve_component_help(
+	*,
+	component_id: str,
+	topics: Iterable[Mapping],
+	language: str,
+	versions: Mapping[str, str | None],
+	roles: Iterable[str],
+) -> dict | None:
+	"""Apply the field-topic ranking to component topics from the current site only."""
+	role_set = set(roles)
+	ranked: dict[str, list] = {layer: [] for layer, _source in LAYERS}
+	for topic in topics:
+		if (
+			topic.get("status") != PUBLISHED
+			or topic.get("target_type") != COMPONENT
+			or topic.get("component_id") != component_id
+			or topic.get("layer") not in ranked
+		):
+			continue
+		rank = _rank(topic, language or "", versions.get(topic.get("app")), role_set)
+		if rank is not None:
+			ranked[topic["layer"]].append((rank, topic))
+	for layer, source in LAYERS:
+		if ranked[layer]:
+			best = max(ranked[layer], key=lambda item: item[0])[1]
+			return {"component_id": component_id, **_answer(source, topic=best, content=best.get("content"))}
+	return None
 
 
 def target_errors(topic: Mapping, *, field_exists: bool = False, field_is_custom: bool = False) -> list[str]:
