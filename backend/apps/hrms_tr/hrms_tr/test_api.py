@@ -326,6 +326,7 @@ class LeaveRequestContextTest(TestCase):
 			name="EMP-SELF-0001", employee_name="Synthetic Employee"
 		)
 		self.fake.db.exists.return_value = "Annual Leave"
+		self.fake.get_all.return_value = ["Annual Leave"]
 		self.fake.PermissionError = frappe.PermissionError
 		self.fake.get_attr.side_effect = frappe.get_attr
 		self.enterContext(
@@ -362,20 +363,35 @@ class LeaveRequestContextTest(TestCase):
 			["name", "employee_name"],
 			as_dict=True,
 		)
-		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26")
+		self.fake.get_all.assert_called_once_with(
+			"Leave Allocation",
+			filters={
+				"employee": "EMP-SELF-0001",
+				"docstatus": 1,
+				"from_date": ["<=", "2026-11-26"],
+				"to_date": [">=", "2026-11-26"],
+			},
+			pluck="leave_type",
+			distinct=True,
+			order_by="leave_type",
+			limit_page_length=2,
+		)
+		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26", "Annual Leave")
 		self.balance.assert_called_once_with("EMP-SELF-0001", "Annual Leave", "2026-11-26")
 		self.fake.db.exists.assert_not_called()
 
 	def test_single_allocated_type_does_not_require_an_annual_leave_record(self):
 		self.fake.db.exists.return_value = None
+		self.fake.get_all.return_value = ["Study Leave"]
 		self.allocations.return_value = {"Study Leave": {"total_leaves_allocated": 5}}
 		result = self.api.get_leave_request_context()
 		self.assertEqual((result["leave_type"], result["leave_balance"]), ("Study Leave", 8.5))
 		self.assertEqual(result["sources"]["leave_type"], "Leave Allocation")
-		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26")
+		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26", "Study Leave")
 		self.balance.assert_called_once_with("EMP-SELF-0001", "Study Leave", "2026-11-26")
 
 	def test_multiple_allocated_types_return_no_type_or_balance(self):
+		self.fake.get_all.return_value = ["Annual Leave", "Study Leave"]
 		self.allocations.return_value = {
 			"Annual Leave": {"total_leaves_allocated": 14},
 			"Study Leave": {"total_leaves_allocated": 5},
@@ -385,6 +401,7 @@ class LeaveRequestContextTest(TestCase):
 			self.assertIsNone(result[key])
 			self.assertIsNone(result["sources"][key])
 		self.balance.assert_not_called()
+		self.allocations.assert_not_called()
 
 	def test_no_employee_returns_null_values_and_sources(self):
 		self.fake.db.get_value.return_value = None
@@ -394,6 +411,7 @@ class LeaveRequestContextTest(TestCase):
 		self.assertEqual(result["sources"], dict.fromkeys(fields))
 		self.allocations.assert_not_called()
 		self.balance.assert_not_called()
+		self.fake.get_all.assert_not_called()
 
 	def test_missing_display_name_has_no_invented_value_or_source(self):
 		self.fake.db.get_value.return_value.employee_name = None
@@ -410,6 +428,7 @@ class LeaveRequestContextTest(TestCase):
 		self.assertEqual((result["leave_type"], result["leave_balance"]), ("Study Leave", 2.5))
 		self.assertEqual(result["sources"]["leave_type"], "Leave Type")
 		self.fake.db.exists.assert_called_once_with("Leave Type", "Study Leave")
+		self.fake.get_all.assert_not_called()
 		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26", "Study Leave")
 		self.balance.assert_called_once_with("EMP-SELF-0001", "Study Leave", "2026-11-26")
 
@@ -423,11 +442,23 @@ class LeaveRequestContextTest(TestCase):
 		self.balance.assert_not_called()
 
 	def test_missing_allocation_does_not_invent_a_zero_balance(self):
+		self.fake.get_all.return_value = []
 		self.allocations.return_value = {}
 		result = self.api.get_leave_request_context()
 		for key in ("leave_type", "leave_balance"):
 			self.assertIsNone(result[key])
 			self.assertIsNone(result["sources"][key])
+		self.balance.assert_not_called()
+		self.allocations.assert_not_called()
+
+	def test_ledger_adjustment_without_allocation_does_not_select_a_type(self):
+		self.fake.get_all.return_value = []
+		self.allocations.return_value = {"Study Leave": {"total_leaves_allocated": 5}}
+		result = self.api.get_leave_request_context()
+		for key in ("leave_type", "leave_balance"):
+			self.assertIsNone(result[key])
+			self.assertIsNone(result["sources"][key])
+		self.allocations.assert_not_called()
 		self.balance.assert_not_called()
 
 	def test_requested_type_without_allocation_preserves_type_and_null_balance(self):
@@ -459,17 +490,20 @@ class LeaveRequestContextTest(TestCase):
 	def test_get_leave_request_context_foreign_data_denied(self):
 		# Frappe discards unsupported arguments. Neither identifier may select another employee.
 		allocations_by_employee = {
-			"EMP-SELF-0001": {"Study Leave": {"total_leaves_allocated": 5}},
-			"EMP-FOREIGN-0001": {"Foreign Leave": {"total_leaves_allocated": 30}},
+			"EMP-SELF-0001": ["Study Leave"],
+			"EMP-FOREIGN-0001": ["Foreign Leave"],
 		}
-		self.allocations.side_effect = lambda employee, date, *args: allocations_by_employee[employee]
+		self.fake.get_all.side_effect = lambda doctype, **kwargs: allocations_by_employee[
+			kwargs["filters"]["employee"]
+		]
+		self.allocations.return_value = {"Study Leave": {"total_leaves_allocated": 5}}
 		result = frappe.call(
 			self.api.get_leave_request_context, employee="EMP-FOREIGN-0001", user="other@example.test"
 		)
 		self.assertEqual(result["employee"], "EMP-SELF-0001")
 		self.assertEqual(result["leave_type"], "Study Leave")
 		self.assertEqual(result["sources"]["leave_type"], "Leave Allocation")
-		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26")
+		self.allocations.assert_called_once_with("EMP-SELF-0001", "2026-11-26", "Study Leave")
 		self.assertEqual(self.fake.db.get_value.call_args.args[1]["user_id"], "employee@example.test")
 		self.assertEqual(self.balance.call_args.args[0], "EMP-SELF-0001")
 
