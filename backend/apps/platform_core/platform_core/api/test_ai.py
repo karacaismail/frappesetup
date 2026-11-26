@@ -195,7 +195,7 @@ class TestAiEndpoints(AiTestCase):
 		"""Apply an update as user A. Return the record and the applied proposal's id."""
 		name, proposal_id, digest = self.proposal_of_a()
 		response = self.approve(self.login(USER_A), proposal_id, digest)
-		self.assertTrue(response.json["message"]["executed"], response.json)
+		self.assertTrue(response.json["message"]["executed"], "Update was not executed")
 		return name, proposal_id
 
 	def test_propose_revert_guest_denied(self):

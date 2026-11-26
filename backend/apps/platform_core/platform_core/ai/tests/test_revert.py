@@ -18,24 +18,24 @@ class TestRevertProposal(AiTestCase):
 		"""Propose an update of the record and approve it. Return the applied proposal's id."""
 		proposal_id = self.propose_update(client, name, **data)["proposal_id"]
 		response = self.approve(client, proposal_id)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
-		self.assertTrue(response.json["message"]["executed"], response.json)
+		self.assertEqual(response.status_code, 200, "Unexpected HTTP status")
+		self.assertTrue(response.json["message"]["executed"], "Update was not executed")
 		return proposal_id
 
 	def propose_revert(self, client, proposal_id: str):
 		return self.human(client, "POST", "propose_revert", body={"proposal_id": proposal_id})
 
 	def opened(self, response) -> dict:
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200, "Unexpected HTTP status")
 		body = response.json["message"]
-		self.assertTrue(body["opened"], body)
+		self.assertTrue(body["opened"], "Revert proposal was not opened")
 		self.assertIsNone(body["deny_reason"])
 		return body["proposal"]
 
 	def refused(self, response, code: str) -> None:
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200, "Unexpected HTTP status")
 		body = response.json["message"]
-		self.assertFalse(body["opened"], body)
+		self.assertFalse(body["opened"], "Revert proposal was opened")
 		self.assertEqual(body["deny_reason"], code)
 		self.assertIsNone(body["proposal"])
 
@@ -80,7 +80,7 @@ class TestRevertProposal(AiTestCase):
 
 		response = self.approve(client, proposal["proposal_id"])
 
-		self.assertTrue(response.json["message"]["executed"], response.json)
+		self.assertTrue(response.json["message"]["executed"], "Update was not executed")
 		self.assertEqual(frappe.db.get_value(DOCTYPE, name, ["title", "amount"]), ("Old", 10))
 
 	def test_changed_record_is_refused_with_record_changed(self):
@@ -135,7 +135,7 @@ class TestRevertProposal(AiTestCase):
 		self.assertFalse(result["isError"], result)
 		proposal_id = result["structuredContent"]["proposal_id"]
 		response = self.approve(client, proposal_id)
-		self.assertTrue(response.json["message"]["executed"], response.json)
+		self.assertTrue(response.json["message"]["executed"], "Update was not executed")
 		self.addCleanup(self.drop_record, response.json["message"]["proposal"]["result_document"])
 
 		self.refused(self.propose_revert(client, proposal_id), "not_revertable")
