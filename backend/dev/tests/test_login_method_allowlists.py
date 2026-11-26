@@ -107,6 +107,12 @@ EXPECTED = {
     "press_tr.api.identity.anonymize_user": SERVICE,
     "press_tr.api.identity.list_identities": SERVICE,
     "press_tr.api.maintenance.cleanup_expired_sessions": ADMIN,
+    # G-138 field help. A signed-in panel account reads the help of one field.
+    "platform_core.api.help.get_field_help": PANEL,
+    "platform_core.api.help.get_component_help": PANEL,
+    # G-138 help coverage report. `frappe.only_for("System Manager")` guards it, so only an
+    # administrator calls it. It stays off the Website User list.
+    "platform_core.api.help.get_help_coverage": ADMIN,
 }
 
 # Methods that other open branches add. The test checks them once they are in the tree.
@@ -281,7 +287,9 @@ class LoginMethodAllowListTests(unittest.TestCase):
 
     def test_every_whitelisted_login_method_has_a_named_caller(self):
         unknown = sorted(set(self.methods) - set(EXPECTED))
-        self.assertEqual(unknown, [], "Name the caller of each new method in EXPECTED and add it to its list.")
+        self.assertEqual(
+            unknown, [], "Name the caller of each new method in EXPECTED and add it to its list."
+        )
 
     def test_every_expected_method_exists_or_waits_for_its_branch(self):
         missing = sorted(set(EXPECTED) - set(self.methods) - set(PENDING))

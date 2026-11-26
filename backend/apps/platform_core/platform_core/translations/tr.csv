@@ -941,3 +941,61 @@ Enter the customer name. It can have at most {0} characters.,Müşteri adını y
 Enter a valid contact e-mail address.,Geçerli bir iletişim e-postası yazın.,
 The customer request does not exist.,Bu müşteri isteği yok.,
 Only a pending customer request can be approved.,Yalnız bekleyen müşteri isteği onaylanır.,
+PLT Help Topic,Yardım Konusu,PLT Help Topic
+"Help content linked to a field, component or route of the user interface. The help panel shows tenant content first, then application content, then the field description.","Arayüzdeki bir alana, bileşene ya da sayfa yoluna bağlı yardım içeriği. Yardım paneli önce kiracı içeriğini gösterir. Sonra uygulama içeriğini gösterir. En son alan açıklamasını gösterir.",PLT Help Topic
+Title,Başlık,PLT Help Topic
+Short name of the help topic. Shown as the heading in the help panel.,Yardım konusunun kısa adı. Yardım panelinde başlık olarak görünür.,PLT Help Topic
+Status,Durum,PLT Help Topic
+"Publishing state. Only published topics are shown to users. A topic is written as a draft, reviewed and then published.",Yayın durumu. Kullanıcılar yalnız yayımlanan konuları görür. Konu önce taslak olarak yazılır. Sonra gözden geçirilir ve yayımlanır.,PLT Help Topic
+Draft,Taslak,PLT Help Topic
+In Review,İncelemede,PLT Help Topic
+Published,Yayımlandı,PLT Help Topic
+Archived,Arşivlendi,PLT Help Topic
+Layer,Katman,PLT Help Topic
+"Who provides the content. Tenant content comes first, then application content. Help on a custom field must be tenant content.",İçeriği kimin verdiğini gösterir. Önce kiracı içeriği gelir. Sonra uygulama içeriği gelir. Özel alanın yardımı kiracı içeriği olmalıdır.,PLT Help Topic
+Tenant,Kiracı,PLT Help Topic
+App,Uygulama,PLT Help Topic
+Content Owner,İçerik Sahibi,PLT Help Topic
+"User responsible for this content. Standard fields belong to the application team, custom fields to the tenant administrator.",Bu içerikten sorumlu kullanıcı. Standart alanlar uygulama ekibine aittir. Özel alanlar kiracı yöneticisine aittir.,PLT Help Topic
+Target Type,Hedef Türü,PLT Help Topic
+"What the topic explains: a field of a document type, a user interface component or a route.","Konunun neyi anlattığını gösterir. Bu bir kayıt türü alanı, arayüz bileşeni ya da sayfa yolu olabilir.",PLT Help Topic
+Field,Alan,PLT Help Topic
+Component,Bileşen,PLT Help Topic
+Route,Sayfa Yolu,PLT Help Topic
+Document Type,Kayıt Türü,PLT Help Topic
+Document type of the field. Required when the target type is Field.,Alanın kayıt türü. Hedef türü “Alan” ise zorunludur.,PLT Help Topic
+Field Name,Alan Adı,PLT Help Topic
+"Field name in the document type, custom fields included. Required when the target type is Field.",Kayıt türündeki alanın adı. Özel alanlar da kabul edilir. Hedef türü “Alan” ise zorunludur.,PLT Help Topic
+Component ID,Bileşen Kimliği,PLT Help Topic
+Identifier of the user interface component. Required when the target type is Component.,Arayüz bileşeninin kimliği. Hedef türü “Bileşen” ise zorunludur.,PLT Help Topic
+Route Pattern,Sayfa Yolu Kalıbı,PLT Help Topic
+"Route the topic applies to, for example /app/sales-invoice. Required when the target type is Route.",Konunun geçerli olduğu sayfa yolu. Örnek: /app/sales-invoice. Hedef türü “Sayfa Yolu” ise zorunludur.,PLT Help Topic
+Application that owns the target. For a field it is filled from the document type when the topic is saved.,Hedefin ait olduğu uygulama. Hedef bir alansa konu kaydedilince kayıt türünden doldurulur.,PLT Help Topic
+Language,Dil,PLT Help Topic
+Language of the content. Leave empty to show the topic in every language.,İçeriğin dili. Konu her dilde görünsün diye boş bırakabilirsiniz.,PLT Help Topic
+Version,Sürüm,PLT Help Topic
+Application version the content applies to. Leave empty to show the topic in every version.,İçeriğin geçerli olduğu uygulama sürümü. Konu her sürümde görünsün diye boş bırakabilirsiniz.,PLT Help Topic
+Target Roles,Hedef Roller,PLT Help Topic
+Roles that see the topic. Leave empty to show the topic to every role.,Konuyu gören roller. Konuyu her rol görsün diye boş bırakabilirsiniz.,PLT Help Topic
+Content,İçerik,PLT Help Topic
+"Help text in plain text. Do not write record data, personal data or secrets here.","Düz metin yardım yazısı. Buraya kayıt verisi, kişisel veri ya da gizli bilgi yazmayın.",PLT Help Topic
+PLT Help Topic Role,Yardım Konusu Rolü,PLT Help Topic Role
+A role that sees a help topic.,Yardım konusunu gören rol.,PLT Help Topic Role
+Role,Rol,PLT Help Topic Role
+Role that sees the help topic.,Yardım konusunu gören rol.,PLT Help Topic Role
+Select the document type of the field.,Alanın kayıt türünü seçin.,
+Enter the field name.,Alan adını yazın.,
+Field {1} does not exist in {0}.,{0} kayıt türünde {1} alanı yok.,
+Help on custom field {1} of {0} must be tenant content.,{0} kayıt türündeki {1} özel alanının yardımı kiracı içeriği olmalıdır.,
+Enter the component identifier.,Bileşen kimliğini yazın.,
+Enter the route pattern.,Sayfa yolu kalıbını yazın.,
+Select a valid target type.,Geçerli bir hedef türü seçin.,
+No help is available for this field.,Bu alan için yardım yok.,shell.help
+A valid field is required.,Geçerli bir alan gerekir.,shell.help
+Select an installed application.,Kurulu bir uygulama seçin.,shell.help
+Tour URL,Tur bağlantısı,PLT Help Topic
+Documentation URL,Belge bağlantısı,PLT Help Topic
+Support URL,Destek bağlantısı,PLT Help Topic
+Optional HTTPS URL or same-site relative path. Leave blank when unavailable.,HTTPS adresini veya site içindeki yolu yazın. Bağlantı yoksa alanı boş bırakın.,PLT Help Topic
+Help links must use HTTPS or a same-site relative path.,Yardım bağlantılarında HTTPS adresi veya site içindeki yol kullanılmalıdır.,
+A valid component identifier is required.,Geçerli bir bileşen kimliği yazın.,
