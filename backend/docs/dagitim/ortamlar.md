@@ -94,6 +94,104 @@ Kararım dört sunucudur:
 
 Sunucu tipini DevOps sorumlusu seçer. rc ve prod aynı tip olur. Sunucu tipini ölçümle seçin. Proje kaydında üretim işçi sayısı henüz ölçülmedi.
 
+### İşçi ve kuyruk önerisi
+
+**G-50 önerisi doğrulanmadı.** Bildirilen sunucuda 128 GB bellek ve AMD EPYC işlemci vardır.
+Çekirdek sayısı bilinmiyor. Sunucuda yük ölçümü yapılmadı.
+Bu öneri yalnız bildirilen 128 GB sunucu içindir.
+Başka sunucuların belleği ve çekirdek sayısı ayrıca doğrulanmalıdır.
+
+İşçi, isteği veya arka plandaki işi çalıştıran süreçtir.
+Kuyruk, çalıştırılmayı bekleyen işleri tutar.
+Gunicorn, web isteklerini işçilere dağıtan programdır.
+
+Bellek hesabı şu varsayımları kullanır:
+
+1. Diğer servisler ve güvenlik payı için 64 GB ayrılır.
+   Veritabanı, Redis, Keycloak ve işletim sistemi bu payı kullanır.
+   Diğer süreçler ve varsa derleme işleri de bu paya dahildir.
+2. Kalan 64 GB, en çok dört ortama bölünür.
+   Ortam başına hesap `(128 - 64) / 4 = 16 GB` olur.
+   Bu bölme, dört ortamın aynı sunucuda bulunduğu varsayımına karşı pay bırakır.
+   Bölme, yukarıdaki sunucu yerleşimini değiştirmez.
+   Daha az ortam varsa kalan pay kendiliğinden başka ortama aktarılmaz.
+3. Her web işçisi için 1 GB varsayılır.
+   Her kuyruk süreci için 2 GB varsayılır.
+   Kuyruk varsayımı üst süreci ve çalışan işi birlikte kapsar.
+   Bu değerler ölçüm sonucu değildir.
+
+| Ortam başına ayrılan pay | Bellek hesabı | Bellekten çıkan üst sınır |
+| --- | --- | --- |
+| Kiracı web işçileri için 8 GB | `8 / 1 = 8` | 8 işçi |
+| Press web işçileri için 4 GB | `4 / 1 = 4` | 4 işçi |
+| İki kuyruk servisi için toplam 4 GB | `4 / 2 = 2` | Toplam 2 süreç |
+
+`C_t`, kiracı web işçilerine ayrılan çekirdek payıdır.
+`C_p`, Press web işçilerine ayrılan çekirdek payıdır.
+`C_q`, iki kuyruk servisine ayrılan toplam çekirdek payıdır.
+Bu paylar, bütün sunucunun çekirdek sayısı değildir.
+DevOps sorumlusu diğer servislerden kalan çekirdekleri ortamlar arasında böler.
+Aynı çekirdek payını birden fazla ortama veya servis grubuna yazmaz.
+Payların toplamı, işçiler için kalan çekirdek sayısını aşamaz.
+
+| Ayar veya süreç grubu | Önerilen hesap |
+| --- | --- |
+| `ATONOTA_GUNICORN_WORKERS` | `min(2 * C_t + 1, 8)` |
+| `ATONOTA_PRESS_GUNICORN_WORKERS` | `min(2 * C_p + 1, 4)` |
+| `tenant-worker` ve `press-worker` toplamı | `min(C_q, 2)` |
+
+`min`, çekirdek ve bellek sınırlarından küçük olanı seçer.
+Kesirli sonuç aşağı yuvarlanır.
+Web formülü, [Gunicorn başlangıç önerisine](https://gunicorn.org/design/#how-many-workers) dayanır.
+Bu formül, yük ölçümünün yerini tutmaz.
+Mevcut web süreçleri `gthread` ve `--threads=4` kullanır.
+`gthread`, bir işçinin birden fazla yürütme kolu kullanmasını sağlar.
+Bellek varsayımı dört kolu birlikte kapsar.
+
+Mevcut geçici değerler kiracı için `4`, Press için `2` olarak korunur.
+Çekirdek sayısı bilinmediğinden bu değerler formül sonucu değildir.
+Her kuyruk servisi için geçici öneri bir süreçtir.
+Press açıksa toplam iki kuyruk süreci için `C_q` en az 2 olmalıdır.
+Her süreç `bench worker --queue short,default,long` komutunu kullanır.
+Üç kuyruk adı, üç ayrı süreç anlamına gelmez.
+Uzun işler kısa işlerin beklemesini artırabilir. DevOps sorumlusu bekleme sürelerini ayrı ölçer.
+Press kapalıysa Press süreçleri çalışmaz. Ayrılan pay kiracıya otomatik aktarılmaz.
+
+Press açıkken ortam başına varsayılan toplam `(4 + 2) * 1 + 2 * 2 = 10 GB` olur.
+Dört ortam için toplam `4 * 10 = 40 GB` olur.
+Bu toplam, işçiler için ayrılan 64 GB sınırının altındadır.
+Bu hesap, işlemci gücünün veya gerçek bellek tüketiminin yeterli olduğunu kanıtlamaz.
+Compose bu öneriyle bellek veya çekirdek kotası uygulamaz.
+
+`stack.yaml` dosyasındaki mevcut varsayılanlar çalışır.
+`environments/*.env` dosyalarındaki öneri satırları yorumdur.
+Mevcut ayar okuyucusu bu iki anahtarı ortam dosyalarında kabul etmez.
+Yorum işaretini kaldırmak dağıtım denetimini düşürür.
+Ortamdan etkin değer seçmek için okuyucuya ayrı destek gerekir.
+
+DevOps sorumlusu, sayı değişmeden önce şu adımları tamamlar:
+
+1. Sunucunun kullanılabilir çekirdek sayısını doğrular.
+2. Bellek ve çekirdek paylarını servisler arasında belirler.
+3. Hazırlık ortamında bellek tüketimini ve işlemci yükünü ölçer.
+4. Web yanıt süresini ve kuyruk beklemesini ölçer.
+5. Ölçümle varsayımları düzeltir ve küçük sınırı yeniden hesaplar.
+6. Sonucu E-8 kaydına yazar.
+
+Bir pay yetersizse sorumlu yerleşimi yeniden değerlendirir.
+Başka bellek boyutunda veya dört ortam aşıldığında hesap yeniden yapılır.
+Bu öneri zamanlayıcı açmaz. G-50'nin tamamının uygulandığını göstermez.
+E-8 engeli, yük ölçümü tamamlanana kadar açık kalır.
+
+Yerel denetim depo kökünde şu komutla çalışır:
+
+```sh
+python3 -I -m unittest discover -s backend/deploy/tests -p test_settings.py -k WorkerSizingProposal -v
+```
+
+Test, doğrulanmadı notunu, hesapları ve geçici komutları denetler.
+Test, canlı kapasiteyi doğrulamaz.
+
 ### Bir sunucunun içi
 
 Her ortam ayrı bir Docker Compose projesidir. Compose, birden çok konteyneri birlikte yöneten araçtır. Proje adı `atonota-<ortam>` olur. Örneğin `atonota-alpha`.

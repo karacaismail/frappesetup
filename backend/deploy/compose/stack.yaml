@@ -71,6 +71,22 @@ services:
     volumes: [tenant-redis-queue:/data]
     networks: [internal]
 
+  # G-50 önerisi doğrulanmadı. Bildirilen sunucu 128 GB bellek ve AMD EPYC işlemci kullanır.
+  # Çekirdek sayısı bilinmiyor. Bu öneri yalnız 128 GB sunucu içindir.
+  # Diğer servisler ve güvenlik payı için 64 GB ayrılır.
+  # En çok dört ortamın bellek hesabı: (128 - 64) / 4 = 16 GB.
+  # Ortam başına kiracı web payı 8 GB, Press web payı 4 GB olur.
+  # Web işçisi başına 1 GB varsayılır. Kiracı sınırı: 8 / 1 = 8.
+  # Press sınırı: 4 / 1 = 4.
+  # Kuyruk payı 4 GB olur. Süreç başına 2 GB varsayılır. Sınır: 4 / 2 = 2.
+  # C_t, C_p ve C_q, ortamın kiracı, Press ve kuyruk süreçlerine ayrılan çekirdek paylarıdır.
+  # Aynı sunucudaki bütün paylar, diğer servislerden kalan çekirdek sayısını aşamaz.
+  # Kiracı: min(2 * C_t + 1, 8). Press: min(2 * C_p + 1, 4).
+  # Kuyruk toplamı: min(C_q, 2). min iki sınırdan küçüğünü seçer.
+  # 4 ve 2 geçici web değerleridir. Çekirdek bilinmediğinden formül sonucu değildir.
+  # gthread ve --threads=4 korunur. Kuyruklar aşağıdaki mevcut komutla çalışır.
+  # Bu hesap kota uygulamaz. Bellek varsayımları ve sayılar yük altında ölçülmelidir.
+  # Ayrıntı ve kabul adımları: backend/docs/dagitim/ortamlar.md.
   tenant-web:
     <<: *tenant
     # --forwarded-allow-ips: nginx runs in the frontend container and sends X-Forwarded-Proto.
@@ -111,6 +127,8 @@ services:
 
   tenant-worker:
     <<: *tenant
+    # G-50 doğrulanmadı. Geçici öneri bir süreçtir. Üç kuyruk adı üç süreç anlamına gelmez.
+    # Press açıksa iki kuyruk servisi toplam iki süreçtir. Bellek hesabı yukarıdadır.
     command: ["bench", "worker", "--queue", "short,default,long"]
     depends_on: [tenant-web]
 
@@ -209,6 +227,7 @@ services:
     volumes: [press-redis-queue:/data]
     networks: [press-internal]
 
+  # G-50 doğrulanmadı. 2 geçici değerdir. Ortak bellek ve çekirdek hesabı yukarıdadır.
   press-web:
     <<: *press
     profiles: [press]
@@ -249,6 +268,7 @@ services:
   press-worker:
     <<: *press
     profiles: [press]
+    # G-50 doğrulanmadı. Geçici öneri bir süreçtir. Kiracıyla ortak kuyruk sınırı yukarıdadır.
     command: ["bench", "worker", "--queue", "short,default,long"]
     depends_on: [press-web]
 

@@ -658,6 +658,67 @@ class SiteCheck(unittest.TestCase):
         self.assertIn("press-site", settings.NOT_CHECKED)
 
 
+class WorkerSizingProposal(unittest.TestCase):
+    """G-50: keep the unmeasured proposal and both resource limits visible."""
+
+    def proposal_sources(self):
+        return (STACK, BACKEND / "docs" / "dagitim" / "ortamlar.md")
+
+    def test_proposal_is_explicitly_unverified(self):
+        for path in self.proposal_sources():
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                section = text.split("G-50 önerisi", 1)
+                self.assertEqual(len(section), 2, f"{path.name}: missing G-50 proposal")
+                self.assertIn("doğrulanmadı", section[1].splitlines()[0])
+                self.assertIn("Çekirdek sayısı bilinmiyor", section[1])
+
+    def test_proposal_explains_cpu_and_shared_memory_limits(self):
+        # Independent budget: reserve half of 128 GB, split the rest across four
+        # environments. Per environment: 8 GB web, 4 GB Press, 4 GB queue workers.
+        for path in self.proposal_sources():
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                for calculation in (
+                    "(128 - 64) / 4 = 16 GB",
+                    "8 / 1 = 8", "4 / 1 = 4", "4 / 2 = 2",
+                    "min(2 * C_t + 1, 8)",
+                    "min(2 * C_p + 1, 4)",
+                    "min(C_q, 2)",
+                ):
+                    self.assertTrue(calculation in text, f"{path.name}: missing {calculation}")
+                self.assertIn("1 GB", text)
+                self.assertIn("2 GB", text)
+
+    def test_environment_proposals_preserve_readable_settings(self):
+        environments = release.load_environments()
+        for name in release.ORDER:
+            with self.subTest(environment=name):
+                text = (DEPLOY / "environments" / f"{name}.env").read_text(encoding="utf-8")
+                self.assertTrue("G-50 önerisi doğrulanmadı" in text, f"{name}: missing unverified note")
+                self.assertIn("# ATONOTA_GUNICORN_WORKERS=4", text)
+                self.assertIn("# ATONOTA_PRESS_GUNICORN_WORKERS=2", text)
+                self.assertIn("(128 - 64) / 4 = 16 GB", text)
+                self.assertNotIn("ATONOTA_GUNICORN_WORKERS", environments[name])
+                self.assertNotIn("ATONOTA_PRESS_GUNICORN_WORKERS", environments[name])
+
+    def test_existing_worker_commands_remain_the_provisional_values(self):
+        text = STACK.read_text(encoding="utf-8")
+        for service, variable, value in (
+            ("tenant-web", "ATONOTA_GUNICORN_WORKERS", 4),
+            ("press-web", "ATONOTA_PRESS_GUNICORN_WORKERS", 2),
+        ):
+            with self.subTest(service=service):
+                block = re.search(rf"(?ms)^  {service}:\n(.*?)(?=^  [a-z]|\Z)", text).group(1)
+                self.assertIn(f"--workers=${{{variable}:-{value}}}", block)
+                self.assertIn("--threads=4", block)
+                self.assertIn("--worker-class=gthread", block)
+        for service in ("tenant-worker", "press-worker"):
+            with self.subTest(service=service):
+                block = re.search(rf"(?ms)^  {service}:\n(.*?)(?=^  [a-z]|\Z)", text).group(1)
+                self.assertIn('["bench", "worker", "--queue", "short,default,long"]', block)
+
+
 class Packing(unittest.TestCase):
     def test_release_carries_every_list(self):
         for target in settings.LISTS.values():
