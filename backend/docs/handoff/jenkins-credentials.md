@@ -31,13 +31,32 @@ Sorunuz olursa soruyu proje Telegram grubuna yazın.
 Grubun adresini depoya, yoruma ve Jenkinsfile dosyasına yazmayın.
 Gizli değerleri gruba da yazmayın.
 
+## Ortam onaylayıcısı
+
+Uzak sunucudaki her değişikliği bir kişi onaylar. Bu notta bu kişiye ortam onaylayıcısı denir.
+Ortam onaylayıcısının adı depoya yazılmaz.
+Jenkins'te onay düğmesini `atonota-deployers` ve `atonota-release-managers` grupları görür.
+prod onayı yalnız `atonota-release-managers` grubundadır.
+DevOps sorumlusu ortam onaylayıcısını bu gruplara ekler.
+
+Uzak sunucuya giden adımlar şunlardır:
+
+1. alpha ortamından beta ortamına geçiş için ortam onaylayıcısından onay alın. Geçişi `Move to beta` aşaması başlatır.
+2. beta ortamından `rc` ortamına geçiş için ortam onaylayıcısından onay alın. Geçişi `atonota-release/atonota-promote` işi yapar.
+3. `rc` ortamından `prod` ortamına geçiş için ortam onaylayıcısından onay alın. Geçişi aynı `atonota-promote` işi yapar.
+4. `rc` ve `prod` geri alması için ortam onaylayıcısından onay alın. Sürdürme işi de bu onayı ister.
+
+Onay gelmezse geçişi başlatmayın.
+Jenkins onay adımında bekler. Onaylanmayan iş sunucuya dokunmaz.
+
 ## Kurulum sırası
 
 1. DevOps sorumlusu Jenkins'te iki klasörü açar: `atonota-delivery` ve `atonota-release`.
 2. DevOps sorumlusu tablodaki kayıtları ilgili klasöre ekler.
 3. DevOps sorumlusu `atonota-build` etiketli ajanı hazırlar. Ajanın ihtiyaçları `backend.Jenkinsfile` dosyasının başında yazılıdır.
 4. DevOps sorumlusu işleri açar. İş adları Jenkinsfile dosyalarının başında yazılıdır.
-5. DevOps sorumlusu ilk koşuyu izler. Her `Gate: ` aşaması ayrı görünmelidir.
+5. DevOps sorumlusu ortam onaylayıcısını onay gruplarına ekler.
+6. DevOps sorumlusu ilk koşuyu izler. Her `Gate: ` aşaması ayrı görünmelidir.
 
 ## Kurallar
 
