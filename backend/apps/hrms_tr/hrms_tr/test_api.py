@@ -9,7 +9,7 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, today
 
 from hrms_tr import leave, retention
-from hrms_tr.api import approve_leave, cancel_leave, get_leave_approver
+from hrms_tr.api import approve_leave, cancel_leave, get_home_summary, get_leave_approver, reject_leave
 
 
 def raise_permission_error(message, exc=frappe.PermissionError, **kwargs):
@@ -28,6 +28,130 @@ class ApprovalEndpointTest(TestCase):
 
 	def test_get_leave_approver_guest_denied(self):
 		self.assert_guest_denied(get_leave_approver)
+
+	def test_reject_leave_guest_denied(self):
+		self.assert_guest_denied(reject_leave)
+
+	def test_get_home_summary_guest_denied(self):
+		self.assert_guest_denied(get_home_summary)
+
+	def test_get_home_summary_foreign_data_denied(self):
+		"""Every part reads through the permission-checked list. Employee rows need employee read."""
+		from hrms_tr import home_summary
+
+		with (
+			patch.object(home_summary, "frappe") as fake,
+			patch.object(home_summary, "today", return_value="2026-11-26"),
+		):
+			fake.session.user = "manager@example.test"
+			fake.get_list.return_value = []
+			fake.has_permission.return_value = False
+			summary = get_home_summary()
+		self.assertEqual(summary["pending_approvals"], [])
+		self.assertEqual(summary["problems"], [])
+		self.assertEqual(summary["recent_changes"], [])
+		fake.get_all.assert_not_called()
+		fake.db.sql.assert_not_called()
+		fake.has_permission.assert_called_once_with("Employee", "read")
+		for call in fake.get_list.call_args_list:
+			self.assertEqual(call.args[0], "Leave Application")
+			self.assertNotIn("ignore_permissions", call.kwargs)
+		pending = fake.get_list.call_args_list[0]
+		self.assertEqual(pending.kwargs["filters"]["leave_approver"], "manager@example.test")
+
+	def test_reject_leave_foreign_data_denied(self):
+		doc = Mock()
+		doc.check_permission.side_effect = frappe.PermissionError("Foreign application")
+		with patch.object(leave, "frappe") as fake:
+			fake.get_roles.return_value = ["HRT Manager"]
+			fake.get_doc.return_value = doc
+			with self.assertRaises(frappe.PermissionError):
+				reject_leave("LEAVE-FOREIGN-0001", "2026-11-22 12:00:00")
+		fake.get_doc.assert_called_once_with("Leave Application", "LEAVE-FOREIGN-0001", for_update=True)
+		doc.check_permission.assert_called_once_with("read")
+		doc.submit.assert_not_called()
+
+	def test_reject_leave_without_approver_role_is_denied(self):
+		with (
+			patch.object(leave, "frappe") as fake,
+			patch.object(leave, "_", side_effect=lambda message, context=None: message),
+		):
+			fake.get_roles.return_value = ["HRT Employee"]
+			fake.PermissionError = frappe.PermissionError
+			fake.throw.side_effect = raise_permission_error
+			with self.assertRaises(frappe.PermissionError):
+				reject_leave("LEAVE-0001", "2026-11-22 12:00:00")
+		fake.get_doc.assert_not_called()
+
+	def test_reject_leave_stale_version_is_rejected_under_lock(self):
+		doc = Mock(employee="EMP-0001", docstatus=0, status="Open", modified="2026-11-22 12:00:01")
+		with (
+			patch.object(leave, "frappe") as fake,
+			patch.object(leave, "_", side_effect=lambda message, context=None: message),
+		):
+			fake.get_roles.return_value = ["HRT Manager"]
+			fake.session.user = "manager@example.test"
+			fake.db.get_value.return_value = "employee@example.test"
+			fake.get_doc.return_value = doc
+			fake.TimestampMismatchError = frappe.TimestampMismatchError
+			fake.throw.side_effect = raise_permission_error
+			with self.assertRaises(frappe.TimestampMismatchError):
+				reject_leave("LEAVE-STALE-0001", "2026-11-22 12:00:00")
+		fake.get_doc.assert_called_once_with("Leave Application", "LEAVE-STALE-0001", for_update=True)
+		for operation in ("read", "write", "submit"):
+			doc.check_permission.assert_any_call(operation)
+		doc.submit.assert_not_called()
+		self.assertEqual(doc.status, "Open")
+
+	def test_reject_leave_sets_rejected_and_submits(self):
+		doc = Mock(employee="EMP-0001", docstatus=0, status="Open", modified="2026-11-22 12:00:00")
+		doc.name = "LEAVE-0001"
+		with patch.object(leave, "frappe") as fake:
+			fake.get_roles.return_value = ["HRT Manager"]
+			fake.session.user = "manager@example.test"
+			fake.db.get_value.return_value = "employee@example.test"
+			fake.get_doc.return_value = doc
+			self.assertEqual(reject_leave("LEAVE-0001", "2026-11-22 12:00:00"), {"name": "LEAVE-0001"})
+		self.assertEqual(doc.status, "Rejected")
+		doc.submit.assert_called_once_with()
+
+	def test_reject_leave_missing_version_raises_validation_error(self):
+		from hrms_tr import api
+
+		with (
+			patch.object(api, "_", side_effect=lambda message, context=None: message),
+			patch.object(frappe, "throw", side_effect=raise_permission_error),
+			patch.object(leave, "reject") as reject,
+		):
+			with self.assertRaises(frappe.ValidationError):
+				reject_leave("LEAVE-MISSING")
+		reject.assert_not_called()
+
+	def test_reject_leave_throttles_by_authenticated_user(self):
+		from types import SimpleNamespace
+
+		cache = Mock()
+		cache.make_key.return_value = b"site:counter"
+		cache.get.return_value = 60
+		cache.incrby.return_value = 61
+		with (
+			patch.object(frappe, "request", SimpleNamespace(method="POST")),
+			patch.object(frappe, "session", frappe._dict(user="manager@example.test")),
+			patch.object(frappe, "cache", cache),
+			patch.object(frappe, "throw", side_effect=raise_permission_error),
+			patch("frappe.rate_limiter._", side_effect=lambda text: text),
+			patch.object(leave, "reject") as reject,
+		):
+			with self.assertRaises(frappe.RateLimitExceededError):
+				reject_leave("HR-LAP-TEST", "2026-11-22 12:00:00")
+		cache.make_key.assert_called_once_with("rl:hrms_tr.api.reject_leave:manager@example.test")
+		reject.assert_not_called()
+
+	def test_endpoint_methods(self):
+		from hrms_tr import api
+
+		self.assertEqual(frappe.allowed_http_methods_for_whitelisted_func[api.reject_leave], ["POST"])
+		self.assertEqual(frappe.allowed_http_methods_for_whitelisted_func[api.get_home_summary], ["GET"])
 
 	def assert_guest_denied(self, endpoint):
 		with (

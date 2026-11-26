@@ -13,6 +13,8 @@ website_user_allowed_methods = [
 	"hrms_tr.api.cancel_leave",
 	"hrms_tr.api.get_leave_approver",
 	"hrms_tr.api.get_leave_request_context",
+	"hrms_tr.api.reject_leave",
+	"hrms_tr.api.get_home_summary",
 ]
 
 before_install = "hrms_tr.setup.check_install"
