@@ -603,9 +603,13 @@
   gap: 0;
 }
 
-/* Boşluk alan kutusunun içindedir. Hata simgesi de düğmenin solunda kalır. */
-.login-pf .pf-v5-c-input-group:has(> .pf-v5-c-input-group__item > [data-password-toggle]) .pf-v5-c-form-control {
-  padding-inline-end: var(--at-hit-target);
+/* Yazı düğmenin altına girmez. Hata simgesi de düğmenin solunda kalır. */
+.login-pf .pf-v5-c-input-group:has(> .pf-v5-c-input-group__item > [data-password-toggle]) .pf-v5-c-form-control > input {
+  padding-inline-end: calc(var(--at-hit-target) + var(--at-space-xs));
+}
+
+.login-pf .pf-v5-c-input-group:has(> .pf-v5-c-input-group__item > [data-password-toggle]) .pf-v5-c-form-control__utilities {
+  margin-inline-end: var(--at-hit-target);
 }
 
 .login-pf .pf-v5-c-input-group__item:has(> [data-password-toggle]) {
