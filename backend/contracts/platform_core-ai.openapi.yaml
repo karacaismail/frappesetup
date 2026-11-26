@@ -236,7 +236,7 @@ paths:
       summary: Approves the proposal and executes the action in this request.
       description: |
         CAN BE DESTRUCTIVE. This endpoint creates, changes, submits, cancels or deletes a document.
-        An application tool can also start a billable action. Check the `destructive` and `billable` fields of the proposal.
+        An application tool can also start a billable action. Check the `destructive`, `billable` and `risk_level` fields of the proposal.
 
         Every human request that writes carries the `X-Frappe-CSRF-Token` header. If the session has no CSRF token, the request is denied.
         An approval can be used only once. The server checks these in order: human session, same user,
@@ -558,9 +558,20 @@ components:
       enum: ["", unknown, succeeded, failed]
       description: An empty value shows that execution has not started. `unknown` shows that no blind retry will be made.
 
+    RiskLevel:
+      type: string
+      enum: [R0, R1, R2, R3]
+      description: |
+        Risk level of the proposal. The server sets it when the proposal opens. The model cannot set or change it.
+        The level comes from the tool's class and flags. An application tool can declare a higher level, never a lower one.
+        `R0`: a read tool. It opens no proposal. `R1`: a write that does not destroy and costs nothing.
+        `R2`: a write that destroys or overwrites data, costs money, or is an admin tool.
+        `R3`: an admin write that destroys or costs money, or a write that both destroys and costs money.
+        The level does not change after the proposal opens.
+
     Proposal:
       type: object
-      required: [proposal_id, status, result, tool, preview, digest, expires_at, created_at, destructive, billable]
+      required: [proposal_id, status, result, tool, preview, digest, expires_at, created_at, destructive, billable, risk_level]
       properties:
         proposal_id: {type: string}
         status: {$ref: "#/components/schemas/ProposalStatus"}
@@ -570,6 +581,7 @@ components:
         target_name: {type: [string, "null"]}
         destructive: {type: boolean}
         billable: {type: boolean}
+        risk_level: {$ref: "#/components/schemas/RiskLevel"}
         preview: {$ref: "#/components/schemas/Preview"}
         digest: {type: string, pattern: "^[0-9a-f]{64}$"}
         expires_at: {type: string, format: date-time, description: "Expiry time. ISO 8601, with a UTC offset."}
@@ -637,10 +649,11 @@ components:
     ApprovalRequired:
       type: object
       description: The result a write tool returns to the model side. The document has not changed yet.
-      required: [status, proposal_id, preview, expires_at, created_at]
+      required: [status, proposal_id, risk_level, preview, expires_at, created_at]
       properties:
         status: {const: approval_required}
         proposal_id: {type: string}
+        risk_level: {$ref: "#/components/schemas/RiskLevel"}
         preview: {$ref: "#/components/schemas/Preview"}
         expires_at: {type: string, format: date-time}
         created_at: {type: string, format: date-time}
@@ -975,12 +988,16 @@ x-mcp-results:
       source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
   ApprovalRequired:
     type: object
-    required: [status, proposal_id, preview, expires_at, created_at]
+    required: [status, proposal_id, risk_level, preview, expires_at, created_at]
     properties:
       status:
         type: string
         enum: [approval_required]
       proposal_id: {type: string}
+      risk_level:
+        type: string
+        enum: [R0, R1, R2, R3]
+        description: Set by the server from the tool. The model cannot set it.
       preview:
         type: object
         required: [action, summary]
@@ -1005,7 +1022,7 @@ x-mcp-results:
       created_at: {type: string, description: ISO 8601 with a UTC offset.}
   ProposalState:
     type: object
-    required: [proposal_id, status, result, tool, destructive, billable, preview, expires_at, created_at]
+    required: [proposal_id, status, result, tool, destructive, billable, risk_level, preview, expires_at, created_at]
     properties:
       proposal_id: {type: string}
       status:
@@ -1021,6 +1038,10 @@ x-mcp-results:
         type: [string, 'null']
       destructive: {type: boolean}
       billable: {type: boolean}
+      risk_level:
+        type: string
+        enum: [R0, R1, R2, R3]
+        description: Set by the server from the tool. The model cannot set it.
       preview:
         type: object
         required: [action, summary]
@@ -1115,11 +1136,17 @@ x-ai-tools-hook:
         pattern: "^[a-z][a-z0-9_]{2,63}$"
         description: Tool name. The layer puts the application name in front. An example result is `hrms_tr_approve_leave`.
       description: {type: string, description: English description. The Turkish text is in the translation file.}
-      arguments: {type: string, description: "Path of the input model. The model is a `pydantic.BaseModel` class and carries the `extra=\"forbid\"` setting. Field names such as `confirm`, `approved` and `force` are rejected."}
+      arguments: {type: string, description: "Path of the input model. The model is a `pydantic.BaseModel` class and carries the `extra=\"forbid\"` setting. Field names such as `confirm`, `approved`, `force` and `risk_level` are rejected."}
       kind: {type: string, enum: [read, write]}
       roles: {type: array, items: {type: string}, description: "Roles that can see the tool. If empty, every logged-in user sees it."}
       destructive: {type: boolean, default: false}
       billable: {type: boolean, default: false}
+      risk_level:
+        type: string
+        enum: [R0, R1, R2, R3]
+        description: |
+          Optional. The level the tool declares. The layer keeps the higher of this level and the level of the tool's class.
+          A lower declared level is ignored. Any other value makes the layer refuse the declaration.
       handler: {type: string, description: "Path of the function that does the work. The function makes its own permission check. For a write tool it returns the name of the affected document under the `name` key."}
       prepare:
         type: string

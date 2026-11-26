@@ -21,6 +21,7 @@
   "preview_digest",
   "destructive",
   "billable",
+  "risk_level",
   "expires_at",
   "status",
   "result",
@@ -143,6 +144,15 @@
    "read_only": 1
   },
   {
+   "description": "Risk level from R0 to R3. The server sets it from the tool when the proposal opens. The model cannot set it.",
+   "fieldname": "risk_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Risk Level",
+   "options": "R0\nR1\nR2\nR3",
+   "read_only": 1
+  },
+  {
    "description": "Moment after which the proposal can no longer be approved.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
@@ -193,7 +203,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 18:00:00.000000",
+ "modified": "2026-11-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI",
  "name": "PLT AI Action Proposal",

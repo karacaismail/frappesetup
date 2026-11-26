@@ -70,12 +70,29 @@ PROPOSAL_LIST_FIELDS = (
 	"target_name",
 	"destructive",
 	"billable",
+	"risk_level",
 	"preview_json",
 	"digest",
 	"expires_at",
 	"result_document",
 	"error",
 )
+
+
+def proposals_without_risk_level() -> list[dict]:
+	"""Proposals opened before the risk level existed (AJA-1001). Only the migration patch reads them."""
+	table = frappe.qb.DocType(PROPOSAL)
+	return (
+		frappe.qb.from_(table)
+		.select(table.name, table.tool_class, table.destructive, table.billable)
+		.where(table.risk_level.isnull() | (table.risk_level == ""))
+		.run(as_dict=True)
+	)
+
+
+def backfill_risk_level(name: str, level: str) -> None:
+	"""Write the level of an old proposal. The save path refuses it, because the level is frozen."""
+	frappe.db.set_value(PROPOSAL, name, "risk_level", level, update_modified=False)
 
 
 def proposals_of(user: str, status: str | None, start: int, limit: int) -> list[dict]:
