@@ -4,6 +4,12 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 rules=backend/dev/security/fixtures
 source backend/dev/security/container-settings
+# Every Python step uses the pinned 3.12 interpreter. The system python3 may be older (AJA-1101).
+py=(uv run --no-project --offline --python 3.12 python -B)
+if ! "${py[@]}" -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))'; then
+    printf '%s\n' 'Python 3.12 is required. Install it with: uv python install 3.12' >&2
+    exit 2
+fi
 semgrep=(uvx --python 3.12 --exclude-newer "$TOOL_CUTOFF" "semgrep@$SEMGREP_VERSION")
 export SEMGREP_ENABLE_VERSION_CHECK=0
 if [[ -z "${SSL_CERT_FILE:-}" && -r /etc/ssl/cert.pem ]]; then
@@ -28,30 +34,30 @@ scan_rules() (
     local report before scan_status=0
     report="$(mktemp "${PANE_SCRATCH_DIR:-${TMPDIR:-/tmp}}/semgrep-review.XXXXXX")" || exit 1
     trap 'rm -f -- "$report"' EXIT
-    before="$(python3 -B backend/dev/security/semgrep_exceptions.py --snapshot)" || exit 1
+    before="$("${py[@]}" backend/dev/security/semgrep_exceptions.py --snapshot)" || exit 1
     # Allow slower rules to finish while still rejecting incomplete scans.
     "${semgrep[@]}" scan --error --strict --metrics=off --json --timeout 20 \
         --config "$rules" \
         --exclude 'backend/dev/security/fixtures/' backend \
         > "$report" || scan_status=$?
-    python3 -B backend/dev/security/semgrep_exceptions.py "$report" "$scan_status" "$before"
+    "${py[@]}" backend/dev/security/semgrep_exceptions.py "$report" "$scan_status" "$before"
 )
 
 status=0
-uv run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py bandit || status=1
+"${py[@]}" backend/dev/security/scans.py bandit || status=1
 # Offline OSV scan of the Press image lock (review 1, finding 3). It reads only local files; the
 # scanner and its database come from backend/dev/security/osv-setup, which needs the network.
-uv run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py press-lock || status=1
+"${py[@]}" backend/dev/security/scans.py press-lock || status=1
 "${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
 scan_rules || status=1
-python3 -B -m unittest discover -s backend/dev/security -p test_semgrep_exceptions.py || status=1
+"${py[@]}" -m unittest discover -s backend/dev/security -p test_semgrep_exceptions.py || status=1
 if backend/dev/security/history-scan --self-test; then
     scan_secrets || status=1
 else
     status=1
 fi
-python3 -B -m unittest discover -s backend/dev/security -p test_endpoints.py || status=1
-python3 -B backend/dev/security/endpoints.py backend || status=1
+"${py[@]}" -m unittest discover -s backend/dev/security -p test_endpoints.py || status=1
+"${py[@]}" backend/dev/security/endpoints.py backend || status=1
 backend/dev/bin/ai-readiness --self-test || status=1
 if commit_base="$(git merge-base HEAD refs/heads/backend)"; then
     backend/dev/bin/ai-readiness --commit-base "$commit_base" || status=1
