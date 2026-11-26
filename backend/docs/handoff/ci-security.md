@@ -37,14 +37,14 @@ Araç özetleri `tool-versions.env` dosyasındadır. `osv-setup` ve `scans.py` a
 
 ### Jenkins'te OSV hazırlığı
 
-`backend.Jenkinsfile` dosyasında `Security tools` aşaması vardır. Bu aşama `Gates` aşamasından hemen önce çalışır.
+`backend.Jenkinsfile` dosyasında `Security tools` aşaması vardır. Bu aşama ilk kapı aşamasından hemen önce çalışır.
 
 1. Aşama `backend/dev/security/osv-setup --if-stale` komutunu çalıştırır.
 2. Araç yoksa ya da özeti tutmazsa komut aracı indirir. Komut aracın özetini denetler.
 3. Veritabanı dosyası yoksa komut onu indirir.
 4. Veritabanı dosyası altı gün ya da daha eskiyse komut onu yeniden indirir.
 5. Daha yeni dosyaya komut dokunmaz.
-6. Sonra `Gates` aşaması `security-audit` kapısını çalıştırır.
+6. Sonra `Gate: security audit` aşaması `security-audit` kapısını çalıştırır.
 
 Tarama yedi günden eski veritabanını reddeder. Bir günlük pay, yedinci güne yakın dosyanın kapıyı düşürmesini önler.
 Zamanlanmış iş kurmayın. Yenilemeyi her derleme kendisi yapar.
@@ -86,6 +86,51 @@ CI kipi kilidi bellekte yeniden üretir. Dosyadaki içerik farklıysa tarama dur
 OSV, Git üzerinden alınan Python paketlerini denetlemez. Rapor bu paketleri `not_run` olarak gösterir.
 Bir Frappe imajının kurulu paketlerini ayrı listelemek için `--runtime-image IMAGE_ID` kullanın.
 `docker image inspect` çıktısındaki yerel imaj kimliğini verin.
+
+## Jenkins kapıları
+
+Jenkins hattında her kapı ayrı bir aşamadır.
+Bir kapı düşerse Jenkins düşen aşamanın adını gösterir.
+Aşama adı `Gate: ` ile başlar.
+Aşağıdaki tablo kapıların tam listesidir.
+`backend/deploy/tests/test_jenkins_gates.py` bu tabloyu Jenkinsfile aşamalarıyla karşılaştırır.
+İki liste eşit değilse test düşer.
+Yeni kapı eklerseniz bu tabloya da bir satır ekleyin.
+
+| Jenkinsfile | Aşama | Çalışma klasörü | Komut |
+| --- | --- | --- | --- |
+| `backend.Jenkinsfile` | `Gate: deploy tests` | `.` | `uv run --no-project --offline --python 3.14 python -I -m unittest discover -s backend/deploy/tests` |
+| `backend.Jenkinsfile` | `Gate: dev tests` | `.` | `uv run --no-project --offline --python 3.14 python -I -m unittest discover -s backend/dev/tests` |
+| `backend.Jenkinsfile` | `Gate: security tool tests` | `.` | `uv run --no-project --offline --python 3.12 python -B -m unittest discover -s backend/dev/security` |
+| `backend.Jenkinsfile` | `Gate: module boundaries` | `.` | `backend/dev/bin/module-boundaries` |
+| `backend.Jenkinsfile` | `Gate: security audit` | `.` | `backend/dev/bin/security-audit` |
+| `backend.Jenkinsfile` | `Gate: platform_core tests` | `.` | `backend/dev/bin/test platform_core` |
+| `backend.Jenkinsfile` | `Gate: hrms_tr tests` | `.` | `backend/dev/bin/test hrms_tr` |
+| `web.Jenkinsfile` | `Gate: lint` | `web` | `npm run lint` |
+| `web.Jenkinsfile` | `Gate: typecheck` | `web` | `npm run typecheck` |
+| `web.Jenkinsfile` | `Gate: unit tests` | `web` | `npm test` |
+
+`.` depo kökü demektir. `web` klasörü `atonota-web` deposunun kopyasıdır.
+`backend/deploy/tests` ve `backend/dev/tests` testleri Python 3.14 ister. Python 3.9 bazı test dosyalarını açamaz.
+`promote.Jenkinsfile` kapı çalıştırmaz. Bu iş yalnız denetlenmiş sürümü taşır.
+
+Şu iki iş henüz Jenkins kapısı değildir:
+
+- `security-full` kaynak taramasıdır.
+- `dast-scan` pasif ZAP taramasıdır.
+
+İki iş de CI işinin içinde açılan geçici bir site ister.
+Jenkins ajanında bu site henüz kurulmadı.
+Site hazır olunca iki işi de tabloya ve Jenkinsfile dosyasına ekleyin.
+
+Aynı test üç kuralı daha denetler:
+
+1. Jenkinsfile içinde `cron`, `pollSCM` ya da başka zamanlı tetikleyici yoktur. Yalnız `githubPush()` işi başlatır.
+2. Jenkinsfile içinde açık parola, token ya da anahtar yoktur.
+3. Jenkinsfile içinde sunucu adresi yoktur. Sunucu adresleri `backend/deploy/environments/` dosyalarındadır.
+
+Gizli değerler yalnız Jenkins kimlik kaydından adla okunur.
+Kayıt adları `backend/docs/handoff/jenkins-credentials.md` dosyasındadır.
 
 ## Yerel site ve kabul
 
