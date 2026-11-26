@@ -99,8 +99,13 @@ def fixture(name):
 	return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def profiles():
+	# The Role Profiles are not fixtures (AJA-934). `hrms_tr.role_profiles` opens them from this file.
+	return json.loads((FIXTURES.parent / "role_profile.json").read_text(encoding="utf-8"))
+
+
 def profile_roles(profile):
-	for row in fixture("02_role_profile.json"):
+	for row in profiles():
 		if row["name"] == profile:
 			return {role["role"] for role in row["roles"]}
 	raise AssertionError(f"Missing role profile {profile}")
