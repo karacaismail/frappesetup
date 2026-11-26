@@ -3,7 +3,9 @@
 The repository is published. Every file in the Git snapshot is scanned for
 home-folder paths, the full names of real people, personal e-mail addresses,
 real-looking Turkish phone numbers, common secret formats, Telegram invite
-links, public server addresses and real values in env files.
+links, public server addresses and real values in env files. JSON and YAML
+files are checked too: a password, secret, token or key field must hold no
+real-looking value (AJA-1074).
 
 Content comes from Git objects, never from the working folder. The default
 snapshot is HEAD. Set RELEASE_REV to another commit, or to ":" to scan the
@@ -83,6 +85,20 @@ ENV_SECRET = re.compile(
     re.IGNORECASE,
 )
 PLACEHOLDER = re.compile(r"(?i)^(?:|<[^>]*>?.*|\$\{?\w+\}?|/[\w./<>-]*)$|example|sahte|degistir|change|fake|dummy")
+# AJA-1074: JSON and YAML files, also their .example copies.
+STRUCTURED_FILE = re.compile(r"(?:^|/)[^/]+\.(?:json|ya?ml)(?:\.example)?$")
+# A quoted "name": "value" pair anywhere on a line, also inside a one-line object.
+JSON_PAIR = re.compile(r'"([A-Za-z][\w.-]*)"\s*:\s*("(?:[^"\\]|\\.)*")')
+# A YAML "name: value" pair at the start of a line, also in a list item.
+YAML_PAIR = re.compile(r"""^\s*(?:-\s+)?(["']?)([A-Za-z][\w.-]*)\1\s*:\s+(.*?)\s*$""")
+# The last word of the field name decides. passwordPolicy, tokenLocation and keyId are not secrets.
+SECRET_WORDS = {"password", "passwd", "secret", "token"}
+# A bare "key" names a cache key or a setting. Only a key with a secret role counts.
+KEY_ROLES = {"api", "private", "secret", "access", "hmac", "signing", "encryption", "client", "master"}
+# Words that never are a secret value: GitHub permission levels and enum values.
+NOT_A_VALUE = {"true", "false", "null", "none", "read", "write", "required", "optional", "~"}
+# The name of an environment variable or a ${{ }} expression only points to the value.
+VALUE_REFERENCE = re.compile(r"^(?:[A-Z][A-Z0-9_]*|\$\{\{.*\}\}|\$\{?\w+.*\}?|-?\d+(?:\.\d+)?)$")
 
 
 def public_address(text):
@@ -113,6 +129,45 @@ def env_secret(name, line):
         return False
     value = match.group(2).strip().strip("\"'")
     return not PLACEHOLDER.search(value)
+
+
+def field_words(name):
+    """Split a field name such as clientSecret, api_key or id-token into lower case words."""
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    return [word.lower() for word in re.split(r"[\s_.-]+", name) if word]
+
+
+def secret_field(field):
+    """True when the field name names a password, secret, token or key."""
+    words = field_words(field)
+    if not words or "csrf" in words:
+        return False
+    if words[-1] in SECRET_WORDS:
+        return True
+    return words[-1] == "key" and len(words) > 1 and words[-2] in KEY_ROLES | SECRET_WORDS
+
+
+def real_value(value):
+    """True when a field value looks like a real secret, not a reference or a placeholder."""
+    value = value.strip().rstrip(",").strip()
+    # Objects, lists, block scalars and comments hold no value on this line.
+    if not value or value[0] in "{[|>&*#":
+        return False
+    value = value.strip("\"'")
+    if value.lower() in NOT_A_VALUE or VALUE_REFERENCE.match(value):
+        return False
+    return not PLACEHOLDER.search(value) and "placeholder" not in value.lower()
+
+
+def structured_secret(name, line):
+    """True when a JSON or YAML file gives a password, secret, token or key field a real-looking value."""
+    if not STRUCTURED_FILE.search(name):
+        return False
+    pairs = [(match.group(1), match.group(2)) for match in JSON_PAIR.finditer(line)]
+    match = YAML_PAIR.match(line)
+    if match and not match.group(1) == '"':
+        pairs.append((match.group(2), match.group(3)))
+    return any(secret_field(field) and real_value(value) for field, value in pairs)
 
 
 def normalise(text):
@@ -213,6 +268,8 @@ def scan_text(name, text):
                     break
         if env_secret(name, line):
             findings.append(("env-secret", number))
+        if structured_secret(name, line):
+            findings.append(("structured-secret", number))
     return findings
 
 
@@ -273,6 +330,49 @@ class ScannerSelfTest(unittest.TestCase):
         )
         for name, line in placeholders:
             self.assertEqual({kind for kind, _ in scan_text(name, line)}, set(), line)
+
+    def test_structured_rule_fires_on_json_and_yaml_samples(self):
+        """AJA-1074: a password field in a JSON or YAML file. Values are assembled at run time."""
+        value = "Gercek" + "." + "Deger42"
+        samples = (
+            ("e2e/review-accounts.json", '  "password": "' + value + '",'),
+            ("dev/settings.json", '{"db_password": "' + value + '"}'),
+            ("dev/compose.yaml", "      ADMIN_PASSWORD: " + value),
+            ("dev/compose.yml", "  - client_secret: '" + value + "'"),
+            ("deploy/values.yaml.example", "apiKey: " + value),
+            ("deploy/values.yaml", "access_token: " + value),
+            ("deploy/values.yaml", "signing-key: " + value),
+        )
+        for name, line in samples:
+            with self.subTest(name=name, line=line):
+                self.assertEqual({kind for kind, _ in scan_text(name, line)}, {"structured-secret"})
+
+    def test_structured_rule_passes_on_references_and_other_fields(self):
+        value = "Gercek" + "Deger42"
+        clean = (
+            ("realm.json", '  "passwordPolicy": "length(12) and notUsername",'),
+            ("apple.json", '    "clientSecret": "ATONOTA_APPLE_P8_KEY",'),
+            ("apple.json", '    "keyId": "ATONOTA_APPLE_KEY_ID",'),
+            ("compose.yaml", "      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Create .env}"),
+            ("compose.yaml", "      KC_DB_PASSWORD_FILE: /run/secrets/kc_db_password"),
+            ("deploy.yml", "      id-token: write"),
+            ("action.yml", "        key: pw-browsers-${{ runner.os }}"),
+            ("action.yml", "        token: ${{ secrets.GITHUB_TOKEN }}"),
+            ("api.openapi.yaml", "              logout_token: signed-logout-token-placeholder"),
+            ("api.openapi.yaml", "              csrf_token: 3f9c2a7d1b4e8f60a5c7d9e1b2a3c4d5"),
+            ("api.openapi.yaml", "        token: {type: string, maxLength: 128}"),
+            ("package-lock.json", '        "comma-separated-tokens": "^2.0.0",'),
+            ("package-lock.json", '        "idb-keyval": "^6.2.1",'),
+            ("realm.json", '  "webAuthnPolicyPasswordlessResidentKey": "required",'),
+            ("settings.json", '  "password": "<yerel parola>",'),
+            ("settings.json", '  "secret": "",'),
+            ("settings.json", '  "token": null,'),
+            ("settings.json", '  "password": "degistir-parola",'),
+            ("notes.md", "password: " + value),
+        )
+        for name, line in clean:
+            with self.subTest(name=name, line=line):
+                self.assertEqual({kind for kind, _ in scan_text(name, line)}, set())
 
     def test_own_source_has_no_mobile_number_literal(self):
         """Samples are built at run time, so the release gate never sees a real-looking number."""

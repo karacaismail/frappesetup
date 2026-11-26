@@ -3,6 +3,8 @@
 import json
 import re
 import runpy
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from uuid import uuid4
@@ -18,6 +20,8 @@ COMPOSE = E2E.parent / "dev/compose.identity-sync.yaml"
 COMPOSE_ORGANIZATION = re.search(r'"organization":"([a-z0-9-]+)"', COMPOSE.read_text()).group(1)
 # A fresh value per run, so no credential literal sits in the source.
 ADMIN_VALUE = uuid4().hex
+# AJA-1074: the shared review password comes from the Git-ignored backend/e2e/.env file.
+REVIEW_VALUE = "inceleme-" + uuid4().hex[:12]
 
 LOCAL = {
     "KC_PUBLIC_URL": "http://identity.localhost:6700",
@@ -25,6 +29,7 @@ LOCAL = {
     "ATONOTA_PRESS_URL": "http://press.localhost:6703",
     "KC_BOOTSTRAP_ADMIN_USERNAME": "synthetic-admin",
     "KC_BOOTSTRAP_ADMIN_PASSWORD": ADMIN_VALUE,
+    "E2E_REVIEW_PASSWORD": REVIEW_VALUE,
 }
 
 
@@ -46,10 +51,13 @@ def completed(payload):
 
 
 class ReviewAccountListTest(unittest.TestCase):
-    def test_the_file_names_the_review_accounts_with_one_shared_password(self):
+    def test_the_file_names_the_review_accounts_without_a_password(self):
         data = json.loads(ACCOUNTS.read_text())
         self.assertIn("local review", data["note"].lower())
-        self.assertIsInstance(data["password"], str)
+        # AJA-1074: the public repository carries no password. The note points to the local file.
+        self.assertNotIn("password", data)
+        self.assertIn("E2E_REVIEW_PASSWORD", data["note"])
+        self.assertIn("backend/e2e/.env", data["note"])
         accounts = {account["username"]: account for account in data["accounts"]}
         self.assertEqual(set(accounts), {
             "inceleme-panel@example.test",
@@ -76,7 +84,7 @@ class ReviewAccountListTest(unittest.TestCase):
     def test_the_loader_returns_the_file_and_rejects_a_changed_list(self):
         load = stack()["load_review_accounts"]
         data = load(ACCOUNTS)
-        self.assertEqual(data["password"], json.loads(ACCOUNTS.read_text())["password"])
+        self.assertEqual(data, json.loads(ACCOUNTS.read_text()))
         broken = json.loads(ACCOUNTS.read_text())
         broken["accounts"][0]["username"] = "someone@example.test"
         with patch.object(Path, "read_text", return_value=json.dumps(broken)):
@@ -147,20 +155,22 @@ class ReviewAccountListTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "reseller"):
                         load(ACCOUNTS)
 
-    def test_the_password_lives_only_in_the_accounts_file(self):
-        password = json.loads(ACCOUNTS.read_text())["password"]
-        for path in (STACK, *sorted((E2E / "preview").glob("stack-review-*.py"))):
-            with self.subTest(path=path.name):
-                self.assertNotIn(password, path.read_text())
+    def test_the_loader_refuses_a_password_in_the_accounts_file(self):
+        # AJA-1074: a password written back into the public file stops the command.
+        load = stack()["load_review_accounts"]
+        broken = {**json.loads(ACCOUNTS.read_text()), "password": REVIEW_VALUE}
+        with patch.object(Path, "read_text", return_value=json.dumps(broken)):
+            with self.assertRaisesRegex(ValueError, "E2E_REVIEW_PASSWORD"):
+                load(ACCOUNTS)
 
-    def test_the_readme_opens_with_the_panel_sign_in_and_points_to_the_accounts_file(self):
-        password = json.loads(ACCOUNTS.read_text())["password"]
+    def test_the_readme_opens_with_the_panel_sign_in_and_points_to_the_local_password(self):
         readme = (E2E / "README.md").read_text()
         first = readme.splitlines()[0]
         self.assertIn("http://localhost:5180", first)
         self.assertIn("inceleme-panel@example.test", first)
-        self.assertIn("backend/e2e/review-accounts.json", first)
-        self.assertNotIn(password, readme)
+        self.assertIn("E2E_REVIEW_PASSWORD", first)
+        self.assertIn("backend/e2e/.env", first)
+        self.assertNotIn("`password` alan", readme)
 
     def test_the_readme_describes_the_tenant_administrator_with_the_tenant_admin_role(self):
         row = next(line for line in (E2E / "README.md").read_text().splitlines()
@@ -178,16 +188,11 @@ class ReviewAccountListTest(unittest.TestCase):
                 self.assertIn("“Website User”", row)
                 self.assertNotIn("System Manager", row)
 
-    def test_the_accounts_file_is_the_only_file_with_the_password(self):
-        password = json.loads(ACCOUNTS.read_text())["password"]
-        found = [
-            path.relative_to(E2E.parent.parent)
-            for path in E2E.parent.rglob("*")
-            if path.is_file() and path != ACCOUNTS and "node_modules" not in path.parts
-            and path.suffix in {".md", ".py", ".json", ".sh", ".yml", ".yaml", ".toml", ".txt", ""}
-            and password in path.read_text(errors="ignore")
-        ]
-        self.assertEqual(found, [])
+    def test_the_local_password_file_is_ignored_by_git(self):
+        ignored = subprocess.run(
+            ["git", "-C", str(E2E), "check-ignore", "-q", str(E2E / ".env")], check=False
+        )
+        self.assertEqual(ignored.returncode, 0)
 
 
 class LocalStackTest(unittest.TestCase):
@@ -234,7 +239,7 @@ class LocalStackTest(unittest.TestCase):
 class ReviewAccountsFlowTest(unittest.TestCase):
     def test_accounts_reach_keycloak_tenant_and_press_through_stdin(self):
         command = stack()["review_accounts"]
-        password = json.loads(ACCOUNTS.read_text())["password"]
+        password = REVIEW_VALUE
         replies = [
             completed({"subjects": {
                 **{email: "sub-" + email for email in TENANT_ACCOUNTS},
@@ -273,6 +278,45 @@ class ReviewAccountsFlowTest(unittest.TestCase):
         press = json.loads(run.call_args_list[2].kwargs["input"])
         self.assertEqual(press["accounts"], [{"email": "inceleme-press@example.test", "subject": "sub-press"}])
         self.assertNotIn(password, json.dumps(summary))
+
+
+class ReviewPasswordTest(unittest.TestCase):
+    def test_a_missing_or_short_password_stops_before_any_docker_call(self):
+        # AJA-1074: the password comes from E2E_REVIEW_PASSWORD. The relaxed rule needs 8 characters.
+        command = stack()["review_accounts"]
+        for value in (None, "", "kisa7ch"):
+            environment = dict(LOCAL)
+            if value is None:
+                environment.pop("E2E_REVIEW_PASSWORD")
+            else:
+                environment["E2E_REVIEW_PASSWORD"] = value
+            with self.subTest(value=value):
+                with patch.dict(command.__globals__, {"run": Mock()}) as globals_:
+                    with self.assertRaisesRegex(ValueError, "E2E_REVIEW_PASSWORD"):
+                        command(["compose"], environment)
+                    globals_["run"].assert_not_called()
+
+    def test_the_template_names_the_review_password_without_a_value(self):
+        template = (E2E.parent / "dev/.env.example").read_text().splitlines()
+        lines = [line for line in template if line.startswith("E2E_REVIEW_PASSWORD=")]
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].partition("=")[2].startswith("degistir-"))
+        # A fresh backend/e2e/.env gets a random value. The template value never reaches Compose.
+        scope = stack()
+        self.assertTrue(lines[0].partition("=")[2].startswith(scope["SECRET_PREFIXES"]))
+        self.assertNotIn("E2E_REVIEW_PASSWORD", scope["default_settings"]())
+
+    def test_a_fresh_env_file_gets_a_random_review_password(self):
+        scope = stack()
+        credentials = scope["credentials"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / ".env"
+            with patch.dict(credentials.__globals__, {"assert_ignored": Mock()}):
+                values = credentials(path)
+        password = values["E2E_REVIEW_PASSWORD"]
+        self.assertGreaterEqual(len(password), 8)
+        self.assertFalse(password.startswith("degistir-"))
+        self.assertEqual(scope["review_password"]({"E2E_REVIEW_PASSWORD": password}), password)
 
 
 class FakeKeycloak:
@@ -340,7 +384,7 @@ class KeycloakScriptTest(unittest.TestCase):
             "keycloak_url": url,
             "admin_username": "synthetic-admin",
             "admin_password": ADMIN_VALUE,
-            "password": self.data["password"],
+            "password": REVIEW_VALUE,
             "relaxed_length": 8,
             "restore_policy": json.loads(REALM.read_text())["passwordPolicy"],
             "accounts": self.data["accounts"],
@@ -382,7 +426,7 @@ class KeycloakScriptTest(unittest.TestCase):
         self.assertEqual(set(result["subjects"]), {*TENANT_ACCOUNTS, "inceleme-press@example.test"})
         self.assertIn(("POST", "/admin/realms/master/users/id-inceleme-yerel-yonetici/role-mappings/realm"),
                       keycloak.calls)
-        self.assertNotIn(self.data["password"], json.dumps(result))
+        self.assertNotIn(REVIEW_VALUE, json.dumps(result))
 
     def test_every_tenant_account_becomes_a_member_of_the_tenant_organization(self):
         # AJA-950, G-160: identity-sync answers the linked accounts read only for a member of the
