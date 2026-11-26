@@ -169,7 +169,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "2a47983d66b5060e81afc080d06970e4129b657dc5d823f5fa1bfbdbd2dcf13e",
+      "sha256": "b598ec2ba336356b8354dc8a31e76e2dd6d1a7c91abf0b219ace3651385bdbae",
       "findings": [
         {
           "rule": "frappe-missing-permission",
