@@ -348,5 +348,185 @@
     "property": "permlevel",
     "property_type": "Int",
     "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee-prefered_email-permlevel",
+    "doc_type": "Employee",
+    "doctype_or_field": "DocField",
+    "field_name": "prefered_email",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee-new_workplace-permlevel",
+    "doc_type": "Employee",
+    "doctype_or_field": "DocField",
+    "field_name": "new_workplace",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee-held_on-permlevel",
+    "doc_type": "Employee",
+    "doctype_or_field": "DocField",
+    "field_name": "held_on",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee-resignation_letter_date-permlevel",
+    "doc_type": "Employee",
+    "doctype_or_field": "DocField",
+    "field_name": "resignation_letter_date",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee-leave_encashed-permlevel",
+    "doc_type": "Employee",
+    "doctype_or_field": "DocField",
+    "field_name": "leave_encashed",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee-encashment_date-permlevel",
+    "doc_type": "Employee",
+    "doctype_or_field": "DocField",
+    "field_name": "encashment_date",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee Education-school_univ-permlevel",
+    "doc_type": "Employee Education",
+    "doctype_or_field": "DocField",
+    "field_name": "school_univ",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee Education-qualification-permlevel",
+    "doc_type": "Employee Education",
+    "doctype_or_field": "DocField",
+    "field_name": "qualification",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee Education-level-permlevel",
+    "doc_type": "Employee Education",
+    "doctype_or_field": "DocField",
+    "field_name": "level",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee Education-year_of_passing-permlevel",
+    "doc_type": "Employee Education",
+    "doctype_or_field": "DocField",
+    "field_name": "year_of_passing",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee Education-class_per-permlevel",
+    "doc_type": "Employee Education",
+    "doctype_or_field": "DocField",
+    "field_name": "class_per",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee Education-maj_opt_subj-permlevel",
+    "doc_type": "Employee Education",
+    "doctype_or_field": "DocField",
+    "field_name": "maj_opt_subj",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee External Work History-company_name-permlevel",
+    "doc_type": "Employee External Work History",
+    "doctype_or_field": "DocField",
+    "field_name": "company_name",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee External Work History-designation-permlevel",
+    "doc_type": "Employee External Work History",
+    "doctype_or_field": "DocField",
+    "field_name": "designation",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee External Work History-salary-permlevel",
+    "doc_type": "Employee External Work History",
+    "doctype_or_field": "DocField",
+    "field_name": "salary",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee External Work History-address-permlevel",
+    "doc_type": "Employee External Work History",
+    "doctype_or_field": "DocField",
+    "field_name": "address",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee External Work History-contact-permlevel",
+    "doc_type": "Employee External Work History",
+    "doctype_or_field": "DocField",
+    "field_name": "contact",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Employee External Work History-total_experience-permlevel",
+    "doc_type": "Employee External Work History",
+    "doctype_or_field": "DocField",
+    "field_name": "total_experience",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "1"
   }
 ]

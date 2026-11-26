@@ -60,6 +60,8 @@ def check_install():
 EMPLOYEE_PERSONAL_LEVEL = 1
 EMPLOYEE_PERSONAL_FIELDS = (
 	"personal_email",
+	# HRMS copies the preferred contact address here. It can be the personal address.
+	"prefered_email",
 	"cell_number",
 	"date_of_birth",
 	"date_of_retirement",
@@ -92,7 +94,33 @@ EMPLOYEE_PERSONAL_FIELDS = (
 	"external_work_history",
 	"reason_for_leaving",
 	"feedback",
+	"new_workplace",
+	"held_on",
+	"resignation_letter_date",
+	"leave_encashed",
+	"encashment_date",
 )
+# The fields of the two personal child tables sit on the same level. Frappe checks a child
+# table query against the field levels of the child type, not of the parent's table field.
+EMPLOYEE_PERSONAL_CHILD_FIELDS = {
+	"Employee Education": (
+		"school_univ",
+		"qualification",
+		"level",
+		"year_of_passing",
+		"class_per",
+		"maj_opt_subj",
+	),
+	"Employee External Work History": (
+		"company_name",
+		"designation",
+		"salary",
+		"address",
+		"contact",
+		"total_experience",
+	),
+}
+EMPLOYEE_PERSONAL_CHILD_TYPES = tuple(EMPLOYEE_PERSONAL_CHILD_FIELDS)
 
 # Types that get HRMS TR custom permission rows next to their standard ones.
 # "Leave Type" gets "select" so a leave role can search the link field of a leave application.
