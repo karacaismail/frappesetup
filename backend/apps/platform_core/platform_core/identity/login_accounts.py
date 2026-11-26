@@ -1,4 +1,4 @@
-"""AtonotA Login reads for the panel: sign-in platforms and linked accounts (AJA-459).
+"""`atonota_login` reads for the panel: sign-in platforms and linked accounts (AJA-459).
 
 The site reads both lists from identity-sync. The site carries no Keycloak management role.
 
@@ -194,7 +194,9 @@ def session_subject() -> str:
 		)
 	):
 		raise IdentityLinkMissing(
-			_("This session is not linked to an AtonotA Login account.", context="platform_core.identity")
+			_("This session is not linked to a {0} account.", context="platform_core.identity").format(
+				site_settings.brand_name()
+			)
 		)
 	return subject
 

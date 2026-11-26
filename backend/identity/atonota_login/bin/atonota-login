@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""AtonotA Login command line.
+"""`atonota_login` command line.
 
   atonota-login render --check          exit 1 when the realm file differs from the registry
   atonota-login render --write          rewrite only the realm file's identityProviders array
@@ -16,6 +16,7 @@
 The apply step reads KC_PUBLIC_URL, KC_BOOTSTRAP_ADMIN_USERNAME, KC_BOOTSTRAP_ADMIN_PASSWORD and the
 platform secret variables from the environment. It prints aliases and states, never a secret.
 A corporate provider without the email_verified rule and without a valid exception stops apply.
+The help text takes the product name from PRODUCT_NAME (backend/brand.env, AJA-1061).
 """
 
 import argparse
@@ -27,6 +28,7 @@ from pathlib import Path
 
 PRODUCT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PRODUCT))
+TECHNICAL_NAME = "atonota_login"
 
 from atonota_login import keycloak_apply, platforms  # noqa: E402
 
@@ -100,8 +102,13 @@ def redirects(arguments, registry):
     return 0
 
 
+def product_name():
+    """The visible product name. Without PRODUCT_NAME the technical name is used."""
+    return os.environ.get("PRODUCT_NAME", "").strip() or TECHNICAL_NAME
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="atonota-login", description="AtonotA Login platform tools.")
+    parser = argparse.ArgumentParser(prog="atonota-login", description=f"{product_name()} platform tools.")
     parser.add_argument("--platforms-dir", type=Path, default=platforms.REGISTRY_DIR,
                         help="Folder of platform records. Default: the product's platforms folder.")
     parser.add_argument("--allow-local-http", action="store_true",

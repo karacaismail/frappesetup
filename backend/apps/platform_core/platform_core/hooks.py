@@ -114,7 +114,7 @@ ai_write_closed_doctypes = [
 website_user_allowed_methods = [
 	"platform_core.api.auth.logout",
 	"platform_core.api.auth.get_csrf_token",
-	# AtonotA Login reads (AJA-459). The server takes the person from the session, never from the request.
+	# `atonota_login` reads (AJA-459). The server takes the person from the session, never from the request.
 	"platform_core.api.auth.list_login_providers",
 	"platform_core.api.auth.list_linked_accounts",
 	"platform_core.api.shell.get_bootstrap",
@@ -165,7 +165,7 @@ website_user_allowed_methods = [
 	"platform_core.api.access.list_permission_logs",
 	"platform_core.api.identity.set_user_role_profiles",
 	"platform_core.api.identity.invite_user",
-	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
+	# `atonota_login` action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
 	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.

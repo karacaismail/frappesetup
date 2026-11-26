@@ -92,7 +92,7 @@ class _Bench:
         for subject in self.subjects:
             self.add_account(subject)
         self.keycloak.serve_directory()
-        # Sign-in platforms for the AtonotA Login reads: general ones and one of the tenant.
+        # Sign-in platforms for the `atonota_login` reads: general ones and one of the tenant.
         for alias in ("google", "facebook", "linkedin", "apple"):
             self.keycloak.add_identity_provider(alias, display_name=alias.title())
         self.keycloak.add_identity_provider("tenant1-sso", display_name="Tenant One SSO", organization_id=ORG_ID)
