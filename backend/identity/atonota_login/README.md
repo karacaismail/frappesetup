@@ -1,6 +1,6 @@
-# AtonotA Login
+# Giriş ürünü (`atonota_login`)
 
-AtonotA Login bağımsız bir giriş ürünüdür (G-157, O-51). Ürün Keycloak üzerinde çalışır. Keycloak'ın eksik bıraktığı işleri Frappe tamamlar.
+Bu klasör bağımsız bir giriş ürünüdür (G-157, O-51). Ürünün görünen adı `backend/brand.env` dosyasındaki `PRODUCT_NAME` değeridir. Alan adı aynı dosyadaki `BRAND_DOMAIN` değeridir. Ürün Keycloak üzerinde çalışır. Keycloak'ın eksik bıraktığı işleri Frappe tamamlar.
 
 Bu klasör ürünün kendi kodunu tutar. Kod MIT lisanslıdır (`LICENSE`). Keycloak ve eklentileri Apache-2.0 lisanslıdır. Bu parçaların listesi `THIRD-PARTY-NOTICES.md` dosyasındadır.
 
@@ -51,7 +51,7 @@ Platform işini bitirince tarayıcıyı şu adrese döndürür:
 https://<giriş adresi>/realms/platform/broker/<platform>/endpoint
 ```
 
-Giriş adresi prod'da `api.login.atonota.net` olur. alpha, beta ve rc ortamlarında adres `api.login.<ortam>.atonota.net` olur. Her ortamın adreslerini şu komut yazar:
+Giriş adresi prod'da `api.login.<BRAND_DOMAIN>` olur. alpha, beta ve rc ortamlarında adres `api.login.<ortam>.<BRAND_DOMAIN>` olur. `<BRAND_DOMAIN>` değeri `backend/brand.env` dosyasındadır. Her ortamın adreslerini şu komut yazar:
 
 ```bash
 bin/atonota-login redirects --env all

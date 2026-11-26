@@ -1,4 +1,4 @@
-"""AtonotA Login endpoints: action decisions (G-161, G-166) and the verification inbox (G-164).
+"""`atonota_login` endpoints: action decisions (G-161, G-166) and the verification inbox (G-164).
 
 The Frappe links are in `platform_core.identity.atonota.decision_api` and `.verification_api`. The rules are in the
 `atonota_login` package. Contract: `backend/contracts/platform_core-identity.openapi.yaml`, tag `atonota-login`.
@@ -24,7 +24,7 @@ def evaluate(action: Any = None) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 def open_paid_plan() -> dict:
-	"""Opens a paid AtonotA Login plan. Closed until the price decision (G-166)."""
+	"""Opens a paid `atonota_login` plan. Closed until the price decision (G-166)."""
 	return decision_api.open_paid_plan()
 
 
