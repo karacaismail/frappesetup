@@ -292,9 +292,52 @@ Sonucu `unknown` olan hedefe yeni öneri açılmaz. İnsan `resolve_proposal` uc
 - Her öneri tek iştir. Zincirli yazma yoktur.
 - Süre zamanlanmış işle değil, okuma anında denetlenir (D-6).
 - İnsan öneriyi `reject_proposal` ucuyla reddedebilir.
-- Risk sınıfını model belirlemez. Sınıf aracın tanımından gelir.
+- Risk sınıfını model belirlemez. Sınıf aracın tanımından gelir. Risk düzeyi kuralı aşağıdaki bölümdedir.
 - Yerleşik yazma araçları kaydı yürütmede satır kilidiyle okur. Sürüm önizlemedekinden farklıysa yazmaz.
 - Okuma aracı kalıcı yazı bırakamaz. Katman okuma aracından sonra işlemi geri alır.
+
+### Risk düzeyi (AJA-1001)
+
+Bu bölüm 26 Kasım 2026 Perşembe günü eklendi.
+
+Her öneri bir risk düzeyi taşır. Düzeyler R0, R1, R2 ve R3 olur. R3 en yüksek düzeydir. Düzey “PLT AI Action Proposal” kaydının `risk_level` alanındadır. Alan salt okunurdur.
+
+Sunucu düzeyi öneri açılırken hesaplar. Hesap yalnız araç kaydından gelir. Model düzeyi belirleyemez. Geri alma işi ve ikinci kişi onayı işi bu alana dayanır.
+
+Sunucu düzeyi aracın türünden, sınıfından ve iki işaretinden hesaplar. Bu işaretler `destructive` ve `billable` işaretleridir. `destructive` işareti aracın veriyi silebildiğini ya da üstüne yazabildiğini gösterir. `billable` işareti aracın ücret doğurabildiğini gösterir.
+
+| Araç | Hesaplanan düzey |
+| --- | --- |
+| Okuma, tanım ya da akış aracı. Bu araç öneri açmaz. | R0 |
+| Yazma aracı. Araç silmez ve ücret doğurmaz. | R1 |
+| Yazma aracı. Araç siler ya da ücret doğurur. | R2 |
+| Yönetim aracı. Araç silmez ve ücret doğurmaz. | R2 |
+| Yazma aracı. Araç hem siler hem ücret doğurur. | R3 |
+| Yönetim aracı. Araç siler ya da ücret doğurur. | R3 |
+
+Yerleşik yazma araçları şu düzeyleri alır:
+
+- `plt_create_document` R1 alır.
+- `plt_update_document`, `plt_submit_document`, `plt_cancel_document` ve `plt_delete_document` R2 alır.
+- `plt_add_custom_field` R2 alır.
+- Öteki yönetim araçları R3 alır. Bu araçlar alan özelliğini, rol iznini ve rolleri değiştirir. Kayıt silme aracı da bu gruptadır.
+
+Uygulama aracı kendi düzeyini bildirebilir. Araç bunu `ai_tools` bildirimindeki `risk_level` anahtarıyla yapar. Sunucu bildirilen düzeyi ve hesaplanan düzeyi karşılaştırır. Yüksek olan düzey geçerli olur. Örneğin silen bir araç R0 bildirirse öneri R2 olur. Geçersiz bir değer bildiren araç yüklenmez. Örneğin `R9` değeri geçersizdir.
+
+Model düzeyi araç argümanında gönderebilir. Bu durumda çağrı reddedilir ve öneri açılmaz. Çağrı `invalid_arguments` yanıtını alır. Seçilen yol budur. Değeri sessizce yok saymak seçilmedi. Bunun iki nedeni var:
+
+1. Bütün araç şemaları bilinmeyen alanı zaten reddeder. Ret aynı kuralı sürdürür.
+2. Ret modele düzeyi kendisinin seçemediğini açıkça gösterir.
+
+Uygulama aracı da `risk_level` adlı bir argüman tanımlayamaz. Böyle bir araç yüklenmez. Bu kural `policy.SERVER_SET_ARGUMENT_NAMES` listesindedir.
+
+Düzey öneri açıldıktan sonra değişmez. Alan, öneri kaydının donmuş alanları arasındadır. Bu kural bekleyen öneride de onaylanmış öneride de geçerlidir.
+
+Düzey şu yanıtlarda görünür: `list_proposals`, `get_proposal`, MCP `plt_get_proposal` aracı ve yazma aracının `approval_required` yanıtı. Sözleşme alanı `RiskLevel` adıyla tanımlar.
+
+Bu işten önce açılmış öneriler de düzey alır. Bunu `platform_core.ai.patches.set_proposal_risk_level` yaması yapar. Yama düzeyi kayıttaki sınıftan ve iki işaretten hesaplar. Uygulama aracının bildirdiği düzey o kayıtlarda saklanmamıştı. Bu yüzden eski kayıtlarda yalnız hesaplanan düzey kullanılır.
+
+Kod `ai/risk.py` dosyasındadır. Testler `ai/tests/test_risk_level.py` dosyasındadır.
 
 ## 8. “PLT AI Action Log” hangi alanları tutar (G-64)
 

@@ -6,6 +6,23 @@ order: 25
 
 Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları kapatan `packages/press-ai` paketinin kararlarını, kurulumunu, kabul ölçütlerini ve kalan sınırlarını verir. Kural: hazır olanı kullan, eksik olanı küçük ve denetlenebilir parçalarla yaz. Mimari [Rail 5](/frappesetup/rail-5-ai/) ile uyumludur; bütün SaaS mimarisi bu pakette koda çevrilmez. Durum: kod taslakları var; bağımsız statik inceleme yapıldı, bulguların düzeltmeleri test sonuçlarıyla son koşuda doğrulanır; canlı Press doğrulaması `not_run`.
 
+## Backend geliştirme durumu
+
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
+
+| Alan | Dalda görülen kanıt | Kalan doğrulama |
+| --- | --- | --- |
+| Model geçidi | `platform_core.model_gateway` kodu, HTTP uçları, OpenAPI sözleşmesi ve test dosyaları | Canlı sağlayıcı sonucu bu kayıtta yok |
+| Kiracı MCP | `platform_core.api.ai` kodu ve sözleşmenin 10. bölümü | Gerçek istemci oturumu |
+| Kimlik | Proje kaydı ve Keycloak sözleşmesi | Canlı Keycloak, Press ve kiracıyla uçtan uca eşitleme |
+| Kod denetimi | `ai-readiness` ve elle başlatılan güvenlik komutları dalda yer alır | CI güvenlik kapısı açık iş olarak durur (O-29) |
+
+Model geçidinde OpenAI uyumlu, Anthropic, Gemini ve Ollama bağlantı biçimleri belgelenir. Geçit, sağlayıcı ve modeli yapılandırılan sıradan seçer. Kullanım kaydı model, token ve maliyeti tutar. Kiracı MCP için işlem ve onay günlüğü ayrı tasarlanır. Sözleşme, kullanım günlüğünü model geçidine bağlar. Yönetici, süresi 365 günü aşan kayıtları elle temizler. Önizleme kayıt silmez. Onaydan sonra silinen kayıtlar kalıcı olarak kaldırılır (O-32).
+
+Test dosyalarının varlığı bu incelemede test sonucu olarak sayılmadı. Canlı Keycloak ve gerçek MCP istemci oturumu `not_run` durumundadır.
+
+Kaynaklar `backend/PROJECT-RECORD.md`, sözleşmenin 10. ve 11. bölümleri ile karar notları 0002, 0004, 0010 ve 0011'dir.
+
 ## Ne hazır alınır, ne yazılır
 
 | Alan | Hazır kullan | Yaz | Gerekçe |
@@ -13,7 +30,7 @@ Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları
 | Frappe uygulama geliştirme bilgisi | `frappe/skills` (`frappe-app-dev`, `deep-app-audit`), atıfla | `frappe-custom-app`, `frappe-app-extension` | Resmi ve derin; lisans dosyası yok, metin kopyalanmaz |
 | Press teşhisi | Press içi MCP (`enable_mcp`) | `press-build-triage`, `press-diagnoser` | Araçlar hazır, teşhis sırası yok |
 | Press kurulum ve dağıtım | — | `press-ai` MCP, `press-operations`, `press-operator` | Hiçbir hazır depo onaylı biçimde karşılamıyor |
-| Site içi veri araçları | `frappe/mcp` çatısı ya da kullanıcı kimlikli sunucu | `platform_core` araçları (Rail 5) | Kullanıcı kimliği ve denetim izi gerekir |
+| Site içi veri araçları | `platform_core.ai` | Kullanıcı yetkisi korunur. Yazmayı insan onaylar. | Kaynak: karar notu 0002 ve sözleşme 10. bölüm. |
 | Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf beta ortamında denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
 
 AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı süreçte birleştirilmeden önce lisans uyumu kullanıcıyla netleştirilir; yeni depolara lisans onaysız seçilmez.
@@ -89,9 +106,9 @@ Tüm paket ZIP'i depo yerleşimini izler: kökte lisans dosyaları ve `packages/
 | Aşama | Görev | Sahip | Bağımlılık | Kabul |
 | --- | --- | --- | --- | --- |
 | A1 | Fixture testleri, bağımsız inceleme, senaryo koşusu | Geliştirme ekibi | — | Testler ve senaryolar geçer; başarısız vaka gevşetilmez |
-| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi; ortam DevOps sorumlusu | A1 | Okuma sonuçları kontrat alanlarıyla eşleşir; gizli alan dönmez |
-| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi; altyapı DevOps sorumlusu | A2 | Her adımda insan onayı; build Success olmadan deploy önerisi reddedilir |
-| A4 | DNS gereksinimi çıktısı | DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular, DevOps sorumlusu doğrular | A3 | Ajan DNS'e dokunmaz; yalnız kayıt gereksinimi üretir |
+| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi ve ortamdan sorumlu DevOps sorumlusu | A1 | Sonuçlar sözleşme alanlarıyla eşleşir. Araç gizli alan döndürmez. |
+| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi ve altyapıdan sorumlu DevOps sorumlusu | A2 | İnsan her adımı onaylar. Derleme Success olmadan sistem dağıtım önerisini reddeder. |
+| A4 | DNS gereksinimi çıktısı | DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular, DevOps sorumlusu doğrular | A3 | Ajan DNS kaydını değiştirmez. Yalnız kayıt gereksinimini üretir. |
 | A5 | OAuth2 delegasyonu ve AI denetim izi | Geliştirme ekibi | Rail 5 | G-28 ve G-87 kabul ölçütleri |
 
 ## Riskler

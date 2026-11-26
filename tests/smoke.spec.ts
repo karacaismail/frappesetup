@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { waitForRequirementsView } from './requirements-view';
 
 const require = createRequire(import.meta.url);
 const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
@@ -89,12 +90,14 @@ async function minEffectiveFontPx(page: Page) {
 
 // Tüm Astro adaları hidrasyonunu bitirene kadar bekler (ssr özniteliği hidrasyonda kalkar).
 async function waitForHydration(page: Page) {
-  // client:visible adalar görünür olmadan hidrate olmaz: önce görünür alana getir.
+  // Astro görünürlüğü display: contents sarmalayıcısında değil, adanın içindeki öğede izler.
   await page.evaluate(() => {
-    document.querySelectorAll('astro-island[ssr]').forEach((el) => el.scrollIntoView({ block: 'center' }));
+    document.querySelector('astro-island[ssr][client="visible"] > .req-explorer')
+      ?.scrollIntoView({ block: 'start', behavior: 'instant' });
   });
   await page.waitForFunction(() => !document.querySelector('astro-island[ssr]'), undefined, { timeout: 20_000 });
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await waitForRequirementsView(page);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
 }
 
 // Mermaid blokları varsa çizimin bitmesini bekler (ölçümler yerleşmiş SVG üzerinde yapılır).
@@ -147,7 +150,7 @@ async function forcedBreakRules(page: Page) {
 // bölünmemiş doğal genişliği satır genişliğinden en az 1 px darsa (sığan sözcük) ihlaldir. Satırdan uzun dizginin satır
 // sonunda kırılması güvenlik ağıdır. Doğal genişlik aynı ebeveynde görünmez, sarılmayan bir kopyayla ölçülür: bölünmüş
 // parçaların toplamı alt piksel ve kerning farkı taşır, yarım piksellik sınır durumunu sığıyor gösterebilir.
-const NAME_TEXT = 'h1, h2, h3, h4, th, td:first-child, .req-id, .req-title, .req-card-title, .brand-name, .nav-link-label, .toc-link';
+const NAME_TEXT = 'h1, h2, h3, h4, th, td:first-child, .req-id, .req-title, .brand-name, .nav-link-label, .toc-link';
 async function midWordSplits(page: Page, { names = true }: { names?: boolean } = {}) {
   return page.evaluate(
     ({ names, nameText }) => {
@@ -237,6 +240,185 @@ async function outlinedElements(page: Page) {
 }
 
 /* ------------------------------------------------------------------ */
+test('page typography follows the semantic scale @touch', async ({ page }) => {
+  for (const [path, body] of [['', '.lede'], ['kararlar/', '.prose > p']]) {
+    for (const width of [320, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(path);
+      const heading = page.locator('main h1');
+      const rootSize = await page.locator('html').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      const headingSize = await heading.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect(headingSize).toBeGreaterThanOrEqual(rootSize * 1.75);
+      expect(headingSize).toBeLessThanOrEqual(rootSize * 2);
+      const prose = page.locator(body).first();
+      await expect(prose).toHaveCSS('font-size', `${rootSize}px`);
+      await expect(prose).toHaveCSS('line-height', `${rootSize * 1.5}px`);
+    }
+  }
+});
+
+test('home sections and decisions use the shared typography scale', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto('');
+  await expect(page.locator('.block-head h2').first()).toHaveCSS('font-size', '28px');
+  await expect(page.locator('.decision p').first()).toHaveCSS('line-height', '24px');
+});
+
+test('traceability keeps typography open until visual approval', async ({ page }) => {
+  await page.goto('izlenebilirlik/');
+  const typography = page.getByRole('row', { name: /^Yazı boyutları Sürüyor/ });
+  await expect(typography).toContainText('Görsel referans onayı bekliyor');
+  const openWork = page.getByRole('region', { name: /Açık işler/ });
+  await expect(openWork).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gereksinimler sayfası HTML payı' })).toBeVisible();
+  await expect(openWork.getByRole('row', { name: /Gereksinimler sayfası HTML payı/ })).toHaveCount(0);
+});
+
+test('requirement fragment scrolls to the table row below the fixed header', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto('gereksinimler/#req-G-151');
+  await waitForRequirementsView(page);
+  const table = page.getByTestId('req-table');
+  await expect(table).toBeVisible();
+  await expect(table.locator('tbody tr[id^="req-"]')).toHaveCount(requirements.length);
+  const row = table.locator('#req-G-151');
+  await expect.poll(() => row.evaluate((el) => {
+    const bounds = el.getBoundingClientRect();
+    const header = document.querySelector('.site-header')!.getBoundingClientRect();
+    return { rowTop: bounds.top, headerBottom: header.bottom, inView: bounds.top >= header.bottom && bounds.top < innerHeight };
+  })).toMatchObject({ inView: true });
+  await expect(page.locator('#req-G-151')).toHaveCount(1);
+  await expect(row).toHaveAttribute('tabindex', '-1');
+  await expect(row).toBeFocused();
+  const focusStyle = () => row.evaluate((el: HTMLTableRowElement) => ({
+    outline: getComputedStyle(el).outlineStyle,
+    indicator: getComputedStyle(el.cells[0]).boxShadow,
+  }));
+  expect(await focusStyle()).toEqual({ outline: 'none', indicator: 'none' });
+
+  await row.evaluate((el: HTMLTableRowElement) => {
+    const next = document.createElement('input');
+    next.setAttribute('aria-label', 'Tab odağı deneme alanı');
+    el.cells[0].append(next);
+  });
+  const next = row.getByRole('textbox', { name: 'Tab odağı deneme alanı' });
+  await page.keyboard.press('Tab');
+  await expect(next).toBeFocused();
+
+});
+
+test('requirement fragment jumps immediately in cards and restores normal scroll behavior', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.addInitScript(() => {
+    window.addEventListener('scroll', () => {
+      document.documentElement.dataset.firstFragmentScroll = String(
+        document.getElementById('req-G-151')?.getBoundingClientRect().top,
+      );
+    }, { once: true });
+  });
+  await page.goto('gereksinimler/#req-G-151');
+  const root = page.locator('html');
+  await expect(root).toHaveAttribute('data-first-fragment-scroll', /^\d/);
+  expect(Number(await root.getAttribute('data-first-fragment-scroll'))).toBeLessThan(844);
+  await expect(root).toHaveCSS('scroll-behavior', 'smooth');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(root).toHaveCSS('scroll-behavior', 'auto');
+});
+
+test('requirement fragment preserves the reading position on rotation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('gereksinimler/#req-G-151');
+  await page.waitForFunction(() => !document.querySelector('astro-island[ssr]'));
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.setViewportSize({ width: 844, height: 390 });
+  await waitForRequirementsView(page);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+  });
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+});
+
+test('requirement fragment does not pull the reader back after a late hydration', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // Gezgin JS'i okur sayfanın başına döndükten sonra iner (yavaş cihaz). Gezgin okuru satıra geri çekmemeli.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto('gereksinimler/#req-G-151', { waitUntil: 'domcontentloaded' });
+  // Tarayıcı önce bağlantının satırına kaydırır. Sonra okur sayfanın başına döner.
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  release();
+  await page.waitForFunction(() => !document.querySelector('astro-island[component-url*="RequirementsExplorer"][ssr]'));
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+  });
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  await expect(page.locator('#req-G-151')).not.toBeFocused();
+});
+
+for (const [width, height, cpu] of [[1366, 900, 1], [800, 1000, 1], [1024, 1366, 1], [1366, 900, 8]]) {
+  const label = cpu > 1 ? ` with a ${cpu}x slower CPU` : '';
+  test(`requirements initial CLS stays within budget at ${width}x${height}${label}`, async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'Layout Instability API Chromium üzerinde ölçülür.');
+    await page.setViewportSize({ width, height });
+    // Yavaş işlemcide tarayıcı uzun HTML'nin ortasında çizer. Yerinden taşınan blok o çizimde gezginin üstünde görünmemeli.
+    if (cpu > 1) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: cpu });
+    page.on('console', (msg) => { if (msg.text().startsWith('CLS shift')) console.log(width, msg.text()); });
+    await page.addInitScript(() => {
+      const root = document.documentElement;
+      let start = -Infinity;
+      let previous = -Infinity;
+      let sum = 0;
+      let max = 0;
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
+          if (entry.hadRecentInput) continue;
+          if (entry.value >= 0.1) {
+            type Source = { node?: Element; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly };
+            const shift = entry as typeof entry & { sources: Source[] };
+            console.log('CLS shift', entry.startTime, entry.value, JSON.stringify(shift.sources.map(
+              ({ node, previousRect, currentRect }) => [node?.nodeName, node?.className, previousRect.top, currentRect.top])));
+          }
+          if (entry.startTime - previous >= 1000 || entry.startTime - start >= 5000) {
+            start = entry.startTime;
+            sum = 0;
+          }
+          previous = entry.startTime;
+          sum += entry.value;
+          max = Math.max(max, sum);
+        }
+        (root ?? document.documentElement).dataset.requirementsCls = String(max);
+      }).observe({ type: 'layout-shift', buffered: true });
+    });
+    await page.route(/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await route.continue();
+    });
+    await page.goto('gereksinimler/', { waitUntil: 'domcontentloaded' });
+    const initialRow = await page.locator('#req-G-151').elementHandle();
+    await expect(page.locator('astro-island[component-url*="RequirementsExplorer"][ssr]')).toHaveCount(0);
+    expect(await initialRow?.evaluate((row) => row === document.getElementById(row.id))).toBe(true);
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await page.waitForTimeout(500);
+    const cls = Number(await page.locator('html').getAttribute('data-requirements-cls'));
+    console.log(`[CLS] ${width}x${height} ${cls.toFixed(3)}`);
+    expect(cls).toBeLessThanOrEqual(0.1);
+  });
+}
+
 test.describe('viewport matrix', () => {
   for (const vp of VIEWPORTS) {
     const pages = vp.name === '320' ? ALL_PAGES : KEY_PAGES;
@@ -246,6 +428,7 @@ test.describe('viewport matrix', () => {
         test(`no horizontal overflow and text >= 1rem on /${path}`, async ({ page }) => {
           await page.goto(path);
           await expect(page.locator('h1')).toBeVisible();
+          if (path === 'gereksinimler/') await waitForHydration(page);
           await waitForMermaid(page);
           // Ayrıştırılamayan diyagram (ör. mesajda ';') hata çıktısıyla yayımlanmaz.
           await expect(page.locator('figure.mermaid-figure[data-state="error"]'), 'Mermaid ayrıştırma hatası').toHaveCount(0);
@@ -277,6 +460,7 @@ test.describe('text scaling', () => {
       for (const path of ['', 'kararlar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/']) {
         await page.goto(path);
         await expect(page.locator('h1')).toBeVisible();
+        if (path === 'gereksinimler/') await waitForHydration(page);
         await waitForMermaid(page);
         await noHorizontalOverflow(page);
         await expectMinFont(page, root);
@@ -561,7 +745,71 @@ async function frameStep(page: Page) {
 }
 
 /* ------------------------------------------------------------------ */
+test.describe('documents without JavaScript', () => {
+  test.use({ javaScriptEnabled: false, viewport: { width: 320, height: 720 } });
+
+  test('desktop AI links remain usable without JavaScript', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('kararlar/');
+    const group = page.getByRole('group', { name: 'AI', exact: true });
+    await expect(group).toBeVisible();
+    const links = group.locator('a[href*="/ai-"]');
+    await expect(links).toHaveCount(DOC_SLUGS.filter((slug) => slug.startsWith('ai-')).length);
+    await expect(links.first()).toBeVisible();
+    await links.first().click();
+    await expect(page).toHaveURL(/\/ai-bakis\/$/);
+  });
+
+  test('embeds stay under their headings and script controls are disabled @touch', async ({ page }) => {
+    await page.goto('yol-haritasi/');
+    await expect(page.locator('[data-embed]')).toHaveCount(0);
+    for (const [name, heading] of [['phase-table', 'Faz tablosu'], ['timeline', 'Faz sırası']]) {
+      const block = page.locator(`.prose [data-embed-source="${name}"]`);
+      await expect(block).toBeVisible();
+      await expect(block).not.toHaveClass(/\bprose\b/);
+      await expect(block.locator('xpath=preceding-sibling::h2[1]')).toHaveText(heading);
+    }
+    await expect(page.getByRole('button', { name: 'Menüyü aç' })).toBeDisabled();
+    await expect(page.getByTestId('color-scheme-toggle')).toBeDisabled();
+    await expect(page.getByTestId('nav-wrapper-ai')).toBeDisabled();
+  });
+
+  test('mobile readers can reach the section list without JavaScript @touch', async ({ page }) => {
+    await page.goto('kararlar/');
+    await page.getByRole('link', { name: 'Doküman bölümlerini aç' }).click();
+    await expect(page).toHaveURL(/\/#sections-h$/);
+    await expect(page.getByRole('heading', { name: 'Doküman bölümleri' })).toBeVisible();
+  });
+});
+
 test.describe('AI nav group', () => {
+  test('keeps its initial AI group state when the shell loads', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    let releaseShell!: () => void;
+    const shellGate = new Promise<void>((resolve) => { releaseShell = resolve; });
+    await page.route(/\/_astro\/Shell\.[^/]+\.js$/, async (route) => {
+      await shellGate;
+      await route.continue();
+    });
+
+    try {
+      await page.goto('kararlar/', { waitUntil: 'domcontentloaded' });
+      const group = page.getByTestId('nav-wrapper-ai');
+      const firstLink = page.locator('#site-nav a[href*="/ai-"]').first();
+      await expect(group).toBeDisabled();
+      await expect(group).toHaveAttribute('aria-expanded', 'false');
+      await expect(firstLink).toBeHidden();
+
+      releaseShell();
+      await waitForHydration(page);
+      await expect(group).toBeEnabled();
+      await expect(group).toHaveAttribute('aria-expanded', 'false');
+      await expect(firstLink).toBeHidden();
+    } finally {
+      releaseShell();
+    }
+  });
+
   test('wrapper is collapsed elsewhere, open on AI pages, keyboard operable', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
@@ -595,7 +843,6 @@ test.describe('focus', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('gereksinimler/');
     await waitForHydration(page);
-    await expect(page.getByTestId('req-table')).toBeVisible();
     await page.mouse.move(1, 1);
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     const seen = new Set<string>();
@@ -766,60 +1013,6 @@ test.describe('touch targets', () => {
 });
 
 test.describe('requirements explorer', () => {
-  test('desktop table waits for idle and an unread card list', async ({ page }) => {
-    await page.setViewportSize({ width: 1366, height: 900 });
-    await page.addInitScript(() => {
-      const callbacks = new Map<number, IdleRequestCallback>();
-      let next = 0;
-      window.requestIdleCallback = (callback) => {
-        callbacks.set(++next, callback);
-        return next;
-      };
-      window.cancelIdleCallback = (id) => { callbacks.delete(id); };
-      Object.assign(window, {
-        runIdleWork: () => {
-          const pending = [...callbacks.values()];
-          callbacks.clear();
-          for (const callback of pending) callback({ didTimeout: false, timeRemaining: () => 50 });
-        },
-      });
-    });
-    await page.goto('gereksinimler/');
-    await waitForHydration(page);
-    const table = page.getByTestId('req-table');
-    const runIdle = () => page.evaluate(() => {
-      (window as Window & { runIdleWork: () => void }).runIdleWork();
-    });
-    await expect(table).toHaveCount(0);
-    const card = page.locator('.req-card').nth(12);
-    await card.scrollIntoViewIfNeeded();
-    const top = (await card.boundingBox())!.y;
-    await runIdle();
-    await expect(card).toBeInViewport();
-    expect(Math.abs((await card.boundingBox())!.y - top)).toBeLessThanOrEqual(1);
-    await expect(table).toHaveCount(0);
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-    await expect.poll(async () => {
-      await runIdle();
-      return table.count();
-    }).toBe(1);
-    await expect(table).toBeVisible();
-  });
-
-  test('server sends one readable requirements view without JavaScript @touch', async ({ browser, baseURL }) => {
-    const page = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 1366, height: 900 }, baseURL });
-    try {
-      await page.goto('gereksinimler/');
-      const cards = page.locator('.req-cards .req-card');
-      await expect(cards).toHaveCount(requirements.length);
-      await expect(cards.first().locator('.req-card-detail')).toBeVisible();
-      await expect(page.getByTestId('req-table')).toHaveCount(0);
-      await noHorizontalOverflow(page);
-    } finally {
-      await page.close();
-    }
-  });
-
   const shouldCount = requirements.filter((r) => r.priority === 'SHOULD').length;
   const mayCount = requirements.filter((r) => r.priority === 'MAY').length;
   const keycloakCount = requirements.filter((r) =>
@@ -880,7 +1073,7 @@ test.describe('requirements explorer', () => {
     const details = requirements.map((r) => strip(r.detail)).sort();
     for (const v of [
       { width: 1366, title: '.req-table .req-title', detail: '.req-table .req-detail' },
-      { width: 390, title: '.req-card-title', detail: '.req-card-detail' },
+      { width: 390, title: '.req-title', detail: '.req-detail' },
     ]) {
       await page.setViewportSize({ width: v.width, height: 900 });
       await page.goto('gereksinimler/');
@@ -907,7 +1100,14 @@ test.describe('requirements explorer', () => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('gereksinimler/');
       await waitForHydration(page);
-      const region = page.getByRole('region', { name: 'Gereksinim tablosu (yatay kaydırılabilir)' });
+      const region = page.locator('.req-results');
+      if (width === 1024) {
+        await expect(region).toHaveAttribute('role', 'region');
+        await expect(region).toHaveAttribute('tabindex', '0');
+      } else {
+        await expect(region).not.toHaveAttribute('role');
+        await expect(region).not.toHaveAttribute('tabindex');
+      }
       await expect(region.locator('thead th')).toHaveCount(6);
       expect(await region.evaluate((el) => getComputedStyle(el).overflowX)).toBe('auto');
       if (width >= 1280) {
@@ -918,14 +1118,35 @@ test.describe('requirements explorer', () => {
     }
   });
 
+  test('non-overflowing requirements cards stay out of the tab order at 320px @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const results = page.locator('.req-results');
+    expect(await results.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(results).not.toHaveAttribute('tabindex');
+    await expect(results).not.toHaveAttribute('role');
+    const first = results.locator('tbody tr').first();
+    for (const label of ['Ray:', 'Faz:', 'Kaynak:']) {
+      await expect(first.getByRole('cell', { name: new RegExp(label) })).toBeVisible();
+    }
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(results).toHaveAttribute('tabindex', '0');
+    await expect(results).toHaveAttribute('role', 'region');
+    await expect(first.getByText('Ray:', { exact: true })).toBeHidden();
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect(results).not.toHaveAttribute('tabindex');
+    await expect(results).not.toHaveAttribute('role');
+  });
+
   test('shows cards at 320px and priority chips filter @touch', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');
     await waitForHydration(page);
-    const cards = page.locator('.req-cards .req-card');
+    const cards = page.locator('.req-table .req-card');
     await expect(cards.first()).toBeVisible();
     await expect(cards).toHaveCount(requirements.length);
-    await expect(page.getByTestId('req-table')).toHaveCount(0);
+    await expect(cards.first()).toHaveCSS('display', 'grid');
     await page.getByRole('button', { name: new RegExp(`^MAY · ${mayCount}$`) }).click();
     await expect(cards).toHaveCount(mayCount);
     await noHorizontalOverflow(page);
@@ -949,13 +1170,46 @@ test.describe('requirements explorer', () => {
     await noHorizontalOverflow(page);
   });
 
+  test('resizing the focused requirements wrapper preserves focus until blur', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const results = page.locator('.req-results');
+    await expect(results).toHaveAttribute('tabindex', '0');
+    await results.focus();
+    await expect(results).toBeFocused();
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect(results).not.toHaveAttribute('role');
+    await expect(results).toBeFocused();
+    await page.getByRole('textbox', { name: 'Ara' }).focus();
+    await expect(results).not.toHaveAttribute('tabindex');
+  });
+
+  test('overflowing requirements use a single keyboard focus edge', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const results = page.getByRole('region', { name: 'Gereksinim tablosu (yatay kaydırılabilir)' });
+    await page.keyboard.press('Tab');
+    await results.focus();
+    await expect(results).toBeFocused();
+    await expect(results).toHaveCSS('outline-style', 'none');
+    await expect(results).toHaveCSS('box-shadow', /0px -2px 0px/);
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => results.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+    await page.mouse.click(1, 1);
+    await results.focus();
+    await expect(results).toHaveCSS('outline-style', 'none');
+    await expect(results).toHaveCSS('box-shadow', 'none');
+  });
+
   // Regresyon (rapor Y-10): ada JS'i gecikirken bir kez yazılan metin kaybolmamalı ve filtre uygulanmalı.
   // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez. Sayaç kesin metinle
   // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
   const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} görev$`);
   for (const vp of [
-    { name: 'desktop', width: 1366, height: 900, tableVisible: true, tag: '' },
-    { name: '320', width: 320, height: 640, tableVisible: false, tag: ' @touch' },
+    { name: 'desktop', width: 1366, height: 900, tag: '' },
+    { name: '320', width: 320, height: 640, tag: ' @touch' },
   ]) {
     test(`text typed once before hydration is kept and applied at ${vp.name} (slow island JS)${vp.tag}`, async ({ page }) => {
       expect(keycloakCount).toBeGreaterThan(0);
@@ -972,8 +1226,7 @@ test.describe('requirements explorer', () => {
       const search = page.getByRole('textbox', { name: 'Ara' });
       const detail = page.getByRole('switch', { name: 'Ayrıntıları göster' });
       await expect(island).toHaveAttribute('ssr', '');
-      await expect(page.locator('.req-card-detail').first()).toBeVisible();
-      await expect(page.getByTestId('req-table')).toHaveCount(0);
+      await expect(page.locator('.req-detail').first()).toBeVisible();
       await search.fill('Keycloak');
       await detail.uncheck();
       // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
@@ -982,15 +1235,14 @@ test.describe('requirements explorer', () => {
       await expect(page.getByTestId('req-count')).toHaveText(exactCount(keycloakCount));
       await expect(search).toHaveValue('Keycloak');
       await expect(detail).not.toBeChecked();
-      await expect(page.locator('.req-detail, .req-card-detail')).toHaveCount(0);
+      const results = page.getByTestId('req-table');
+      await expect(results).toBeVisible();
+      await expect(page.locator('.req-detail')).toHaveCount(0);
       await expect(island).not.toHaveAttribute('ssr', '');
-      const table = page.getByTestId('req-table');
-      if (vp.tableVisible) await expect(table).toBeVisible();
-      else await expect(table).toBeHidden();
     });
   }
 
-  test('desktop fallback keeps a focused code box while the table loads', async ({ page }) => {
+  test('responsive table keeps a focused code box through hydration', async ({ page }) => {
     await page.setViewportSize({ width: 770, height: 900 });
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -1008,10 +1260,10 @@ test.describe('requirements explorer', () => {
       // Önce ölçümün %200 düzenine yetiştiğini bekle, sonra hedef kutuyu sıra numarasıyla sabitle.
       await expect.poll(() => mismatched(page)).toBe(0);
       const index = await page.evaluate(() =>
-        Array.from(document.querySelectorAll('.req-card-detail code')).findIndex((c) => c.getAttribute('tabindex') === '0'),
+        Array.from(document.querySelectorAll('.req-detail code')).findIndex((c) => c.getAttribute('tabindex') === '0'),
       );
       expect(index).toBeGreaterThanOrEqual(0);
-      const code = page.locator('.req-card-detail code').nth(index);
+      const code = page.locator('.req-detail code').nth(index);
       await code.focus();
       await expect(code).toBeFocused();
       await expect(code).toHaveAttribute('tabindex', '0');
@@ -1019,24 +1271,39 @@ test.describe('requirements explorer', () => {
       await waitForHydration(page);
       await expect(code).toBeFocused();
       await expect(code).toHaveAttribute('tabindex', '0');
-      await expect(page.getByTestId('req-table')).toHaveCount(0);
-      await page.getByRole('textbox', { name: 'Ara' }).focus();
       await expect(page.getByTestId('req-table')).toBeVisible();
     } finally {
       release();
     }
   });
 
-  test('focus returns to search when resizing a focused desktop table', async ({ page }) => {
-    await page.setViewportSize({ width: 1366, height: 900 });
-    await page.goto('gereksinimler/');
-    await waitForHydration(page);
-    const table = page.getByRole('region', { name: /Gereksinim tablosu/ });
-    await table.focus();
-    await expect(table).toBeFocused();
-    await page.setViewportSize({ width: 320, height: 640 });
-    await expect(page.getByTestId('req-table')).toHaveCount(0);
-    await expect(page.getByRole('textbox', { name: 'Ara' })).toBeFocused();
+  test.describe('without JavaScript', () => {
+    test.use({ javaScriptEnabled: false, viewport: { width: 320, height: 800 } });
+
+    test('requirements stay readable @touch', async ({ page }) => {
+      await page.goto('gereksinimler/');
+      await expect(page.locator('.prose #dağılım-özeti')).toBeVisible();
+      await expect(page.getByRole('region', { name: /Tablo: Gereksinim dağılımı/ })).toBeVisible();
+      const table = page.getByRole('table', { name: 'Gereksinimler', exact: true });
+      const rows = table.locator('tbody').getByRole('row');
+      await expect(table).toBeVisible();
+      await expect(rows).toHaveCount(requirements.length);
+      await expect(rows.first()).toHaveCSS('display', 'grid');
+      await expect(page.getByRole('textbox', { name: 'Ara' })).toBeHidden();
+      await expect(page.getByRole('group', { name: 'Önceliğe göre süz' })).toBeHidden();
+      await expect(page.locator('.req-more > summary')).toBeHidden();
+      await expect(page.getByRole('switch', { name: 'Ayrıntıları göster' })).toBeHidden();
+      const note = page.locator('noscript > p');
+      await expect(note).toBeVisible();
+      await expect(note).toContainText('Arama ve süzgeçler JavaScript gerektirir.');
+      await noHorizontalOverflow(page);
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await expect(rows.first()).toHaveCSS('display', 'grid');
+      expect(await page.locator('.req-results').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await page.setViewportSize({ width: 1366, height: 900 });
+      await expect(rows.first()).toHaveCSS('display', 'table-row');
+      await noHorizontalOverflow(page);
+    });
   });
 
   test('search text and focus survive orientation change', async ({ page }) => {
@@ -1051,6 +1318,10 @@ test.describe('requirements explorer', () => {
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(search).toHaveValue('Keycloak');
     await expect(count).toHaveText(exactCount(keycloakCount));
+    await expect(search).toBeFocused();
+    await expect(page.getByTestId('req-table').locator('tbody tr')).toHaveCount(keycloakCount);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator('.req-table .req-card')).toHaveCount(keycloakCount);
     await expect(search).toBeFocused();
     await noHorizontalOverflow(page);
   });
@@ -1067,7 +1338,7 @@ const countWhere = (f: (r: (typeof requirements)[number]) => boolean) => require
 test.describe('task board', () => {
   for (const vp of [
     { name: 'desktop', width: 1366, height: 900, title: '.req-table .req-title', row: (id: string) => `tr:has(code.req-id:text-is("${id}"))` },
-    { name: '320', width: 320, height: 640, title: '.req-card-title', row: (id: string) => `#req-${id}` },
+    { name: '320', width: 320, height: 640, title: '.req-title', row: (id: string) => `#req-${id}` },
   ]) {
     test(`done tasks are struck through, labelled and keep text contrast at ${vp.name}`, async ({ page }) => {
       expect(doneIds.length).toBeGreaterThan(0);
@@ -1250,7 +1521,7 @@ test.describe('task board', () => {
 /* ------------------------------------------------------------------ */
 // Uzun satır içi kod bölünmez; satırdan uzunsa kendi kutusunda kayar (global.css). Yalnız gerçekten taşan kutu Tab
 // sırasındadır (sayfa betiği; WebKit taşan kutuyu kendiliğinden odaklamaz), ok tuşuyla kayar, sığınca sıradan çıkar.
-const INLINE_CODE = '.prose :not(pre, a) > code, :is(.req-card-detail, .req-detail) > code';
+const INLINE_CODE = '.prose :not(pre, a) > code, .req-detail > code';
 async function codeBoxes(page: Page) {
   return page.evaluate((sel) =>
     Array.from(document.querySelectorAll<HTMLElement>(sel))
@@ -1285,7 +1556,7 @@ test.describe('long inline code', () => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');
     await page.evaluate(() => document.fonts.ready);
-    const codes = page.locator('.req-cards .req-card-detail > code');
+    const codes = page.locator('.req-table .req-detail > code');
     const stops = codes.and(page.locator('[tabindex="0"]'));
     const namedStops = stops.and(page.getByRole('group', { name: 'Kaydırılabilir kod', exact: true }));
     await expect.poll(() => stops.count()).toBeGreaterThan(0);
@@ -1300,7 +1571,7 @@ test.describe('long inline code', () => {
   test('all requirement cards fit plain text without emergency breaks at 320px @touch', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');
-    const details = page.locator('.req-card-detail');
+    const details = page.locator('.req-detail');
     await expect(details).toHaveCount(requirements.length);
     await page.evaluate(() => document.fonts.ready);
     const overflows = await details.evaluateAll((cards) => cards.flatMap((card) => {
@@ -1313,7 +1584,7 @@ test.describe('long inline code', () => {
         if (text.nodeType !== Node.TEXT_NODE) continue;
         range.selectNodeContents(text);
         if ([...range.getClientRects()].some((rect) => rect.right > right + 1)) {
-          escaping.push(`${detail.closest('li')?.id}: ${text.textContent?.trim()}`);
+          escaping.push(`${detail.closest('tr')?.id}: ${text.textContent?.trim()}`);
         }
       }
       detail.style.removeProperty('overflow-wrap');
@@ -1353,6 +1624,7 @@ test.describe('long inline code', () => {
     await noHorizontalOverflow(page);
   });
 
+
   test('scrolls in its own box, is keyboard reachable while it overflows and leaves the tab order when it fits', async ({
     page,
     browserName,
@@ -1380,7 +1652,6 @@ test.describe('long inline code', () => {
     await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     const code = page.locator('[data-test-code]');
     await expect(code).toBeFocused();
-    await expect(code).toHaveCSS('white-space', 'nowrap');
     expect(await code.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
     // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz ve kaydırmayı canlandırır: her basıştan sonra
     // sonuç 1 sn'ye kadar beklenir, en çok üç basış.
@@ -1409,8 +1680,6 @@ test.describe('long inline code', () => {
     await page.locator('#icerik').focus();
     await expect.poll(() => mismatched(page), '1366 px: yalnız taşan kod Tab sırasında').toBe(0);
     await expect.poll(() => code.evaluate((el) => el.hasAttribute('tabindex')), '1366 px: sığan kod Tab sırasında değil').toBe(false);
-    await expect(code).not.toHaveAttribute('role', 'group');
-    await expect(code).not.toHaveAttribute('aria-label', /Kaydırılabilir kod/);
   });
 
   test('requirement card code stays keyboard reachable after filtering re-renders the cards', async ({ page }) => {
@@ -1490,7 +1759,7 @@ test.describe('diagrams', () => {
     expect(problems).toEqual([]);
   });
 
-  test('roadmap timeline is moved next to its placeholder', async ({ page }) => {
+  test('roadmap timeline renders in the document', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('yol-haritasi/');
     await expect(page.locator('.prose .diagram-timeline')).toHaveCount(1);
@@ -1614,6 +1883,7 @@ test.describe('accessibility (axe)', () => {
         await page.emulateMedia({ colorScheme: scheme });
         await page.goto(path);
         await expect(page.locator('h1')).toBeVisible();
+        if (path === 'gereksinimler/') await waitForHydration(page);
         await waitForMermaid(page);
         const results = await new AxeBuilder({ page })
           .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
@@ -1718,7 +1988,7 @@ test.describe('network budget', () => {
 
     const reqs = await load(page, 'gereksinimler/');
     const reqsHtml = kb(reqs, 'html');
-    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (test sınırı 180)` });
+    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (bütçe 180)` });
     console.log(`[bütçe] Gereksinimler HTML ${reqsHtml.toFixed(1)} KB`);
     expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(180);
     // Ada bütçesi: Gereksinimler sayfasının kabuğa EK olarak indirdiği tüm JS (adanın kendi parçası + yalnız onun

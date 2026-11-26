@@ -14,6 +14,7 @@ BENCH_KEYS = {
     "workers",
     "background_workers",
     "gunicorn_workers",
+    "scheduler_tick_interval",
 }
 SITE_KEYS = {
     "allow_tests",

@@ -114,6 +114,40 @@ class ConnectionCheck(TypedDict):
 	models_visible: int | None
 
 
+class FileJobCreated(TypedDict):
+	name: str
+
+
+class FileJobChunk(TypedDict):
+	index: int
+	first_page: int
+	last_page: int
+	byte_count: int
+	status: Literal["planned", "queued", "running", "done", "failed"]
+	failure_code: str | None
+
+
+class FileJobStatus(TypedDict):
+	name: str
+	status: Literal["preparing", "planned", "queued", "running", "completed", "failed"]
+	failure_code: str | None
+	chunk_count: int | None
+	estimated_cost: str | None
+	currency: str | None
+	chunks: list[FileJobChunk]
+
+
+class FileJobQueued(TypedDict):
+	name: str
+	status: Literal["queued"]
+
+
+class FileChunkQueued(TypedDict):
+	name: str
+	chunk_index: int
+	status: Literal["queued"]
+
+
 def _respond(call, *args, allow_api_key=False):
 	try:
 		policy.require_session(allow_api_key=allow_api_key)
@@ -197,3 +231,40 @@ def save_connection(
 def check_connection(api: str) -> ConnectionCheck | ErrorResponse:
 	"""Check a saved connection with one model-list request and record the result."""
 	return _respond(connections.check_connection, api)
+
+
+# Large file jobs (G-156). The service checks the route, the file and the job owner.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+def create_file_job(
+	route: str, file: str, instruction: str, limit: int = 1024
+) -> FileJobCreated | ErrorResponse:
+	"""Record a large PDF job and queue its page text step. No provider is called."""
+	return _respond(lambda: {"name": api.create_file_job(route, file, instruction, limit)})
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+def file_job_status(file_job: str) -> FileJobStatus | ErrorResponse:
+	"""Show the chunk plan, the cost estimate and the progress of the caller's job."""
+	return _respond(api.file_job_status, file_job)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+def start_file_job(file_job: str) -> FileJobQueued | ErrorResponse:
+	"""Queue every planned chunk. Each chunk is a separate, possibly billable gateway call."""
+
+	def start():
+		api.start_file_job(file_job)
+		return {"name": file_job, "status": "queued"}
+
+	return _respond(start)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+def retry_file_chunk(file_job: str, chunk_index: int) -> FileChunkQueued | ErrorResponse:
+	"""Queue one failed chunk again. Finished chunks are not sent again."""
+
+	def retry():
+		api.retry_file_chunk(file_job, chunk_index)
+		return {"name": file_job, "chunk_index": chunk_index, "status": "queued"}
+
+	return _respond(retry)

@@ -16,7 +16,10 @@ website_user_allowed_methods = [
 
 before_install = "hrms_tr.setup.check_install"
 before_migrate = "hrms_tr.setup.before_migrate"
-after_migrate = "hrms_tr.setup.after_migrate"
+# The Role Profiles are not fixtures: a profile write leaves a lock (AJA-934). The setup step opens
+# only the missing ones. `after_sync` runs on install after the fixtures, so the roles exist.
+after_sync = ["hrms_tr.role_profiles.ensure"]
+after_migrate = ["hrms_tr.role_profiles.ensure", "hrms_tr.setup.after_migrate"]
 before_uninstall = "hrms_tr.setup.before_uninstall"
 after_uninstall = "hrms_tr.setup.after_uninstall"
 

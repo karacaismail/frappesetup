@@ -501,6 +501,215 @@ paths:
           $ref: '#/components/responses/Busy'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.create_file_job:
+    post:
+      summary: Record a large PDF job
+      description: >
+        Requires a signed-in session, access to the route and read access to the File record.
+        Records the job and queues the page text step. No provider is called and nothing is charged.
+        Read the chunk count and the cost estimate with file_job_status before the start (G-156).
+      operationId: createFileJob
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [route, file, instruction]
+              properties:
+                route:
+                  type: string
+                  minLength: 1
+                  description: AI Route document name
+                file:
+                  type: string
+                  minLength: 1
+                  maxLength: 140
+                  description: File document name of a PDF the caller can read
+                instruction:
+                  type: string
+                  minLength: 1
+                  description: Instruction sent with every chunk. At most 16 KiB as UTF-8.
+                limit:
+                  type: integer
+                  minimum: 1
+                  default: 1024
+                  description: Output token limit of each chunk request
+            example:
+              route: fixture-route
+              file: fixture-file
+              instruction: Summarize the fixture text.
+              limit: 256
+      responses:
+        '200':
+          description: Recorded job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    additionalProperties: false
+                    required: [name]
+                    properties:
+                      name: {type: string, description: PLT AI File Job document name}
+              example:
+                message: {name: fixture-job}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.file_job_status:
+    post:
+      summary: Show the plan and the progress of a large file job
+      description: >
+        Only the job owner, an AI Manager or a System Manager can read the job.
+        After the text step the job is planned. The chunk count and the cost estimate are then known before any provider call.
+        The estimate is null when a route price is unknown or the target currencies differ.
+      operationId: fileJobStatus
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileJobReference'
+            example:
+              file_job: fixture-job
+      responses:
+        '200':
+          description: Job plan and chunk states. Chunk text is never returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    $ref: '#/components/schemas/FileJobStatus'
+              example:
+                message:
+                  name: fixture-job
+                  status: planned
+                  failure_code: null
+                  chunk_count: 1
+                  estimated_cost: '0.25'
+                  currency: USD
+                  chunks:
+                    - {index: 0, first_page: 1, last_page: 2, byte_count: 900, status: planned, failure_code: null}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+  /api/method/platform_core.api.model.start_file_job:
+    post:
+      summary: Start a planned large file job
+      description: >
+        Only the job owner, an AI Manager or a System Manager can start the job. The job must be planned.
+        Every chunk is queued and later sent as a separate gateway call. Each call may incur provider charges.
+      operationId: startFileJob
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileJobReference'
+            example:
+              file_job: fixture-job
+      responses:
+        '200':
+          description: Chunks queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    additionalProperties: false
+                    required: [name, status]
+                    properties:
+                      name: {type: string}
+                      status: {const: queued}
+              example:
+                message: {name: fixture-job, status: queued}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/method/platform_core.api.model.retry_file_chunk:
+    post:
+      summary: Queue one failed chunk again
+      description: >
+        Only the job owner, an AI Manager or a System Manager can retry a chunk. Only a failed chunk is queued again.
+        Finished chunks are not sent again. The retry may incur a provider charge.
+      operationId: retryFileChunk
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file_job, chunk_index]
+              properties:
+                file_job: {type: string, minLength: 1, maxLength: 140}
+                chunk_index: {type: integer, minimum: 0}
+            example:
+              file_job: fixture-job
+              chunk_index: 0
+      responses:
+        '200':
+          description: Chunk queued again
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    additionalProperties: false
+                    required: [name, chunk_index, status]
+                    properties:
+                      name: {type: string}
+                      chunk_index: {type: integer, minimum: 0}
+                      status: {const: queued}
+              example:
+                message: {name: fixture-job, chunk_index: 0, status: queued}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 components:
   securitySchemes:
     session:
@@ -595,6 +804,14 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             message: {error: provider_unavailable}
+    NotFound:
+      description: The large file job has no chunk with this index
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: chunk_not_found}
     Result:
       description: Normalized Frappe RPC response
       content:
@@ -613,6 +830,49 @@ components:
               api: fixture-api
               model: fixture-model
   schemas:
+    FileJobReference:
+      type: object
+      additionalProperties: false
+      required: [file_job]
+      properties:
+        file_job:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: PLT AI File Job document name
+    FileJobStatus:
+      type: object
+      additionalProperties: false
+      required: [name, status, failure_code, chunk_count, estimated_cost, currency, chunks]
+      properties:
+        name: {type: string}
+        status:
+          enum: [preparing, planned, queued, running, completed, failed]
+        failure_code:
+          type: [string, 'null']
+          description: Why the text step or the job stopped, for example ocr_unavailable or file_too_large.
+        chunk_count:
+          type: [integer, 'null']
+          minimum: 0
+        estimated_cost:
+          type: [string, 'null']
+          description: Decimal text of the largest reservation over the route targets, or null when unknown.
+        currency:
+          type: [string, 'null']
+        chunks:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [index, first_page, last_page, byte_count, status, failure_code]
+            properties:
+              index: {type: integer, minimum: 0}
+              first_page: {type: integer, minimum: 1}
+              last_page: {type: integer, minimum: 1}
+              byte_count: {type: integer, minimum: 0}
+              status:
+                enum: [planned, queued, running, done, failed]
+              failure_code: {type: [string, 'null']}
     DecimalCost:
       type: string
       pattern: '^(?:0|[1-9][0-9]{0,11})(?:[.][0-9]{1,9})?(?![\s\S])'
@@ -638,7 +898,8 @@ components:
                     invalid_note, output_limit_exceeds_deadline, authentication_required, data_policy_denied,
                     transaction_active, attempt_in_progress, attempt_already_settled, quota_exceeded, gateway_busy,
                     endpoint_unavailable, gateway_unavailable, provider_unavailable, provider_timeout, preview_required, preview_invalid,
-                    unknown_provider, invalid_fields, catalog_unavailable]
+                    unknown_provider, invalid_fields, catalog_unavailable, unsupported_file, job_not_planned,
+                    chunk_not_found, chunk_not_failed]
                 fields:
                   type: array
                   description: Names of the connection fields that failed validation

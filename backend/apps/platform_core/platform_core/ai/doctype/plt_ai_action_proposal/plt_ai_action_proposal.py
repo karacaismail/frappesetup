@@ -22,6 +22,7 @@ FROZEN_FIELDS = (
 	"preview_json",
 	"digest",
 	"preview_digest",
+	"risk_level",
 )
 # A proposal in one of these states is decided. Its state does not change again.
 DECIDED_STATES = ("rejected", "expired", "consumed")

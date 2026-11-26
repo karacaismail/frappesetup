@@ -5,7 +5,7 @@ insan iletir. Hiçbir devir mesajı otomatik gönderilmez. Erişim bilgisine sah
 
 ## Roller
 
-| Rol | Kişi | İşler | Kontrat işlemleri |
+| Rol kodu | Görev sahibi | İşler | Kontrat işlemleri |
 | --- | --- | --- | --- |
 | `infrastructure_owner` | DevOps sorumlusu | Sunucu hazırlığı ve gruba bağlama, disk ölçümü, onaylı build cache temizliği, registry deposu, ajan ve worker, servis yeniden başlatma, SSH ile log okuma, Press kod düzeltmesinin canlıya kurulumu, katalog etiketi | `release_group.add_server`, `server.disk_check`, `server.build_cache_cleanup`, `server.restart_services`, `registry.repository_check`, `logs.read`, `server.ping_agent`, `server.agent_version`, `press.code_fix`, `cluster.catalog_label` |
 | `dns_owner` | DevOps sorumlusu kaydı hazırlar ve doğrular; alan adı sorumlusu GoDaddy'de uygular | Alan adı kaydı | `dns.record` |

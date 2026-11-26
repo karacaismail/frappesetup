@@ -13,6 +13,8 @@ dependencies = [
     # requests ships with Frappe 16 (2.33.x). oidc_verify lives in backend/libs/oidc_verify and is
     # installed from there (dev images use `pip install --no-deps -e`); it is not on PyPI.
     "oidc_verify==0.1.0",
+    # Large file jobs (G-156) read PDF text on the server. Frappe 16 pins pypdf 6.21.4.
+    "pypdf~=6.21.4",
     "PyPika @ git+https://github.com/frappe/pypika@7ef6e40215d46cd531e8c4e58650b84c11abbd04",
     "redis~=7.1.0",
     "requests~=2.33.0",

@@ -3405,5 +3405,41 @@
     "reason": "The disposable bench container supplies bench on PATH.",
     "owner": "dev-ortam",
     "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_worker_sizing.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for the G-50 sizing audit command-line test.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_worker_sizing.py",
+    "code": "return subprocess.run(args, capture_output=True, text=True, check=False)",
+    "statementSha256": "4d9fc0a5716daab698ed3f926a5d5835def7737eea60a5def28da981ffbeba9c",
+    "reason": "Test runs its own Python on a fixed audit script with temporary input files.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/e2e/tests/test_tenant_ca_trust.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import is used by the inspected subprocess call and does not execute a command itself.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/tests/test_tenant_ca_trust.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "616dceedc5f4bda7d0e1c835162f8d3074414d1b9026c7264a232ef9b2d6a2e3",
+    "reason": "The test runs the tenant entrypoint from compose.tenant.yaml with sh, without a shell string from outside, in a temporary directory.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-25"
   }
 ]
