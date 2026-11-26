@@ -14,13 +14,18 @@ FONT = "style='font-family: var(--mantine-font-family), \"Outfit Variable\", Out
 
 def figure(cls: str, label: str, svg: str, caption: str, source: str) -> str:
     """Kaydırma bölgesi figürün içindeki div'dir: figcaption'lı <figure> role=region alamaz (ARIA in HTML)."""
-    return (
-        f"---\n// {source} — scripts/gen-diagrams.py üretir; elle düzenlemeyin.\n---\n"
+    source_text = (
+        f"---\n// {source} — scripts/gen-diagrams.py üretir; elle düzenlemeyin.\n"
+        + ("import { PRODUCT_NAME, BRAND_DOMAIN } from '../data/site';\n"
+           "import DiagramBrandLabel from './DiagramBrandLabel.astro';\n"
+           if "{{PRODUCT_NAME}}" in svg + caption or "{{BRAND_DOMAIN}}" in svg + caption else "")
+        + "---\n"
         f'<figure class="diagram {cls}">\n'
         f'<div class="diagram-scroll" tabindex="0" role="region" aria-label="{label} (yatay kaydırılabilir)">\n'
         + svg
         + f'\n</div>\n<figcaption class="diagram-note">{caption}</figcaption>\n</figure>\n'
     )
+    return source_text.replace("{{PRODUCT_NAME}}", "{PRODUCT_NAME}").replace("{{BRAND_DOMAIN}}", "{BRAND_DOMAIN}")
 
 
 def timeline() -> str:
@@ -67,7 +72,11 @@ def timeline() -> str:
         fill = "var(--fs-accent-soft)" if acc else "var(--fs-surface)"
         o.append(f"<rect x='{x}' y='{y}' width='{BOX_W}' height='{BOX_H}' rx='10' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>")
         o.append(f"<text x='{x + 16}' y='{y + 26}' font-size='18' font-weight='650' fill='var(--fs-ink)'>{pid}</text>")
-        o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
+        if "{{PRODUCT_NAME}}" in name_of(pid):
+            brand_label = name_of(pid).replace("{{PRODUCT_NAME}}", "${PRODUCT_NAME}")
+            o.append(f"<DiagramBrandLabel name={{`{brand_label}`}} x={{{x + 16}}} y={{{y + 50}}} maxWidth={{{BOX_W - 32}}} />")
+        else:
+            o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
     # P7'ye giden iki ok kendi yolundan gider. Hiçbiri başka fazın okuyla çizgi ya da çıkış noktası paylaşmaz.
     # P1 → P7: P1'in sağından ayrı bir noktadan (y=148) çıkar. x=510 şeridinden iner, P7'ye üst yarıdan girer.
     #   x=510, P1 → P4 şeridinin (x=524) solundadır. Böylece P1 → P4'ün y=222 parçasını kesmez.
@@ -125,7 +134,7 @@ def timeline() -> str:
         "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
         "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
         "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. "
-        "P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
+        "P7 {{PRODUCT_NAME}} ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
     )
     return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 
