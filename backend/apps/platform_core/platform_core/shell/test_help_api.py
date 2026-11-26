@@ -73,6 +73,29 @@ class TestFieldHelp(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self.add_topic("no_such_field")
 
+	def test_unsafe_help_links_cannot_be_saved(self):
+		for fieldname in ("tour_url", "doc_url", "support_url"):
+			for value in ("javascript:alert(1)", "//example.test", "/\\example.test", "http://example.test"):
+				with self.subTest(fieldname=fieldname, value=value):
+					record = self.add_topic(OPEN_FIELD)
+					record.set(fieldname, value)
+					with self.assertRaises(frappe.ValidationError):
+						record.save()
+
+	def test_blank_help_links_are_normalized_and_safe_links_are_saved(self):
+		record = self.add_topic(OPEN_FIELD)
+		record.update(
+			{"tour_url": "  ", "doc_url": "https://docs.example.test/guide", "support_url": "/support"}
+		)
+		record.save()
+		record.reload()
+		self.assertFalse(record.tour_url)
+		frappe.set_user(USER)
+		answer = get_field_help(DOCTYPE, OPEN_FIELD, USER, "en")
+		self.assertIsNone(answer["tour_url"])
+		self.assertEqual(answer["doc_url"], "https://docs.example.test/guide")
+		self.assertEqual(answer["support_url"], "/support")
+
 	def test_readable_field_returns_the_tenant_topic(self):
 		record = self.add_topic(OPEN_FIELD)
 		frappe.set_user(USER)
@@ -143,6 +166,7 @@ class TestHelpHooks(IntegrationTestCase):
 	def test_website_users_reach_field_help_but_not_the_coverage_report(self):
 		allowed = frappe.get_hooks("website_user_allowed_methods")
 		self.assertIn("platform_core.api.help.get_field_help", allowed)
+		self.assertIn("platform_core.api.help.get_component_help", allowed)
 		self.assertNotIn("platform_core.api.help.get_help_coverage", allowed)
-		for name in ("get_field_help", "get_help_coverage"):
+		for name in ("get_field_help", "get_component_help", "get_help_coverage"):
 			self.assertIn(frappe.get_attr(f"platform_core.api.help.{name}"), frappe.whitelisted, name)
