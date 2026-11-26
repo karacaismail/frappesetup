@@ -10,8 +10,11 @@ import json
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.tests.test_api import make_request
+from frappe.translate import get_user_lang
 from frappe.utils import get_test_client
 from frappe.utils.password import update_password
+
+from platform_core.ai.errors import CONTEXT
 
 MCP_PATH = "/api/method/platform_core.api.ai.mcp"
 API = "/api/method/platform_core.api.ai."
@@ -25,6 +28,15 @@ MANAGER = "yz.yonetici@example.test"
 DESK_USER = "yz.desk@example.test"
 DESK_ROLE = "YZ Desk"
 PASSWORD = "Sahte-Parola-7391-yz!"
+
+
+def answer_text(message: str, user: str) -> str:
+	"""The fixed text of the layer as a request of the user gets it.
+
+	A logged-in request answers in the user's language, else in the site's language.
+	The test compares against the same translation, so it holds for an English and a Turkish site.
+	"""
+	return frappe._(message, lang=get_user_lang(user), context=CONTEXT)
 
 
 def ensure_fixtures() -> None:

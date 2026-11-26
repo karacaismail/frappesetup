@@ -4,10 +4,17 @@ x-tenant: &tenant
     context: ..
     dockerfile: dev/Dockerfile.tenant
   working_dir: /home/frappe/frappe-bench
+  # A recreated container loses the trust that session-tls.sh adds with update-ca-certificates.
+  # Each start rebuilds the CA bundle from the image bundle and the relay certificate that
+  # session-tls.sh keeps in the sites volume (AJA-936). Without that file the bundle is the image bundle.
+  # $$ stops Compose interpolation; the shell sees one $. The image entrypoint still runs last.
+  entrypoint: ["sh", "-c", "set -eu; bundle=\"$${REQUESTS_CA_BUNDLE}\"; cat \"$${FS_SYSTEM_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}\" > \"$$bundle\"; if [ -s sites/.e2e-trust/identity-sync.crt ]; then printf '\\n' >> \"$$bundle\"; cat sites/.e2e-trust/identity-sync.crt >> \"$$bundle\"; fi; exec \"$$@\"", "fs-tenant-ca", "/usr/local/bin/entrypoint.sh"]
   volumes:
     - tenant-sites:/home/frappe/frappe-bench/sites
     - tenant-logs:/home/frappe/frappe-bench/logs
   environment:
+    REQUESTS_CA_BUNDLE: /tmp/fs-tenant-ca-bundle.crt
+    SSL_CERT_FILE: /tmp/fs-tenant-ca-bundle.crt
     FS_TENANT_WEB_PORT: ${FS_TENANT_WEB_PORT:?Use dev/bin/compose}
     FS_TENANT_SOCKET_PORT: ${FS_TENANT_SOCKET_PORT:?Use dev/bin/compose}
     MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Create .env}

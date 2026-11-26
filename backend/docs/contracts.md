@@ -285,7 +285,7 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.auth.get_login_url` | POST | Misafir, istek sınırlı | Keycloak giriş adresini üretir. |
 | `press_tr.api.auth.keycloak_callback` | GET | Misafir, `state` ve kod | Kodu belirteçle değiştirir. Kullanıcıyı `(iss, sub)` ile bulur. Takım yoksa açar (G-12). |
 | `press_tr.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Press oturumlarını kapatır. |
-| `press_tr.api.account.request_recovery` | POST | Misafir, yalnız e-posta adresi | Bağlı hesap varsa bir kurtarma inceleme kaydı açar. Saatte 5 istek sınırı vardır. Her adrese aynı yanıtı verir (G-163). |
+| `press_tr.api.account.request_recovery` | POST | Misafir, yalnız e-posta adresi | Bağlı hesap varsa bir kurtarma inceleme kaydı açar. Kaydı yanıttan sonra bir arka plan işi açar. Yanıt süresi her adreste aynı kalır. Saatte 5 istek sınırı vardır. Her adrese aynı yanıtı verir (G-163). |
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
 | `press_tr.api.identity.anonymize_user` | POST | Servis belirteci, `azp=identity-sync` | Press kullanıcısını kapatır, API anahtarlarını geçersiz kılar ve kişiyi gösteren alanları anonim yapar. Fatura gibi iş kayıtları silinmez. |

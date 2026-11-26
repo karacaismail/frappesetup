@@ -2108,5 +2108,35 @@
   "phase": "P7",
   "source": "configure",
   "owner": "Ürün sahibi; güvenlik ve uyum sorumluları"
+ },
+ {
+  "id": "G-168",
+  "title": "Kiracı yöneticisi yardımcısı rolü",
+  "detail": "Kiracı yöneticisi bu rolü kendi şirketinden birine verir. Frappe rolleri \"Website User\" ve \"Tenant Admin Assistant\" rolüdür. Rol bir Role Profile ile verilir. \"Tenant Admin\" ve \"System Manager\" rolü verilmez. Kişi kiracının Press takımında üyedir. Kişi siteyi ve site durumunu görür. Ödeme, fatura ve plan yetkisi yoktur. Kişi \"Hesap\", \"İzin talepleri\", \"Site ve plan\" ve \"Yapay zekâ işlemleri\" gruplarını görür. \"Site ve plan\" grubu yalnız okunur. Kişi \"Yönetim\" grubunda yalnız kullanıcı listesini görür. Kişi rol ve yetki değiştiremez. G-62 uçları bu role kapalıdır. Kişi yeni kullanıcı açamaz ve kullanıcı silemez. Kişi planı değiştiremez. Kişi fatura ve ödeme göremez. Kişi siteyi silemez, devredemez ve yedekten geri yükleyemez. Kişi Desk ekranına giremez. G-53 kuralı geçerlidir. Kabul: bu roldeki kullanıcı yalnız izinli menü gruplarını görür ve yasak işlemlerin hepsinde ret alır.",
+  "rail": "R2 Frappe geliştirme",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Ürün sahibi"
+ },
+ {
+  "id": "G-169",
+  "title": "Bayi yöneticisi rolü ve \"Müşteriler\" grubu",
+  "detail": "Bayi, platformu müşterilere satan iş ortağıdır. Platform operatörü bu rolü onaylı bir bayinin sorumlusuna verir. Bayinin kendi kiracısında \"Website User\" ve \"Reseller Admin\" rolü vardır. Müşteri kiracılarında bayinin Frappe rolü yoktur. Bayinin Press takımı partner takımıdır. Press partner ödemeleri ve partner seviyeleri G-33 içinde kalır. Bayi kendi müşterilerinin listesini ve site durumunu görür. Bayi müşteri adına yeni kiracı açma isteği gönderir. Bağ, platform_core içinde bir kayıtla tutulur. Kayıt bayi kiracısını müşteri kiracısına bağlar. Bu kaydı yalnız platform operatörü açar ve kapatır. Platform operatörü isteği onaylar. Bayi \"Hesap\", \"Site ve plan\" ve yeni \"Müşteriler\" grubunu görür. Bayi müşteri kiracısının iş verisini göremez. Örneğin izin kayıtlarını göremez. Bayi müşteri kiracısına kullanıcı olarak giremez. Destek erişimi ayrı gereksinimle tanımlanır. Bayi başka bayinin müşterilerini göremez. Bayi fiyat, indirim ve komisyon oranı belirleyemez. Bu konular proje sahibindedir. Bayiye \"System Manager\" ve \"Platform Operator\" rolü verilmez. Kabul: bayi yöneticisi yalnız kendi müşterilerini görür ve müşteri iş verisi istekleri reddedilir.",
+  "rail": "R1 Press",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Ürün sahibi"
+ },
+ {
+  "id": "G-170",
+  "title": "Bayi yöneticisi yardımcısı rolü",
+  "detail": "Bayi yöneticisi bu rolü kendi şirketinden birine verir. Bayinin kendi kiracısında \"Website User\" ve \"Reseller Assistant\" rolü vardır. Kişi bayinin partner takımında üyedir. Kişi müşteri listesini ve site durumunu yalnız okur. Kişi \"Hesap\", \"Müşteriler\" ve \"Site ve plan\" gruplarını görür. \"Müşteriler\" ile \"Site ve plan\" grupları yalnız okunur. Kişi yeni müşteri kiracısı açma isteği gönderemez. Kişi müşterinin planını değiştiremez. Kişi bayi ödemelerini ve komisyon raporunu göremez. Kişi bayi takımına üye ekleyemez ve rol veremez. Bayi yöneticisinin bütün yasakları bu rol için de geçerlidir. Kabul: bu roldeki kullanıcı müşteri listesini ve site durumunu okur ve yazma isteklerinin hepsinde ret alır.",
+  "rail": "R1 Press",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Ürün sahibi"
  }
 ]
