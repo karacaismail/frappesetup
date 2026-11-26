@@ -94,6 +94,142 @@ Kararım dört sunucudur:
 
 Sunucu tipini DevOps sorumlusu seçer. rc ve prod aynı tip olur. Sunucu tipini ölçümle seçin. Proje kaydında üretim işçi sayısı henüz ölçülmedi.
 
+### İşçi ve kuyruk önerisi
+
+**G-50 önerisi doğrulanmadı.** Bildirilen sunucuda 128 GB bellek ve AMD EPYC işlemci vardır.
+Çekirdek sayısı bilinmiyor. Sunucuda yük ölçümü yapılmadı.
+Bu öneri yalnız bildirilen 128 GB sunucu içindir.
+Başka sunucuların belleği ve çekirdek sayısı ayrıca doğrulanmalıdır.
+
+Kararın kaynağı AJA-1055 görevidir. Karar 26 Kasım 2026 Perşembe günü verildi.
+Sunucularda zamanlayıcı ve düzenli yedek açık kabul edilir.
+Bu görev sunucudaki çalışma durumunu doğrulamaz.
+prod ortamına yalnız deneme verisi girer. Öneri gerçek müşteri yükünü kapsamaz.
+
+İşçi, isteği veya arka plandaki işi çalıştıran süreçtir.
+Kuyruk, çalıştırılmayı bekleyen işleri tutar.
+Gunicorn, web isteklerini işçilere dağıtan programdır.
+
+Bellek hesabı şu varsayımları kullanır:
+
+1. Diğer servisler ve güvenlik payı için 64 GB ayrılır.
+   Veritabanı, Redis, Keycloak ve işletim sistemi bu payı kullanır.
+   Diğer süreçler ve varsa derleme işleri de bu paya dahildir.
+2. Kalan 64 GB, en çok dört ortama bölünür.
+   Ortam başına hesap `(128 - 64) / 4 = 16 GB` olur.
+   Bu bölme, dört ortamın aynı sunucuda bulunduğu varsayımına karşı pay bırakır.
+   Bölme, yukarıdaki sunucu yerleşimini değiştirmez.
+   Daha az ortam varsa kalan pay kendiliğinden başka ortama aktarılmaz.
+3. `tenant-scheduler` için 1 GB ayrılır. Bu pay doğrulanmadı.
+   Bu servis, zamanı gelen Frappe işlerini kuyruğa gönderir.
+4. Yedek işi için 3 GB ayrılır. Bu pay doğrulanmadı.
+   Her ortamda eşzamanlı tek yedek işi varsayılır.
+   Dört ortam aynı anda yedek alabilir.
+   Yedeğin sıkıştırma ve aktarım işlemleri de bu paya dahildir.
+5. İşçilere kalan bellek `16 - 1 - 3 = 12 GB` olur.
+   Zamanlayıcı ve yedek payı, diğer servislerin 64 GB payından ayrıdır.
+   Aynı pay iki kez sayılmaz.
+6. Her web işçisi için 1 GB varsayılır.
+   Her kuyruk süreci için 2 GB varsayılır.
+   Kuyruk varsayımı üst süreci ve çalışan işi birlikte kapsar.
+   Bu değerler ölçüm sonucu değildir.
+
+| Ortam başına ayrılan pay | Bellek hesabı | Bellekten çıkan üst sınır |
+| --- | --- | --- |
+| Kiracı web işçileri için 6 GB | `6 / 1 = 6` | 6 işçi |
+| Press web işçileri için 2 GB | `2 / 1 = 2` | 2 işçi |
+| İki kuyruk servisi için toplam 4 GB | `4 / 2 = 2` | Toplam 2 süreç |
+
+`C_t`, kiracı web işçilerine ayrılan çekirdek payıdır.
+`C_p`, Press web işçilerine ayrılan çekirdek payıdır.
+`C_q`, iki kuyruk servisine ayrılan toplam çekirdek payıdır.
+`C_env`, diğer servislerden sonra ortama ayrılan çekirdek payıdır.
+`C_s`, zamanlayıcının çekirdek payıdır. `C_b`, yedek işinin çekirdek payıdır.
+Bu iki işlemci payı da doğrulanmadı. Sayıları ölçüm belirler.
+`C_s > 0` ve `C_b > 0` olmalıdır.
+Bu paylar, bütün sunucunun çekirdek sayısı değildir.
+DevOps sorumlusu diğer servislerden kalan çekirdekleri ortamlar arasında böler.
+Ortamların `C_env` toplamı, kalan çekirdek sayısını aşamaz.
+Aşağıdaki koşul, zamanlayıcı ve yedek payını işçilere kalan paydan düşer:
+
+`C_t + C_p + C_q <= C_env - C_s - C_b`
+
+DevOps sorumlusu aynı çekirdek payını iki kez ayırmaz.
+Sorumlu, yedek çalışırken bu koşulu ayrıca doğrular.
+
+| Ayar veya süreç grubu | Önerilen hesap |
+| --- | --- |
+| `ATONOTA_GUNICORN_WORKERS` | `min(2 * C_t + 1, 6)` |
+| `ATONOTA_PRESS_GUNICORN_WORKERS` | `min(2 * C_p + 1, 2)` |
+| `tenant-worker` ve `press-worker` toplamı | `min(C_q, 2)` |
+
+`min`, çekirdek ve bellek sınırlarından küçük olanı seçer.
+Kesirli sonuç aşağı yuvarlanır.
+Web formülü, [Gunicorn başlangıç önerisine](https://gunicorn.org/design/#how-many-workers) dayanır.
+Bu formül, yük ölçümünün yerini tutmaz.
+Mevcut web süreçleri `gthread` ve `--threads=4` kullanır.
+`gthread`, bir işçinin birden fazla yürütme kolu kullanmasını sağlar.
+Bellek varsayımı dört kolu birlikte kapsar.
+
+Mevcut geçici değerler kiracı için `4`, Press için `2` olarak korunur.
+Çekirdek sayısı bilinmediğinden bu değerler formül sonucu değildir.
+Her kuyruk servisi için geçici öneri bir süreçtir.
+Press açıksa toplam iki kuyruk süreci için `C_q` en az 2 olmalıdır.
+Her süreç `bench worker --queue short,default,long` komutunu kullanır.
+Üç kuyruk adı, üç ayrı süreç anlamına gelmez.
+Uzun işler kısa işlerin beklemesini artırabilir. DevOps sorumlusu bekleme sürelerini ayrı ölçer.
+Press kapalıysa Press süreçleri çalışmaz. Ayrılan pay kiracıya otomatik aktarılmaz.
+
+Press açıkken geçici değerlerin hesabı aşağıdadır. Zamanlayıcı ve yedek aynı anda çalışıyor kabul edilir.
+
+| Hesap | Toplam |
+| --- | --- |
+| Bir ortamın geçici değerleri | `(4 + 2) * 1 + 2 * 2 + 1 + 3 = 14 GB` |
+| Dört ortam ve diğer servisler | `64 + 4 * 14 = 120 GB` |
+| Sunucuda kalan bellek | `128 - 120 = 8 GB` |
+| Bir ortamın işçi bellek sınırları | `(6 + 2) * 1 + 2 * 2 + 1 + 3 = 16 GB` |
+| Dört ortam bellek sınırındayken sunucu | `64 + 4 * 16 = 128 GB` |
+
+İşçilere ayrılan pay toplam `4 * 12 = 48 GB` olur.
+Zamanlayıcı ve yedek payları toplam `4 * (1 + 3) = 16 GB` olur.
+Bu hesap, işlemci gücünün veya gerçek bellek tüketiminin yeterli olduğunu kanıtlamaz.
+Compose bu öneriyle bellek veya çekirdek kotası uygulamaz.
+
+`stack.yaml` dosyasındaki mevcut varsayılanlar çalışır.
+`environments/*.env` dosyalarındaki öneri satırları yorumdur.
+Mevcut ayar okuyucusu bu iki anahtarı ortam dosyalarında kabul etmez.
+Yorum işaretini kaldırmak dağıtım denetimini düşürür.
+Ortamdan etkin değer seçmek için okuyucuya ayrı destek gerekir.
+
+DevOps sorumlusu, sayı değişmeden önce şu adımları tamamlar:
+
+1. Sunucunun kullanılabilir çekirdek sayısını doğrular.
+2. Bellek ve çekirdek paylarını servisler arasında belirler.
+3. Hazırlık ortamında zamanlayıcı ve yedek çalışırken kaynak tüketimini ölçer.
+4. Web yanıt süresini ve kuyruk beklemesini ölçer.
+5. Ölçümle varsayımları düzeltir ve küçük sınırı yeniden hesaplar.
+6. Sonucu E-8 kaydına yazar.
+
+Bir pay yetersizse sorumlu yerleşimi yeniden değerlendirir.
+Başka bellek boyutunda veya dört ortam aşıldığında hesap yeniden yapılır.
+Bir ortamda eşzamanlı yedek sayısı artarsa hesap yeniden yapılır.
+Sunucu kararı, bu Mac'te veya Jenkinsfile içinde zamanlanmış iş kurmaz.
+Bu değişiklik yalnız öneriyi düzeltir. Depoya cron veya zamanlanmış iş eklemez.
+Mevcut `tenant-scheduler` servisi `COMPOSE_PROFILES=scheduler` ile seçilir.
+Bu görev mevcut servis seçimini değiştirmez.
+G-50'nin tamamının uygulandığını göstermez.
+E-8 engeli, yük ölçümü tamamlanana kadar açık kalır.
+
+Yerel denetim depo kökünde şu komutla çalışır:
+
+```sh
+python3 -I -m unittest discover -s backend/deploy/tests -p test_settings.py -k WorkerSizingProposal -v
+```
+
+Test, doğrulanmadı notunu, hesapları ve geçici komutları denetler.
+Zamanlayıcı, yedek ve prod deneme verisi sınırı da denetlenir.
+Test, canlı kapasiteyi doğrulamaz.
+
 ### Bir sunucunun içi
 
 Her ortam ayrı bir Docker Compose projesidir. Compose, birden çok konteyneri birlikte yöneten araçtır. Proje adı `atonota-<ortam>` olur. Örneğin `atonota-alpha`.
@@ -621,7 +757,7 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |
-| E-7 | Karar verildi, kurulum kaldı. Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Sunucuda kurulum henüz yapılmadı | DevOps sorumlusu zamanlayıcıyı sunucuda `COMPOSE_PROFILES=scheduler` ile açar. Düzenli yedeği de sunucuda kurar | DevOps sorumlusu |
+| E-7 | Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Sunucuda kurulum henüz yapılmadı. Çalışma durumu doğrulanmadı | DevOps sorumlusu zamanlayıcıyı sunucuda `COMPOSE_PROFILES=scheduler` ile açar. Düzenli yedeği de sunucuda kurar. Sorumlu, ayrı sunucu işinde sonucu doğrular. Bu görev yalnız kaynak payını hesaplar | DevOps sorumlusu |
 | E-8 | Üretim işçi sayısı ölçülmedi | DevOps sorumlusu rc'de yük ölçer. `ATONOTA_GUNICORN_WORKERS` değerini ölçümle seçer | DevOps sorumlusu |
 | E-9 | Gerçek servislerle uçtan uca test yok | Uçtan uca test beta'da gerçek Keycloak ve kiracıyla koşar | integration-e2e işi |
 | E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | Devir notundaki adımlar uygulanır | DevOps sorumlusu |
