@@ -71,13 +71,13 @@
  },
  {
   "id": "P7",
-  "title": "P7 AtonotA Login ürünü",
+  "title": "P7 {{PRODUCT_NAME}} ürünü",
   "after": [
    "P1",
    "P2"
   ],
-  "goal": "AtonotA Login'i bağımsız ve ücretli bir giriş ürünü olarak yayına almak: Keycloak üzerinde markalı giriş ekranı (`api.login.atonota.net`), veriyle gelen sınırsız sayıda platform ile oturum açma, Frappe'de üyelik, işlem kuralı ve inceleme kayıtları, tanıtım sayfası ve müşteri başına ücretli kullanım.",
-  "exit": "Bir müşteri uygulaması \"AtonotA Login\" düğmesiyle girişi başlatıyor ve adres çubuğunda `api.login.atonota.net` görünüyor; Google ve en az bir başka platformla giriş `accounts.google.com` gibi platform adresine gidip `api.login.atonota.net/realms/<realm>/broker/<platform>/endpoint` yolundan dönüyor; yeni platform kod değişmeden yalnız veri kaydıyla açılıyor; zorunlu SSO sosyal girişle aşılamıyor; kullanıcı yolculuklarının durum sonuçları sunucu testleriyle geçiyor; tanıtım sayfası yayında; fiyat ve plan kararı ürün sahibince kapanmış ve ücretli müşteri hesabı açılabiliyor.",
-  "owner": "Platform ekibi (Keycloak teması, Frappe kayıtları, yetki); Frontend ekibi (giriş ekranı, tanıtım sayfası); DevOps sorumlusu (Keycloak HA, `api.login.` DNS değerleri, sertleştirme); alan adı sorumlusu (`atonota.net` DNS kaydı); ürün sahibi (fiyat ve plan, K-61)"
+  "goal": "{{PRODUCT_NAME}}'i bağımsız ve ücretli bir giriş ürünü olarak yayına almak: Keycloak üzerinde markalı giriş ekranı (`api.login.{{BRAND_DOMAIN}}`), veriyle gelen sınırsız sayıda platform ile oturum açma, Frappe'de üyelik, işlem kuralı ve inceleme kayıtları, tanıtım sayfası ve müşteri başına ücretli kullanım.",
+  "exit": "Bir müşteri uygulaması \"{{PRODUCT_NAME}}\" düğmesiyle girişi başlatıyor ve adres çubuğunda `api.login.{{BRAND_DOMAIN}}` görünüyor; Google ve en az bir başka platformla giriş `accounts.google.com` gibi platform adresine gidip `api.login.{{BRAND_DOMAIN}}/realms/<realm>/broker/<platform>/endpoint` yolundan dönüyor; yeni platform kod değişmeden yalnız veri kaydıyla açılıyor; zorunlu SSO sosyal girişle aşılamıyor; kullanıcı yolculuklarının durum sonuçları sunucu testleriyle geçiyor; tanıtım sayfası yayında; fiyat ve plan kararı ürün sahibince kapanmış ve ücretli müşteri hesabı açılabiliyor.",
+  "owner": "Platform ekibi (Keycloak teması, Frappe kayıtları, yetki); Frontend ekibi (giriş ekranı, tanıtım sayfası); DevOps sorumlusu (Keycloak HA, `api.login.` DNS değerleri, sertleştirme); alan adı sorumlusu (`{{BRAND_DOMAIN}}` DNS kaydı); ürün sahibi (fiyat ve plan, K-61)"
  }
 ]

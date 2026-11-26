@@ -14,6 +14,17 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 
 ## Mimari kararlar
 
+- Site marka ayarını `backend/brand.env` dosyasından okur. Dosyada gizli bilgi bulunmaz.
+- `src/data/site.ts`, `PRODUCT_NAME` ve `BRAND_DOMAIN` değerlerini verir. Ortak ayrıştırıcı `src/lib/brand.mjs` dosyasındadır.
+- Güncel Markdown metinleri `{{PRODUCT_NAME}}` ve `{{BRAND_DOMAIN}}` işaretlerini kullanır. Sätteri eklentisi bu işaretleri derlemede doldurur.
+- Eklenti adı marka ayarından üretilen bir özet taşır. Ayar değişince Astro eski içerik önbelleğini bırakır.
+- Başlıkları, gezinme adlarını ve JSON metinlerini gösteren bileşenler aynı ayarı kullanır. Teknik adresler ve gereksinim kimlikleri değişmez.
+- Tarihsel sayfalar `acik-kararlar.md`, `karar-katalogu.md` ve `izlenebilirlik.md` dosyalarıdır. `task-board.json` içindeki geçmiş notlar da korunur. Tam liste `backend/brand-exclusions.txt` dosyasındadır.
+- Diyagram üreticisi marka değerini çıktıya yazmaz. Üretilen Astro bileşeni marka değerini site ayarından alır. Marka değişince yalnız siteyi derlemek yeterlidir.
+- Diyagram etiketi, gerçek yazı genişliğini ölçer. Ad kutuya sığmazsa etiket “Giriş ürünü” olur. Tam ad, diyagram açıklamasında görünür kalır. Yazı küçültülmez.
+- `npm run build`, önce `npm run test:brand` kontrolünü çalıştırır. `npm run test:brand-build`, farklı ayarla ayrı çıktı üretir. Bu kontrol geçici olarak marka dosyasını değiştirir. Kontrol bitince dosya geri yüklenir. Bu kontrolü aynı klasördeki diğer derlemelerle birlikte çalıştırmayın.
+- Marka derleme testi, Chromium ile uzun adı ve diyagram işaretlerini denetler. Mevcut CI akışları testi ilk tarayıcı parçasında çalıştırır.
+
 - İçerik `src/content/docs/*.md` (glob loader, şema: `title`, `nav`, `order`). Başlıklar `##`/`###`; `<`/`>` kod dışında kaçışlı.
 - `src/data/requirements.json` gereksinimlerin tek doğruluk kaynağıdır (G ve SA serileri, kimlikler korunur, yeni kalem sona eklenir). Gezgin, dağılım özeti (`RequirementSummary.astro`) ve faz tablosundaki kimlik listesi (`PhaseTable.astro`) derleme anında bundan üretilir; markdown'da elle tablo kopyası tutulmaz. `tests/consistency.spec.ts` kimlik bütünlüğünü, G/SA/K atıflarını, iç bağlantıları ve rapor faz kararlarını denetler.
 - `src/data/task-board.json` görev panosunun sunum verisidir. Dosyada epic listesi, durum kuralları ve olgunluk düzeyi kuralları vardır. Her gereksinimin epiği, durumu ve düzeyi de bu dosyadadır. Durumlar `done`, `in-progress`, `not-started` ve `unverified` değerleridir. Düzeyler `poc`, `mvp`, `post-mvp`, `scale` ve `enterprise` değerleridir. `requirements.json` kayıtlarına dokunulmaz. "Bitti" yalnız kanıtla yazılır: commit ve depoda var olan test dosyası. Düzey elle seçilmez: faz eşlemesi ve adı yazılı istisna listesinden türer. `tests/consistency.spec.ts` kapsamayı, kuralları ve kanıtı denetler. Gezgin aynı veriyi tablo ve gruplu (faz, sonra epic) görünümde gösterir. Kurallar tablosu `TaskBoardRules.astro` ile `task-rules` yer tutucusuna derlenir.

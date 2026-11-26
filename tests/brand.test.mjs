@@ -50,6 +50,16 @@ test('Sätteri fills text, headings, links, inline code and highlighted code saf
   assert.doesNotMatch(result.code, /\{\{(?:PRODUCT_NAME|BRAND_DOMAIN)\}\}|%7B%7B/i);
   assert.match(result.code, /https:\/\/api\.login\.example\.test/);
   assert.match(result.code, /Örnek &amp; Güven &lt;Giriş&gt;/);
-  assert.doesNotMatch(result.code, /<Giriş>/);
+  // Angle brackets are valid inside a quoted HTML attribute. Text stays escaped.
+  assert.doesNotMatch(result.code.replace(/title="[^"]*"/g, ''), /<Giriş>/);
   assert.equal(result.metadata.headings[0].text, brand.PRODUCT_NAME);
+});
+
+test('fills placeholders split across Shiki tokens without removing highlighting', async () => {
+  const renderer = await satteri({ hastPlugins: [brandPlaceholders(brand)] }).createRenderer({ syntaxHighlight: { type: 'shiki' } });
+  for (const [language, code] of [['js', 'const host = {{BRAND_DOMAIN}};'], ['sh', 'HOST={{BRAND_DOMAIN}}']]) {
+    const result = await renderer.render(`\`\`\`${language}\n${code}\n\`\`\``);
+    assert.ok(result.code.includes('<span'), 'syntax highlighting remains');
+    assert.equal(result.code.replace(/<[^>]*>/g, '').trim(), code.replace('{{BRAND_DOMAIN}}', brand.BRAND_DOMAIN));
+  }
 });
