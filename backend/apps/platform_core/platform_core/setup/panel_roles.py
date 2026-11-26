@@ -44,12 +44,20 @@ def ensure() -> None:
 				role_name=record["role_name"],
 				desk_access=record.get("desk_access", 0),
 			).insert(ignore_permissions=True)
-	for record in load_profiles():
+	ensure_profiles(load_profiles())
+
+
+def ensure_profiles(records: list[dict], app: str = "platform_core") -> None:
+	"""Inserts every missing Role Profile of `records` and leaves an existing one alone.
+
+	Other apps call this step through `frappe.get_attr`, for example `hrms_tr.role_profiles`.
+	"""
+	for record in records:
 		if not frappe.db.exists("Role Profile", record["name"]):
-			insert_profile_now(record)
+			insert_profile_now(record, app)
 
 
-def insert_profile_now(record: dict) -> None:
+def insert_profile_now(record: dict, app: str = "platform_core") -> None:
 	doc = frappe.get_doc(
 		{
 			"doctype": "Role Profile",
@@ -60,7 +68,7 @@ def insert_profile_now(record: dict) -> None:
 	flags = frappe.local.flags
 	before = flags.in_install
 	if not before:
-		flags.in_install = "platform_core"
+		flags.in_install = app
 	try:
 		doc.insert(ignore_permissions=True)
 	finally:
