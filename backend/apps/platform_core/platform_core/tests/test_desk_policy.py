@@ -11,6 +11,7 @@ from urllib.parse import quote, urlsplit
 
 import frappe
 from frappe.auth import CookieManager, LoginManager
+from frappe.core.doctype.user.user import generate_keys
 from frappe.tests import IntegrationTestCase
 from frappe.tests.test_api import make_request
 from frappe.utils import get_test_client, set_request
@@ -25,6 +26,10 @@ OPERATOR = "desk-policy-operator@example.test"
 PORTAL_USER = "desk-policy-portal@example.test"
 SETTINGS_HOOK = "platform_core.config.desk_policy.apply"
 REQUEST_HOOK = "platform_core.config.desk_policy.before_request"
+AUTH_HOOK = "platform_core.config.desk_policy.after_auth"
+OAUTH_CLIENT = "desk-policy-oauth-client"
+# Frappe resolves these to the Desk (`frappe/website/path_resolver.py`). AJA-846 found them.
+DESK_PATH_SPELLINGS = ("/desk/..", "/desk/x/../..", "/desk%20", "/desk.html")
 
 
 def _user(email, roles, user_type="System User"):
@@ -48,6 +53,37 @@ def _sid(user):
 	return sid
 
 
+def _bearer_token(user):
+	client_id = frappe.db.get_value("OAuth Client", {"app_name": OAUTH_CLIENT}, "client_id")
+	if not client_id:
+		client = frappe.get_doc(
+			{
+				"doctype": "OAuth Client",
+				"app_name": OAUTH_CLIENT,
+				"grant_type": "Authorization Code",
+				"redirect_uris": "http://localhost",
+				"default_redirect_uri": "http://localhost",
+				"response_type": "Code",
+				"scopes": "all",
+				"skip_authorization": 1,
+			}
+		).insert(ignore_permissions=True)
+		client_id = client.client_id
+	access_token = frappe.generate_hash()
+	frappe.get_doc(
+		{
+			"doctype": "OAuth Bearer Token",
+			"access_token": access_token,
+			"client": client_id,
+			"expires_in": 3600,
+			"scopes": "all",
+			"status": "Active",
+			"user": user,
+		}
+	).insert(ignore_permissions=True)
+	return access_token
+
+
 class TestDeskPolicy(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
@@ -60,16 +96,26 @@ class TestDeskPolicy(IntegrationTestCase):
 		_user(PORTAL_USER, [], user_type="Website User")
 		frappe.db.commit()
 		cls.sids = {user: _sid(user) for user in (TENANT_ADMIN, OPERATOR, PORTAL_USER)}
+		cls.api_keys = {user: generate_keys(user) for user in (TENANT_ADMIN, OPERATOR)}
+		cls.bearer_tokens = {user: _bearer_token(user) for user in (TENANT_ADMIN, OPERATOR)}
 		frappe.db.commit()
 
-	def get(self, path, user=None, *, follow_redirects=False):
+	def get(self, path, user=None, *, follow_redirects=False, headers=None):
 		client = get_test_client()
 		if user:
 			client.set_cookie("sid", self.sids[user])
-		return make_request(target=client.get, args=(path,), kwargs={"follow_redirects": follow_redirects})
+		kwargs = {"follow_redirects": follow_redirects, "headers": headers or {}}
+		return make_request(target=client.get, args=(path,), kwargs=kwargs)
 
-	def assert_sent_to_panel(self, path, user=TENANT_ADMIN):
-		response = self.get(path, user)
+	def api_key_header(self, user):
+		keys = self.api_keys[user]
+		return {"Authorization": f"token {keys['api_key']}:{keys['api_secret']}"}
+
+	def bearer_header(self, user):
+		return {"Authorization": f"Bearer {self.bearer_tokens[user]}"}
+
+	def assert_sent_to_panel(self, path, user=TENANT_ADMIN, *, headers=None):
+		response = self.get(path, user if headers is None else None, headers=headers)
 		self.assertEqual(response.status_code, 302, f"{path}: {response.status_code}")
 		self.assertEqual(urlsplit(response.headers["Location"]).path, PANEL_PATH, path)
 
@@ -108,6 +154,46 @@ class TestDeskPolicy(IntegrationTestCase):
 		for path in ("/app/", "/app/user", "/app/user/new", "/desk/", "/desk/user", "/app//user"):
 			with self.subTest(path=path):
 				self.assert_sent_to_panel(path)
+
+	def test_desk_path_spellings_that_frappe_resolves_are_redirected(self):
+		for path in DESK_PATH_SPELLINGS:
+			with self.subTest(path=path):
+				self.assert_sent_to_panel(path)
+
+	def test_desk_path_check_follows_frappe_path_rules(self):
+		from platform_core.config.desk_policy import is_desk_path
+
+		for path in ("/desk", "/desk/..", "/desk/x/../..", "/desk ", " /desk/ ", "/desk.html", "/app.html"):
+			with self.subTest(path=path):
+				self.assertTrue(is_desk_path(path))
+		for path in ("/", "/desktop", "/apple", "/panel", "/api/method/x", "/x/../desk", "/desk.htm"):
+			with self.subTest(path=path):
+				self.assertFalse(is_desk_path(path))
+
+	def test_auth_hook_runs_after_the_credential_hooks(self):
+		self.assertIn(AUTH_HOOK, hooks.auth_hooks)
+		self.assertEqual(hooks.auth_hooks[-1], AUTH_HOOK)
+
+	def test_api_key_request_to_the_desk_is_redirected(self):
+		for path in ("/desk", "/app/user", "/desk.html"):
+			with self.subTest(path=path):
+				self.assert_sent_to_panel(path, headers=self.api_key_header(TENANT_ADMIN))
+
+	def test_oauth_token_request_to_the_desk_is_redirected(self):
+		for path in ("/desk", "/desk/user"):
+			with self.subTest(path=path):
+				self.assert_sent_to_panel(path, headers=self.bearer_header(TENANT_ADMIN))
+
+	def test_platform_operator_opens_the_desk_with_an_api_key(self):
+		response = self.get("/desk", headers=self.api_key_header(OPERATOR))
+		self.assertEqual(response.status_code, 200)
+		self.assertIn(b"frappe.boot =", response.data)
+
+	def test_api_paths_keep_working_with_an_api_key(self):
+		for headers in (self.api_key_header(TENANT_ADMIN), self.bearer_header(TENANT_ADMIN)):
+			response = self.get("/api/method/frappe.auth.get_logged_user", headers=headers)
+			self.assertEqual(response.status_code, 200)
+			self.assertEqual(response.json["message"], TENANT_ADMIN)
 
 	def test_tenant_admin_never_sees_403_on_desk_addresses(self):
 		for path in ("/app", "/desk", "/app/user"):

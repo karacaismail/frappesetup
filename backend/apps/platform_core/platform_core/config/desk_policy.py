@@ -4,8 +4,6 @@ Frappe has no setting that keeps a System User away from the Desk, so a request 
 The settings below turn off Desk notices and make the panel the site's home page.
 """
 
-import posixpath
-
 import frappe
 from frappe.core.doctype.system_settings.system_settings import clear_system_settings_cache
 from werkzeug.exceptions import HTTPException
@@ -14,7 +12,7 @@ from werkzeug.utils import redirect
 OPERATOR_ROLE = "Platform Operator"
 PANEL_ROUTE = "panel"
 PANEL_PATH = "/" + PANEL_ROUTE
-DESK_ROOTS = ("/app", "/desk")
+DESK_ROOTS = ("app", "desk")
 SYSTEM_SETTINGS = {
 	"enable_onboarding": 0,
 	"disable_system_update_notification": 1,
@@ -24,12 +22,28 @@ WEBSITE_SETTINGS = {"home_page": PANEL_ROUTE}
 
 
 def is_desk_path(path: str) -> bool:
-	"""True for /app, /desk and every page below them. Similar names such as /apple do not match."""
-	path = posixpath.normpath("/" + (path or "").lstrip("/"))
+	"""True for /app, /desk and every page below them. Similar names such as /apple do not match.
+
+	The check copies Frappe's own path rules (`frappe/website/path_resolver.py`): strip "/" and
+	spaces at both ends, then drop a trailing ".html". So /desk/.., /desk%20 and /desk.html match.
+	"""
+	path = (path or "").strip("/ ")
+	if path.endswith(".html"):
+		path = path[: -len(".html")]
 	return any(path == root or path.startswith(root + "/") for root in DESK_ROOTS)
 
 
 def before_request() -> None:
+	"""Cookie sessions. Frappe runs this hook before it reads API keys and tokens."""
+	_send_to_panel()
+
+
+def after_auth() -> None:
+	"""API keys and OAuth tokens. Frappe runs `auth_hooks` after it knows the user."""
+	_send_to_panel()
+
+
+def _send_to_panel() -> None:
 	request = getattr(frappe.local, "request", None)
 	if request is None or request.method == "OPTIONS" or not is_desk_path(request.path):
 		return

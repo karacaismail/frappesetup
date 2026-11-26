@@ -26,6 +26,8 @@ auth_hooks = [
 	"platform_core.ai.agent_token.authenticate_request",
 	"platform_core.ai.oauth.authenticate_request",
 	"platform_core.shell.native_metadata.guard_native_metadata",
+	# G-53: the Desk check again, after API keys and OAuth tokens named the user.
+	"platform_core.config.desk_policy.after_auth",
 ]
 # AU-19: local sign-in functions are replaced by gated wrappers (identity/login_policy.py).
 override_whitelisted_methods = {
