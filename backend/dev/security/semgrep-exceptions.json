@@ -169,7 +169,8 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "09cd5ff5ad007ea6f48cc3d5b5808652806c4f7278fff007ebe915f8e1558093",
+      "sha256": "933409f0be2011c370ede12cef029c787c04ed0885557ced1dd5f2ad9ae47cb0",
+      "reviewNote": "Digest refreshed on 27 November 2026 (AJA-1283). Since 92f8c277 four files changed: api/atonota_login.py, hooks.py, identity/atonota/decision_api.py and identity/atonota/verification_api.py. Each change replaces the product name with `atonota_login` in a comment, a docstring or the TASK_MARK text. No code path, permission check or finding line changed. All 36 findings were re-reviewed and stay approved.",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -253,13 +254,13 @@
           "rule": "frappe-missing-permission",
           "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
           "line": 16,
-          "reason": "Answers only for the signed-in session user; a guest gets PermissionError. The server reads that user's own records as evidence and ignores body fields such as user. No document is chosen by the caller."
+          "reason": "Answers only for the signed-in session user; a guest gets PermissionError. The server reads that user's own records as evidence and ignores body fields such as user. No document is chosen by the caller. Re-reviewed on 27 November 2026 (AJA-1283): since 92f8c277 only the product name in comments, docstrings and the ToDo mark text changed; the check and the line are unchanged."
         },
         {
           "rule": "frappe-missing-permission",
           "path": "backend/apps/platform_core/platform_core/api/atonota_login.py",
           "line": 25,
-          "reason": "Signed-in session user only; a guest gets PermissionError. The final step reruns the same decision and stays closed until the price decision (G-166). No document is chosen by the caller."
+          "reason": "Signed-in session user only; a guest gets PermissionError. The final step reruns the same decision and stays closed until the price decision (G-166). No document is chosen by the caller. Re-reviewed on 27 November 2026 (AJA-1283): since 92f8c277 only the product name in comments, docstrings and the ToDo mark text changed; the check and the line are unchanged."
         },
         {
           "rule": "frappe-missing-permission",
@@ -325,19 +326,19 @@
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/identity/atonota/decision_api.py",
           "line": 108,
-          "reason": "The server opens one owner task per empty rule for the System Manager role (G-167). The text is built from the policy, not from the request. The calling user needs no ToDo write right."
+          "reason": "The server opens one owner task per empty rule for the System Manager role (G-167). The text is built from the policy, not from the request. The calling user needs no ToDo write right. Re-reviewed on 27 November 2026 (AJA-1283): since 92f8c277 only the product name in comments, docstrings and the ToDo mark text changed; the check and the line are unchanged."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
           "line": 88,
-          "reason": "Writes the verification case only from open_attempt, a server-side call that no endpoint whitelists. The case id is checked for length first (G-164). Both DocTypes are closed to AI writes in hooks.py."
+          "reason": "Writes the verification case only from open_attempt, a server-side call that no endpoint whitelists. The case id is checked for length first (G-164). Both DocTypes are closed to AI writes in hooks.py. Re-reviewed on 27 November 2026 (AJA-1283): since 92f8c277 only the product name in comments, docstrings and the ToDo mark text changed; the check and the line are unchanged."
         },
         {
           "rule": "frappe-ignore-permissions",
           "path": "backend/apps/platform_core/platform_core/identity/atonota/verification_api.py",
           "line": 109,
-          "reason": "Stores the notice only after the HMAC signature over the raw body is verified (G-164). The caller is the provider without a session. The unique event_id index refuses duplicates."
+          "reason": "Stores the notice only after the HMAC signature over the raw body is verified (G-164). The caller is the provider without a session. The unique event_id index refuses duplicates. Re-reviewed on 27 November 2026 (AJA-1283): since 92f8c277 only the product name in comments, docstrings and the ToDo mark text changed; the check and the line are unchanged."
         },
         {
           "rule": "frappe-ignore-permissions",
