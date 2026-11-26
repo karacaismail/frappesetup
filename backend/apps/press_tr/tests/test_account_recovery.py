@@ -507,7 +507,7 @@ class ReviewerRoleSetupTest(unittest.TestCase):
 
 	def test_existing_role_is_left_alone(self):
 		# A second install or migrate finds the role and changes nothing, so it raises no error.
-		for _ in range(2):
+		for _attempt in range(2):
 			framework = self._ensure(existing=REVIEWER)
 			framework.get_doc.assert_not_called()
 			framework.db.set_value.assert_not_called()
