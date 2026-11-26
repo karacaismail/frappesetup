@@ -8,7 +8,7 @@
 	}
 }
 
-# HSTS leaves out includeSubDomains on purpose: other names under atonota.net (mail, outside
+# HSTS leaves out includeSubDomains on purpose: other names under <BRAND_DOMAIN> (mail, outside
 # services in the DNS zone) may not serve HTTPS. Every host this edge serves sets HSTS itself.
 # "?" sets a header only when the service did not: Frappe and Keycloak keep their own policy, and
 # static files and redirects still refuse framing by other sites. Each "?" header has its own

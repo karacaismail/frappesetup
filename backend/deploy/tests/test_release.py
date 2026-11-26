@@ -51,7 +51,8 @@ class EnvironmentFiles(unittest.TestCase):
 
     def test_host_names_follow_the_domain_map(self):
         for name, settings in release.load_environments().items():
-            base = "atonota.net" if name == "prod" else f"{name}.atonota.net"
+            domain = release.load_brand()["BRAND_DOMAIN"]
+            base = domain if name == "prod" else f"{name}.{domain}"
             self.assertEqual(settings["ATONOTA_BASE_HOST"], base)
             self.assertEqual(settings["ATONOTA_ID_HOST"], f"api.login.{base}")
             self.assertEqual(settings["ATONOTA_PRESS_HOST"], f"press.{base}")
@@ -61,7 +62,7 @@ class EnvironmentFiles(unittest.TestCase):
 
     def test_prod_keycloak_host_stays_as_recorded(self):
         # PROJECT-RECORD.md O-51 (replaces the address in O-1).
-        self.assertEqual(release.load_environments()["prod"]["ATONOTA_ID_HOST"], "api.login.atonota.net")
+        self.assertEqual(release.load_environments()["prod"]["ATONOTA_ID_HOST"], "api.login." + release.load_brand()["BRAND_DOMAIN"])
 
     def test_old_identity_host_names_are_gone(self):
         # O-51: the old id.* names get no alias or redirect.
