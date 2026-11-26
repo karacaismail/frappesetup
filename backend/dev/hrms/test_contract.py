@@ -202,8 +202,13 @@ class TestLeaveRequestContextContract(unittest.TestCase):
         (parameter,) = route["get"]["parameters"]
         self.assertEqual((parameter["name"], parameter["in"]), ("leave_type", "query"))
         self.assertFalse(parameter["required"])
-        self.assertEqual(parameter["schema"]["default"], "Annual Leave")
+        self.assertNotIn("default", parameter["schema"])
         self.assertEqual(parameter["schema"]["maxLength"], 140)
+
+    def test_leave_type_source_accepts_explicit_type_and_allocation(self):
+        schema = self.contract["components"]["schemas"]["LeaveRequestContextResponse"]
+        source = schema["properties"]["message"]["properties"]["sources"]["properties"]["leave_type"]
+        self.assertEqual(set(source["enum"]), {"Leave Type", "Leave Allocation", None})
 
     def test_context_accepts_absent_data_and_real_zero(self):
         route = self.contract["paths"]["/method/hrms_tr.api.get_leave_request_context"]["get"]
