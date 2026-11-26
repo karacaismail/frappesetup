@@ -2815,8 +2815,8 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/test_review.py",
-    "code": "result = subprocess.run([bin_dir / \"security-audit\"], env={**env, \"BASE\": base,",
-    "statementSha256": "4db293247e0beb9845602bf3759d4986a5abe0126e55cd21ba1fd48baed07444",
+    "code": "return subprocess.run([gate], env=env, capture_output=True, text=True)",
+    "statementSha256": "cfd7f33308cf182261a972846eb048d749fa342c6a87cb1140286071c138516c",
     "owner": "security-tooling",
     "reason": "The regression test invokes the copied security gate with an absolute fixture path and mock tools.",
     "ignoreUntil": "2027-02-22"

@@ -13,7 +13,11 @@ from hrms_tr.users import HRMS_TR_ROLES
 
 HR_ROLE = "HRT Admin"
 MANAGER_ROLE = "HRT Manager"
-APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE)
+# The AI approval tool stays with the HRMS TR roles.
+TOOL_APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE)
+# The panel role of platform_core. It approves and rejects every leave of its site (AJA-947).
+TENANT_ADMIN_ROLE = "Tenant Admin"
+APPROVER_ROLES = (*TOOL_APPROVER_ROLES, TENANT_ADMIN_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 HRMS_APPROVER_METHOD = "hrms.hr.doctype.leave_application.leave_application.get_leave_approver"
 
@@ -96,10 +100,12 @@ def validate_approval(doc, method=None):
 			_("The selected approver cannot submit this leave application.", context="hrms_tr"),
 			frappe.PermissionError,
 		)
-	if doc.status != "Approved" or frappe.session.user == "Administrator":
+	if doc.status not in ("Approved", "Rejected") or frappe.session.user == "Administrator":
 		return
+	# Approving and rejecting are both decisions of an approver (AJA-1024).
 	check_approver_role()
-	check_not_own_leave(doc)
+	if doc.status == "Approved":
+		check_not_own_leave(doc)
 
 
 def pending_leave(name: str, *, expected_version: str | None = None, lock: bool = False):

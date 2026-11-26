@@ -155,3 +155,23 @@ class TestTenantAdminAssistantHttp(panel_roles.PanelRoleHttpCase):
 			customer_name="Örnek Müşteri",
 			contact_email="ornek.musteri@example.test",
 		)
+
+	# --- AI provider types (AJA-947) ---
+
+	def test_assistant_cannot_read_the_schema_of_the_ai_types(self):
+		client = self.login()
+		for doctype in panel_roles.AI_TYPES:
+			with self.subTest(doctype=doctype):
+				response = self.call(client, "GET", panel_roles.META_API, doctype=doctype)
+				self.assertEqual(response.status_code, 403, (doctype, response.data[:300]))
+
+	def test_assistant_cannot_read_or_change_the_ai_records(self):
+		records = self.make_ai_records()
+		client = self.login()
+		for doctype, name in records.items():
+			with self.subTest(doctype=doctype):
+				response = self.send(client, "GET", panel_roles.REST + f"{doctype}/{name}")
+				self.assertEqual(response.status_code, 403, (doctype, response.data[:300]))
+				self.assertNotIn(panel_roles.FAKE_AI_KEY.encode(), response.data)
+				self.assert_rest_denied(client, "DELETE", doctype, name)
+				self.assertTrue(frappe.db.exists(doctype, name))

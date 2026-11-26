@@ -25,7 +25,10 @@ after_uninstall = "hrms_tr.setup.after_uninstall"
 
 ai_tools = ["hrms_tr.ai_tools.declarations"]
 permission_query_conditions = {"Leave Application": "hrms_tr.access.query_condition"}
-has_permission = {"Leave Application": "hrms_tr.access.has_permission"}
+has_permission = {
+	"Leave Application": "hrms_tr.access.has_permission",
+	"File": "hrms_tr.employee_privacy.file_has_permission",
+}
 doc_events = {
 	"Leave Application": {
 		"autoname": "hrms_tr.leave.name_portal_leave",
