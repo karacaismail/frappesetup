@@ -13,6 +13,8 @@ OPERATOR_ROLE = "Platform Operator"
 PANEL_ROUTE = "panel"
 PANEL_PATH = "/" + PANEL_ROUTE
 DESK_ROOTS = ("app", "desk")
+# Frappe `app.py` sends a raw path with this prefix to the API handler, never to a page.
+API_PREFIX = "/api/"
 SYSTEM_SETTINGS = {
 	"enable_onboarding": 0,
 	"disable_system_update_notification": 1,
@@ -26,11 +28,20 @@ def is_desk_path(path: str) -> bool:
 
 	The check copies Frappe's own path rules (`frappe/website/path_resolver.py`): strip "/" and
 	spaces at both ends, then drop a trailing ".html". So /desk/.., /desk%20 and /desk.html match.
+
+	A path with a "." or ".." part is also True (AJA-849). Frappe looks the page up with
+	`os.path.join(app, "www", path)`, so /./desk and /../www/desk open `www/desk.html`.
+	Frappe's API handler takes every raw path that starts with /api/, so those are left alone.
 	"""
-	path = (path or "").strip("/ ")
+	raw = path or ""
+	path = raw.strip("/ ")
 	if path.endswith(".html"):
 		path = path[: -len(".html")]
-	return any(path == root or path.startswith(root + "/") for root in DESK_ROOTS)
+	if any(root == path or path.startswith(root + "/") for root in DESK_ROOTS):
+		return True
+	if raw.startswith(API_PREFIX):
+		return False
+	return any(part in (".", "..") for part in path.split("/"))
 
 
 def before_request() -> None:
