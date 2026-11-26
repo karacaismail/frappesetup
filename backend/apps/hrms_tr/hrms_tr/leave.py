@@ -13,9 +13,11 @@ from hrms_tr.users import HRMS_TR_ROLES
 
 HR_ROLE = "HRT Admin"
 MANAGER_ROLE = "HRT Manager"
+# The AI approval tool stays with the HRMS TR roles.
+TOOL_APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE)
 # The panel role of platform_core. It approves and rejects every leave of its site (AJA-947).
 TENANT_ADMIN_ROLE = "Tenant Admin"
-APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE, TENANT_ADMIN_ROLE)
+APPROVER_ROLES = (*TOOL_APPROVER_ROLES, TENANT_ADMIN_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 HRMS_APPROVER_METHOD = "hrms.hr.doctype.leave_application.leave_application.get_leave_approver"
 
