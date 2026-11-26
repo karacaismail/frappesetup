@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { BRAND, createUser, openLogin, submitPassword } from './helpers';
+import { BRAND, createUser, openLogin, screens, submitPassword } from './helpers';
 
 // Giriş ekranı onaylı taslağa uyar (AJA-1125). Taslak: AJA-880, 3. sürüm, "main-giris" bölümü.
 
@@ -234,3 +234,10 @@ test('sign-in: the title is "Giriş yapın" and the button is "Giriş yap"', asy
   await expect(page.locator('#kc-login')).toHaveText('Giriş yap');
   await expect(page.locator('body')).not.toContainText(SIGN_IN_OLD);
 });
+
+for (const item of screens) {
+  test(`${item.name}: the screen never says "oturum aç"`, async ({ page }) => {
+    await item.open(page);
+    await expect(page.locator('body')).not.toContainText(SIGN_IN_OLD);
+  });
+}

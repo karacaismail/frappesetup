@@ -451,7 +451,7 @@ test.describe('sihirli bağlantı e-postası', () => {
       const alternative = page.locator('form:has([name="tryAnotherWay"])');
       await alternative.evaluate((form: HTMLFormElement) => form.requestSubmit());
       const signInOption = {
-        tr: 'E-posta bağlantısı E-postanıza gelen bağlantıyla oturum açın.',
+        tr: 'E-posta bağlantısı E-postanıza gelen bağlantıyla giriş yapın.',
         en: 'Email link Sign in with a link sent to your email.',
       };
       await page.getByRole('button', { name: signInOption[lang], exact: true }).click();

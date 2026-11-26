@@ -257,9 +257,9 @@
   --pf-v5-global--danger-color--200: var(--at-color-error);
   --pf-v5-global--BorderRadius--sm: var(--at-radius);
   /* Temel temanın "transition: all" ve 250 ms değeri merkezi tokenlara bağlanır. */
-  --pf-v5-global--TransitionDuration: var(--at-motion-duration-fast);
+  --pf-v5-global--TransitionDuration: var(--at-motion-duration-mid);
   --pf-v5-global--TimingFunction: var(--at-motion-easing-standard);
-  --pf-v5-global--Transition: background-color var(--at-motion-duration-fast) var(--at-motion-easing-standard);
+  --pf-v5-global--Transition: background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* ---------- Sayfa ve kart ---------- */
@@ -408,7 +408,7 @@
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: var(--at-link-underline-offset);
-  transition: color var(--at-motion-duration-fast) var(--at-motion-easing-standard);
+  transition: color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .login-pf a:not([class*="c-button"]):hover {
@@ -535,7 +535,7 @@
   border-radius: var(--at-radius);
   color: var(--at-color-text);
   min-block-size: var(--at-hit-target);
-  transition: border-color var(--at-motion-duration-fast) var(--at-motion-easing-standard);
+  transition: border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* Temel tema kenarlığı sözde öğelerle çizer ve odakta alt çizgiyi kalınlaştırır. Bu çizim kapatılır. */
@@ -648,9 +648,9 @@
   text-align: center;
   text-decoration: none;
   transition:
-    background-color var(--at-motion-duration-fast) var(--at-motion-easing-standard),
-    border-color var(--at-motion-duration-fast) var(--at-motion-easing-standard),
-    color var(--at-motion-duration-fast) var(--at-motion-easing-standard);
+    background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .login-pf .pf-v5-c-button.pf-m-block {
@@ -847,7 +847,7 @@
   font-family: var(--at-font-ui);
   font-size: var(--at-font-body);
   text-align: start;
-  transition: background-color var(--at-motion-duration-fast) var(--at-motion-easing-standard);
+  transition: background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .at-choice:hover {
@@ -965,7 +965,7 @@
   border-radius: var(--at-radius);
   font-size: var(--at-font-min);
   padding: var(--at-space-xxs) var(--at-space-xs);
-  transition: opacity var(--at-motion-duration-fast) var(--at-motion-easing-standard);
+  transition: opacity var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .kc-login-tooltip .kc-tooltip-text::after {
