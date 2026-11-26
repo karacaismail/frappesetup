@@ -42,6 +42,7 @@
       "platform_core.api.shell",
       "platform_core.api.meta",
       "platform_core.api.collection",
+      "platform_core.api.help",
       "platform_core.shell.http"
     ],
     "platform_core.model_gateway": [
@@ -72,6 +73,7 @@
     "platform_core.api.shell": "platform_core.shell",
     "platform_core.api.meta": "platform_core.shell",
     "platform_core.api.collection": "platform_core.shell",
+    "platform_core.api.help": "platform_core.shell",
     "platform_core.api.model": "platform_core.model_gateway",
     "platform_core.api.access": "platform_core.access",
     "platform_core.api.mobile": "platform_core.mobile",
