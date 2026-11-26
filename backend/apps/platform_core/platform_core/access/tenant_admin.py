@@ -50,8 +50,11 @@ LEVEL_GRANTS = {("Role Profile", 1): ("read", "write")}
 CLOSED_APPS = frozenset({"frappe", "platform_core"})
 # Only the platform operator gives a reseller role (G-169).
 RESELLER_ROLES = frozenset({"Reseller Admin", "Reseller Assistant"})
+# press_tr opens this role on the Press site. Only Administrator gives it (AJA-421).
+# The name is written here: platform_core does not import press_tr.
+RECOVERY_REVIEWER_ROLE = "Recovery Reviewer"
 # The holder cannot change these roles, give them to anyone or give them permission rows.
-CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE} | RESELLER_ROLES
+CLOSED_ROLES = frozenset(STANDARD_ROLES) | {ROLE, RECOVERY_REVIEWER_ROLE} | RESELLER_ROLES
 
 
 def ensure_permissions() -> None:

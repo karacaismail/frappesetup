@@ -83,7 +83,10 @@ required_apps = ["press"]
 # ------------
 
 # before_install = "press_tr.install.before_install"
-# after_install = "press_tr.install.after_install"
+# AJA-421: the setup step opens the "Recovery Reviewer" role only when it is missing.
+# The role is not a fixture: Frappe rewrites every fixture on each migrate (AJA-857).
+after_install = ["press_tr.press_identity.recovery.ensure_reviewer_role"]
+after_migrate = ["press_tr.press_identity.recovery.ensure_reviewer_role"]
 
 # Uninstallation
 # ------------

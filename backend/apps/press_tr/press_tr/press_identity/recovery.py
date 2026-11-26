@@ -77,6 +77,19 @@ def _changed(doc, previous, fields):
 	return [field for field in fields if _value(doc, field) != _value(previous, field)]
 
 
+def ensure_reviewer_role() -> None:
+	"""Opens the reviewer role when it is missing. Runs after install and migrate (AJA-421).
+
+	The role is not a fixture. Frappe rewrites every fixture record on each migrate (AJA-857).
+	An existing role is left alone, so a change made on the site stays.
+	"""
+	if frappe.db.exists("Role", REVIEWER_ROLE):
+		return
+	frappe.get_doc(doctype="Role", role_name=REVIEWER_ROLE, desk_access=1, is_custom=1).insert(
+		ignore_permissions=True
+	)
+
+
 def require_reviewer(doc) -> str:
 	"""Return the session user if they may decide this recovery review, else raise PermissionError.
 
