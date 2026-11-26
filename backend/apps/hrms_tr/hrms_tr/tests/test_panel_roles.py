@@ -48,6 +48,7 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 	"""Shared setup. A subclass sets `ROLE`."""
 
 	ROLE = ""
+	new_leaves = 0
 
 	@classmethod
 	def setUpClass(cls):
@@ -110,6 +111,21 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 				from_date="2026-01-01",
 				to_date="2027-12-31",
 			).insert()
+		if not frappe.db.exists(
+			"Holiday List Assignment", {"assigned_to": COMPANY, "holiday_list": HOLIDAY_LIST, "docstatus": 1}
+		):
+			# HRMS 16 finds the holiday list of an employee through a submitted assignment.
+			# Written directly: the assignment flow of HRMS is not the subject of this test.
+			assignment = frappe.get_doc(
+				doctype="Holiday List Assignment",
+				applicable_for="Company",
+				assigned_to=COMPANY,
+				holiday_list=HOLIDAY_LIST,
+				from_date="2026-01-01",
+				docstatus=1,
+			)
+			assignment.name = f"HR-HLA-{HOLIDAY_LIST}"
+			assignment.db_insert()
 		if not frappe.db.exists("Leave Type", LEAVE_TYPE):
 			# Leave without pay: HRMS does not ask for an allocation.
 			frappe.get_doc(doctype="Leave Type", leave_type_name=LEAVE_TYPE, is_lwp=1).insert()
@@ -120,11 +136,14 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 		doc = frappe.get_doc(
 			doctype=DOCTYPE,
 			name=f"{cls.prefix}-{index}",
+			# db_insert skips the naming step. The submit still asks for the series.
+			naming_series="HR-LAP-.YYYY.-",
 			employee=cls.employee,
 			company=COMPANY,
 			leave_type=LEAVE_TYPE,
-			from_date="2026-12-07",
-			to_date="2026-12-07",
+			# One day per leave: HRMS rejects two leaves of one employee on the same day.
+			from_date=f"2026-12-0{7 + index}",
+			to_date=f"2026-12-0{7 + index}",
 			posting_date="2026-11-26",
 			status="Open",
 			docstatus=0,
@@ -194,12 +213,15 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 		)
 
 	def new_leave_body(self) -> dict:
+		# A new day for each new leave: HRMS rejects two leaves of one employee on the same day.
+		type(self).new_leaves += 1
+		day = f"2026-12-{13 + type(self).new_leaves}"
 		return {
 			"employee": self.employee,
 			"company": COMPANY,
 			"leave_type": LEAVE_TYPE,
-			"from_date": "2026-12-14",
-			"to_date": "2026-12-14",
+			"from_date": day,
+			"to_date": day,
 			"posting_date": "2026-11-26",
 		}
 

@@ -33,12 +33,16 @@ class RoleFixtureTest(unittest.TestCase):
 		for profile in profiles():
 			self.assertIn("HRT Employee", {row["role"] for row in profile["roles"]})
 
-	def test_hr_employee_permission_only_grants_read(self):
+	def test_employee_permissions_only_grant_read(self):
+		# HRMS asks for Employee read before a leave is opened. The two panel roles open leaves (AJA-947).
 		permissions = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Employee"]
-		self.assertEqual(len(permissions), 1)
-		permission = permissions[0]
-		self.assertEqual(permission["role"], "HRT Admin")
-		self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
+		self.assertEqual(
+			{row["role"] for row in permissions}, {"HRT Admin", "Tenant Admin", "Tenant Admin Assistant"}
+		)
+		for permission in permissions:
+			with self.subTest(role=permission["role"]):
+				self.assertEqual(permission["permlevel"], 0)
+				self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
 
 	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
@@ -57,7 +61,16 @@ class RoleFixtureTest(unittest.TestCase):
 class LinkSearchPermissionTest(unittest.TestCase):
 	"""A role that fills in a leave application can search its "Leave Type" link field."""
 
-	ROLES = frozenset({"HRT Employee", "HRT Manager", "HRT Admin", "System Manager"})
+	ROLES = frozenset(
+		{
+			"HRT Employee",
+			"HRT Manager",
+			"HRT Admin",
+			"System Manager",
+			"Tenant Admin",
+			"Tenant Admin Assistant",
+		}
+	)
 
 	def test_every_leave_role_can_select_leave_types_only(self):
 		rows = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Leave Type"]
