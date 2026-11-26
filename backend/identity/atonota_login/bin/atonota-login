@@ -31,6 +31,9 @@ sys.path.insert(0, str(PRODUCT))
 from atonota_login import keycloak_apply, platforms  # noqa: E402
 
 BACKEND = PRODUCT.parents[1]
+sys.path.insert(0, str(BACKEND / "deploy"))
+from release import load_environments  # noqa: E402
+
 REALM_FILE = BACKEND / "identity" / "keycloak" / "realm" / "platform-realm.json"
 ENVIRONMENTS = BACKEND / "deploy" / "environments"
 ENVIRONMENT_CHOICES = ("alpha", "beta", "rc", "prod", "all")
@@ -87,14 +90,14 @@ def redirects(arguments, registry):
             for p in registry
         }
     else:
-        names = sorted(f.stem for f in ENVIRONMENTS.glob("*.env")) if arguments.env == "all" else [arguments.env]
+        try:
+            environments = load_environments(ENVIRONMENTS)
+        except (OSError, ValueError) as error:
+            raise platforms.RegistryError(str(error)) from error
+        names = sorted(environments) if arguments.env == "all" else [arguments.env]
         table = {}
         for name in names:
-            path = ENVIRONMENTS / f"{name}.env"
-            if not path.is_file():
-                print(f"There is no environment file for {name}.", file=sys.stderr)
-                return 2
-            for alias, uri in platforms.environment_redirects(platforms.read_env_file(path), registry).items():
+            for alias, uri in platforms.environment_redirects(environments[name], registry).items():
                 table[f"{name} {alias}"] = uri
     print(json.dumps(table, indent=2) if arguments.json else "\n".join(f"{k}: {v}" for k, v in table.items()))
     return 0
