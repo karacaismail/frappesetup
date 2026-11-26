@@ -114,8 +114,8 @@ services:
     command: ["bench", "worker", "--queue", "short,default,long"]
     depends_on: [tenant-web]
 
-  # Frappe's own scheduler. Off until the project owner decides on scheduled work
-  # (cron rule in backend/CLAUDE.md). Turn on with COMPOSE_PROFILES=scheduler.
+  # Frappe's own scheduler. The project owner approved it on the servers on
+  # 26 November 2026 (D-16). The DevOps lead turns it on with COMPOSE_PROFILES=scheduler.
   tenant-scheduler:
     <<: *tenant
     profiles: [scheduler]

@@ -44,3 +44,7 @@ Yazılan değerler şunlardır:
 G-42 yerel kabul testi bu değerleri yeni kiracıda da denetleyecek.
 
 Dikkat edilecek bir nokta var. `after_migrate` test sitesinde de dili `tr` yapar. İngilizce hata metni bekleyen başka bir test bu yüzden düşebilir. Gerçek arka uç denemesinde bunu izleyin.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

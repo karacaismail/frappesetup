@@ -180,7 +180,11 @@ beta ve rc ortamları aynı kalıbı izler. Örneğin beta'da Press `press.beta.
 - Ana daldan gelen iş yalnız alpha ve beta anahtarlarını görür. rc ve prod anahtarları ayrı bir Jenkins klasöründedir. Bu yüzden ana daldaki değişiklik prod'a kendiliğinden gitmez.
 - Jenkins her dağıtımdan sonra sağlık denetimi koşar. Denetim geçmezse sonraki ortama taşıma yapılmaz.
 - alpha ortamında hata olursa hat yedeği kendiliğinden geri yükler. rc ve prod ortamında bu kararı DevOps sorumlusu verir.
-- Yedek her dağıtımdan önce alınır. Düzenli yedek yoktur, çünkü zamanlanmış iş kurulmaz (E-7).
+- Yedek her dağıtımdan önce alınır.
+- Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır (E-7). Kurulumu DevOps sorumlusu yapar.
+- Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz.
+- Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer.
+- IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır.
 
 ### Canlıya çıkışın önündeki engeller
 
@@ -193,10 +197,10 @@ Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dos
 | E-3 | `/panel` sayfası arka uçta hazır. Arayüz paketi bu adrese göre henüz ayarlanmadı | atonota-web işi |
 | E-4 | Çözüldü. Ayar listeleri yazıldı. Gerçek değerleri DevOps sorumlusu sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok | DevOps sorumlusu |
-| E-7 | Zamanlanmış iş yasağı yüzünden düzenli yedek yok | Proje sahibi |
+| E-7 | Karar verildi: zamanlayıcı ve düzenli yedek sunucularda açıktır. Sunucuda kurulum henüz yapılmadı | DevOps sorumlusu |
 | E-9 | Gerçek servislerle uçtan uca test yok | integration-e2e işi |
 | E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | DevOps sorumlusu |
 | E-11 | GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı | Alan adı sorumlusu |
-| E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | Hukuk ve ürün sahibi |
+| E-14 | Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer. KVKK aktarım bildirimi ve VERBİS kaydı da bitmedi | Hukuk ve ürün sahibi |
 
 Prod'a çıkmadan önce üç yaşam döngüsü testi de geçmelidir. Bu testler TLS aracısı olan hazırlık ortamında koşar (backend proje kaydı O-50).

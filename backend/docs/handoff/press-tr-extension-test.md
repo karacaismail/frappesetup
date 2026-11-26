@@ -33,3 +33,7 @@ Test paketi, ilk uygulama kurulumu sırasında dosya ölçümü yapmaz.
 Yerel dosya testi geçici bir çekirdek dosyasına yazdı.
 Dosya değişince test komutu hata verdi.
 Ayrı bir Press test sitesi çalışmadığı için HTTP paketi koşmadı.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

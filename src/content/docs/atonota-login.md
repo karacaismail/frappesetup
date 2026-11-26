@@ -133,6 +133,8 @@ Beş platformun kaydı hazırdır:
 | Facebook | Kapalı |
 | X | Kapalı |
 
+Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar (K-63). Hesaplar açılınca DevOps sorumlusu istemcileri bu hesaplarda açar.
+
 Facebook ve X, e-postanın doğrulandığını Keycloak'a bildirmez. Bu yüzden iki kayıt kapalıdır. Önce ek bir denetim yazılır. Sonra kayıtlar açılır.
 
 Platformun gizli anahtarı veri dosyasına yazılmaz. Dosya yalnız ortam değişkeninin adını yazar. Bütün değişkenleri dolu olan platform açılır. Bir değişken boşsa platform kapalı kalır. O zaman düğmesi giriş ekranında görünmez.
