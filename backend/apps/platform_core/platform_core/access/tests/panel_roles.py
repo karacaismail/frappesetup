@@ -47,6 +47,9 @@ try:
 	from frappe.tests.test_api import make_request
 	from frappe.utils import get_test_client
 	from frappe.utils.password import update_password
+
+	# The AI types belong to platform_core.model_gateway. The shared test package writes them.
+	from platform_core.tests.ai_records import insert_ai_records, remove_ai_records
 except ImportError:  # The fixture tests also run without Frappe.
 	frappe = None
 	IntegrationTestCase = unittest.TestCase
@@ -310,7 +313,7 @@ class PanelRoleHttpCase(IntegrationTestCase):
 
 	def make_ai_records(self) -> dict[str, str]:
 		"""Inserts the three AI records for one test and removes them after it (AJA-947)."""
-		names = insert_ai_records(frappe.generate_hash(length=8))
+		names = insert_ai_records(frappe.generate_hash(length=8), FAKE_AI_KEY)
 
 		def remove():
 			frappe.set_user("Administrator")
@@ -412,32 +415,3 @@ AI_TYPES = ("PLT AI Provider", "PLT AI Account", "PLT AI API")
 META_API = "platform_core.api.meta.get_doctype"
 # A made-up credential. No response may carry it.
 FAKE_AI_KEY = "sahte-anahtar-947-yalniz-test"
-
-
-def insert_ai_records(suffix: str) -> dict[str, str]:
-	"""Inserts one provider, account and API as the administrator. Returns the names by type."""
-	provider = frappe.get_doc(
-		doctype="PLT AI Provider", provider_name=f"PR Saglayici {suffix}", adapter="openai"
-	).insert(ignore_permissions=True)
-	account = frappe.get_doc(
-		doctype="PLT AI Account",
-		provider=provider.name,
-		account_name=f"PR Hesap {suffix}",
-		currency="USD",
-	).insert(ignore_permissions=True)
-	api = frappe.get_doc(
-		doctype="PLT AI API",
-		account=account.name,
-		api_name=f"PR API {suffix}",
-		base_url="https://saglayici.example.test",
-		auth_type="api_key",
-		api_key=FAKE_AI_KEY,
-	).insert(ignore_permissions=True)
-	return {"PLT AI Provider": provider.name, "PLT AI Account": account.name, "PLT AI API": api.name}
-
-
-def remove_ai_records(names: dict[str, str]) -> None:
-	for doctype in ("PLT AI API", "PLT AI Account", "PLT AI Provider"):
-		name = names.get(doctype)
-		if name and frappe.db.exists(doctype, name):
-			frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)
