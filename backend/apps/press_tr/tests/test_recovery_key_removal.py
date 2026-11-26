@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 APP = Path(__file__).resolve().parents[1] / "press_tr"
 DOCTYPE_DIR = APP / "press_identity/doctype/ptr_recovery_review"
@@ -308,15 +309,17 @@ class KeyRemovalRequestTest(unittest.TestCase):
 
 		self.deletion = deletion
 		self.framework = Mock()
+		self.client_value = uuid4().hex
+		self.access_value = uuid4().hex
 		self.framework.conf = SimpleNamespace(
 			identity_sync_url="http://identity-sync.example.test:3205/",
-			press_service_client_secret="test-only",
+			press_service_client_secret=self.client_value,
 		)
 		self.requests = Mock()
 		self.requests.RequestException = deletion.requests.RequestException
 		self.requests.ReadTimeout = deletion.requests.ReadTimeout
 		self.token = Mock(status_code=200)
-		self.token.json.return_value = {"access_token": "service-token"}
+		self.token.json.return_value = {"access_token": self.access_value}
 		self.reply = Mock(status_code=200)
 		self.reply.raw.read.return_value = json.dumps({"status": "done", "removed": 2}).encode()
 		self.requests.post.side_effect = [self.token, self.reply]
@@ -343,8 +346,9 @@ class KeyRemovalRequestTest(unittest.TestCase):
 		self.assertEqual(self._send(), 2)
 		token_call, call = self.requests.post.call_args_list
 		self.assertEqual(token_call.kwargs["data"]["scope"], "aud-identity-sync")
+		self.assertEqual(token_call.kwargs["auth"], ("press-service", self.client_value))
 		self.assertEqual(call.args[0], "http://identity-sync.example.test:3205/v1/recovery-key-removals")
-		self.assertEqual(call.kwargs["headers"], {"Authorization": "Bearer service-token"})
+		self.assertEqual(call.kwargs["headers"], {"Authorization": f"Bearer {self.access_value}"})
 		self.assertEqual(
 			call.kwargs["json"],
 			{
@@ -421,8 +425,9 @@ class KeyRemovalRouteTest(unittest.TestCase):
 		from press_tr.api import account
 
 		framework = Mock()
-		framework.get_request_header.return_value = "csrf-1"
-		framework.session = SimpleNamespace(data={"csrf_token": "csrf-1"})
+		csrf_value = uuid4().hex
+		framework.get_request_header.return_value = csrf_value
+		framework.session = SimpleNamespace(data={"csrf_token": csrf_value})
 		removal = Mock(return_value={"status": "Completed"})
 		with (
 			patch.object(account, "frappe", framework),
