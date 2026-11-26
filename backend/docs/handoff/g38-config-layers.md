@@ -14,3 +14,7 @@ Yetkili deneme ortamı hazır olduğunda platform ekibi şu adımları uygular.
 
 Press Settings içindeki `bench_configuration` yalnız yeni bench için kullanılır.
 Mevcut bench'e yayılma kanıtı Release Group üzerinden alınır.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

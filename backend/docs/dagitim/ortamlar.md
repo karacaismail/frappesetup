@@ -37,7 +37,7 @@ Bu belgede şu kelimeler geçer:
 | alpha | Ana daldaki son kodu denemek | Geliştirme ekibi | Ana dal güncellenince kendiliğinden |
 | beta | Ürün ekibinin iç denemesi | Ürün sahibi ve test ekibi | Jenkins'te "Move to beta" düğmesiyle |
 | rc | Prod'un aynısında son kabul denemesi | Test ekibi ve DevOps sorumlusu | Jenkins'te "Move to rc" düğmesiyle |
-| prod | Gerçek müşteri | Müşteriler | Jenkins'te "Move to prod" düğmesiyle |
+| prod | Müşteriye açılacak canlı ortam. Bugün yalnız deneme verisi girer | Ürün sahibi ve test ekibi | Jenkins'te "Move to prod" düğmesiyle |
 
 Her ortamın kuralları `backend/deploy/environments/` klasöründedir. Bu dosyalarda sır yoktur.
 
@@ -48,6 +48,12 @@ rc ve prod ortamları daha sıkıdır:
 - Hata olursa veritabanı kendiliğinden geri yüklenmez. Bu kararı DevOps sorumlusu verir.
 
 alpha ortamında hata olursa hat yedeği kendiliğinden geri yükler. alpha verisi deneme verisidir.
+
+Proje sahibi 26 Kasım 2026 Perşembe günü şu kararları verdi:
+
+- Gerçek müşteri verisi için karar yoktur. Bu yüzden prod ortamına yalnız deneme verisi girer.
+- IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).
+- Frappe zamanlayıcısı ve düzenli yedek sunucularda açılır. Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz.
 
 ## Alan adı haritası
 
@@ -356,7 +362,9 @@ Bu kural tutarsa geri dönüşte veritabanını geri yüklemek gerekmez.
 - Yedek klasöründe bir `SHA256SUMS` dosyası vardır. Geri yükleme önce bu özetleri denetler.
 - Sunucu dışı kopya Hetzner Object Storage'a gider. Kopyayı `rclone` aracı yapar.
 - rc ve prod'da sunucu dışı kopya zorunludur.
-- Yedeği yalnız bir kişi ya da bir dağıtım başlatır. Zamanlanmış yedek yoktur.
+- Yedeği bir dağıtım ya da bir kişi başlatır.
+- Proje sahibi 26 Kasım 2026 Perşembe günü sunucularda düzenli yedeği onayladı. Düzenli yedeği DevOps sorumlusu sunucuda kurar. Bugün depoda düzenli yedek kurulumu yoktur.
+- Geliştirme Mac'inde zamanlanmış iş kurulmaz.
 
 Elle yedek almak için DevOps sorumlusu sunucuda şu komutu çalıştırır:
 
@@ -598,7 +606,7 @@ Proje kaydı karar sitesinden önce gelir. Şu çelişkileri buldum:
 | Ç-5 | Yol haritası X-02 üç ortam sayar: Colima geliştirme, staging ve prod | Colima yalnız geliştirme içindir. Canlıda dört ortam vardır | X-02 dört ortamla yazılır |
 | Ç-6 | Dağıtım hattı P1 içinde kurulur | Jenkins hattı canlıya çıkıştan önce gerekir | Dağıtım hattı P0'a alınır |
 | Ç-7 | O-1: "Alan adının kayıt yeri doğrulanmadı" | Proje sahibi DNS'in GoDaddy'de olduğunu söyledi | O-1 notu "GoDaddy" olarak güncellenir |
-| Ç-8 | P0: offsite yedek ve izleme uyarıları | Zamanlanmış iş yasağı vardır | Yedek yalnız dağıtımda ve elle alınır. Düzenli yedek için proje sahibinin kararı gerekir (E-7) |
+| Ç-8 | P0: offsite yedek ve izleme uyarıları | Zamanlanmış iş yasağı yalnız geliştirme Mac'i içindir | Proje sahibi 26 Kasım 2026 Perşembe günü sunucularda düzenli yedeği onayladı (E-7) |
 | Ç-9 | `ci.yml` PR kapısı | Kapı yalnız siteyi ve `press-ai` paketini sınıyordu | Bu iş dağıtım testlerini kapıya ekledi. Backend testleri yine yalnız Jenkins'te koşar |
 
 Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir işle yapar.
@@ -613,14 +621,14 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |
-| E-7 | Zamanlanmış iş yasağı var. Bu yüzden Frappe zamanlayıcısı kapalıdır. Düzenli yedek de yoktur | Proje sahibi karar verir. Zamanlayıcı `COMPOSE_PROFILES=scheduler` ile açılır | Proje sahibi |
+| E-7 | Karar verildi, kurulum kaldı. Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Sunucuda kurulum henüz yapılmadı | DevOps sorumlusu zamanlayıcıyı sunucuda `COMPOSE_PROFILES=scheduler` ile açar. Düzenli yedeği de sunucuda kurar | DevOps sorumlusu |
 | E-8 | Üretim işçi sayısı ölçülmedi | DevOps sorumlusu rc'de yük ölçer. `ATONOTA_GUNICORN_WORKERS` değerini ölçümle seçer | DevOps sorumlusu |
 | E-9 | Gerçek servislerle uçtan uca test yok | Uçtan uca test beta'da gerçek Keycloak ve kiracıyla koşar | integration-e2e işi |
 | E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | Devir notundaki adımlar uygulanır | DevOps sorumlusu |
 | E-11 | GoDaddy'nin `*.app.alpha` gibi çok katlı joker kaydı kabul ettiği doğrulanmadı | Kayıt girilirken denenir. Kabul edilmezse her kiracı için ayrı A kaydı girilir | Alan adı sorumlusu |
 | E-12 | E-posta aktarma sunucusu seçilmedi (G-47) | SMTP sağlayıcısı seçilir. Sırlar `keycloak.env` dosyasına yazılır | DevOps sorumlusu |
 | E-13 | Arayüz ve arka uç ayrı taşınır. Bir ortamda uyumsuz ikili oluşabilir | Bir ortamda önce arka uç taşınır. Arayüz arka ucun sözleşmesini aşmaz | Orkestratör |
-| E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | prod'a gerçek veri girmeden önce hukuk onayı alınır | Hukuk ve ürün sahibi |
+| E-14 | Gerçek müşteri verisi için karar yoktur. KVKK aktarım bildirimi ve VERBİS kaydı da bitmedi | prod ortamına yalnız deneme verisi girer (26 Kasım 2026). Gerçek veri için önce proje sahibi karar verir. Sonra hukuk onayı alınır | Hukuk ve ürün sahibi |
 | E-15 | Üretim imajları Mac'te arm64 ile denendi. Hetzner sunucuları amd64 olabilir | `build-release` bütün imajları `linux/amd64` için derler. arm64 derleme ajanı QEMU öykünmesiyle derler. Sunucular amd64 olur. arm64 sunucu seçilirse önce Go bağımlılıkları sabitlenir. Ayrıntı [Press imajı belgesindedir](press-imaji.md) | DevOps sorumlusu |
 | E-16 | identity-sync üretimde yalnız iç ağda HTTP ile açılır. Üç bağlantı bu servise ulaşmalıdır. Bunlar Keycloak olayları, telefonun oturum kapatma isteği ve Press'in silme isteğidir. Press'in silme isteği 23 Kasım 2026 Pazartesi günü çözüldü. `press-web` ile identity-sync ayrı bir ağı paylaşır. Ağın adı `press-identity` olur. Bu ağda yalnız bu iki servis vardır. Ağın internete çıkışı yoktur (`internal: true`). `identity_sync_url` değeri `http://identity-sync:6115` olur. Gerekçe şudur. identity-sync internete açılsaydı silme ve oturum kapatma uçları da açılırdı. identity-sync `press-internal` ağına girseydi Press'in Redis'ine ulaşırdı. O Redis parolasızdır. Ayrı ağ yalnız gereken bağlantıyı açar. Ters yön de kapalı bir ağdır. identity-sync, Press'e `identity-press` ağından ulaşır (O-55). Bunu `test_press_image.py` denetler. Diğer iki bağlantı için geçerli değer henüz yok. Bunlar `KC_SPI_EVENTS_LISTENER__WEBHOOK__URL` ve `mobile_identity_sync_url` değerleridir. İkisi HTTPS ister | Keycloak olayları ve telefon isteği için iç ağda TLS tasarlanır. Başka bir yol da vardır. Ön vekilde yalnız iç ağa açık bir ad açılır. identity-sync hiçbir yolda internete açılmaz | identity-sync işi ve DevOps sorumlusu |
 

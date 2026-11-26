@@ -4,6 +4,14 @@ Bu not DevOps sorumlusu içindir. Not 23 Kasım 2026 Pazartesi günü yazıldı.
 
 Platform, kullanıcının oturum açtığı dış hizmettir. Örneğin Google bir platformdur. Platformun paneli, o hizmetin geliştirici ekranıdır.
 
+## Geliştirici hesaplarının sahibi
+
+Proje sahibi bu kararı 26 Kasım 2026 Perşembe günü verdi.
+
+- Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar.
+- Hesap açılınca DevOps sorumlusu istemciyi bu hesapta açar.
+- Bu notta kişi adı yazılmaz. Hesabın sahibi “hesap sorumlusu” diye anılır.
+
 ## Her platformda aynı olan adımlar
 
 1. DevOps sorumlusu platformun panelinde bir istemci açar. İstemci, AtonotA Login'in o platformdaki kaydıdır.
@@ -47,6 +55,7 @@ Her ortam için platform panelinde ayrı istemci açın. Böylece alpha'nın sı
 
 ### Google: `google`
 
+- Google geliştirici hesabını hesap sorumlusu açar.
 - Tarayıcı Google'ın `accounts.google.com` adresine gider.
 - Panel Google Cloud Console'dur. "APIs & Services" bölümünde "OAuth consent screen" ekranını doldurun.
 - "Credentials" bölümünde "OAuth client ID" açın. Tür olarak "Web application" seçin.
@@ -55,6 +64,7 @@ Her ortam için platform panelinde ayrı istemci açın. Böylece alpha'nın sı
 
 ### Apple: `apple`
 
+- Apple geliştirici hesabını hesap sorumlusu açar.
 - Tarayıcı Apple'ın `appleid.apple.com` adresine gider.
 - Panel Apple Developer hesabıdır. Bir "Services ID" kaydı açın.
 - Bu kayıtta "Sign in with Apple" özelliğini açın.
@@ -73,6 +83,7 @@ Her ortam için platform panelinde ayrı istemci açın. Böylece alpha'nın sı
 
 ### LinkedIn: `linkedin`
 
+- LinkedIn geliştirici hesabını hesap sorumlusu açar.
 - Tarayıcı LinkedIn'in `www.linkedin.com` adresine gider.
 - Panel LinkedIn Developers sitesidir. Bir uygulama açın.
 - Uygulamaya "Sign In with LinkedIn using OpenID Connect" ürününü ekleyin.
@@ -100,3 +111,7 @@ Giriş adresinin DNS kaydını DevOps sorumlusu hazırlar. Alan adı sorumlusu k
 - Düğmeye basınca tarayıcı platformun kendi adresine gider.
 - Platform işini bitirince tarayıcı `api.login.<ortam tabanı>` adresine döner.
 - Panelde kayıtlı olmayan dönüş adresini platform reddeder.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

@@ -42,7 +42,7 @@
  {
   "id": "G-5",
   "title": "Offsite yedek: Hetzner Object Storage, Agent endpoint yaması, GFS ve çapraz kopya",
-  "detail": "Cluster başına Backup Bucket (endpoint_url `https://fsn1.your-objectstorage.com`), Press Settings `aws_s3_bucket` ve `offsite` anahtarları, `backup_rotation_scheme='Grandfather-father-son'` (7 günlük/4 haftalık/12 aylık/10 yıllık saklama bütçeye yazılır), Site Plan offsite_backups=1. Agent `upload_offsite_backup` ENDPOINT_URL okumaz ve rclone yolu AWS'e sabittir (doğrulandı); Agent yaması (boto3 endpoint_url, `--s3-provider Other`, Press Settings `offsite_backups_provider` 'S3 Compatible') upstream PR hedefiyle yazılır; Hetzner replication desteklemediği için fsn1→nbg1 günlük `rclone sync --immutable`; özel yedek saatleri `schedule_logical_backup_at_custom_time=1` + `logical_backup_times` Press sunucu saatiyle (02:00-05:00 Istanbul = 23:00-02:00 UTC) yazılır. Kabul: 5 GB üstü yedek yüklenip Remote File indirme bağlantısı çalışır.",
+  "detail": "Cluster başına Backup Bucket (endpoint_url `https://fsn1.your-objectstorage.com`), Press Settings `aws_s3_bucket` ve `offsite` anahtarları, `backup_rotation_scheme='Grandfather-father-son'` (7 günlük/4 haftalık/12 aylık/10 yıllık saklama bütçeye yazılır), Site Plan offsite_backups=1. Agent `upload_offsite_backup` ENDPOINT_URL okumaz ve rclone yolu AWS'e sabittir (doğrulandı); Agent yaması (boto3 endpoint_url, `--s3-provider Other`, Press Settings `offsite_backups_provider` 'S3 Compatible') upstream PR hedefiyle yazılır; Hetzner replication desteklemediği için fsn1→nbg1 günlük `rclone sync --immutable`; özel yedek saatleri `schedule_logical_backup_at_custom_time=1` + `logical_backup_times` Press sunucu saatiyle (02:00-05:00 Istanbul = 23:00-02:00 UTC) yazılır. Kabul: 5 GB üstü yedek yüklenip Remote File indirme bağlantısı çalışır. Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır. Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Kurulumu DevOps sorumlusu yapar.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P0",
@@ -1132,7 +1132,7 @@
  {
   "id": "G-114",
   "title": "Yedekleme, DR ve rollback runbook'ları",
-  "detail": "Press DB, Keycloak DB, agent DB ve Registry günlük şifreli yedek + çapraz lokasyon; RPO ≤ 24 saat (kiracı), ≤ 1 saat (Press/Keycloak binlog/WAL), RTO ≤ 8 saat belgelenir; çeyrek bazlı DR tatbikatı (Press'in kaybı dahil); rollback: Deploy Candidate önceki bench'e Site Update geri alma, Site yedekten geri yükleme, Agent Update auto_rollback, Keycloak sürüm geri alma; her prosedür runbook + ADR olarak depoda sürümlenir.",
+  "detail": "Press DB, Keycloak DB, agent DB ve Registry günlük şifreli yedek + çapraz lokasyon; RPO ≤ 24 saat (kiracı), ≤ 1 saat (Press/Keycloak binlog/WAL), RTO ≤ 8 saat belgelenir; çeyrek bazlı DR tatbikatı (Press'in kaybı dahil); rollback: Deploy Candidate önceki bench'e Site Update geri alma, Site yedekten geri yükleme, Agent Update auto_rollback, Keycloak sürüm geri alma; her prosedür runbook + ADR olarak depoda sürümlenir. Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır. Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Kurulumu DevOps sorumlusu yapar.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P1",
