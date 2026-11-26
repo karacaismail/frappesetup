@@ -24,6 +24,13 @@ Her ortamın anahtarı ayrıdır. Bir anahtar yalnız kendi ortamını açar.
 rc ve prod anahtarlarını `atonota-delivery` klasörüne koymayın.
 Bu klasördeki işler `main` dalına her push ile kendiliğinden başlar.
 
+## Yazışma kanalı
+
+Bu işle ilgili yazışmalar proje Telegram grubunda yapılır.
+Sorunuz olursa soruyu proje Telegram grubuna yazın.
+Grubun adresini depoya, yoruma ve Jenkinsfile dosyasına yazmayın.
+Gizli değerleri gruba da yazmayın.
+
 ## Kurulum sırası
 
 1. DevOps sorumlusu Jenkins'te iki klasörü açar: `atonota-delivery` ve `atonota-release`.

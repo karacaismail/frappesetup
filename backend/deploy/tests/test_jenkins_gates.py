@@ -213,5 +213,25 @@ class Secrets(unittest.TestCase):
         self.assertEqual(listed, used)
 
 
+TELEGRAM_LINK = re.compile(r"(?i)\b(?:t|telegram)\.(?:me|dog)/")
+
+
+def telegram_links(text):
+    return TELEGRAM_LINK.findall(text)
+
+
+class ContactChannel(unittest.TestCase):
+    def test_handoff_note_names_the_project_telegram_group(self):
+        self.assertIn("proje Telegram grubu", CREDENTIALS_NOTE.read_text())
+
+    def test_handoff_note_holds_no_telegram_link(self):
+        self.assertEqual(telegram_links(CREDENTIALS_NOTE.read_text()), [])
+
+    def test_the_check_finds_telegram_links(self):
+        self.assertEqual(len(telegram_links("Gruba katılın: https://t.me/+abc")), 1)
+        self.assertEqual(len(telegram_links("telegram.me/joinchat/x")), 1)
+        self.assertEqual(telegram_links("proje Telegram grubu"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
