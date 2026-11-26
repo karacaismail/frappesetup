@@ -169,7 +169,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "501aeaaf98c6e8a4fbb28e490a005da6527f7ebf0c591e9d99adc8af2c9cbfa2",
+      "sha256": "eec5b2f9ffd1f0d5dd6fe9c88fe43f4f60d948f4ec0d70ad58a4bfd33a57cf49",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -400,6 +400,7 @@
         "backend/apps/platform_core/platform_core/access/tenant_admin.py",
         "backend/apps/platform_core/platform_core/api/access.py",
         "backend/apps/platform_core/platform_core/api/atonota_login.py",
+        "backend/apps/platform_core/platform_core/api/help.py",
         "backend/apps/platform_core/platform_core/api/identity.py",
         "backend/apps/platform_core/platform_core/api/reseller.py",
         "backend/apps/platform_core/platform_core/api/test_reseller.py",
@@ -409,7 +410,9 @@
         "backend/apps/platform_core/platform_core/identity/user_admin.py",
         "backend/apps/platform_core/platform_core/model_gateway/large_file.py",
         "backend/apps/platform_core/platform_core/reseller/customers.py",
-        "backend/apps/platform_core/platform_core/setup/panel_roles.py"
+        "backend/apps/platform_core/platform_core/setup/panel_roles.py",
+        "backend/apps/platform_core/platform_core/shell/help.py",
+        "backend/apps/platform_core/platform_core/shell/help_content.py"
       ]
     }
   ]

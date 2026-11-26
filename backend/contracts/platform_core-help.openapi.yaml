@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: Platform Core help API
+  version: 0.1.0
+  description: |
+    Field help for the signed-in tenant user (G-138). The G-137 help panel reads this contract.
+    Help topics are "PLT Help Topic" records. Only published topics are returned.
+    Fallback order is tenant content, application content, the Frappe field description,
+    then a generic answer with the request_help action.
+servers:
+  - url: /api/method
+    description: Frappe endpoint root of the tenant site
+security:
+  - session: []
+paths:
+  /platform_core.api.help.get_field_help:
+    get:
+      operationId: getFieldHelp
+      summary: Read the help of one field
+      description: |
+        Returns the help of one field of a document type. The server first checks the
+        shell metadata of the document type with the current user's permissions.
+        That check applies the DocType permission, field permission levels, masks and the
+        site metadata policy. A field the user cannot read, or a field that does not exist,
+        returns source "unavailable" with no content. The two cases look the same.
+        A topic applies when its language is empty, equals the request language or equals
+        its base language. Its version must be empty or equal the installed version of the
+        application that owns the document type. Its target roles must be empty or include
+        a role of the user. Inside a layer, the topic with the closest language and version
+        wins, then the most recently modified one. Changes no record.
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Exact DocType name. Child tables are not accepted.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 140
+          example: Sales Invoice
+        - name: fieldname
+          in: query
+          required: true
+          description: Field name, custom fields included.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 140
+          example: due_date
+        - name: language
+          in: query
+          description: Language code of the content. The default is the request language.
+          schema:
+            type: string
+            maxLength: 20
+          example: tr
+      responses:
+        '200':
+          description: Help of the field, or the reason there is none.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                additionalProperties: false
+                properties:
+                  message:
+                    $ref: '#/components/schemas/FieldHelp'
+              examples:
+                tenant:
+                  value:
+                    message:
+                      doctype: Sales Invoice
+                      fieldname: due_date
+                      source: tenant
+                      topic: HT-00001
+                      title: Due date
+                      content: Enter the date the customer must pay by.
+                      message: null
+                      actions: []
+                none:
+                  value:
+                    message:
+                      doctype: Sales Invoice
+                      fieldname: due_date
+                      source: none
+                      topic: null
+                      title: null
+                      content: null
+                      message: No help is available for this field.
+                      actions: [request_help]
+        '401':
+          description: The supplied session has expired or is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: SessionExpired
+                session_expired: 1
+        '403':
+          description: Browser session required, or the user cannot read the document type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: PermissionError
+        '417':
+          description: A parameter is missing, too long or not supported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: ValidationError
+        '429':
+          description: The account exceeded 240 requests per 60 seconds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: RateLimitExceededError
+  /platform_core.api.help.get_help_coverage:
+    get:
+      operationId: getHelpCoverage
+      summary: Report the share of fields with help as a System Manager
+      description: |
+        Counts the value fields of the non-child document types of one installed application.
+        Custom fields are included. A field has help when a published field topic exists
+        or the field has a description. Layout fields such as section breaks and tables are
+        not counted. The ratio is null when there is no field. Changes no record.
+      parameters:
+        - name: app
+          in: query
+          required: true
+          description: Name of an installed application.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 140
+          example: erpnext
+      responses:
+        '200':
+          description: Coverage report of the application.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                additionalProperties: false
+                properties:
+                  message:
+                    $ref: '#/components/schemas/Coverage'
+              example:
+                message:
+                  app: erpnext
+                  total: 4
+                  with_topic: 1
+                  with_description_only: 1
+                  covered: 2
+                  without_help: 2
+                  ratio: 0.5
+                  topic_ratio: 0.25
+                  missing:
+                    - doctype: Sales Invoice
+                      fieldname: customer
+                      is_custom: false
+        '401':
+          description: The supplied session has expired or is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: SessionExpired
+                session_expired: 1
+        '403':
+          description: Browser session required or the System Manager role missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: PermissionError
+        '417':
+          description: The application is not installed or a parameter is not supported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                exc_type: ValidationError
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Host-bound Frappe browser session cookie.
+  schemas:
+    FieldHelp:
+      type: object
+      required: [doctype, fieldname, source, topic, title, content, message, actions]
+      additionalProperties: false
+      properties:
+        doctype:
+          type: string
+        fieldname:
+          type: string
+        source:
+          type: string
+          enum: [tenant, app, description, none, unavailable]
+          description: |
+            tenant and app mean a help topic. description means the Frappe field description.
+            none means no help exists. unavailable means the user cannot read the field.
+        topic:
+          type: [string, 'null']
+          description: Name of the help topic record, only for tenant and app.
+        title:
+          type: [string, 'null']
+          description: Title of the help topic, only for tenant and app.
+        content:
+          type: [string, 'null']
+          description: Plain text help. Null for none and unavailable. Render it as text, not markup.
+        message:
+          type: [string, 'null']
+          description: Translated "No help is available for this field." text, only for none.
+        actions:
+          type: array
+          items:
+            type: string
+            enum: [request_help]
+          description: request_help appears only for none.
+    Coverage:
+      type: object
+      required: [app, total, with_topic, with_description_only, covered, without_help, ratio, topic_ratio, missing]
+      additionalProperties: false
+      properties:
+        app:
+          type: string
+        total:
+          type: integer
+          minimum: 0
+          description: Number of counted fields.
+        with_topic:
+          type: integer
+          minimum: 0
+          description: Fields with at least one published topic.
+        with_description_only:
+          type: integer
+          minimum: 0
+          description: Fields without a topic but with a description.
+        covered:
+          type: integer
+          minimum: 0
+        without_help:
+          type: integer
+          minimum: 0
+        ratio:
+          type: [number, 'null']
+          description: covered divided by total, rounded to four decimals.
+        topic_ratio:
+          type: [number, 'null']
+          description: with_topic divided by total, rounded to four decimals.
+        missing:
+          type: array
+          items:
+            type: object
+            required: [doctype, fieldname, is_custom]
+            additionalProperties: false
+            properties:
+              doctype:
+                type: string
+              fieldname:
+                type: string
+              is_custom:
+                type: boolean
+    Error:
+      type: object
+      description: Native Frappe error envelope. Developer mode may add diagnostics.
+      properties:
+        exc_type:
+          type: string
+        _server_messages:
+          type: string
+        session_expired:
+          type: integer
+          const: 1
+      additionalProperties: true
