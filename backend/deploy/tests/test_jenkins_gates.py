@@ -185,7 +185,7 @@ class Secrets(unittest.TestCase):
             "environment { REGISTRY_TOKEN = 'abc123def' }",
             'def password = "hunter22"',
             "sh 'docker login ghcr.io --password s3cretvalue'",
-            "-----BEGIN OPENSSH PRIVATE KEY-----",
+            "-----BEGIN OPENSSH " + "PRIVATE KEY-----",
             "env.GH = 'ghp_" + "a" * 36 + "'",
         )
         for sample in samples:
