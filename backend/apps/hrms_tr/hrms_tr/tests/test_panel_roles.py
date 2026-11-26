@@ -189,7 +189,9 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 
 	def reject(self, client, name: str):
 		"""Rejecting is a submit with the status “Rejected”."""
-		return self.send(client, "PUT", REST + f"{DOCTYPE}/{name}", body={"status": "Rejected", "docstatus": 1})
+		return self.send(
+			client, "PUT", REST + f"{DOCTYPE}/{name}", body={"status": "Rejected", "docstatus": 1}
+		)
 
 	def new_leave_body(self) -> dict:
 		return {
@@ -209,7 +211,10 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 		self.assertEqual(response.status_code, 200, response.data[:300])
 
 	def test_holder_reads_every_leave_of_the_site(self):
-		query = {"filters": json.dumps([["name", "like", f"{self.prefix}-%"]]), "fields": json.dumps(["name"])}
+		query = {
+			"filters": json.dumps([["name", "like", f"{self.prefix}-%"]]),
+			"fields": json.dumps(["name"]),
+		}
 		response = self.send(self.login(), "GET", REST + DOCTYPE, query=query)
 
 		self.assertEqual(response.status_code, 200, response.data[:300])

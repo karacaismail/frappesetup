@@ -407,7 +407,7 @@ class PanelRoleHttpCase(IntegrationTestCase):
 
 # --- AI provider types (AJA-947) ---
 
-# The panel page “Yapay zekâ sağlayıcıları” reads these three types.
+# The panel page of the AI providers (/administration/ai-providers) reads these three types.
 AI_TYPES = ("PLT AI Provider", "PLT AI Account", "PLT AI API")
 META_API = "platform_core.api.meta.get_doctype"
 # A made-up credential. No response may carry it.
