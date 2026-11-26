@@ -146,6 +146,24 @@ class TestTenantAdminHttp(panel_roles.PanelRoleHttpCase):
 				field, value = next(iter(body.items()))
 				self.assertEqual(frappe.db.get_value(doctype, name, field), value)
 
+	def test_admin_writes_the_credential_and_never_reads_it_back(self):
+		"""The credential is at level 1. The admin writes it there and has no read right (AJA-1024)."""
+		from frappe.utils.password import get_decrypted_password
+
+		records = self.make_ai_records()
+		name = records["PLT AI API"]
+		new_key = "yeni-sahte-anahtar-1024-yalniz-test"
+		client = self.login()
+
+		response = self.send(
+			client, "PUT", panel_roles.REST + f"PLT AI API/{name}", body={"api_key": new_key}
+		)
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertNotIn(new_key.encode(), response.data)
+		self.assertEqual(get_decrypted_password("PLT AI API", name, "api_key"), new_key)
+		self.assertEqual(frappe.get_meta("PLT AI API").get_field("api_key").permlevel, 1)
+
 	def test_admin_cannot_delete_the_ai_records(self):
 		records = self.make_ai_records()
 		client = self.login()

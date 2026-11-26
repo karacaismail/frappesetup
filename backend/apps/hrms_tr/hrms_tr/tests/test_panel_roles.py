@@ -10,6 +10,9 @@ The panel page “İzin talepleri” reads “Leave Application”. The product 
 A tenant is its own Frappe site. A leave of another tenant is not on this site, so its name
 cannot be read here.
 
+Both roles choose an employee when they open a leave. They never read the personal fields
+of the employee record (AJA-1024).
+
 The requests go through the WSGI application of Frappe with a real session. The test needs a
 Frappe test site with HRMS TR and platform_core installed:
 `PANE_PORT=<port> backend/dev/bin/test hrms_tr --module hrms_tr.tests.test_panel_roles`.
@@ -25,6 +28,8 @@ try:
 	from frappe.tests.test_api import make_request
 	from frappe.utils import get_test_client
 	from frappe.utils.password import update_password
+
+	from hrms_tr import leave
 except ImportError:  # Outside a bench the test is skipped.
 	frappe = None
 	IntegrationTestCase = unittest.TestCase
@@ -41,6 +46,15 @@ LEAVE_TYPE = "HRT Panel Role Leave"
 HOLIDAY_LIST = "HRT Panel Role Holidays"
 # The name of a leave that lives on another tenant's site.
 FOREIGN_LEAVE = "baska-kiraci-izin-947"
+SEARCH_LINK = "/api/method/frappe.desk.search.search_link"
+# Made-up personal values of the employee. No response to the two roles may carry them.
+DATE_OF_BIRTH = "1990-01-01"
+PERSONAL_VALUES = {
+	"iban": "TR330006100519786457841947",
+	"bank_ac_no": "9470001024",
+	"passport_number": "U94710240",
+	"health_details": "Sahte saglik notu 1024",
+}
 
 
 @unittest.skipIf(frappe is None, "Needs a Frappe test site with HRMS TR installed.")
@@ -85,6 +99,8 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 			.insert()
 			.name
 		)
+		# Written directly: the personal values are test data, not the subject of a form.
+		frappe.db.set_value("Employee", cls.employee, PERSONAL_VALUES, update_modified=False)
 		cls.leaves = [cls.insert_leave(index) for index in range(2)]
 		# Committed on purpose: the request uses another connection.
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
@@ -257,12 +273,50 @@ class PanelRoleLeaveCase(IntegrationTestCase):
 		self.assertTrue(frappe.db.exists(DOCTYPE, self.leaves[0]))
 
 	def test_holder_cannot_read_a_leave_of_another_tenant(self):
+		"""One test site holds one tenant. The same request reads a real leave of this site first.
+
+		Without that first read the test would pass for a role that reads no leave at all.
+		"""
+		client = self.login()
+		own = self.send(client, "GET", REST + f"{DOCTYPE}/{self.leaves[0]}")
+		self.assertEqual(own.status_code, 200, own.data[:300])
+		self.assertEqual(own.json["data"]["employee"], self.employee)
 		self.assertFalse(frappe.db.exists(DOCTYPE, FOREIGN_LEAVE))
 
-		response = self.send(self.login(), "GET", REST + f"{DOCTYPE}/{FOREIGN_LEAVE}")
+		response = self.send(client, "GET", REST + f"{DOCTYPE}/{FOREIGN_LEAVE}")
 
 		self.assertIn(response.status_code, (403, 404), response.data[:300])
 		self.assertNotIn(b'"employee"', response.data)
+
+	def test_holder_selects_the_employee_of_a_leave(self):
+		body = {"doctype": "Employee", "txt": self.prefix, "reference_doctype": DOCTYPE}
+		response = self.send(self.login(), "POST", SEARCH_LINK, body=body)
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		values = {row["value"] for row in response.json["message"]}
+		self.assertIn(self.employee, values)
+
+	def test_holder_does_not_read_the_personal_fields_of_an_employee(self):
+		client = self.login()
+		fields = json.dumps(["name", "date_of_birth", *PERSONAL_VALUES])
+		requests = {
+			"record": ("GET", REST + f"Employee/{self.employee}", None),
+			"list": (
+				"GET",
+				REST + "Employee",
+				{"fields": fields, "filters": json.dumps({"name": self.employee})},
+			),
+			"value": (
+				"GET",
+				"/api/method/frappe.client.get_value",
+				{"doctype": "Employee", "filters": self.employee, "fieldname": fields},
+			),
+		}
+		for label, (method, path, query) in requests.items():
+			with self.subTest(request=label):
+				response = self.send(client, method, path, query=query)
+				for value in (DATE_OF_BIRTH, *PERSONAL_VALUES.values()):
+					self.assertNotIn(value.encode(), response.data, (label, response.status_code))
 
 
 class TenantAdminLeaveTest(PanelRoleLeaveCase):
@@ -295,6 +349,15 @@ class TenantAdminAssistantLeaveTest(PanelRoleLeaveCase):
 
 		self.assertEqual(response.status_code, 403, response.data[:300])
 		self.assertEqual(self.leave_state(self.leaves[1]), ("Open", 0))
+
+	def test_assistant_cannot_reject_through_the_approval_policy(self):
+		"""The policy refuses a rejection by a role that does not approve, not only the submit right."""
+		frappe.set_user(self.user)
+		doc = frappe.get_doc(DOCTYPE, self.leaves[1])
+		doc.status = "Rejected"
+
+		with self.assertRaises(frappe.PermissionError):
+			leave.validate_approval(doc)
 
 	def test_assistant_cannot_set_the_status_when_opening_a_leave(self):
 		body = {**self.new_leave_body(), "status": "Approved", "docstatus": 1}

@@ -33,16 +33,17 @@ class RoleFixtureTest(unittest.TestCase):
 		for profile in profiles():
 			self.assertIn("HRT Employee", {row["role"] for row in profile["roles"]})
 
-	def test_employee_permissions_only_grant_read(self):
-		# HRMS asks for Employee read before a leave is opened. The two panel roles open leaves (AJA-947).
+	def test_employee_permissions_grant_read_or_select_only(self):
+		# The two panel roles choose the employee of a leave (AJA-947). They only select it:
+		# a read right would open the personal fields of every employee record (AJA-1024).
+		expected = {"HRT Admin": {"read"}, "Tenant Admin": {"select"}, "Tenant Admin Assistant": {"select"}}
 		permissions = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Employee"]
-		self.assertEqual(
-			{row["role"] for row in permissions}, {"HRT Admin", "Tenant Admin", "Tenant Admin Assistant"}
-		)
+		self.assertEqual({row["role"] for row in permissions}, set(expected))
 		for permission in permissions:
 			with self.subTest(role=permission["role"]):
 				self.assertEqual(permission["permlevel"], 0)
-				self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
+				granted = {key for key, value in permission.items() if value == 1}
+				self.assertEqual(granted, expected[permission["role"]])
 
 	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
