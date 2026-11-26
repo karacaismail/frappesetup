@@ -411,13 +411,21 @@ class PermissionMatrixIntegrationTest(IntegrationTestCase):
 		"""HRT Admin reads the personal fields. The two panel roles read only level 0 (AJA-1024)."""
 		from frappe.client import get as client_get
 
-		for person, sees in (("admin", True), ("tenant_admin", False), ("tenant_assistant", False)):
-			with self.subTest(person=person):
-				self.sign_in(person)
-				data = client_get("Employee", self.employees["employee"])
-				self.assertIn("employee_name", data)
-				for field in ("date_of_birth", "iban", "passport_number"):
-					self.assertEqual(field in data, sees, field)
+		values = {"iban": "TR330006100519786457841024", "passport_number": "U10241024"}
+		frappe.db.savepoint("before_personal_values")
+		try:
+			frappe.db.set_value("Employee", self.employees["employee"], values, update_modified=False)
+			for person, sees in (("admin", True), ("tenant_admin", False), ("tenant_assistant", False)):
+				with self.subTest(person=person):
+					self.sign_in(person)
+					data = client_get("Employee", self.employees["employee"])
+					# A hidden field keeps its key with an empty value.
+					self.assertTrue(data.get("employee_name"))
+					for field in ("date_of_birth", *values):
+						self.assertEqual(bool(data.get(field)), sees, field)
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.rollback(save_point="before_personal_values")
 
 	def test_reporting_change_moves_the_record_to_the_new_manager(self):
 		frappe.db.savepoint("before_reports_to_change")

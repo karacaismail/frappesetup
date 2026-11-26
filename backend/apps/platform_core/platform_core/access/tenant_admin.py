@@ -78,6 +78,9 @@ def ensure_permissions() -> None:
 		# Installation reads its own permission row (exception to G-3).
 		name = frappe.db.get_value("Custom DocPerm", row)
 		missing = {ptype: 1 for ptype in ptypes if not frappe.db.get_value("Custom DocPerm", name, ptype)}
+		# Frappe turns read on in every new row. A grant without read keeps it off (AJA-1024).
+		if "read" not in ptypes and frappe.db.get_value("Custom DocPerm", name, "read"):
+			missing["read"] = 0
 		if missing:
 			# The row without “if owner” gets the rights. Each migrate gives back a removed right.
 			update_custom_docperm(name, missing)

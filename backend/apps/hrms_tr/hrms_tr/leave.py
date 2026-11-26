@@ -100,10 +100,12 @@ def validate_approval(doc, method=None):
 			_("The selected approver cannot submit this leave application.", context="hrms_tr"),
 			frappe.PermissionError,
 		)
-	if doc.status != "Approved" or frappe.session.user == "Administrator":
+	if doc.status not in ("Approved", "Rejected") or frappe.session.user == "Administrator":
 		return
+	# Approving and rejecting are both decisions of an approver (AJA-1024).
 	check_approver_role()
-	check_not_own_leave(doc)
+	if doc.status == "Approved":
+		check_not_own_leave(doc)
 
 
 def pending_leave(name: str, *, expected_version: str | None = None, lock: bool = False):

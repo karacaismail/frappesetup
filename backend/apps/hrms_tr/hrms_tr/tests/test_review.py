@@ -77,7 +77,8 @@ class RoleFixtureTest(unittest.TestCase):
 			for row in fixture("05_custom_docperm.json")
 			if row["parent"] == "Employee" and row["permlevel"] == setup.EMPLOYEE_PERSONAL_LEVEL
 		]
-		self.assertEqual({row["role"]: {k for k, v in row.items() if v == 1} for row in rows}, expected)
+		granted = {row["role"]: {k for k, v in row.items() if v == 1 and k != "permlevel"} for row in rows}
+		self.assertEqual(granted, expected)
 		self.assertEqual(len(rows), len(expected))
 
 	def test_only_authorized_roles_can_cancel_and_amend(self):
@@ -281,7 +282,9 @@ class OperationsRoleTest(unittest.TestCase):
 				rule = next(row for row in rules if row["role"] == role)
 				self.assertEqual(rule["scope"], "all")
 				self.assertTrue(all(rule[f"allow_{name}"] for name in ("read", "write", "submit", "cancel")))
-		self.assertFalse({"Employee", "Leave Approver", "HR User"} & {row["role"] for row in permissions})
+		# Native HRMS roles get no leave rows. Their Employee rows only keep the personal fields (AJA-1024).
+		leave_roles = {row["role"] for row in permissions if row["parent"] == "Leave Application"}
+		self.assertFalse({"Employee", "Leave Approver", "HR User"} & leave_roles)
 
 	def test_operations_roles_can_cancel_natively(self):
 		with patch.object(leave, "frappe") as fake:
