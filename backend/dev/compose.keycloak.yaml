@@ -1,12 +1,12 @@
-# Keycloak geliştirme ortamı. Sahibi kimlik-realm işidir.
-# Keycloak, PostgreSQL, Mailpit ve olay testlerinin kayıt servisini kurar.
-# Gerekli ortam değişkenleri ../identity/keycloak/.env.example dosyasındadır.
-# Portları PANE_PORT değişkeninden ../identity/keycloak/bin/kc-dev.sh betiği üretir.
-# Keycloak container içinde de ana bilgisayardaki portu dinler. Böylece tarayıcı ve
-# container'lar aynı adresi kullanır ve belirteçteki iss değeri tutar (sözleşme 9. bölüm).
-# Realm dosyaları imaja derleme sırasında kopyalanır (../identity/keycloak/Dockerfile).
-# Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden bind mount kullanılmaz.
-# İmaj varsa `kc-dev.sh up` onu yeniden kullanır. Realm dosyası değişince `kc-dev.sh build` çalıştırın.
+# Keycloak development environment. The identity realm work item owns it.
+# It sets up Keycloak, PostgreSQL, Mailpit and the recorder service of the event tests.
+# The required environment variables are in ../identity/keycloak/.env.example.
+# The ../identity/keycloak/bin/kc-dev.sh script derives the ports from PANE_PORT.
+# Inside the container, Keycloak also listens on the host port. So the browser and the
+# containers use the same address, and the token's iss value matches (contract, section 9).
+# The realm files are copied into the image at build time (../identity/keycloak/Dockerfile).
+# Colima's factory profile does not mount the repository folder into the VM, so no bind mount is used.
+# `kc-dev.sh up` reuses an existing image. Run `kc-dev.sh build` after changing a realm file.
 services:
   keycloak:
     # The shared stack supplies its worktree namespace; standalone runs keep their port tag.
@@ -38,7 +38,7 @@ services:
       KC_DB_PASSWORD: ${KC_DB_PASSWORD:?}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
-      # Realm dosyasındaki ${...} yer tutucuları. Keycloak bunları içe alırken ortamdan okur.
+      # The ${...} placeholders of the realm file. Keycloak reads them from the environment on import.
       ATONOTA_SITE_TENANT1_URL: ${ATONOTA_SITE_TENANT1_URL:?}
       ATONOTA_SITE_TENANT1_SECRET: ${ATONOTA_SITE_TENANT1_SECRET:?}
       ATONOTA_SITE_TENANT1_SERVICE_SECRET: ${ATONOTA_SITE_TENANT1_SERVICE_SECRET:?}
@@ -83,7 +83,7 @@ services:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      # Keycloak imajında curl yok. Resmî belge bash'in /dev/tcp yolunu önerir.
+      # The Keycloak image has no curl. The official documentation suggests bash's /dev/tcp path.
       test:
         - CMD-SHELL
         - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.0 200' <&3"
