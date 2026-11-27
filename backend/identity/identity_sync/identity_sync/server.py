@@ -479,7 +479,7 @@ class _Api:
         _LOG.info("execute operation=revoke_session azp=%s outcome=executed", azp)
         return 200, {"sid": sid, "revoked": True}
 
-    # --- AtonotA Login reads: called by platform_core sites (AJA-459) ---
+    # --- `atonota_login` reads: called by platform_core sites (AJA-459) ---
 
     def get_login_providers(self, body: bytes, azp: str) -> Reply:
         """The sign-in platforms the calling tenant may show. The request names no person.
@@ -651,7 +651,7 @@ def make_server(
     list_routes = {"/v1/dead-letters": api.get_dead_letters, "/v1/operations": api.get_operations}
     limiter = _RateLimiter(settings.rate_limit)
     # Each of these routes has its own caller list. A client is in one list only.
-    # The AtonotA Login reads are open to the tenant site clients only (AJA-459).
+    # The `atonota_login` reads are open to the tenant site clients only (AJA-459).
     special_routes = {
         "/v1/sessions/revoke": settings.session_azp,
         "/v1/login-providers": settings.session_azp,

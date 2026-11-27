@@ -60,7 +60,7 @@ test('GV-6: pages are served with a content security policy and the themes work 
   expect(login['content-security-policy']).toContain("object-src 'none'");
   expect(login['x-content-type-options']).toBe('nosniff');
   expect(login['x-frame-options']).toBe('SAMEORIGIN');
-  await expect(page.getByRole('button', { name: 'Oturum açın', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Giriş yap', exact: true })).toBeVisible();
   violations.push(...(await page.evaluate(() => (window as unknown as { cspViolations?: string[] }).cspViolations ?? [])));
 
   const email = await createUser();
@@ -82,7 +82,7 @@ test('XSS: markup typed into the sign-in form is shown as text and never runs', 
   await openLogin(page);
   await page.getByLabel('E-posta').fill(payload);
   await page.getByLabel('Parola', { exact: true }).fill('wrong-password-123');
-  await page.getByRole('button', { name: 'Oturum açın', exact: true }).click();
+  await page.getByRole('button', { name: 'Giriş yap', exact: true }).click();
   await expect(page.locator('#input-error-username')).toBeVisible();
   // The value comes back in the field. It must be text, not markup.
   await expect(page.getByLabel('E-posta')).toHaveValue(payload);

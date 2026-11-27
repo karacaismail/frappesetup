@@ -1,3 +1,4 @@
+import { parseBrand, fillBrand, fillBrandData } from '../src/lib/brand.mjs';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -7,15 +8,17 @@ import { test, expect } from '@playwright/test';
 // İçerik tutarlılığı (rapor E-15): gereksinim JSON'u, fazlar, açık kararlar ve markdown sayfaları aynı karar setine
 // bağlı kalmalı. Tarayıcı gerektirmez; tek projede koşar.
 const root = new URL('../', import.meta.url);
+const brand = parseBrand(readFileSync(new URL('backend/brand.env', root), 'utf8'));
+const domainPattern = brand.BRAND_DOMAIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 type Req = { id: string; title: string; detail: string; rail: string; priority: string; phase: string; source: string; owner?: string };
-const reqs: Req[] = JSON.parse(read('src/data/requirements.json'));
+const reqs: Req[] = fillBrandData(JSON.parse(read('src/data/requirements.json')), brand);
 type Phase = { id: string; after: string[]; entryGate?: string };
-const phases: Phase[] = JSON.parse(read('src/data/phases.json'));
+const phases: Phase[] = fillBrandData(JSON.parse(read('src/data/phases.json')), brand);
 const docsDir = new URL('src/content/docs/', root);
 const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
-  .map((f) => ({ slug: f.replace(/\.md$/, ''), text: readFileSync(new URL(f, docsDir), 'utf8') }));
+  .map((f) => ({ slug: f.replace(/\.md$/, ''), text: fillBrand(readFileSync(new URL(f, docsDir), 'utf8'), brand) }));
 const ids = new Set(reqs.map((r) => r.id));
 // release: commit'i içeren main yayını (PR numarası ve yayın commit'i); null ise commit henüz yayımlanmadı.
 type Release = { pr: number; commit: string } | null;
@@ -28,6 +31,7 @@ type TaskBoard = {
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
   items: Record<string, TaskItem>;
 };
+const decisionRows = docs.flatMap(({ text }) => [...text.matchAll(/^\| (K-\d+) \|.*$/gm)]);
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
 
 // Git yardımcıları: kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer.
@@ -130,8 +134,62 @@ const releaseShape = (label: string, rel: unknown): string[] => {
 };
 
 test.describe('content consistency', () => {
+  const processDocuments = [
+    'task-template.md',
+    'developer-first-comment.md',
+    'review-template.md',
+    'definition-of-done.md',
+    'rule-change-process.md',
+  ];
+  const ruleDocuments = [
+    'frappe-python-standartlari.md',
+    'frappe-python-disi-standartlari.md',
+    'headless-frontend-standartlari.md',
+    'mobile.md',
+  ];
+
+  for (const file of processDocuments) {
+    test(`rule process document ${file} exists and cites defined rules`, () => {
+      const path = `docs/standartlar/${file}`;
+      expect(existsSync(new URL(path, root)), `${path} is missing`).toBe(true);
+      expect(statSync(new URL(path, root)).isFile(), `${path} must be a file`).toBe(true);
+      const text = read(path);
+      expect(text, `${path} needs a concrete example`).toMatch(/^## Somut örnek$/m);
+      const definedCodes = new Set(ruleDocuments.flatMap((source) =>
+        [...read(`docs/standartlar/${source}`).matchAll(/^\*\*([A-Z]{1,2}-\d+)\s/gm)].map((match) => match[1]),
+      ));
+      const citedCodes = [...text.matchAll(/\b[A-Z]{1,2}-\d+\b/g)].map((match) => match[0]);
+      expect(citedCodes.length, `${path} needs an existing rule code`).toBeGreaterThan(0);
+      expect(citedCodes.filter((code) => !definedCodes.has(code)), `${path} cites undefined rules`).toEqual([]);
+    });
+  }
+
   test.beforeEach(({ browserName }) => {
     test.skip(browserName !== 'chromium', 'Dosya düzeyi denetim; tek motorda koşar.');
+  });
+
+  test('standards folder holds the naming report and README lists every file', () => {
+    // docs/standartlar kuralların tek doğruluk kaynağıdır (AJA-1310). README klasördeki her .md dosyasına bağlantı verir.
+    const dir = new URL('docs/standartlar/', root);
+    expect(existsSync(new URL('naming_rules_report.md', dir)), 'naming_rules_report.md yok').toBe(true);
+    const readme = readFileSync(new URL('README.md', dir), 'utf8');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md');
+    expect(files.filter((f) => !readme.includes(`](${f})`)), "README'de bağlantısı olmayan dosya").toEqual([]);
+  });
+
+  test('standards README links the five rule process documents', () => {
+    // A Takımının beş süreç belgesi (AJA-1309) README'den bağlantı alır; her hedef dosya depoda vardır (AJA-1336).
+    const dir = new URL('docs/standartlar/', root);
+    const readme = readFileSync(new URL('README.md', dir), 'utf8');
+    const processFiles = [
+      'task-template.md',
+      'developer-first-comment.md',
+      'review-template.md',
+      'definition-of-done.md',
+      'rule-change-process.md',
+    ];
+    expect(processFiles.filter((f) => !readme.includes(`](${f})`)), "README'de bağlantısı olmayan süreç belgesi").toEqual([]);
+    expect(processFiles.filter((f) => !existsSync(new URL(f, dir))), 'depoda olmayan süreç belgesi').toEqual([]);
   });
 
   test('task board covers every requirement with a valid epic, status and level', () => {
@@ -255,6 +313,30 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('brand merge review preserves released product evidence and incomplete delivery', () => {
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const product = board.items['G-157'];
+    expect.soft(product.status).toBe('done');
+    expect.soft(product.evidence).toEqual({
+      commit: '18a9fff8',
+      release: { pr: 23, commit: '22e70ad7' },
+      tests: [
+        'backend/identity/atonota_login/tests/test_product_boundary.py',
+        'backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts',
+      ],
+    });
+    expect.soft(board.update.note).toContain('Marka ayarı 30494610 birleşmesiyle geldi.');
+    expect.soft(board.update.note).toContain('backend/brand.env');
+    expect.soft(board.update.note).toContain('backend/brand-exclusions.txt');
+    // A shared brand setting does not finish mail delivery, theme acceptance or live DNS.
+    for (const id of ['G-47', 'G-80', 'G-158']) {
+      expect.soft(board.items[id].status, id).toBe('in-progress');
+      expect.soft(board.update.note, id).toContain(`${id} için kanıt 30494610`);
+    }
+    expect.soft(board.items['G-17'].status).toBe('not-started');
+    expect.soft(board.items['G-2'].status).toBe('not-started');
+  });
+
   test('fabricated evidence commits fail in full history', () => {
     // Uydurma commit kodu tam geçmişte geçmez (inceleme r2-1, E-1). release null olsa da geçmez.
     // Sığ kopyada geçmiş yoktur; orada bu denetim koşamaz.
@@ -271,6 +353,80 @@ test.describe('content consistency', () => {
   test('task board names environments, not staging', () => {
     // Backend'de staging ortamı yoktur; canlı ortamlar alpha, beta, rc ve prod'dur. Pano kuralları ortam adını yazar.
     expect(read('src/data/task-board.json')).not.toMatch(/staging/i);
+  });
+
+  test('published retention, AI safeguards and decision caveats remain documented', () => {
+    const text = (slug: string) => docs.find((doc) => doc.slug === slug)!.text;
+    expect(text('rail-5-ai')).toContain('konuşma içeriği 90 gün');
+    expect(reqs.find((req) => req.id === 'G-87')?.detail).toContain('konuşma içeriği 90 gün');
+
+    const k9 = text('kararlar').split('\n').find((line) => line.startsWith('| K9 |'));
+    const homeCard = read('src/pages/index.astro').split('\n').find((line) => line.includes("id: 'K9'"));
+    for (const decision of [k9, homeCard]) {
+      expect(decision).toContain('AI eylemleri aynı sunucu izinlerinden geçer.');
+      expect(decision).toContain('Yazma eylemleri önizleme ve onay gerektirir.');
+      expect(decision).toContain('Sistem her eylemi denetim kaydına yazar.');
+      expect(decision).toContain('KVKK uyumu zorunlu');
+    }
+
+    const introduction = text('acik-kararlar').split('\n## ')[0];
+    expect(introduction).toContain('Kararlar üç türdür ve **Tür** sütununda yazılıdır');
+    expect(introduction).toContain('"Öneri" sütunundaki sayılar ölçülmüş kapasite veya kabul edilmiş taahhüt değildir.');
+  });
+
+  test('revised rows retain their original ids and decision links', () => {
+    // Bunlar incelemede karşılaştırılan önceki satırların bağlarıdır. CI için bir Git dalı gerekmez.
+    const originalLinks: Record<string, string[]> = {
+      'G-12': ['G-120'],
+      'G-57': ['G-120'],
+      'G-64': ['G-52'],
+      'G-77': ['G-124', 'G-148', 'G-16', 'G-82', 'K-25'],
+      'G-78': ['G-57'],
+      'G-81': ['G-152'],
+      'G-83': ['G-15'],
+      'G-87': ['G-64'],
+      'G-88': ['G-137'],
+      'G-90': ['G-116'],
+      'G-110': ['G-3'],
+      'G-116': ['G-24', 'G-52'],
+      'G-148': ['G-28', 'K-25'],
+      'SA-41': ['G-22', 'K-13', 'SA-19', 'SA-21'],
+    };
+    const linksById = new Map(reqs.map((req) => [req.id, req.detail.match(/\b(?:G-|SA-|K-|X-)\d+\b/g) ?? []]));
+    const missing = Object.entries(originalLinks).flatMap(([id, links]) => {
+      const current = linksById.get(id);
+      return current ? links.filter((link) => !current.includes(link)).map((link) => `${id} → ${link}`) : [id];
+    });
+    expect(missing).toEqual([]);
+
+    const decisions = new Map(decisionRows.map((row) => [row[1], row[0]]));
+    for (const [id, links] of Object.entries({ 'K-6': ['G-80', 'G-152'], 'K-8': ['G-43'], 'K-41': ['G-78', 'K-8'] })) {
+      for (const link of links) expect(decisions.get(id), `${id} → ${link}`).toContain(link);
+    }
+  });
+
+  test('revised approval and identity rules retain their acceptance conditions', () => {
+    const requirements = new Map(reqs.map((req) => [req.id, req.detail]));
+    const approval = requirements.get('G-86');
+    for (const rule of [
+      'approve_proposal', 'İnsan oturumu', 'fiyat sürümü', 'yeniden önizleme',
+      'Otomatik zincirleme yazma yasaktır', 'silme', 'iptal', 'submit', 'toplu güncelleme',
+      'ödeme', 'dış sisteme gönderim', 'tekrar gönderim', 'süresi dolan', 'değişen belge', 'başka kullanıcı',
+    ]) expect(approval?.toLocaleLowerCase('tr'), `G-86: ${rule}`).toContain(rule.toLocaleLowerCase('tr'));
+
+    const pressLogin = requirements.get('G-12');
+    for (const endpoint of [
+      'signup', 'send_otp', 'verify_otp', 'send_login_link', 'login_using_key',
+      'reset_password', 'enable_2fa', 'verify_2fa', 'product_trial.send_verification_code_for_login',
+      'Press Vue `/dashboard` yalnız iç ağa açıktır', 'Press 2FA kapalı, Keycloak MFA açık kalır',
+    ]) expect(pressLogin, `G-12: ${endpoint}`).toContain(endpoint);
+
+    for (const rule of ['K-25', 'açık', 'PKCE S256']) expect(requirements.get('G-77')).toContain(rule);
+    for (const rule of ['yetki gereksinimi', 'yıkıcı', 'ücretli']) expect(requirements.get('G-84')).toContain(rule);
+    for (const setting of ['enable_onboarding=0', 'disable_system_update_notification=1', 'disable_change_log_notification=1']) {
+      expect(requirements.get('G-53')).toContain(setting);
+    }
+    expect(requirements.get('G-90')).toContain('Rail 6 ile aynı maskeleme sözlüğü');
   });
 
   test('requirement ids are unique, contiguous and well formed', () => {
@@ -304,9 +460,18 @@ test.describe('content consistency', () => {
     expect(missing).toEqual([]);
   });
 
-  test('every K decision reference exists in the open decisions page', () => {
-    const decisions = docs.find((d) => d.slug === 'acik-kararlar')!.text;
-    const defined = new Set([...decisions.matchAll(/^\| (K-\d+) \|/gm)].map((m) => m[1]));
+  test('decision ids are unique', () => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const [, id] of decisionRows) {
+      if (seen.has(id)) duplicates.add(id);
+      seen.add(id);
+    }
+    expect([...duplicates]).toEqual([]);
+  });
+
+  test('every K decision reference has a documented decision', () => {
+    const defined = new Set(decisionRows.map((row) => row[1]));
     const missing: string[] = [];
     const scan = (where: string, text: string) => {
       for (const m of text.matchAll(/\bK-(\d+)\b/g)) if (!defined.has(`K-${m[1]}`)) missing.push(`${where}: K-${m[1]}`);
@@ -314,6 +479,18 @@ test.describe('content consistency', () => {
     for (const d of docs) scan(d.slug, d.text);
     for (const r of reqs) scan(r.id, r.detail);
     expect(missing).toEqual([]);
+  });
+
+  test('all document embeds render once without placeholders', () => {
+    for (const doc of docs) {
+      const names = [...doc.text.matchAll(/<div data-embed="([a-z0-9-]+)"><\/div>/g)].map((match) => match[1]);
+      expect(new Set(names).size, doc.slug).toBe(names.length);
+      if (names.length === 0) continue;
+      const html = read(`dist/${doc.slug}/index.html`);
+      expect(html, doc.slug).not.toMatch(/<[^>]*\sdata-embed=/);
+      const sources = [...html.matchAll(/data-embed-source="([a-z0-9-]+)"/g)].map((match) => match[1]);
+      expect(sources, doc.slug).toEqual(names);
+    }
   });
 
   test('internal links point to existing pages and anchors', () => {
@@ -354,6 +531,120 @@ test.describe('content consistency', () => {
     expect(phaseOf('G-12')).toBe('P1');
     const p0exit = JSON.stringify(phases.find((p) => p.id === 'P0'));
     expect(p0exit).not.toMatch(/Press'e (sosyal )?giriş/);
+  });
+
+  test('panel roles G-168, G-169 and G-170 are MVP items (AJA-827)', () => {
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    for (const id of ['G-168', 'G-169', 'G-170']) {
+      const r = reqs.find((x) => x.id === id)!;
+      expect(r.priority, id).toBe('MUST');
+      expect(r.phase, id).toBe('P1');
+      expect(board.items[id].level, id).toBe('mvp');
+    }
+    for (const id of ['G-169', 'G-170']) {
+      const d = reqs.find((x) => x.id === id)!.detail;
+      expect(d, id).not.toContain('Kalem G-33 partner programına bağlıdır.');
+      expect(d, id).not.toContain('Kalem MVP kapsamında değildir.');
+    }
+    const g169 = reqs.find((x) => x.id === 'G-169')!.detail;
+    expect(g169).not.toContain('Partner programı G-33 gereksinimindedir.');
+    expect(g169).toContain('Press partner ödemeleri ve partner seviyeleri G-33 içinde kalır.');
+    expect(g169).toContain('Bağ, platform_core içinde bir kayıtla tutulur.');
+    expect(g169).toContain('Kayıt bayi kiracısını müşteri kiracısına bağlar.');
+    expect(g169).toContain('Bu kaydı yalnız platform operatörü açar ve kapatır.');
+    expect(g169).toContain('Platform operatörü isteği onaylar.');
+  });
+
+  test('26 November 2026 decisions are written in requirements and handoff notes (AJA-1070)', () => {
+    // Karar 5: her devir notu ortak kanalı "proje Telegram grubu" diye anar.
+    const handoffs = [
+      ...readdirSync(new URL('backend/docs/handoff/', root))
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => `backend/docs/handoff/${f}`),
+      'backend/dev/press/provisioning-handoff.md',
+    ];
+    expect(handoffs.length).toBeGreaterThan(5);
+    for (const file of handoffs) expect(read(file), file).toContain('proje Telegram grubu');
+    // Karar 1: Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar.
+    const social = read('backend/docs/handoff/atonota-login-platforms.md');
+    for (const platform of ['Google', 'Apple', 'LinkedIn']) {
+      const section = social.split(/^### /m).find((part) => part.startsWith(platform));
+      expect(section, platform).toBeTruthy();
+      expect(section!, platform).toContain('hesap sorumlusu');
+    }
+    expect(read('src/content/docs/atonota-login.md')).toContain('hesap sorumlusu');
+    // Karar 2: zamanlayıcı ve düzenli yedek yalnız sunucularda açılır.
+    for (const id of ['G-5', 'G-114']) {
+      const d = reqs.find((x) => x.id === id)!.detail;
+      expect(d, id).toContain('Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır');
+      expect(d, id).toContain("Geliştirme Mac'inde zamanlanmış iş kurulmaz.");
+    }
+    for (const file of ['backend/docs/dagitim/ortamlar.md', 'src/content/docs/rail-6-operasyon.md', 'backend/PROJECT-RECORD.md']) {
+      const text = read(file);
+      expect(text, file).toContain("Geliştirme Mac'inde zamanlanmış iş kurulmaz.");
+      expect(text, file).not.toContain('Düzenli yedek yoktur');
+    }
+    // Karar 3: prod ortamına yalnız deneme verisi girer.
+    const envs = read('backend/docs/dagitim/ortamlar.md');
+    expect(envs).toContain('prod ortamına yalnız deneme verisi girer.');
+    expect(envs).not.toMatch(/^\| prod \| Gerçek müşteri \|/m);
+    // Karar 4: IPv6 önce deneme sunucusunda, sonra prod'da (AJA-507).
+    for (const file of ['backend/docs/dagitim/ortamlar.md', 'backend/docs/handoff/canli-deneme-listesi.md']) {
+      expect(read(file), file).toContain('IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).');
+    }
+  });
+
+  test('G-73 requires British English source content and fallbacks (AJA-1414)', () => {
+    const g73 = reqs.find((r) => r.id === 'G-73');
+    expect(g73, 'G-73 keeps its identity').toBeDefined();
+    const detail = g73!.detail;
+    for (const required of [
+      "Varsayılan dil MVP'de İngiliz İngilizcesidir (`en-GB`).",
+      'Kaynak katalog İngiliz İngilizcesidir (`en-GB`).',
+      'Bütün içerik önce İngiliz İngilizcesiyle yazılır.',
+      'Türkçe ve öteki diller kullanıcının tercihiyle gelir.',
+      'İngilizce metin özenle yazılır ve gözden geçirilir.',
+      'Arayüzün yedek dili `en-GB` olur.',
+      "Backend'in yedek dili `en` kalır.",
+    ]) expect.soft(detail, required).toContain(required);
+    for (const superseded of [
+      'Varsayılan dilin İngilizce olması da MVP dışıdır.',
+      'İngilizce metin uydurulmaz.',
+      'Varsayılan dil sonra İngilizce yapılır.',
+      "Arayüzün yedek dili MVP'de `tr` olur.",
+      'Var olan Türkçe metin bugün `tr` kataloğuna harfi harfine girer.',
+      'İngilizce metin çeviri işinde girer.',
+    ]) expect.soft(detail, superseded).not.toContain(superseded);
+  });
+
+  test('G-171 appends country-based units with an unstarted board item (AJA-1414)', () => {
+    const units = reqs.find((r) => r.id === 'G-171');
+    const g73 = reqs.find((r) => r.id === 'G-73');
+    expect(units, 'Country-based units have a requirement').toBeDefined();
+    expect(g73).toBeDefined();
+    expect(reqs.at(-1)?.id, 'New requirements are appended').toBe('G-171');
+    expect(units).toMatchObject({ rail: 'R3 Frontend', priority: g73!.priority, phase: g73!.phase });
+    expect(units!.detail).toContain('Ölçü birimi kullanıcının ülkesine göre değişir.');
+    expect(units!.detail).toContain('metre ya da inç');
+    expect(units!.detail).toContain('kilogram ya da libre');
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    expect(board.items['G-171']).toMatchObject({ epic: 'panel-core', status: 'not-started', level: 'mvp' });
+  });
+
+  test('GILT approval is recorded in decision 43 (AJA-1358)', () => {
+    const decisions = read('docs/standartlar/KARARLAR.md');
+    expect(decisions).toMatch(/^### Karar 43\./m);
+    const decision = decisions.split(/^### Karar 43\./m)[1]?.split(/^#{1,3} /m)[0];
+    for (const reference of [
+      'd8822566', 'G-73', '27 Kasım 2026 Cuma günü', '"Evet, onaylıyorum"',
+      'frappe-python-standartlari.md', 'M-9', 'headless-frontend-standartlari.md',
+      'IC-9', 'IC-16', 'AD-11', 'AX-9',
+    ]) expect(decision, reference).toContain(reference);
+    expect(decisions.indexOf('### Karar 43.')).toBeGreaterThan(decisions.indexOf('### Karar 42.'));
+    const introduction = decisions.split(/^## /m)[0];
+    expect(introduction).toContain('sekiz günün');
+    expect(introduction).toContain('İlk gün 20 Kasım 2026 Cuma günüdür.');
+    expect(introduction).toContain('Son gün 27 Kasım 2026 Cuma günüdür.');
   });
 
   test('built pages have no table rows rendered as paragraphs', () => {
@@ -526,7 +817,7 @@ test.describe('content consistency', () => {
     const RULES: [RegExp, string][] = [
       // Adın geçersiz olduğunu söyleyen yasak cümleleri ("... adı kullanılmaz", "... açılmaz") muaftır.
       [/(?<![_\w])press\.api\.ops(?!.{0,40}(kullanılmaz|açılmaz))/, 'press.api.ops (press_tr.api.ops olmalı)'],
-      [/<marka>\.com\.tr|<kiracı>\.atonota\.net/, 'eski ad: kiracı <kiracı>.app.atonota.net, marka alanı atonota.net olmalı (backend ad haritası)'],
+      [new RegExp(`<marka>\\.com\\.tr|<kiracı>\\.${domainPattern}`), `eski ad: kiracı <kiracı>.app.${brand.BRAND_DOMAIN}, marka alanı ${brand.BRAND_DOMAIN} olmalı (backend ad haritası)`],
       [/buy_credits_iyzico|press\.api\.billing\.create_iyzico/, 'iyzico ucu press_tr.api.billing.create_iyzico_checkout_form olmalı'],
       [/kullanıcının Keycloak token/, 'kiracı verisi kullanıcının Keycloak belirteciyle değil aracı belirteciyle (G-148)'],
     ];

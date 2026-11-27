@@ -1002,10 +1002,13 @@ Bu bölüm motorun öteki modüllere ve Frappe'ye açtığı bağları listeler 
 
 | Uç | Yöntem | Kim çağırabilir |
 | --- | --- | --- |
-| `platform_core.api.access.explain_permission` | GET | Masa kullanıcısı. Website User çağıramaz. |
+| `platform_core.api.access.explain_permission` | GET | Masa kullanıcısı. Website User yalnız “Tenant Admin” rolüyle çağırır (G-62). |
 | `platform_core.api.access.get_access_summary` | GET | Masa kullanıcısı ve Website User. Herkes yalnız kendi özetini görür. |
 | `platform_core.api.access.set_field_level` | POST | “System Manager” |
 | `platform_core.api.access.set_level_access` | POST | “System Manager” |
+| `platform_core.api.access.list_role_permissions` | GET | “System Manager” ve “Tenant Admin” (G-62) |
+| `platform_core.api.access.set_role_permission` | POST | “System Manager” ve “Tenant Admin” (G-62) |
+| `platform_core.api.access.remove_role_permission` | POST | “System Manager” ve “Tenant Admin” (G-62) |
 
 ### Website User için kapalı uçlar
 
@@ -1015,7 +1018,7 @@ Karar: Website User için `validate_link_and_fetch` ucu kapalı kalır. Portal f
 | --- | --- | --- |
 | `get_access_summary` | Açık | Kullanıcı yalnız kendi kapsamlarını görür. |
 | `frappe.desk.search.search_link` | Açık | Liste sahibi kabuk işidir. Arama kuraldan geçer. |
-| `explain_permission` | Kapalı | Yanıt kural ayrıntısı taşıyabilir. |
+| `explain_permission` | Yalnız “Tenant Admin” | Uç rolü kendisi denetler. Kural ayrıntısı yalnız “System Manager” rolüne gider. |
 | `frappe.desk.search.search_widget` | Kapalı | Portal bu ucu kullanmaz. |
 | `frappe.client.validate_link_and_fetch` | Kapalı | Portal formları kendi uçlarını kullanır. |
 | `set_field_level`, `set_level_access` | Kapalı | Yalnız “System Manager” çağırır. |
@@ -1033,7 +1036,7 @@ Giriş matrisi testi bu tabloyu gerçek istekle sınar (`access/tests/test_entry
 | `doc_events` | `platform_core.access.rules.clear_cache` | “Role” ve “DocType” olaylarında kural listesini unutur. Olaylar `on_trash` ve `after_rename` olur. |
 | `after_install`, `after_migrate` | `platform_core.access.reports.switch_off_governed_auto_email_reports` | Kurallı veriye dokunan e-posta raporlarını kapatır. |
 | `before_job` | `platform_core.access.reports.refuse_prepared_report_job` | Sıradaki hazır rapor işini reddeder. |
-| `website_user_allowed_methods` | `platform_core.api.access.get_access_summary` | Website User özet ucunu çağırabilir. |
+| `website_user_allowed_methods` | `platform_core.api.access.get_access_summary`, `platform_core.api.access.explain_permission` | Website User özet ucunu çağırabilir. Açıklama ucunu yalnız “Tenant Admin” rolüyle çağırır. |
 
 Tam bağlar `platform_core/hooks.py` dosyasındadır. Kısa sınıf adlarının modülü `platform_core.access.reports` olur. Sınıf eklerinin yöntemleri `super()` çağrısını korur. Üç uç sarmalayıcısı `platform_core.access.link_search` modülündedir. Sarmalayıcı adları Frappe uçlarının son adıyla aynıdır.
 
@@ -1050,8 +1053,85 @@ Shell modülü “PLT Access Rule” kaydının `on_update` ve `on_trash` olayla
 
 ### Kayıt türü
 
-Motorun tek kayıt türü “PLT Access Rule” türüdür. Alanları 3. bölümdedir. Türü yalnız “System Manager” okur ve yazar.
+Motorun tek kayıt türü “PLT Access Rule” türüdür. Alanları 3. bölümdedir. Türü “System Manager” ve “Tenant Admin” rolleri okur ve yazar. “Tenant Admin” rolünün sınırları aşağıdaki bölümdedir.
 
 ### Paket
 
 Motor `pypika` paketini doğrudan içe aktarır. Paket `pyproject.toml` dosyasında bildirilir (T-3). Frappe paketi kendi çatalından sabit bir commit ile kurar. Bu yüzden sürüm yazılmadı.
+
+## 22. Kiracı yöneticisi rolü (G-62)
+
+Kiracı yöneticisinin rolü “Tenant Admin” rolüdür. Rolün kodu `platform_core/access/tenant_admin.py` dosyasındadır. Bu karar AJA-802 göreviyle 25 Kasım 2026 Çarşamba günü verildi.
+
+### Rol nasıl kurulur
+
+1. `platform_core` kurulunca rol kendiliğinden oluşur.
+2. Her göçte (migrate) rol ve izin satırları yeniden denetlenir. Eksik satır eklenir.
+3. Rolün masa erişimi yoktur. Rol sahibi panelde Website User olarak kalır.
+
+### Rol neleri yönetir
+
+| Kayıt türü | İzin |
+| --- | --- |
+| “Role” | Okur, yazar, ekler, siler. |
+| “Role Profile” | Okur, yazar, ekler, siler. |
+| “User Permission” | Okur, yazar, ekler, siler. |
+| “PLT Access Rule” | Okur, yazar, ekler, siler. |
+| “User” | Yalnız okur. |
+
+Rol, rol profilindeki rol listesini de okur ve yazar. Bu liste 1. düzeydedir.
+
+Frappe “Custom DocPerm” türüne ek izin satırı verdirmez. Bu yüzden rol izin satırlarını üç uçla yönetir:
+
+| Uç | Yöntem | İş |
+| --- | --- | --- |
+| `platform_core.api.access.list_role_permissions` | GET | Bir türün izin satırlarını okur. |
+| `platform_core.api.access.set_role_permission` | POST | Bir rolün izin satırını ekler ya da değiştirir. |
+| `platform_core.api.access.remove_role_permission` | POST | Bir rolün izin satırını siler. |
+
+Bu uçları yalnız “System Manager” ve “Tenant Admin” rolleri çağırır. Öteki herkes 403 alır.
+
+Bir türün izin satırları saklanırken önce standart satırları kopyalanır. Böylece öteki roller iznini kaybetmez.
+
+“Tenant Admin” rolü `explain_permission` ucunu da çağırır. Rol sahibi yalnız kendi iznini sorar. Kural ayrıntısını yalnız “System Manager” görür.
+
+### Rol neleri yapamaz
+
+Rol sahibi “System Manager” ve “Administrator” rollerini kimseye veremez. Rol sahibi bu iki rolü kimseden de alamaz. Rol sahibi bu iki rolün iznini de değiştiremez. Denemeler 403 yanıtı alır.
+
+1. Bu iki rolün kaydını değiştiremez ve silemez.
+2. Bu iki rolü bir rol profiline koyamaz.
+3. Bu iki rolün izin satırını ekleyemez, değiştiremez ve silemez.
+4. Bu iki role erişim kuralı yazamaz.
+5. Bu iki rolden birini taşıyan kullanıcıya kullanıcı izni yazamaz.
+6. Bir role masa erişimi veremez. Masa erişimi kullanıcıyı System User yapar. O zaman panelin uç listesi devreden çıkar.
+7. Yalnız iş türlerine izin satırı yazabilir. Örneğin ERPNext ve HRMS türleri iş türüdür. System Manager'ın sitede açtığı özel türler de iş türüdür.
+8. Frappe ve `platform_core` türlerine izin satırı yazamaz. Bu türlerde betik, giriş, belirteç ve ayar kayıtları vardır. Örneğin “Client Script” ve “OAuth Bearer Token” bu türlerdendir. Bu kayıtlar rol sahibini System Manager gücüne taşıyabilirdi.
+9. Tek kayıtlı ayar türlerine ve parola alanı olan türlere de izin satırı yazamaz. Alt tablodaki parola alanı da sayılır.
+10. Standart rollere izin satırı yazamaz. Standart roller “Administrator”, “System Manager”, “Script Manager”, “All” ve “Guest” rolleridir.
+11. Kullanıcıya ve rol profiline yalnız sade rol verebilir. Masa rolü, standart rol ve “Tenant Admin” rolü sade rol değildir.
+12. Yalnız sade rolü değiştirebilir ve silebilir. Kendi rolünü ve masa rollerini değiştiremez. Örneğin bir masa rolünü kapatamaz.
+13. Kullanıcıdan standart rolü ve “Tenant Admin” rolünü alamaz.
+14. Kapalı türlerin izin satırlarını listeleyemez.
+
+Bu denetimler “System Manager” rolü olmayan herkes için çalışır. Kurulum ve göç bu denetimlere girmez.
+
+### Rol profili değişince
+
+Rol sahibi bir profili değiştirince profilin kullanıcıları da güncellenir. Frappe bu kayıtları rol sahibinin adıyla saklar. Rol sahibinin kullanıcı yazma izni yoktur. Bu yüzden `GuardedRoleProfile` sınıfı kullanıcıları izin denetimi olmadan saklar. Kullanıcı denetimi yine çalışır. Sade olmayan bir rolü taşıyan kullanıcı atlanır. Örneğin System Manager kullanıcısı atlanır. Yoksa profil eşitlemesi bu rolü silerdi. Atlanan kullanıcı sayısı günlüğe yazılır. Bu kullanıcıları System Manager kaydeder.
+
+### Göç ve saklı izin satırları
+
+Her göç rolün izin satırlarını yeniden tamamlar. System Manager bir hakkı kaldırırsa sonraki göç o hakkı geri verir.
+
+Rol kurulurken beş türün standart izin satırları saklı satıra kopyalanır. Bu türler “Role”, “Role Profile”, “User”, “User Permission” ve “PLT Access Rule” türleridir. Frappe bu türlerin standart satırlarını sonraki sürümde değiştirirse saklı satırlar değişmez. Bu durumda satırları System Manager eşitler.
+
+### Kiracı sınırı
+
+Her kiracı ayrı bir Frappe sitesidir. Rol, oturum ve kayıtlar yalnız o sitede yaşar. Bu yüzden rol sahibi yalnız kendi kiracısında çalışır.
+
+### Bilinen sınırlar
+
+Website User kayıt yöntemlerini `run_method` yoluyla çağırabilir. Kabuğun uç listesi bu yolu denetlemez. Bu durum G-62 işinden önce de vardı. Rol sahibi yalnız iş türlerine izin verebildiği için açık küçülür. Bu yolun kapatılması ayrı bir iştir.
+
+Bir erişim kuralı türün bütününü yönetir (3. bölüm). Kuralı olmayan roller o türde kayıt göremez. Rol sahibi sıradan bir role kural yazarsa “System Manager” rolü de etkilenebilir. Motor kaydı saklarken kuralsız rolleri uyarı olarak gösterir. Bu sınır motorun tasarımından gelir.

@@ -8,6 +8,7 @@ Site ayarları `sites/<site>/site_config.json` dosyasındadır.
 | --- | --- | --- |
 | Ortak bench | `mail_*` | Siteler ortak posta ayarlarını kullanır. |
 | Ortak bench | `workers`, `background_workers`, `gunicorn_workers` | Bu değerler bench'in işlem sayısını belirler. |
+| Ortak bench | `scheduler_tick_interval` | Zamanlayıcı bench genelinde çalışır. Frappe bu değeri ortak ayardan okur. |
 | Ortak bench | `redis_cache`, `redis_queue`, `redis_socketio` | Siteler ortak Redis bağlantılarını kullanır. |
 | Ortak bench | `socketio_port`, `webserver_port` | Bu değerler bench'in bağlantı noktalarını belirler. |
 | Site | `db_name`, `db_password`, `db_type`, `db_user` | Her site kendi veritabanı ayarlarını tutar. |

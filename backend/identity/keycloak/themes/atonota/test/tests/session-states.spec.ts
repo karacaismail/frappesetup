@@ -135,7 +135,7 @@ test.describe('session ended on the server', () => {
     await page.locator('#password').fill('not-used-here');
     await page.locator('#kc-login').click();
     await expect(page.locator('#kc-page-title')).toHaveText('Bir sorun oldu');
-    await expect(page.locator('#kc-error-message')).toContainText('Oturum açma bilgisini bulamadık.');
+    await expect(page.locator('#kc-error-message')).toContainText('Giriş bilgisini bulamadık.');
     await expect(page.locator('#backToApplication')).toBeVisible();
     await expect(page.locator('.at-brand')).toContainText(BRAND);
     expect(await page.locator('link[href*="css/atonota.css"]').count(), 'theme stylesheet').toBe(1);

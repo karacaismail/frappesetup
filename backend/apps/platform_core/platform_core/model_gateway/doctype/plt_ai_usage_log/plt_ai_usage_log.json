@@ -27,7 +27,9 @@
   "resolved_by",
   "previous_result",
   "resolved_at",
-  "resolution_note"
+  "resolution_note",
+  "file_job",
+  "chunk_index"
  ],
  "fields": [
   {
@@ -226,6 +228,22 @@
    "fieldname": "resolution_note",
    "fieldtype": "Small Text",
    "label": "Resolution Note",
+   "read_only": 1
+  },
+  {
+   "description": "Large file job that sent this attempt, if any.",
+   "fieldname": "file_job",
+   "fieldtype": "Link",
+   "label": "File Job",
+   "read_only": 1,
+   "options": "PLT AI File Job",
+   "search_index": 1
+  },
+  {
+   "description": "Order of the chunk in the file job, starting at zero.",
+   "fieldname": "chunk_index",
+   "fieldtype": "Int",
+   "label": "Chunk Index",
    "read_only": 1
   }
  ],

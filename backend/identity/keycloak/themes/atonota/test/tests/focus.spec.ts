@@ -28,8 +28,9 @@ test('giriş ekranında Tab ve Shift+Tab sırası görsel sırayı izler', async
   const expected = [
     'password',
     'password-show-password',
-    'forgot-password',
+    // The draft puts the forgot-password link after the sign-in button (AJA-1125).
     'kc-login',
+    'at-forgot-password',
     'authenticateWebAuthnButton',
     'register-account',
     'at-locale-tr',

@@ -95,9 +95,12 @@ tags:
     description: Admin endpoint that turns on Keycloak sign-in on the site.
   - name: sync
     description: User endpoints of the sync service. They need a service token.
+  - name: user-admin
+    description: |
+      The panel's user management (G-98). The session must hold the “System Manager” or “Tenant Admin” role.
   - name: atonota-login
     description: |
-      AtonotA Login action decisions (G-161, G-166). They need a signed-in session.
+      atonota_login action decisions (G-161, G-166). They need a signed-in session.
       The verification inbox endpoint (G-164) is the one exception: the provider calls it without a session.
 
 x-site-settings:
@@ -158,12 +161,18 @@ x-site-settings:
       example: https://identity-sync.example.test
       required: false
       note: |
-        Root address of identity-sync. It must use HTTPS. The phone session revocation and the AtonotA Login reads (AJA-459) use it.
-        If it is empty, the two AtonotA Login reads return 503.
+        Root address of identity-sync. It must use HTTPS. The phone session revocation and the atonota_login reads (AJA-459) use it.
+        If it is empty, the two atonota_login reads return 503.
+    - key: keycloak_organization_id
+      example: 7f0c2e6a-0000-4000-8000-000000000001
+      required: false
+      note: |
+        The Keycloak id of the tenant's organization. The invitation endpoint (G-98) sends it to identity-sync.
+        It never comes from the request. If it is empty, the invitation endpoint returns 503 and makes no call.
     - key: identity_brand_name
-      example: AtonotA Login
+      example: <PRODUCT_NAME>
       required: true
-      note: The sign-in button label is built from this value.
+      note: The sign-in button label uses PRODUCT_NAME from backend/brand.env, injected into this site setting.
     - key: platform_panel_url
       example: http://tenant1.localhost:8661/panel
       required: true
@@ -290,8 +299,8 @@ paths:
                   value:
                     message:
                       login_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
-                      brand_name: AtonotA Login
-                      label: Sign in with AtonotA Login
+                      brand_name: <PRODUCT_NAME>
+                      label: Sign in with <PRODUCT_NAME>
         "400":
           description: "`redirect_to` is not safe. The `exc_type` value is `InvalidRedirect`."
           content:
@@ -826,7 +835,7 @@ paths:
                     message:
                       social_login_key: keycloak
                       enabled: false
-                      provider_name: AtonotA Login
+                      provider_name: <PRODUCT_NAME>
         "400":
           description: |
             A site setting is missing. The `exc_type` value is `KeycloakSettingsMissing`.
@@ -1509,7 +1518,7 @@ paths:
     post:
       tags: [atonota-login]
       operationId: atonotaLoginOpenPaidPlan
-      summary: Opens a paid AtonotA Login plan. The gate is closed until the price decision (G-166).
+      summary: Opens a paid identity product plan. The gate is closed until the price decision (G-166).
       description: |
         This endpoint is the example final step of an action (G-161).
         It judges the `open-paid-plan` action, collects the evidence again and calls `Policy.confirm` right before the write.
@@ -2652,6 +2661,143 @@ paths:
           $ref: "#/components/responses/IstekSiniri"
         default:
           description: While the gate is off, the response of the original Frappe function. This contract does not define it.
+
+  /platform_core.api.identity.set_user_role_profiles:
+    post:
+      tags: [user-admin]
+      operationId: setUserRoleProfiles
+      summary: Gives a user of this tenant exactly these role profiles (G-98).
+      description: |
+        The user's roles follow the profiles. Frappe keeps the roles when the list is empty: only the profile links go.
+        A user of the tenant is a Website User with an identity link to the site's issuer.
+        Any other user gets 403: a user of another tenant, a desk user, the Administrator or a missing user.
+        The answer does not tell whether the person exists.
+
+        A profile with the “System Manager” or “Administrator” role gets 403. A profile with a desk role gets 403.
+        The guard of the access module still runs on the save. A role that is not plain gets 403 there.
+        Every change writes a Permission Log row.
+        An unknown body field gets 400.
+      x-yikici: false
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [user, role_profiles]
+              properties:
+                user: {type: string, description: The user's name (the e-mail address).}
+                role_profiles:
+                  type: array
+                  items: {type: string}
+                  description: The names of the role profiles. The list replaces the user's profiles.
+      responses:
+        "200":
+          description: The profiles and the roles of the user after the change.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [user, role_profiles, roles]
+                    properties:
+                      user: {type: string}
+                      role_profiles: {type: array, items: {type: string}}
+                      roles: {type: array, items: {type: string}}
+        "400":
+          description: An unknown field, or `role_profiles` is not a list of names. `exc_type` is `InvalidInput`.
+        "403":
+          description: The caller has neither of the two manager roles, the user is not a user of this tenant, or a profile holds a protected, desk or closed role.
+        "404":
+          description: A role profile does not exist.
+
+  /platform_core.api.identity.invite_user:
+    post:
+      tags: [user-admin]
+      operationId: inviteUser
+      summary: Previews or runs the invitation of a person into this tenant (G-16, G-79, G-98).
+      description: |
+        The site calls identity-sync `POST /v1/invitations` with its own service token.
+        identity-sync creates the Keycloak user if it does not exist, adds the user to the tenant's organization
+        and sends the password e-mail (UPDATE_PASSWORD and CONFIGURE_TOTP).
+        The organization comes from the `keycloak_organization_id` site setting, never from the request.
+        identity-sync checks again that the organization is the tenant's own. Another organization gets 403.
+
+        The flow has two steps.
+        1. The panel sends `dry_run: true`. identity-sync only reads. The answer carries the operations and a `preview_digest`.
+        2. The person looks at the preview. The panel sends `dry_run: false` with the same fields and the `preview_digest`.
+           This second call is the person's approval. The site gives it a new, single-use approval id.
+           identity-sync runs only the approved plan. If the plan changed, the answer is 409 and nothing is written.
+
+        The e-mail of a desk user gets 409 and makes no call (G-16).
+        The Website User of the invited person is made when the person signs in for the first time.
+        A sent e-mail cannot be taken back.
+        An unknown body field gets 400. For example `organization_id` gets 400.
+      x-yikici: false
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, dry_run]
+              properties:
+                email: {type: string, maxLength: 254}
+                first_name: {type: string, maxLength: 150}
+                last_name: {type: string, maxLength: 150}
+                dry_run:
+                  type: boolean
+                  description: true for the preview, false for the run. The field must be written.
+                preview_digest:
+                  type: string
+                  pattern: "^[0-9a-f]{64}$"
+                  description: Required when `dry_run` is false. The digest of the preview.
+      responses:
+        "200":
+          description: The preview or the result of the run.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [dry_run, subject, previews]
+                    properties:
+                      dry_run: {type: boolean}
+                      subject:
+                        type: [string, "null"]
+                        description: The Keycloak id of the user. Null in a preview when the user does not exist yet.
+                      previews:
+                        type: array
+                        items:
+                          type: object
+                          required: [operation]
+                          properties:
+                            operation: {type: string}
+                            target: {type: string}
+                            destructive: {type: boolean}
+                      preview_digest:
+                        type: string
+                        description: Only in a preview. The run must send it back.
+        "400":
+          description: An unknown field, a wrong e-mail, a missing `dry_run` or a run without its `preview_digest`. `exc_type` is `InvalidInput`.
+        "403":
+          description: The caller has neither of the two manager roles, or identity-sync refused the organization.
+        "409":
+          description: The e-mail belongs to a desk user (`IdentityConflict`), or the plan changed after the preview (`InvitationChanged`).
+        "503":
+          description: The site has no organization setting, or identity-sync did not answer. `exc_type` is `IdentityServiceUnavailable`.
 
 components:
   securitySchemes:

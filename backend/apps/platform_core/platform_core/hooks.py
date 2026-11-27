@@ -14,6 +14,8 @@ before_request = [
 	"platform_core.identity.login_policy.before_request",
 	"platform_core.identity.session_policy.before_request",
 	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
+	# G-53: users without the Platform Operator role go from /app and /desk to the panel.
+	"platform_core.config.desk_policy.before_request",
 ]
 on_session_creation = ["platform_core.identity.session_policy.on_session_creation"]
 # Keep the idle clock across site cache clears. Frappe matches prefixes.
@@ -24,6 +26,8 @@ auth_hooks = [
 	"platform_core.ai.agent_token.authenticate_request",
 	"platform_core.ai.oauth.authenticate_request",
 	"platform_core.shell.native_metadata.guard_native_metadata",
+	# G-53: the Desk check again, after API keys and OAuth tokens named the user.
+	"platform_core.config.desk_policy.after_auth",
 ]
 # AU-19: local sign-in functions are replaced by gated wrappers (identity/login_policy.py).
 override_whitelisted_methods = {
@@ -60,6 +64,12 @@ after_install = [
 	"platform_core.mobile.store.seed_sequence",
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
+	# G-62, G-168, G-169, G-170: the panel roles and profiles, only the missing ones (AJA-899).
+	"platform_core.setup.panel_roles.ensure",
+	# G-62: the permission rows of the "Tenant Admin" role.
+	"platform_core.access.tenant_admin.ensure_permissions",
+	# G-53: Desk notices off, the panel is the home page.
+	"platform_core.config.desk_policy.apply",
 ]
 after_migrate = [
 	"platform_core.identity.session_policy.apply",
@@ -67,11 +77,16 @@ after_migrate = [
 	"platform_core.access.reports.switch_off_governed_auto_email_reports",
 	"platform_core.ai.setup.disable_builtin_mcp",
 	"platform_core.config.turkey_setup.apply",
+	"platform_core.setup.panel_roles.ensure",
+	"platform_core.access.tenant_admin.ensure_permissions",
+	"platform_core.config.desk_policy.apply",
 ]
 
 # G-41: the setup wizard overwrites some defaults, so the Türkiye defaults run after it.
 setup_wizard_complete = ["platform_core.config.turkey_setup.apply"]
 
+# The panel roles and profiles are not fixtures: Frappe rewrites every fixture on each migrate,
+# and a Role Profile write leaves a lock (AJA-857). `platform_core.setup.panel_roles` opens them.
 fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
@@ -88,17 +103,26 @@ ai_write_closed_doctypes = [
 	# G-164: verification notices and cases change only through the signed provider notice and its queue job.
 	"PLT Verification Notice",
 	"PLT Verification Case",
+	# G-156: file jobs and their chunks change only through the large file queue steps.
+	"PLT AI File Job",
+	"PLT AI File Chunk",
+	# G-169: only the Platform Operator changes reseller links, never a generic AI write.
+	"Reseller Customer Link",
+	"Reseller Customer Request",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
 	"platform_core.api.auth.logout",
 	"platform_core.api.auth.get_csrf_token",
-	# AtonotA Login reads (AJA-459). The server takes the person from the session, never from the request.
+	# `atonota_login` reads (AJA-459). The server takes the person from the session, never from the request.
 	"platform_core.api.auth.list_login_providers",
 	"platform_core.api.auth.list_linked_accounts",
 	"platform_core.api.shell.get_bootstrap",
 	"platform_core.api.collection.group_summary",
 	"platform_core.api.meta.get_doctype",
+	# G-138: field help reuses the shell metadata check. The coverage report is for the System Manager.
+	"platform_core.api.help.get_field_help",
+	"platform_core.api.help.get_component_help",
 	"frappe.auth.get_logged_user",
 	"logout",
 	"frappe.desk.search.search_link",
@@ -108,10 +132,12 @@ website_user_allowed_methods = [
 	"platform_core.api.ai.mcp_resource_metadata",
 	"platform_core.api.ai.issue_agent_token",
 	"platform_core.api.ai.list_proposals",
+	"platform_core.api.ai.list_second_approvals",
 	"platform_core.api.ai.get_proposal",
 	"platform_core.api.ai.approve_proposal",
 	"platform_core.api.ai.reject_proposal",
 	"platform_core.api.ai.resolve_proposal",
+	"platform_core.api.ai.propose_revert",
 	"platform_core.api.mobile.v1_activity",
 	"platform_core.api.mobile.v1_list_installations",
 	"platform_core.api.mobile.v1_pull",
@@ -126,11 +152,26 @@ website_user_allowed_methods = [
 	"platform_core.api.mobile_pwa.v1_register",
 	"platform_core.api.mobile_pwa.v1_revoke",
 	"platform_core.api.mobile_pwa.v1_revoke_installation",
-	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
+	# The user's own rule scopes.
 	"platform_core.api.access.get_access_summary",
-	# AtonotA Login action decisions (G-161, G-166). The server collects the evidence; roles are not read.
+	# G-62: the endpoint itself refuses a Website User without the “Tenant Admin” role.
+	# Rule detail goes only to a System Manager.
+	"platform_core.api.access.explain_permission",
+	# G-62: the role permission rows. The endpoints refuse everyone but the two manager roles.
+	"platform_core.api.access.list_role_permissions",
+	"platform_core.api.access.set_role_permission",
+	"platform_core.api.access.remove_role_permission",
+	# G-98: the panel's user management. The endpoints refuse everyone but the two manager roles.
+	"platform_core.api.access.list_permission_logs",
+	"platform_core.api.identity.set_user_role_profiles",
+	"platform_core.api.identity.invite_user",
+	# `atonota_login` action decisions (G-161, G-166). The server collects the evidence; roles are not read.
 	"platform_core.api.atonota_login.evaluate",
 	"platform_core.api.atonota_login.open_paid_plan",
+	# G-169, G-170: the reseller endpoints. `approve_customer_request` is for the Desk operator.
+	"platform_core.api.reseller.list_customers",
+	"platform_core.api.reseller.customer_status",
+	"platform_core.api.reseller.request_customer",
 ]
 
 
@@ -146,6 +187,8 @@ clear_cache = ["platform_core.shell.cache.clear_cache"]
 
 doc_events = {
 	"User": {
+		# G-62: only a System Manager gives or takes the two protected roles.
+		"validate": ["platform_core.access.tenant_admin.guard_user"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
 			"platform_core.shell.cache.invalidate_permissions",
@@ -153,8 +196,12 @@ doc_events = {
 		],
 	},
 	"Role": {
+		# Before Frappe's own validate: disabling a role deletes its user rows there.
+		"before_validate": ["platform_core.access.tenant_admin.guard_role"],
+		"before_rename": ["platform_core.access.tenant_admin.guard_role"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
+			"platform_core.access.tenant_admin.guard_role",
 			"platform_core.shell.cache.invalidate_permissions",
 			"platform_core.access.rules.clear_cache",
 		],
@@ -162,16 +209,29 @@ doc_events = {
 		"after_rename": ["platform_core.access.rules.clear_cache"],
 	},
 	"Role Profile": {
+		"validate": ["platform_core.access.tenant_admin.guard_role_profile"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_role_profile",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"User Permission": {
+		"validate": ["platform_core.access.tenant_admin.guard_user_permission"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_user_permission",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"Custom DocPerm": {
+		"before_insert": ["platform_core.access.tenant_admin.guard_custom_docperm"],
+		"validate": ["platform_core.access.tenant_admin.guard_custom_docperm"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_custom_docperm",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"DocType": {
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
@@ -191,8 +251,12 @@ doc_events = {
 	},
 	# This DocType is installed with the access-rule module. Keep shell validators fresh after rule changes.
 	"PLT Access Rule": {
+		"validate": ["platform_core.access.tenant_admin.guard_access_rule"],
 		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.access.tenant_admin.guard_access_rule",
+			"platform_core.shell.cache.invalidate_permissions",
+		],
 	},
 	"DocShare": {
 		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
@@ -262,6 +326,9 @@ after_request = ["platform_core.shell.headers.add_security_headers"]
 
 # Panel client routes (platform-core-kabuk): every /panel/<path> renders the /panel page.
 website_route_rules = [{"from_route": "/panel/<path:app_path>", "to_route": "panel"}]
+# G-53: the Desk check on the page Frappe resolves, such as the home page of "/" (AJA-963).
+# Frappe uses only the last resolver hook, so this list keeps one entry.
+website_path_resolver = ["platform_core.config.desk_policy.resolve_website_path"]
 
 after_build = ["platform_core.shell.assets.remove_panel_source_maps"]
 
@@ -275,6 +342,8 @@ extend_doctype_class = {
 	"Prepared Report": ["platform_core.access.reports.GuardedPreparedReport"],
 	"Auto Email Report": ["platform_core.access.reports.GuardedAutoEmailReport"],
 	"File": ["platform_core.access.reports.GuardedFile"],
+	# G-62: a “Tenant Admin” profile change reaches its users.
+	"Role Profile": ["platform_core.access.tenant_admin.GuardedRoleProfile"],
 }
 # A Prepared Report queued before a rule existed is refused when its job starts.
 before_job = ["platform_core.access.reports.refuse_prepared_report_job"]

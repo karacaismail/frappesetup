@@ -1289,7 +1289,7 @@ Hata kodu `forbidden` olur.
 Ends one Keycloak session.,Bir Keycloak oturumunu kapatır.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.summary
 Development environment. The port is the `PANE_PORT` value plus 5.,"Geliştirme ortamı. Port, `PANE_PORT` değerinin 5 fazlasıdır.",identity_sync.openapi.yaml: servers[0].description
 Lists the sign-in platforms that the calling tenant may show.,Çağıran kiracının gösterebileceği giriş platformlarını listeler.,identity_sync.openapi.yaml: paths./v1/login-providers.get.summary
-"The source is the AtonotA Login security review (AJA-458) and the panel contract, G-159.
+"The source is the security review of the sign-in product (AJA-458) and the panel contract, G-159.
 The login page of a `platform_core` site shows one button for each platform in this list.
 The request names no person and has no body.
 
@@ -1306,7 +1306,7 @@ The service may keep the platform list of the realm for 30 seconds. The list hol
 Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint. These are the service clients of the tenant sites.
 Operator, preview and deletion clients get 403. The service needs the `view-identity-providers` role in Keycloak.
 The endpoint only reads. It writes nothing in Keycloak or on a target.
-","Kaynak AtonotA Login güvenlik incelemesi (AJA-458) ve panel sözleşmesinin G-159 maddesidir.
+","Kaynak giriş ürününün güvenlik incelemesi (AJA-458) ve panel sözleşmesinin G-159 maddesidir.
 `platform_core` sitesinin giriş sayfası bu listedeki her platform için bir düğme gösterir.
 İstek hiçbir kişiyi adlandırmaz ve gövde taşımaz.
 
@@ -1332,7 +1332,7 @@ The error code is `forbidden`.
 Hata kodu `forbidden` olur.
 ",identity_sync.openapi.yaml: paths./v1/login-providers.get.responses.403.description
 Lists the linked platforms and the local sign-in ways of one member.,Bir üyenin bağlı platformlarını ve yerel giriş yollarını listeler.,identity_sync.openapi.yaml: paths./v1/linked-accounts.post.summary
-"The source is the AtonotA Login security review (AJA-458) and the panel contract, G-160.
+"The source is the security review of the sign-in product (AJA-458) and the panel contract, G-160.
 The account page of a `platform_core` site shows which platforms the signed-in user has linked.
 The site takes the id of the user from its own session and identity link. The body carries this id.
 The method is POST so that the id of the user is not in the address. The endpoint still only reads.
@@ -1353,7 +1353,7 @@ Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
 Operator, preview and deletion clients get 403.
 Remaining risk: a taken-over tenant site can read the linked platforms of its own members.
 It cannot read the members of another tenant. The decision record is `docs/decisions/0003-keycloak-extensions.md`.
-","Kaynak AtonotA Login güvenlik incelemesi (AJA-458) ve panel sözleşmesinin G-160 maddesidir.
+","Kaynak giriş ürününün güvenlik incelemesi (AJA-458) ve panel sözleşmesinin G-160 maddesidir.
 `platform_core` sitesinin hesap sayfası, oturumu açık kullanıcının bağladığı platformları gösterir.
 Site kullanıcının kimliğini kendi oturumundan ve kimlik bağından alır. Gövde bu kimliği taşır.
 Yöntem POST'tur. Böylece kullanıcının kimliği adrese girmez. Uç yine de yalnız okur.

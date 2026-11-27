@@ -91,6 +91,9 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - Marka adı ve alan adı ayardan gelir. Kodda sabit yazılmaz.
 - **D-5. Son kullanıcı yalnız ayrı arayüzü görür.** Son kullanıcının türü “Website User” olur (Karar 10, G-16).
 - **D-6. Zamanlanmış iş kurulmaz.** Proje sahibi `cron` kurulumunu istemedi (V-9).
+  - Proje sahibi 26 Kasım 2026 Perşembe günü iki istisna onayladı. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır (D-16).
+  - Geliştirme Mac'inde zamanlanmış iş kurulmaz.
+  - Öteki maddeler değişmez. Örneğin uygulama koduna `scheduler_events` kaydı eklenmez. Mutabakat ve taramalar elle başlar (O-11, O-29).
 - **D-7. Bütün uygulamalar Frappe 16 ile yazılır.** `press_tr` de Frappe 16 üzerinde çalışır. Proje sahibi bunu şöyle yazdı: “app frappe v16.x ile koldlansın”.
 - **D-8. Var olan Press kurulumu kullanılır.** Bu Mac'te Colima'da bir Press deneme kurulumu var. Kurulum değiştirilmez. İmajı ve kurulum betikleri yeniden kullanılır.
 - **D-9. Her şey yapay zekâyla yönetilebilir olur.** Bütün DocType'lar, alanlar ve backend işlemleri yapay zekâya açık bir katmandan geçer. Katman model sağlayıcısından bağımsızdır. Proje sahibi şöyle yazdı: “ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.” Ayrıntı sözleşmenin 10. bölümündedir.
@@ -122,6 +125,14 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - Frappe 16'nın hazır özellikleri tercih edilir. Örneğin API v2, `UnitTestCase` ve `IntegrationTestCase`, `extend_doctype_class`, `autoname: UUID` ve `frappe.qb`. Her kullanım Frappe 16.56.0 kaynağında doğrulanır.
   - Kural dosyaları `docs/standartlar/` klasöründedir. Asıl kopya proje sahibinin `rules ai` klasöründedir. İki kopya aynı tutulur.
   - Sihirli bağlantı ve Apple ile giriş MVP'ye girer (karar dosyası, 786. satır). Eklenti lisansı Apache-2.0 ya da MIT olur.
+
+- **D-16. 26 Kasım 2026 kararları.** Proje sahibi 26 Kasım 2026 Perşembe günü beş karar verdi:
+  1. Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar. Depoda kişi adı yazılmaz.
+  2. Frappe zamanlayıcısı ve düzenli yedek sunucularda açılır. Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz (D-6).
+  3. Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer.
+  4. IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).
+  5. Ortak işlerde yazışma kanalı proje Telegram grubudur. Grubun adresi ve kişi adları depoya yazılmaz.
+  - `backend/dev/tests/test_release_residue.py` depoyu tarar. Test Telegram grup bağlantısını, genel IP adresini ve `.env` dosyasındaki gerçek parolayı yakalar.
 
 ## Orkestratörün seçtiği varsayılanlar
 
@@ -300,7 +311,8 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
   - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur. İş `unknown` kalır ve Keycloak hesabı silinmez (O-43).
 
-- **O-45. P2 ödeme katmanı MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü MVP durum denetimiyle alındı. Prod, gerçek müşterinin kullandığı canlı ortamdır.
+- **O-45. P2 ödeme katmanı MVP'ye girmez.** Karar 23 Kasım 2026 Pazartesi günü MVP durum denetimiyle alındı. Prod, müşteriye açılacak canlı ortamdır.
+  - Bugün prod ortamına yalnız deneme verisi girer (D-16).
   - MVP ilk kullanılabilir sürümdür (D-1).
   - İlk kullanıcılar ürünü alpha ve beta ortamında dener. Bu ortamlarda ödeme alınmaz.
   - iyzico ve e-fatura işi prod satışından önce biter.
@@ -373,7 +385,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
     4. `press_tr.api.auth.keycloak_callback` Keycloak'tan dönüşü karşılar.
     5. `press_tr.api.keycloak_backchannel_logout` Keycloak'ın oturum kapatma bildirimini alır. Bildirim imzalıdır. Keycloak bu bildirimi genel adresten gönderir.
     6. `press_tr.api.account.request_deletion` silme isteğini alır.
-    7. `press_tr.api.account.request_recovery` hesap kurtarma isteğini alır (G-163). Bu yol 24 Kasım 2026 Salı günü eklendi. Gerekçe şudur. Anahtarını kaybeden kişi giriş yapamaz ve Tailscale ağında değildir. Yol kapalı kalırsa kurtarma akışı başlayamaz. Yöntem yalnız POST kabul eder. Bir adresten saatte en çok 5 istek gelebilir. Yöntem yalnız e-posta adresi alır ve her adrese aynı yanıtı verir. Yöntem yalnız bir inceleme kaydı açar. Anahtar değiştirmez, oturum açmaz, bağlantı göndermez.
+    7. `press_tr.api.account.request_recovery` hesap kurtarma isteğini alır (G-163). Bu yol 24 Kasım 2026 Salı günü eklendi. Gerekçe şudur. Anahtarını kaybeden kişi giriş yapamaz ve Tailscale ağında değildir. Yol kapalı kalırsa kurtarma akışı başlayamaz. Yöntem yalnız POST kabul eder. Bir adresten saatte en çok 5 istek gelebilir. Yöntem yalnız e-posta adresi alır ve her adrese aynı yanıtı verir. Yöntem yalnız bir inceleme kaydı açar. Anahtar değiştirmez, oturum açmaz, bağlantı göndermez. Bu sınırın IPv6 için bir açığı var. Caddy, IPv6 ile gelen kişiyi Docker ağ geçidi adresinden görür. Bu yüzden bütün IPv6 kullanıcıları aynı 5 isteklik sınırı paylaşır. Bir saldırgan bu 5 isteği harcarsa IPv6 kullanıcıları bir saat kurtarma isteği gönderemez. Bu açığı `docs/decisions/0003-keycloak-extensions.md` dosyası da yazar. Düzeltme bu kararın parçası değildir. Düzeltme ayrı bir altyapı işidir. DevOps sorumlusu bu işi AJA-507 görevinde yapar.
   - API yolları `/api/method/` önekiyle açılır. `/api/v1/` ve `/api/v2/` önekleri açılmaz.
   - Öteki bütün yollar yalnız Tailscale adreslerinden açılır. Örneğin `/app`, `/desk`, `/dashboard` ve `/api/resource/` böyledir. Tailscale adresleri `100.64.0.0/10` ve `fd7a:115c:a1e0::/48` aralıklarıdır. Başka istek 404 alır.
   - Yerel ağ aralıkları özel sayılmaz. Gerekçe şudur. Docker, IPv6 ile gelen genel isteği `172.16.0.0/12` içinden bir adresle gösterebilir.

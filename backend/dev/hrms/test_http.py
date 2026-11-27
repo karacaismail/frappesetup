@@ -41,6 +41,16 @@ class Client:
             with error:
                 return error.code, error.read()
 
+    def final_path(self, path):
+        """Path of the page the redirects end on."""
+        request = Request(self.base + path, headers={"X-Frappe-Site-Name": self.site})
+        try:
+            with self.opener.open(request, timeout=15) as response:
+                return urlsplit(response.geturl()).path
+        except HTTPError as error:
+            with error:
+                return urlsplit(error.geturl()).path
+
     def csrf_token(self):
         status, body = self.page("/panel")
         match = re.search(rb'<meta name="csrf-token" content="([^"]+)"', body)
@@ -354,7 +364,11 @@ class LeaveHttpTest(unittest.TestCase):
         for actor in ("employee", "manager", "hr"):
             with self.subTest(actor=actor):
                 client = self.login(actor)
-                for path in ("/app", "/desk", "/hrms", "/hr/team", "/roster"):
+                # G-53: Desk requests end on the panel. The bundled HRMS pages stay closed.
+                for path in ("/app", "/desk"):
+                    with self.subTest(path=path):
+                        self.assertEqual(client.final_path(path), "/panel")
+                for path in ("/hrms", "/hr/team", "/roster"):
                     with self.subTest(path=path):
                         code, _ = client.page(path)
                         self.assertEqual(code, 403)
@@ -399,7 +413,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(status, 200, result.get("exc_type"))
         self.contract_validators["approver"].validate(result)
         self.assertEqual(result["message"], {"approver": self.data["users"]["manager"]})
-        self.assertEqual(self.login("manager").page("/app")[0], 403)
+        self.assertEqual(self.login("manager").final_path("/app"), "/panel")
         day = (date.fromisoformat(own["from_date"]) + timedelta(days=8)).isoformat()
         draft = {key: own[key] for key in ("employee", "company", "leave_type")}
         draft.update(

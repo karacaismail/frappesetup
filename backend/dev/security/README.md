@@ -76,8 +76,12 @@ Listedeki dosyalardan biri veya Semgrep kuralı değişirse istisnaları yeniden
 İnceleme bitince depo kökünde şu komutu çalıştırın.
 
 ```sh
-python3 -B backend/dev/security/semgrep_exceptions.py --snapshot
+uv run --no-project --offline --python 3.12 python -B backend/dev/security/semgrep_exceptions.py --snapshot
 ```
+
+Komut Python 3.12 ile çalışır. Sistemin `python3` aracı daha eski olabilir.
+Kapı da bütün Python adımlarını 3.12 ile çalıştırır.
+3.12 yoksa kapı hata verir ve 0 ile bitmez.
 
 Komut her kapsam için bir özet yazdırır.
 Özet `null` ise kapsama ait onayları yenilemeyin.

@@ -1,7 +1,20 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const START = "/api/method/platform_core.api.auth.start_login";
-const LABEL = "AtonotA Login ile oturum aç";
+
+// The product name comes from PRODUCT_NAME or from backend/brand.env (AJA-1061).
+// The site must use the same value in its identity_brand_name setting.
+function productName(): string {
+	if (process.env.PRODUCT_NAME) return process.env.PRODUCT_NAME;
+	const text = readFileSync(resolve(__dirname, "../../../../../../brand.env"), "utf-8");
+	const line = text.split("\n").find((row) => row.startsWith("PRODUCT_NAME="));
+	if (!line) throw new Error("backend/brand.env has no PRODUCT_NAME value");
+	return line.slice("PRODUCT_NAME=".length).trim();
+}
+
+const LABEL = `${productName()} ile oturum aç`;
 
 // Safari and WebKit move focus to links only with Option+Tab by default. Chromium uses Tab.
 function tabKey(browserName: string) {

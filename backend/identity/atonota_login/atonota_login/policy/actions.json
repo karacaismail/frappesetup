@@ -6,7 +6,7 @@
     {"id": "retry-limits", "owner": "security-owner", "value": null, "description": "How many verification attempts a person may start."},
     {"id": "verification-data-region", "owner": "compliance-owner", "value": null, "description": "Where the verification provider may keep data."},
     {"id": "guest-actions", "owner": "product-owner", "value": null, "description": "Which actions a person may take without signing in."},
-    {"id": "paid-plan-pricing", "owner": "product-owner", "value": null, "description": "Plan, price and unit of the paid AtonotA Login use (G-166, K-61)."}
+    {"id": "paid-plan-pricing", "owner": "product-owner", "value": null, "description": "Plan, price and unit of the paid use of the sign-in product (G-166, K-61)."}
   ],
   "actions": [
     {
@@ -34,7 +34,7 @@
     },
     {
       "id": "open-paid-plan",
-      "description": "Open a paid AtonotA Login plan for a customer.",
+      "description": "Open a paid plan of the sign-in product for a customer.",
       "controls": [
         {"id": "membership", "applies": true, "required": true, "evidence": "membership", "rules": []},
         {"id": "pricing", "applies": true, "required": true, "evidence": "pricing-decision", "rules": ["paid-plan-pricing"]}

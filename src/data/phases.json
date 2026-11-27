@@ -3,7 +3,7 @@
   "id": "P0",
   "title": "P0 Altyapı",
   "after": [],
-  "goal": "Hetzner bare-metal üzerinde Press v0.154.x kontrol düzlemi (Frappe 16 / Python 3.14; Press bu sürümde açık yama dizisiyle açılır, O-52), Jenkins dağıtım hattı ve dört ortam (alpha, beta, rc, prod), proxy-app-db-registry-monitor-log sunucuları, Keycloak HA ve sertleştirme, Hetzner Object Storage offsite yedek, ağ sertleştirme, güvenlik danışmanlığı karar kaydı ve ERPNext v16 TR Release Group için ilk Deploy Candidate derlemesi.",
+  "goal": "Hetzner bare-metal üzerinde Press v0.154.x kontrol düzlemi (Frappe 16 / Python 3.14; Press bu sürümde açık yama dizisiyle açılır, O-52; sürüm kaydı KD-05), Jenkins dağıtım hattı ve dört ortam (alpha, beta, rc, prod), proxy-app-db-registry-monitor-log sunucuları, Keycloak HA ve sertleştirme, Hetzner Object Storage offsite yedek, ağ sertleştirme, güvenlik danışmanlığı karar kaydı ve ERPNext v16 TR Release Group için ilk Deploy Candidate derlemesi.",
   "exit": "Press alpha, beta, rc ve prod ortamlarında ayakta; TLS sertifikaları alınmış (MVP'de GoDaddy kaydı ve ad başına sertifika; Route 53 joker sertifikası Press sunucu kurma akışı çalışınca yeniden açılır); asgari alpha Release Group'unda (Frappe + ERPNext; G-3 dağıtım zinciri) imaj derlenip bir test sitesi Active olmuş (uygulama kaynakları, prod grubu ve zamanlanmış dağıtım G-14 ile P1'de); offsite yedek Hetzner bucket'ında listelenmiş ve geri yüklenmiş (MVP'de düzenli yedek yoktur, yedek yalnız dağıtımda ve elle alınır; düzenli yedek için proje sahibinin kararı gerekir, E-7); Keycloak HA ayakta ve yönetim konsolu ile Admin REST API public host'ta kapalı; güvenlik danışmanlığı karar kaydı ve kaynak defteri açılmış; tüm sunucular Press doctype'larıyla envanterde ve izleme uyarıları e-postaya düşüyor (Press üretim imajında Telegram paketi yok).",
   "owner": "DevOps sorumlusu (sunucular, Jenkins hattı, yedek, Keycloak HA ve sertleştirme, güvenlik danışmanlığı kaydı); alan adı sorumlusu (GoDaddy kayıtları, G-2); Platform ekibi (kaynak defteri, G-128)"
  },
@@ -44,8 +44,8 @@
   "after": [
    "P1"
   ],
-  "goal": "App çerçevesinin (backend iskelet, frontend modül, yetki/AI/abonelik sözleşmeleri, uygulama durum modeli, yardım ve tur içeriği) HRMS TR ile ilk kez uygulanması; Marketplace App, App Plan, Product Trial, aktivasyon UX, paylaşım bağlantıları ve güvenli bağlantı önizlemesi.",
-  "exit": "Yeni müşteri Keycloak ile kayıt → 14 günlük deneme sitesi → 'Etkinleştir' → Agent Job → sidebar'da HRMS TR başlığı akışı E2E testte ve ilk ödeyen müşteride çalışıyor; HRMS TR bordro kabul senaryoları geçiyor; subscription info ile özellik kapıları ve uygulama durumları doğrulanmış; paylaşılan kayıt bağlantısının oturumsuz önizlemesi kayıt verisi içermiyor; ilk ziyaret turu girdi kaybı olmadan çalışıyor.",
+  "goal": "Ekip uygulama çerçevesini ilk kez HRMS TR ile uygular. Çerçeve arka uç iskeletini ve ön yüz modülünü içerir. Yetki, AI ve abonelik sözleşmelerini kapsar. Uygulama durum modelini, yardım metnini ve ilk ziyaret turunu da kapsar. Kapsamda Marketplace App, App Plan ve Product Trial var. Etkinleştirme, paylaşım bağlantıları ve güvenli bağlantı önizlemesi de kapsama girer.",
+  "exit": "Müşteri Keycloak ile kaydolur. Sistem 14 günlük deneme sitesini açar. Müşteri Etkinleştir düğmesine basınca Agent Job başlar. HRMS TR başlığı yan menüde görünür. Bu akış uçtan uca testte ve ilk ödeyen müşteride çalışır. HRMS TR bordro kabul senaryoları geçer. Ekip, subscription info ile özellik erişimini ve uygulama durumlarını doğrular. Oturumsuz bağlantı önizlemesi paylaşılan kaydın verisini göstermez. İlk ziyaret turu kullanıcının girdisini korur.",
   "owner": "Platform ekibi + App ekibi + Frontend ekibi; ürün sahibi (plan/fiyat, K-29, K-35); mali müşavir (bordro parametreleri)"
  },
  {
@@ -71,13 +71,13 @@
  },
  {
   "id": "P7",
-  "title": "P7 AtonotA Login ürünü",
+  "title": "P7 {{PRODUCT_NAME}} ürünü",
   "after": [
    "P1",
    "P2"
   ],
-  "goal": "AtonotA Login'i bağımsız ve ücretli bir giriş ürünü olarak yayına almak: Keycloak üzerinde markalı giriş ekranı (`api.login.atonota.net`), veriyle gelen sınırsız sayıda platform ile oturum açma, Frappe'de üyelik, işlem kuralı ve inceleme kayıtları, tanıtım sayfası ve müşteri başına ücretli kullanım.",
-  "exit": "Bir müşteri uygulaması \"AtonotA Login\" düğmesiyle girişi başlatıyor ve adres çubuğunda `api.login.atonota.net` görünüyor; Google ve en az bir başka platformla giriş `accounts.google.com` gibi platform adresine gidip `api.login.atonota.net/realms/<realm>/broker/<platform>/endpoint` yolundan dönüyor; yeni platform kod değişmeden yalnız veri kaydıyla açılıyor; zorunlu SSO sosyal girişle aşılamıyor; kullanıcı yolculuklarının durum sonuçları sunucu testleriyle geçiyor; tanıtım sayfası yayında; fiyat ve plan kararı ürün sahibince kapanmış ve ücretli müşteri hesabı açılabiliyor.",
-  "owner": "Platform ekibi (Keycloak teması, Frappe kayıtları, yetki); Frontend ekibi (giriş ekranı, tanıtım sayfası); DevOps sorumlusu (Keycloak HA, `api.login.` DNS değerleri, sertleştirme); alan adı sorumlusu (`atonota.net` DNS kaydı); ürün sahibi (fiyat ve plan, K-61)"
+  "goal": "{{PRODUCT_NAME}} ürününü bağımsız ve ücretli bir giriş ürünü olarak yayına almak: Keycloak üzerinde markalı giriş ekranı (`api.login.{{BRAND_DOMAIN}}`), veriyle gelen sınırsız sayıda platform ile oturum açma, Frappe'de üyelik, işlem kuralı ve inceleme kayıtları, tanıtım sayfası ve müşteri başına ücretli kullanım.",
+  "exit": "Bir müşteri uygulaması \"{{PRODUCT_NAME}}\" düğmesiyle girişi başlatıyor ve adres çubuğunda `api.login.{{BRAND_DOMAIN}}` görünüyor; Google ve en az bir başka platformla giriş `accounts.google.com` gibi platform adresine gidip `api.login.{{BRAND_DOMAIN}}/realms/<realm>/broker/<platform>/endpoint` yolundan dönüyor; yeni platform kod değişmeden yalnız veri kaydıyla açılıyor; zorunlu SSO sosyal girişle aşılamıyor; kullanıcı yolculuklarının durum sonuçları sunucu testleriyle geçiyor; tanıtım sayfası yayında; fiyat ve plan kararı ürün sahibince kapanmış ve ücretli müşteri hesabı açılabiliyor.",
+  "owner": "Platform ekibi (Keycloak teması, Frappe kayıtları, yetki); Frontend ekibi (giriş ekranı, tanıtım sayfası); DevOps sorumlusu (Keycloak HA, `api.login.` DNS değerleri, sertleştirme); alan adı sorumlusu (`{{BRAND_DOMAIN}}` DNS kaydı); ürün sahibi (fiyat ve plan, K-61)"
  }
 ]

@@ -257,11 +257,12 @@ class TestWebsiteUser(AccessRuleTestCase):
 
 		self.assertEqual(response.status_code, 403)
 
-	def test_summary_is_on_the_shell_allow_list_and_the_explanation_is_not(self):
+	def test_summary_and_explanation_are_on_the_shell_allow_list(self):
+		"""G-62: the explanation endpoint itself refuses a Website User without “Tenant Admin”."""
 		allowed = frappe.get_hooks("website_user_allowed_methods")
 
 		self.assertIn("platform_core.api.access.get_access_summary", allowed)
-		self.assertNotIn("platform_core.api.access.explain_permission", allowed)
+		self.assertIn("platform_core.api.access.explain_permission", allowed)
 
 
 class TestQueuedJobs(AccessRuleTestCase):

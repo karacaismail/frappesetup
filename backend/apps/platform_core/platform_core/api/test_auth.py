@@ -120,7 +120,7 @@ class TestAuthEndpointAccess(FrappeAPITestCase):
 		response = h.request(client.post, PREFIX + "setup_keycloak_login", headers=h.csrf_headers(client))
 		self.assertEqual(response.status_code, 403)
 
-	# --- AtonotA Login reads (AJA-459): api/test_login_reads.py covers them in full ---
+	# --- `atonota_login` reads (AJA-459): api/test_login_reads.py covers them in full ---
 
 	def _refusing_identity_sync(self):
 		"""No request may reach identity-sync in the refusal tests below."""

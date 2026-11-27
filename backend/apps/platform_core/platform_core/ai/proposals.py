@@ -12,24 +12,46 @@ from frappe.utils import add_to_date, get_datetime, now_datetime
 from frappe.utils.response import json_handler
 from pydantic import Field
 
-from platform_core.ai import access, registry, schema_check, store, timestamps, versioning
+from platform_core.ai import (
+	access,
+	fields,
+	policy,
+	registry,
+	risk,
+	schema_check,
+	store,
+	timestamps,
+	versioning,
+)
 from platform_core.ai.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
 from platform_core.ai.tools import results
 
 TTL_SECONDS = 600
+# An R3 proposal runs only after a second person approves it too (AJA-1003).
+TWO_PERSON_LEVEL = "R3"
+AWAITING = "awaiting_second_approval"
+# States in which `approve` may still act. Both run out at `expires_at`.
+OPEN_STATES = ("pending", AWAITING)
 STATUS_FILTERS = {
 	"pending": ("pending",),
-	"expired": ("pending", "expired"),
+	AWAITING: (AWAITING,),
+	"expired": ("pending", AWAITING, "expired"),
 	"rejected": ("rejected",),
 	"consumed": ("consumed",),
 }
 APPROVE_ATTEMPTS = 4
 # Paging by offset scans the skipped rows. The list is for a human's recent proposals.
 MAX_LIST_START = 10_000
+# Proposals that wait for a second approval live at most `TTL_SECONDS`. The waiting list reads at
+# most this many of them and keeps those the reader may approve.
+MAX_SECOND_APPROVAL_SCAN = 500
 # Upper bounds of the two texts a human endpoint takes. A name is at most 140 characters in Frappe.
 MAX_ID_CHARS = 140
 MAX_DIGEST_CHARS = 128
 PREVIEW_KEYS = ("action", "summary", "changes", "details")
+# The permission a second person needs on the target, by the action of the preview (AJA-1003).
+# Other actions (`update`, `app_tool`, `admin`) need write permission.
+ACTION_PERMISSION = {"create": "create", "submit": "submit", "cancel": "cancel", "delete": "delete"}
 
 
 class GetProposalArguments(ToolArguments):
@@ -38,6 +60,10 @@ class GetProposalArguments(ToolArguments):
 
 def _json(value: Any) -> str:
 	return json.dumps(value, sort_keys=True, default=json_handler, ensure_ascii=False)
+
+
+# The canonical JSON form the layer stores and compares.
+canonical = _json
 
 
 def _target_key(doctype: str | None, name: str | None) -> str | None:
@@ -137,8 +163,12 @@ def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 	return spec
 
 
-def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
-	"""Build the preview and open the proposal record. Nothing is written to the target record."""
+def open_proposal(tool: registry.AiTool, arguments: dict, *, source=None) -> tuple[dict, Any]:
+	"""Build the preview and open the proposal record. Nothing is written to the target record.
+
+	`source` is the applied proposal a revert proposal undoes (AJA-1002). The revert's level is
+	at least the source's level.
+	"""
 	# The stored input is canonical JSON. The preview is built from that same form, so the
 	# preview made at approval, from the stored input, lists its changes in the same order.
 	args_json = _json(arguments)
@@ -161,6 +191,9 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 	preview = {key: spec[key] for key in PREVIEW_KEYS if spec.get(key) is not None}
 	preview_json = _json(preview)
 	version = spec.get("target_version")
+	level = risk.level(tool)
+	if source is not None:
+		level = risk.higher(level, source.risk_level or "R0")
 	doc = store.insert_proposal(
 		{
 			"user": frappe.session.user,
@@ -178,6 +211,9 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 			"digest": _digest(frappe.session.user, tool.name, target_key, version, args_json, preview_json),
 			"destructive": int(tool.destructive),
 			"billable": int(tool.billable),
+			# From the tool and the source proposal only. The model's arguments never reach this value.
+			"risk_level": level,
+			"source_proposal": source.name if source else None,
 			"expires_at": add_to_date(now_datetime(), seconds=TTL_SECONDS),
 			"status": "pending",
 		}
@@ -185,6 +221,7 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 	result = {
 		"status": "approval_required",
 		"proposal_id": doc.name,
+		"risk_level": doc.risk_level,
 		"preview": json.loads(preview_json),
 		"expires_at": timestamps.iso(doc.expires_at),
 		"created_at": timestamps.iso(doc.creation),
@@ -195,7 +232,7 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 def public(doc, *, with_digest: bool = True) -> dict:
 	"""The outward form of the proposal. A pending proposal past its time shows as `expired`."""
 	status = doc.status
-	if status == "pending" and get_datetime(doc.expires_at) < now_datetime():
+	if status in OPEN_STATES and get_datetime(doc.expires_at) < now_datetime():
 		status = "expired"
 	result = {
 		"proposal_id": doc.name,
@@ -206,11 +243,16 @@ def public(doc, *, with_digest: bool = True) -> dict:
 		"target_name": doc.target_name,
 		"destructive": bool(doc.destructive),
 		"billable": bool(doc.billable),
+		"risk_level": doc.risk_level,
+		"source_proposal": doc.get("source_proposal") or None,
 		"preview": json.loads(doc.preview_json),
 		"expires_at": timestamps.iso(doc.expires_at),
 		"created_at": timestamps.iso(doc.creation),
 		"result_document": doc.result_document,
 		"error": doc.error,
+		"first_approved_at": timestamps.iso(doc.first_approved_at),
+		"second_approver": doc.second_approver or None,
+		"second_approved_at": timestamps.iso(doc.second_approved_at),
 	}
 	if with_digest:
 		result["digest"] = doc.digest
@@ -232,6 +274,10 @@ def _own(proposal_id: str, *, for_update: bool = False):
 	if doc.user != frappe.session.user:
 		raise frappe.PermissionError(_("This proposal belongs to another user.", context=CONTEXT))
 	return doc
+
+
+# The owner check, for the revert endpoint of `platform_core.ai.revert`.
+own = _own
 
 
 def read_for_model(proposal_id: str) -> dict:
@@ -264,6 +310,105 @@ def list_for_human(status: str | None = None, limit: int = 20, start: int = 0) -
 		return {"proposals": [public(row) for row in rows[:count]], "has_next_page": len(rows) > count}
 
 	return access.human_call("call", "list_proposals", page)
+
+
+def needs_second_approval(doc) -> bool:
+	return doc.risk_level == TWO_PERSON_LEVEL
+
+
+def second_approver_problem(doc, tools: dict | None = None) -> str | None:
+	"""Why the session user may not give the second approval of `doc`. None if the user may.
+
+	The rule is in the decision note, section 7, "Second approval of R3". The second person is
+	an enabled user of this site, is not the owner, may use the tool and may write the target
+	record. The person may also read every field the preview shows (AJA-1077). Without a target record the person needs the permission on the target DocType.
+	A create, submit, cancel or delete needs that permission, not only write.
+	Nobody holds write permission on the layer's own records. For those the tool's own role
+	check decides. `tools` maps tool names to tools, so a list reads the registry only once.
+	"""
+	user = frappe.session.user
+	if user == doc.user:
+		return "second_approver_required"
+	if user in ("", "Guest") or not store.user_enabled(user):
+		return "not_second_approver"
+	tool = tools.get(doc.tool) if tools is not None else registry.find(doc.tool)
+	doctype, name = doc.target_doctype, doc.target_name
+	if tool is None or not tool.visible() or not doctype:
+		return "not_second_approver"
+	if doctype in policy.LAYER_DOCTYPES:
+		return None
+	target = name if name and store.document_exists(doctype, name) else None
+	preview = json.loads(doc.preview_json or "{}")
+	ptype = ACTION_PERMISSION.get(preview.get("action"), "write")
+	if not frappe.has_permission(doctype, ptype, doc=target, user=user):
+		return "not_second_approver"
+	if not _preview_readable(doctype, preview):
+		# The owner built the preview. It may show a field this person may not read (AJA-1077).
+		return "not_second_approver"
+	return None
+
+
+def _preview_readable(doctype: str, preview: dict) -> bool:
+	"""Whether the session user may read every field of `doctype` the preview shows.
+
+	A change that names a field of the target DocType needs read permission on it, permission
+	level and secret fields included. For a child table field every row field counts too.
+	A name that is no field of the DocType (for example `title.bold` of a field property) shows
+	no record value.
+	"""
+	meta = fields.get_meta(doctype)
+	can_read = fields.readable(meta)
+	for change in preview.get("changes") or []:
+		if not isinstance(change, dict):
+			return False
+		field = meta.get_field(change.get("fieldname") or "")
+		if field is None:
+			continue
+		if field.fieldname not in can_read:
+			return False
+		if field.fieldtype in ("Table", "Table MultiSelect") and not _rows_readable(
+			frappe.get_meta(field.options), doctype, change
+		):
+			return False
+	return True
+
+
+def _rows_readable(child_meta, parenttype: str, change: dict) -> bool:
+	can_read = fields.readable(child_meta, parenttype)
+	for value in (change.get("old"), change.get("new")):
+		for row in value if isinstance(value, list) else []:
+			if not isinstance(row, dict):
+				continue
+			if any(child_meta.get_field(key) is not None and key not in can_read for key in row):
+				return False
+	return True
+
+
+def list_second_approvals_for_human(limit: int = 20, start: int = 0) -> dict:
+	"""R3 proposals of other users that the session user may approve as the second person.
+
+	Each row carries the digest. The second person sends it back with the approval, as the owner
+	does. A row is shown only to a person who may write the target and read every field the
+	preview shows (AJA-1077).
+	"""
+
+	def page() -> dict:
+		if not 0 <= int(start) <= MAX_LIST_START:
+			frappe.throw(
+				_("start must be between 0 and {0}.", context=CONTEXT).format(MAX_LIST_START),
+				frappe.ValidationError,
+			)
+		count = min(max(int(limit), 1), 100)
+		tools = {tool.name: tool for tool in registry.all_tools()}
+		rows = [
+			row
+			for row in store.awaiting_second_approval(frappe.session.user, MAX_SECOND_APPROVAL_SCAN)
+			if second_approver_problem(row, tools) is None
+		]
+		chosen = rows[int(start) : int(start) + count + 1]
+		return {"proposals": [public(row) for row in chosen[:count]], "has_next_page": len(chosen) > count}
+
+	return access.human_call("call", "list_second_approvals", page)
 
 
 def _log(stage: str, doc, *, decision: str, deny_reason: str | None = None, **extra) -> None:
@@ -335,21 +480,26 @@ def _approve(proposal_id: str, digest: str) -> dict:
 	doc = store.load_proposal(proposal_id)
 	if doc is None:
 		raise frappe.DoesNotExistError(_("Proposal not found.", context=CONTEXT))
-	if doc.user != frappe.session.user:
+	user = frappe.session.user
+	second = doc.user != user and doc.status == AWAITING
+	if doc.user != user and not second:
 		# Another user's proposal is not returned in the response. The preview carries that
 		# user's data.
-		frappe.db.rollback()
-		_log("approve", doc, decision="denied", deny_reason="not_owner")
-		access.commit_own_writes()
-		raise frappe.PermissionError(_("This proposal belongs to another user.", context=CONTEXT))
+		_refuse(doc, "not_owner", _("This proposal belongs to another user.", context=CONTEXT))
+	if second and second_approver_problem(doc):
+		# Only a person who may write the target sees or approves the proposal of another user.
+		_refuse(doc, "not_second_approver", _("You may not approve this proposal.", context=CONTEXT))
 
 	# The lock order is the same in every request: first all proposals of the target, then this
 	# proposal. If the order changes, two racing approvals lock each other. The status is read
 	# again under the lock.
 	siblings = store.lock_target(doc.target_key) if doc.target_key else []
 	doc = store.load_proposal(proposal_id, for_update=True)
-	if doc.status != "pending":
+	if doc.status not in OPEN_STATES or (doc.status == "pending" and second):
 		return _denied(doc, "not_pending")
+	if doc.status == AWAITING and doc.user == user:
+		# The owner's second approval counts as one approval. The proposal waits on.
+		return _denied(doc, "second_approver_required")
 	if get_datetime(doc.expires_at) < now_datetime():
 		return _denied(doc, "expired", new_status="expired")
 	if not isinstance(digest, str) or not secrets.compare_digest(digest, doc.digest):
@@ -367,10 +517,15 @@ def _approve(proposal_id: str, digest: str) -> dict:
 	# execution time.
 	try:
 		spec = _run_preview(tool, arguments)
+	except frappe.PermissionError:
+		if second:
+			# The second person may not do this action. That person cannot end the owner's
+			# proposal: the proposal keeps waiting for another second person.
+			frappe.clear_messages()
+			_refuse(doc, "not_second_approver", _("You may not approve this proposal.", context=CONTEXT))
+		return _preview_refused(doc, "permission")
 	except ToolDenied as error:
 		return _preview_refused(doc, error.code)
-	except frappe.PermissionError:
-		return _preview_refused(doc, "permission")
 	except frappe.DoesNotExistError:
 		return _preview_refused(doc, "document_changed")
 	except frappe.ValidationError:
@@ -382,7 +537,37 @@ def _approve(proposal_id: str, digest: str) -> dict:
 		# The human approved another preview than the one the tool gives now. A new proposal
 		# and a new approval are needed.
 		return _denied(doc, "document_changed", new_status="rejected")
+	if needs_second_approval(doc) and doc.status == "pending":
+		return _await_second_approval(doc)
+	if doc.status == AWAITING:
+		doc.second_approver, doc.second_approved_at = user, now_datetime()
 	return _execute(doc, tool, arguments)
+
+
+def _refuse(doc, reason: str, message: str) -> None:
+	"""Log a denied approval of another user's proposal and answer 403. Nothing of it is returned."""
+	frappe.db.rollback()
+	_log("approve", doc, decision="denied", deny_reason=reason)
+	access.commit_own_writes()
+	raise frappe.PermissionError(message)
+
+
+def _await_second_approval(doc) -> dict:
+	"""Store the owner's first approval of an R3 proposal. Nothing runs now.
+
+	The preview above ran app code. Whatever it wrote is rolled back first, so the commit carries
+	only the proposal and its log row. The proposal is read again under its lock.
+	"""
+	frappe.db.rollback()
+	frappe.clear_messages()
+	doc = store.load_proposal(doc.name, for_update=True)
+	if doc.status != "pending":
+		return _denied(doc, "not_pending")
+	doc.status, doc.first_approved_at = AWAITING, now_datetime()
+	store.save_proposal(doc)
+	_log("approve", doc, decision="allowed")
+	access.commit_own_writes()
+	return {"executed": False, "deny_reason": None, "proposal": public(doc)}
 
 
 def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
@@ -413,17 +598,22 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	# its own `prepare` included. Such code may reach another system or commit. Every error
 	# below this line is `unknown`, whatever its type, `ToolDenied` included. A human resolves it.
 	# ---------------------------------------------------------------------------------------
+	from platform_core.ai import revert
+
 	try:
+		# The old values are read from the locked record just before the write (AJA-1002).
+		captured = revert.capture(tool, prepared) if tool.tool_class != "app" else None
 		if tool.tool_class == "app":
 			result = tool.handler(tool.prepare(**arguments)) if tool.prepare else tool.handler(**arguments)
 		else:
 			result = tool.handler(prepared)
+		touched = result.get("name") if isinstance(result, dict) else None
+		doc.result = "succeeded"
+		doc.result_document = str(touched) if touched else doc.target_name
+		revert.record_applied(doc, captured)
 	except Exception as error:
 		return _execution_error(doc, tool, error, result="unknown")
 
-	touched = result.get("name") if isinstance(result, dict) else None
-	doc.result = "succeeded"
-	doc.result_document = str(touched) if touched else doc.target_name
 	store.save_proposal(doc)
 	_log(
 		"execute",
@@ -496,7 +686,7 @@ def _error_text(tool: registry.AiTool, error: Exception) -> str:
 def reject(proposal_id: str) -> dict:
 	def run() -> dict:
 		doc = _own(proposal_id, for_update=True)
-		if doc.status != "pending":
+		if doc.status not in OPEN_STATES:
 			raise access.WrongState(_("Only a pending proposal can be rejected.", context=CONTEXT))
 		doc.status, doc.decided_at = "rejected", now_datetime()
 		store.save_proposal(doc)

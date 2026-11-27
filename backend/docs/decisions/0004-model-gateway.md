@@ -30,7 +30,7 @@ Ollama, yerel model sağlayıcısı olarak kalır.
 
 Tabloda `create` oluşturma, `delete` silme, `read` okuma, `write` yazma iznidir.
 İzin seviyesi 0 kayda, seviye 1 ise `api_key` parola alanına uygulanır.
-Alt tablo erişimini bağlı olduğu yol kaydından alır.
+Alt tablo erişimini bağlı olduğu üst kayıttan alır.
 
 | Kayıt türü | İzin seviyesi | Rol | İşlemler |
 | --- | --- | --- | --- |
@@ -41,7 +41,9 @@ Alt tablo erişimini bağlı olduğu yol kaydından alır.
 | `PLT AI Provider` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
 | `PLT AI Route` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
 | `PLT AI Usage Log` | 0 | PLT AI Manager, System Manager | read |
+| `PLT AI File Job` | 0 | PLT AI Manager, System Manager | read |
 | `PLT AI Route Target` | 0 | Yok | Yok |
+| `PLT AI File Chunk` | 0 | Yok | Yok |
 
 Orkestratör, D-10, 22 Kasım 2026 Pazar
 
@@ -60,6 +62,10 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | HTTP | `platform_core.api.model.provider_catalog` | Bağlantı formunun sağlayıcı tanımlarını ve alanlarını verir. |
 | HTTP | `platform_core.api.model.save_connection` | Alanları tanıma göre denetler. Yeni bağlantıyı kaydeder. Anahtarı şifreli alana yazar. Kullanıcı başına 60 saniyede 10 isteği kabul eder. |
 | HTTP | `platform_core.api.model.check_connection` | Model listesini okuyarak canlı deneme yapar. Sonucu kayda yazar. Kullanıcı başına 60 saniyede 10 isteği kabul eder. |
+| HTTP | `platform_core.api.model.create_file_job` | Büyük PDF işini açar. Yol ve dosya yetkisini denetler. Sağlayıcıyı çağırmaz. |
+| HTTP | `platform_core.api.model.file_job_status` | Parça planını, tahmini maliyeti ve parça durumlarını gösterir. Parça metnini vermez. |
+| HTTP | `platform_core.api.model.start_file_job` | Planlanmış işin parçalarını kuyruğa koyar. |
+| HTTP | `platform_core.api.model.retry_file_chunk` | Başarısız tek parçayı yeniden kuyruğa koyar. |
 | Bench | `platform_core.model_gateway.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
 | Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` ve `reconcile_stale_pending` araçlarını bildirir. |
 | Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |

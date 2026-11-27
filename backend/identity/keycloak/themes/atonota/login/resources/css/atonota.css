@@ -9,6 +9,15 @@
  */
 
 /* tokens:start */
+/*
+ * Ortak tasarım tokenları. Giriş ve hesap temaları bu bölümü birebir aynı taşır. Bir test iki bölümü karşılaştırır.
+ * Kaynak: atonota-web deposu, src/design/ klasörü, dal pc/aja997-tokenlar, commit d21799c (AJA-997).
+ * Keycloak teması o dosyayı içe aktaramaz. Değerler aynı adla, başına "at-" eklenerek buraya taşındı.
+ * Örneğin kaynaktaki --color-primary burada --at-color-primary olur.
+ * Kaynak değerler hesaplanır. Buradaki sayılar d21799c commit'inde css-variables.ts çıktısıdır.
+ * "taslak" yazan değerler kaynakta yoktur. Onlar onaylı taslaktan gelir: AJA-880, 3. sürüm.
+ */
+
 /* ---------- Yazı tipi: Outfit kendi sunucumuzdan gelir (SIL OFL 1.1, fonts/OFL.txt) ---------- */
 
 @font-face {
@@ -31,173 +40,236 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* ---------- Tokenlar ---------- */
-
 :root {
-  /* Renk: açık tema */
-  --at-color-page: #f3f1ec;
-  --at-color-surface: #ffffff;
-  --at-color-surface-sunken: #eef0f5;
-  --at-color-surface-sunken-hover: #e1e5ee;
-  --at-color-ink: #161d33;
-  --at-color-ink-soft: #4a5268;
-  --at-color-line: #7d8496;
-  --at-color-line-strong: #4a5268;
-  --at-color-action: #1f2f63;
-  --at-color-action-hover: #16224a;
-  --at-color-action-active: #0f1836;
-  --at-color-on-action: #ffffff;
-  --at-color-link: #24397d;
-  --at-color-link-hover: #131f4a;
-  --at-color-seal: #c2452d;
-  --at-color-danger: #a8261b;
-  --at-color-danger-surface: #fbecea;
-  --at-color-warning-surface: #fbf1dc;
-  --at-color-success-surface: #e6f3ec;
-  --at-color-info-surface: #e9edf8;
-  --at-color-focus: #161d33;
-  --at-color-masthead: #161d33;
-  --at-color-on-masthead: #ffffff;
-  --at-shadow-card: 0 1px 2px rgb(22 29 51 / 0.06), 0 12px 32px rgb(22 29 51 / 0.1);
+  /* Yazı. Kaynak: tokens.ts fontFamily ve typography. Boyutlar kaynakta px'tir.
+     Burada aynı değer rem ile yazılır: kullanıcının tarayıcı yazı boyutu korunur. 1rem = 16px. */
+  --at-font-ui: "Outfit Variable", Outfit, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --at-font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --at-font-min: 0.875rem; /* 14px */
+  --at-font-body: 1rem; /* 16px */
+  --at-font-h1: 1.625rem; /* 26px */
+  --at-font-h2: 1.25rem; /* 20px */
+  --at-font-h3: 1.125rem; /* 18px */
+  --at-line-height: 1.5; /* taslak --lh-body */
+  --at-line-height-tight: 1.25; /* taslak --lh-tight */
+  --at-font-weight-sm: 400;
+  --at-font-weight-md: 500;
+  --at-font-weight-lg: 600;
 
-  /* Yazı */
-  --at-font-text: "Outfit Variable", "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --at-text-sm: 0.875rem;
-  --at-text-md: 1rem;
-  --at-text-lg: 1.125rem;
-  --at-text-title: 1.5rem;
-  --at-text-brand: 1.375rem;
-  --at-leading: 1.5;
-  --at-leading-tight: 1.25;
-  --at-weight-regular: 400;
-  --at-weight-medium: 500;
-  --at-weight-bold: 600;
+  /* Kontrol yüksekliği. Kaynak: tokens.ts sizes.button. */
+  --at-control-h-sm: 36px;
+  --at-control-h-md: 42px;
+  --at-control-h-lg: 48px;
 
-  /* Boşluk */
-  --at-space-1: 0.25rem;
-  --at-space-2: 0.5rem;
-  --at-space-3: 0.75rem;
-  --at-space-4: 1rem;
-  --at-space-5: 1.5rem;
-  --at-space-6: 2rem;
-  --at-page-gutter: 0.75rem;
-  --at-card-padding: 1.25rem;
-  --at-card-width: 27rem;
+  /* Boşluk. Kaynak: tokens.ts space. */
+  --at-space-xxs: 4px;
+  --at-space-xs: 8px;
+  --at-space-sm: 12px;
+  --at-space-md: 16px;
+  --at-space-lg: 24px;
+  --at-space-xl: 32px;
+  --at-space-xxl: 48px;
 
-  /* Köşe ve kenarlık */
-  --at-radius-card: 1rem;
-  --at-radius-control: 0.625rem;
-  --at-border-control: 1px;
+  /* Yerleşim. Kaynak: tokens.ts layout ve radius. */
+  --at-form-max-width: 420px;
+  --at-card-padding: 24px;
+  --at-icon-size: 20px;
+  --at-radius: 5px;
+  --at-card-radius: 10px;
+  --at-border-width: 1px; /* tokens.ts border.width */
 
-  /* Etkili dokunma alanı. Görünen boyuttan ayrı bir tokendır. */
-  --at-hit: 2.75rem;
+  /* Dokunma alanı. Kaynak: tokens.ts hitTarget. Görünen boyuttan ayrıdır. */
+  --at-hit-target: 44px;
 
-  /* Odak göstergesi: öğenin altında düz ve kısa bir çizgi */
-  --at-focus-thickness: 3px;
-  --at-focus-gap: 2px;
-  --at-focus-underline-offset: 4px;
-  --at-link-underline-offset: 3px;
-  --at-brand-mark-size: 2rem;
-  --at-focus-bar:
-    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
-    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
+  /* Odak göstergesi. Kaynak: tokens.ts focusIndicator. Çevreleyen halka değildir, alt kenarda tek çizgidir. */
+  --at-focus-indicator-size: 2px;
 
-  /* Hareket */
-  --at-motion-duration: 160ms;
-  --at-motion-ease: cubic-bezier(.65, 0, .35, 1);
-  --at-motion-none: 0s;
+  /* Hareket. Kaynak: motion.ts. */
+  --at-motion-easing-standard: cubic-bezier(.65, 0, .35, 1);
+  --at-motion-duration-fast: 100ms;
+  --at-motion-duration-mid: 200ms;
+  --at-motion-duration-instant: 0ms;
+
+  /* Birincil renk. Kaynak: tokens.ts primary. #00aacc açık temada yazı rengi olmaz, yalnız düğme zeminidir. */
+  --at-color-primary: #00aacc;
+  --at-color-primary-hover: #00b2dd;
+  --at-color-primary-active: #00baee;
+  /* Açık temada birincil düğme zemini birincil renktir. Koyu temada kaynak ayrı bir düz zemin verir. */
+  --at-primary-bg: var(--at-color-primary);
+  --at-primary-bg-hover: var(--at-color-primary-hover);
+  --at-primary-bg-active: var(--at-color-primary-active);
+  --at-primary-text: rgba(0, 0, 0, 0.85);
+  --at-primary-text-hover: rgba(0, 0, 0, 1);
+
+  /* Zemin, metin ve çizgi: açık tema. Kaynak: tokens.ts palette.light ve link.light. */
+  --at-color-bg-layout: #f4f5f7;
+  --at-color-bg-panel: #ffffff;
+  --at-color-bg-panel-alt: #eef0f3;
+  --at-color-bg-elevated: #ffffff;
+  --at-color-bg-input: #ffffff;
+  --at-color-bg-button: #eef0f3;
+  --at-color-bg-button-hover: #e2e5ea;
+  --at-color-text: #1b1f24;
+  --at-color-text-quiet: #4b5563;
+  --at-color-line: #cfd4dc;
+  --at-color-ink: #006f86;
+  --at-color-tint: rgba(0, 170, 204, 0.12);
+  --at-color-ok: #166534;
+  --at-color-warn: #92400e;
+  --at-color-link: #006f86;
+  --at-color-link-hover: #006e89;
+  --at-color-link-active: #006e8e;
+  --at-focus-indicator-color: #006f86;
+  /* Hata yazısı. Kaynak: tokens.ts danger.light.color (antd colorError, 4.5:1 için koyulaştırılmış). */
+  --at-color-error: #ab3335;
+  /* Durum zeminleri. Kaynakta yok. Değerler taslaktan: --ok-tint, --warn-tint, --danger-tint. */
+  --at-color-ok-tint: rgba(21, 128, 61, 0.12);
+  --at-color-warn-tint: rgba(180, 83, 9, 0.12);
+  --at-color-error-tint: rgba(185, 28, 28, 0.1);
+
+  /* Gölge. Kaynak: tokens.ts shadows.light. */
+  --at-shadow-card: 0.13px 0.13px 0.19px 0 rgba(11, 18, 32, 0.01), 0.27px 0.27px 0.38px 0 rgba(11, 18, 32, 0.01),
+    0.53px 0.53px 0.75px 0 rgba(11, 18, 32, 0.01), 1.06px 1.06px 1.5px 0 rgba(11, 18, 32, 0.01),
+    2.12px 2.12px 3px 0 rgba(11, 18, 32, 0.01), 4.24px 4.24px 6px 0 rgba(11, 18, 32, 0.01),
+    8.49px 8.49px 12px 0 rgba(11, 18, 32, 0.01);
+  --at-shadow-dropdown: 0px 0.06px 0.14px 0 rgba(11, 18, 32, 0.02), 0px 0.13px 0.28px 0 rgba(11, 18, 32, 0.02),
+    0px 0.25px 0.56px 0 rgba(11, 18, 32, 0.02), 0px 0.5px 1.13px 0 rgba(11, 18, 32, 0.02),
+    0px 1px 2.25px 0 rgba(11, 18, 32, 0.02), 0px 2px 4.5px 0 rgba(11, 18, 32, 0.02),
+    0px 4px 9px 0 rgba(11, 18, 32, 0.02), 0px 8px 18px 0 rgba(11, 18, 32, 0.02),
+    0px 16px 36px 0 rgba(11, 18, 32, 0.02);
 }
 
+/* Koyu tema. Keycloak bu sınıfı işletim sistemi koyu temadayken ekler. Kaynak: tokens.ts darkVariables. */
 :root.pf-v5-theme-dark {
-  --at-color-page: #0e1322;
-  --at-color-surface: #1a2036;
-  --at-color-surface-sunken: #262d47;
-  --at-color-surface-sunken-hover: #323a58;
-  --at-color-ink: #eef0f6;
-  --at-color-ink-soft: #b9bfd0;
-  --at-color-line: #8089a1;
-  --at-color-line-strong: #b9bfd0;
-  --at-color-action: #c9d3ff;
-  --at-color-action-hover: #dde3ff;
-  --at-color-action-active: #ffffff;
-  --at-color-on-action: #10172e;
-  --at-color-link: #bcc8ff;
-  --at-color-link-hover: #e0e6ff;
-  --at-color-seal: #ff8a6b;
-  --at-color-danger: #ffa799;
-  --at-color-danger-surface: #43201f;
-  --at-color-warning-surface: #3d3219;
-  --at-color-success-surface: #1b3a2c;
-  --at-color-info-surface: #252e52;
-  --at-color-focus: #ffffff;
-  --at-color-masthead: #1a2036;
-  --at-color-on-masthead: #eef0f6;
-  --at-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+  /* Koyu temada birincil düğme düz zemindir. Kaynak: tokens.ts primary.dark. */
+  --at-primary-bg: #142c33;
+  --at-primary-bg-hover: #123741;
+  --at-primary-bg-active: #123943;
+  --at-primary-text: rgba(0, 170, 204, 0.89);
+  --at-primary-text-hover: rgba(0, 170, 204, 1);
+
+  --at-color-bg-layout: #17171a;
+  --at-color-bg-panel: #1f1f23;
+  --at-color-bg-panel-alt: #2a2a30;
+  --at-color-bg-elevated: #2a2a30;
+  --at-color-bg-input: #141418;
+  --at-color-bg-button: #34343b;
+  --at-color-bg-button-hover: #3f3f47;
+  --at-color-text: #ececf0;
+  --at-color-text-quiet: #a8a8b3;
+  --at-color-line: #3a3a42;
+  --at-color-ink: #16b1d0;
+  --at-color-tint: rgba(0, 170, 204, 0.14);
+  --at-color-ok: #4ade80;
+  --at-color-warn: #fbbf24;
+  --at-color-link: #16b1d0;
+  --at-color-link-hover: #00b2dd;
+  --at-color-link-active: #00baee;
+  --at-focus-indicator-color: #16b1d0;
+  /* Kaynak: tokens.ts danger.dark.color. */
+  --at-color-error: #e88182;
+  /* Taslaktaki koyu tema değerleri. */
+  --at-color-ok-tint: rgba(74, 222, 128, 0.12);
+  --at-color-warn-tint: rgba(251, 191, 36, 0.12);
+  --at-color-error-tint: rgba(248, 113, 113, 0.12);
+
+  /* Kaynak: tokens.ts shadows.dark. */
+  --at-shadow-card: 0.13px 0.13px 0.19px 0 rgba(0, 0, 0, 0.03), 0.27px 0.27px 0.38px 0 rgba(0, 0, 0, 0.03),
+    0.53px 0.53px 0.75px 0 rgba(0, 0, 0, 0.03), 1.06px 1.06px 1.5px 0 rgba(0, 0, 0, 0.03),
+    2.12px 2.12px 3px 0 rgba(0, 0, 0, 0.03), 4.24px 4.24px 6px 0 rgba(0, 0, 0, 0.03),
+    8.49px 8.49px 12px 0 rgba(0, 0, 0, 0.03);
+  --at-shadow-dropdown: 0px 0.06px 0.14px 0 rgba(0, 0, 0, 0.05), 0px 0.13px 0.28px 0 rgba(0, 0, 0, 0.05),
+    0px 0.25px 0.56px 0 rgba(0, 0, 0, 0.05), 0px 0.5px 1.13px 0 rgba(0, 0, 0, 0.05),
+    0px 1px 2.25px 0 rgba(0, 0, 0, 0.05), 0px 2px 4.5px 0 rgba(0, 0, 0, 0.05),
+    0px 4px 9px 0 rgba(0, 0, 0, 0.05), 0px 8px 18px 0 rgba(0, 0, 0, 0.05),
+    0px 16px 36px 0 rgba(0, 0, 0, 0.05);
 }
 
-@media (min-width: 30rem) {
-  :root {
-    --at-page-gutter: 1.5rem;
-    --at-card-padding: 2rem;
-    --at-text-title: 1.75rem;
-  }
-}
-
+/* Dokunmatik ekranda dokunma alanı büyür. Kaynak: tokens.ts hitTarget.coarse. Görünen kontrol boyutu değişmez. */
 @media (any-pointer: coarse) {
   :root {
-    --at-hit: 3rem;
+    --at-hit-target: 48px;
   }
 }
 
+/* Azaltılmış hareket: süreler sıfır olur. Kaynak: motion.ts instantMs. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --at-motion-duration-fast: 0ms;
+    --at-motion-duration-mid: 0ms;
+  }
+}
 /* tokens:end */
 
-/* Login-only layout tokens. */
+/*
+ * Yalnız giriş temasının tokenları. Ortak bölümde yoktur, çünkü hesap teması bunları kullanmaz.
+ * Değerler ortak tokenlardan türer ya da taslaktan gelir (AJA-880, 3. sürüm, "Giriş" bölümü).
+ */
 :root {
   --at-recovery-code-column: 16ch;
   --at-checkbox-box: 1.25rem;
+  /* Taslak: .login-card iç boşluğu. Dikeyde 32px, yatayda 24px. Dar ekranda 24px ve 16px. */
+  --at-card-padding-block: var(--at-space-xl);
+  --at-card-padding-inline: var(--at-card-padding);
+  /* Taslak: .login-brand .mark 2.25rem kare. */
+  --at-brand-mark-size: 2.25rem;
+  /* Bağlantı alt çizgisi ve odak çizgisi metinden bu kadar aşağıdadır. */
+  --at-link-underline-offset: 0.2em;
+  --at-focus-underline-offset: 0.2em;
+  /* Odak çizgisi ile öğe arasındaki boşluk. Çizgi köşelere değmez, öğeyi çevrelemez. */
+  --at-focus-gap: 2px;
+  --at-focus-bar:
+    0 calc(var(--at-radius) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius)) var(--at-color-bg-panel),
+    0 calc(var(--at-radius) + var(--at-focus-gap) + var(--at-focus-indicator-size)) 0 calc(-1 * var(--at-radius)) var(--at-focus-indicator-color);
+}
+
+@media (max-width: 30rem) {
+  :root {
+    --at-card-padding-block: var(--at-space-lg);
+    --at-card-padding-inline: var(--at-space-md);
+  }
 }
 
 /* PatternFly değişkenleri Atonota tokenlarına bağlanır. Böylece temel bileşenler de aynı kimliği taşır. */
 :root,
 :root.pf-v5-theme-dark {
-  --pf-v5-global--FontFamily--text: var(--at-font-text);
-  --pf-v5-global--FontFamily--heading: var(--at-font-text);
-  --pf-v5-global--FontFamily--text--vf: var(--at-font-text);
-  --pf-v5-global--FontFamily--heading--vf: var(--at-font-text);
-  --pf-v5-global--FontFamily--monospace: var(--at-font-mono);
-  --pf-v5-global--FontFamily--monospace--vf: var(--at-font-mono);
-  --pf-v5-global--FontSize--xs: var(--at-text-sm);
-  --pf-v5-global--FontSize--sm: var(--at-text-sm);
-  --pf-v5-global--FontSize--md: var(--at-text-md);
-  --pf-v5-global--Color--100: var(--at-color-ink);
-  --pf-v5-global--Color--200: var(--at-color-ink-soft);
-  --pf-v5-global--BackgroundColor--100: var(--at-color-surface);
-  --pf-v5-global--BackgroundColor--200: var(--at-color-surface-sunken);
+  --pf-v5-global--FontFamily--text: var(--at-font-ui);
+  --pf-v5-global--FontFamily--heading: var(--at-font-ui);
+  --pf-v5-global--FontFamily--text--vf: var(--at-font-ui);
+  --pf-v5-global--FontFamily--heading--vf: var(--at-font-ui);
+  --pf-v5-global--FontFamily--monospace: var(--at-font-code);
+  --pf-v5-global--FontFamily--monospace--vf: var(--at-font-code);
+  --pf-v5-global--FontSize--xs: var(--at-font-min);
+  --pf-v5-global--FontSize--sm: var(--at-font-min);
+  --pf-v5-global--FontSize--md: var(--at-font-body);
+  --pf-v5-global--Color--100: var(--at-color-text);
+  --pf-v5-global--Color--200: var(--at-color-text-quiet);
+  --pf-v5-global--BackgroundColor--100: var(--at-color-bg-panel);
+  --pf-v5-global--BackgroundColor--200: var(--at-color-bg-panel-alt);
   --pf-v5-global--BorderColor--100: var(--at-color-line);
   --pf-v5-global--BorderColor--200: var(--at-color-line);
   --pf-v5-global--BorderColor--300: var(--at-color-line);
-  --pf-v5-global--primary-color--100: var(--at-color-action);
-  --pf-v5-global--primary-color--200: var(--at-color-action-hover);
+  --pf-v5-global--primary-color--100: var(--at-primary-bg);
+  --pf-v5-global--primary-color--200: var(--at-primary-bg-hover);
   --pf-v5-global--link--Color: var(--at-color-link);
   --pf-v5-global--link--Color--hover: var(--at-color-link-hover);
-  --pf-v5-global--danger-color--100: var(--at-color-danger);
-  --pf-v5-global--danger-color--200: var(--at-color-danger);
-  --pf-v5-global--BorderRadius--sm: var(--at-radius-control);
+  --pf-v5-global--danger-color--100: var(--at-color-error);
+  --pf-v5-global--danger-color--200: var(--at-color-error);
+  --pf-v5-global--BorderRadius--sm: var(--at-radius);
   /* Temel temanın "transition: all" ve 250 ms değeri merkezi tokenlara bağlanır. */
-  --pf-v5-global--TransitionDuration: var(--at-motion-duration);
-  --pf-v5-global--TimingFunction: var(--at-motion-ease);
-  --pf-v5-global--Transition: background-color var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-global--TransitionDuration: var(--at-motion-duration-mid);
+  --pf-v5-global--TimingFunction: var(--at-motion-easing-standard);
+  --pf-v5-global--Transition: background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* ---------- Sayfa ve kart ---------- */
 
 .login-pf body {
-  background: var(--at-color-page);
-  color: var(--at-color-ink);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  line-height: var(--at-leading);
+  background: var(--at-color-bg-layout);
+  color: var(--at-color-text);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  line-height: var(--at-line-height);
   min-height: 100dvh;
   height: auto;
   overflow-wrap: break-word;
@@ -208,14 +280,14 @@
   justify-content: center;
   align-items: flex-start;
   min-height: 100dvh;
-  padding: var(--at-space-5) var(--at-page-gutter) var(--at-space-6);
-  padding-inline: max(var(--at-page-gutter), env(safe-area-inset-left)) max(var(--at-page-gutter), env(safe-area-inset-right));
+  padding: var(--at-space-lg) var(--at-space-md);
+  padding-inline: max(var(--at-space-md), env(safe-area-inset-left)) max(var(--at-space-md), env(safe-area-inset-right));
 }
 
 .pf-v5-c-login__container {
   display: block;
   width: 100%;
-  max-width: var(--at-card-width);
+  max-width: var(--at-form-max-width);
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -227,64 +299,65 @@
   }
 }
 
-.pf-v5-c-login__header {
-  padding: 0;
-  margin: 0 0 var(--at-space-4);
-}
-
 .at-brand,
 #kc-header-wrapper.at-brand {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--at-space-2);
-  padding: 0 var(--at-space-1);
+  gap: var(--at-space-xs);
+  padding: 0;
+  margin: 0 0 var(--at-space-lg);
   /* !important: without it the base theme colours the brand name and the contrast test fails. */
-  color: var(--at-color-ink) !important;
-  font-size: var(--at-text-brand);
-  font-weight: var(--at-weight-bold);
+  color: var(--at-color-text) !important;
+  font-size: var(--at-font-h2);
+  font-weight: var(--at-font-weight-lg);
   letter-spacing: 0;
-  line-height: var(--at-leading-tight);
+  line-height: var(--at-line-height-tight);
   text-align: start;
   text-transform: none;
 }
 
 .at-brand__mark {
   flex: none;
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
+  display: grid;
+  place-items: center;
+  inline-size: var(--at-brand-mark-size);
+  block-size: var(--at-brand-mark-size);
+  border-radius: var(--at-radius);
+  background: var(--at-primary-bg);
+  color: var(--at-primary-text);
 }
 
-.at-brand__ring {
-  stroke: var(--at-color-ink);
-}
-
-.at-brand__dot {
-  fill: var(--at-color-seal);
+.at-brand__name {
+  min-inline-size: 0;
 }
 
 .pf-v5-c-login__main {
-  background: var(--at-color-surface);
-  border-radius: var(--at-radius-card);
+  background: var(--at-color-bg-panel);
+  border-radius: var(--at-radius);
   box-shadow: var(--at-shadow-card);
   margin: 0;
+}
+
+.pf-v5-c-login__main {
+  padding: var(--at-card-padding-block) var(--at-card-padding-inline);
 }
 
 .pf-v5-c-login__main-header {
   display: block;
   border: 0;
-  padding: var(--at-card-padding) var(--at-card-padding) var(--at-space-4);
+  padding: 0 0 var(--at-space-md);
 }
 
 .pf-v5-c-login__main-header .pf-v5-c-title {
-  color: var(--at-color-ink);
-  font-size: var(--at-text-title);
-  font-weight: var(--at-weight-bold);
-  line-height: var(--at-leading-tight);
+  color: var(--at-color-text);
+  font-size: var(--at-font-h1);
+  font-weight: var(--at-font-weight-lg);
+  line-height: var(--at-line-height-tight);
 }
 
 .pf-v5-c-login__main-body {
-  padding: 0 var(--at-card-padding) var(--at-card-padding);
+  padding: 0;
 }
 
 .pf-v5-c-login__main-footer {
@@ -295,12 +368,12 @@
 .pf-v5-c-login__main-footer-band {
   background: transparent;
   border: 0;
-  padding: var(--at-space-4) 0 0;
+  padding: var(--at-space-md) 0 0;
   text-align: start;
 }
 
 .pf-v5-c-login__main-footer-band:first-child {
-  margin-block-start: var(--at-space-2);
+  margin-block-start: var(--at-space-xs);
 }
 
 .pf-v5-c-login__main-footer-band-item {
@@ -310,54 +383,63 @@
 /* ---------- Metin ve bağlantı ---------- */
 
 .login-pf .pf-v5-u-font-size-sm,
-.login-pf .pf-v5-c-helper-text__item-text,
+.login-pf .pf-v5-c-helper-text__item-text {
+  font-size: var(--at-font-min);
+}
+
+/* Taslak: alan etiketi gövde boyutunda ve orta kalınlıktadır (.field > label). */
 .login-pf .pf-v5-c-form__label {
-  font-size: var(--at-text-sm);
+  font-size: var(--at-font-body);
 }
 
 .login-pf .pf-v5-u-color-200 {
   /* !important: the base theme sets this with a utility class that uses !important. */
-  color: var(--at-color-ink-soft) !important;
+  color: var(--at-color-text-quiet) !important;
 }
 
 .login-pf .pf-v5-c-form__label-text {
-  color: var(--at-color-ink);
-  font-weight: var(--at-weight-medium);
+  color: var(--at-color-text);
+  font-weight: var(--at-font-weight-md);
 }
 
 .login-pf a:not([class*="c-button"]) {
   color: var(--at-color-link);
-  font-weight: var(--at-weight-medium);
+  font-weight: var(--at-font-weight-md);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: var(--at-link-underline-offset);
-  transition: color var(--at-motion-duration) var(--at-motion-ease);
+  transition: color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .login-pf a:not([class*="c-button"]):hover {
   color: var(--at-color-link-hover);
 }
 
-/* Tek başına duran bağlantılar dokunma alanını doldurur. */
+/* Tek başına duran bağlantılar dokunma alanını doldurur. Dokunmatik ekranda bu alan 48px olur. */
+.login-pf .at-forgot {
+  margin: 0;
+}
+
+.login-pf .at-forgot a,
 .login-pf .pf-v5-c-helper-text a,
 .login-pf #kc-registration a,
 .at-locale__link {
   display: inline-flex;
   align-items: center;
-  min-block-size: var(--at-hit);
+  min-block-size: var(--at-hit-target);
 }
 
 .login-pf #kc-registration {
-  color: var(--at-color-ink-soft);
+  color: var(--at-color-text-quiet);
 }
 
 .login-pf .pf-v5-c-list {
-  padding-inline-start: var(--at-space-5);
+  padding-inline-start: var(--at-space-lg);
 }
 
 #kc-totp-secret-key {
-  font-family: var(--at-font-mono);
-  font-size: var(--at-text-md);
+  font-family: var(--at-font-code);
+  font-size: var(--at-font-body);
   letter-spacing: 0.04em;
 }
 
@@ -368,10 +450,10 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0 var(--at-space-4);
-  background: var(--at-color-surface-sunken);
-  border-radius: var(--at-radius-control);
-  padding: var(--at-space-2) var(--at-space-3);
+  gap: 0 var(--at-space-md);
+  background: var(--at-color-bg-panel-alt);
+  border-radius: var(--at-radius);
+  padding: var(--at-space-xs) var(--at-space-sm);
 }
 
 .at-attempted__text {
@@ -380,27 +462,27 @@
 }
 
 .at-attempted__label {
-  color: var(--at-color-ink-soft);
-  font-size: var(--at-text-sm);
+  color: var(--at-color-text-quiet);
+  font-size: var(--at-font-min);
 }
 
 .at-attempted__value {
-  color: var(--at-color-ink);
-  font-weight: var(--at-weight-medium);
+  color: var(--at-color-text);
+  font-weight: var(--at-font-weight-md);
   min-inline-size: 0;
 }
 
 .login-pf a.at-attempted__restart {
   display: inline-flex;
   align-items: center;
-  min-block-size: var(--at-hit);
-  font-size: var(--at-text-sm);
+  min-block-size: var(--at-hit-target);
+  font-size: var(--at-font-min);
 }
 
 /* Temel tema bu boşluğu yalnız geniş ekranda verir. Dar ekranda da bölümler ayrı durur. */
 .login-pf .pf-v5-u-mb-md-on-md {
   /* !important: the base theme sets this with a utility class that uses !important. */
-  margin-block-end: var(--at-space-4) !important;
+  margin-block-end: var(--at-space-md) !important;
 }
 
 /* Parola sıfırlamada açıklama formun üstünde görünür. Açıklamada odaklanan öğe yoktur. */
@@ -411,7 +493,7 @@
 
 [data-page-id="login-login-reset-password"] .pf-v5-c-login__main-body > .pf-v5-c-login__main-footer {
   order: -1;
-  margin-block-end: var(--at-space-4);
+  margin-block-end: var(--at-space-md);
 }
 
 [data-page-id="login-login-reset-password"] .pf-v5-c-login__main-footer-band {
@@ -420,20 +502,20 @@
 }
 
 .login-pf .at-intro {
-  color: var(--at-color-ink-soft);
-  margin-block-end: var(--at-space-4);
+  color: var(--at-color-text-quiet);
+  margin-block-end: var(--at-space-md);
 }
 
 /* Bazı temel şablonlarda etiket alanına değer. Etiket ile alan arasına boşluk konur. */
 .login-pf .pf-v5-c-form__group > .pf-v5-c-form__label {
   display: block;
-  margin-block-end: var(--at-space-1);
+  margin-block-end: var(--at-space-xxs);
 }
 
 /* ---------- Form alanı ---------- */
 
 .login-pf .pf-v5-c-form {
-  gap: var(--at-space-4);
+  gap: var(--at-space-md);
 }
 
 /* Izgara ve esnek kutu öğeleri içeriğinden dar olabilir. Böylece büyük yazıda sayfa taşmaz. */
@@ -447,13 +529,13 @@
 }
 
 .login-pf .pf-v5-c-form-control {
-  --pf-v5-c-form-control--FontSize: var(--at-text-md);
-  background: var(--at-color-surface);
-  border: var(--at-border-control) solid var(--at-color-line);
-  border-radius: var(--at-radius-control);
-  color: var(--at-color-ink);
-  min-block-size: var(--at-hit);
-  transition: border-color var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-form-control--FontSize: var(--at-font-body);
+  background: var(--at-color-bg-input);
+  border: var(--at-border-width) solid var(--at-color-line);
+  border-radius: var(--at-radius);
+  color: var(--at-color-text);
+  min-block-size: var(--at-hit-target);
+  transition: border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 /* Temel tema kenarlığı sözde öğelerle çizer ve odakta alt çizgiyi kalınlaştırır. Bu çizim kapatılır. */
@@ -463,13 +545,13 @@
 }
 
 .login-pf .pf-v5-c-form-control:hover {
-  border-color: var(--at-color-line-strong);
+  border-color: var(--at-color-text-quiet);
 }
 
 /* Hata sınırı dört kenardadır. Kayıt formundaki alanlar hatayı yalnız aria-invalid ile bildirir. */
 .login-pf .pf-v5-c-form-control.pf-m-error,
 .login-pf .pf-v5-c-form-control:has(> input[aria-invalid="true"]) {
-  border-color: var(--at-color-danger);
+  border-color: var(--at-color-error);
 }
 
 /* Kayıt formunda giriş alanı da aynı sınıfı taşır. İç alan ikinci bir çerçeve çizmez. */
@@ -479,56 +561,90 @@
 }
 
 .login-pf .pf-v5-c-form-control.pf-m-readonly {
-  background: var(--at-color-surface-sunken);
+  background: var(--at-color-bg-panel-alt);
 }
 
 .login-pf .pf-v5-c-form-control > input {
-  border-radius: var(--at-radius-control);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  min-block-size: var(--at-hit);
-  padding-inline: var(--at-space-3);
+  border-radius: var(--at-radius);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  min-block-size: var(--at-hit-target);
+  padding-inline: var(--at-space-sm);
 }
 
 .login-pf .pf-v5-c-form-control__icon.pf-m-status {
-  color: var(--at-color-danger);
+  color: var(--at-color-error);
 }
 
 .login-pf .pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text,
 .login-pf .kc-feedback-text.pf-m-error {
-  color: var(--at-color-danger);
-  font-weight: var(--at-weight-medium);
+  color: var(--at-color-error);
+  font-weight: var(--at-font-weight-md);
 }
 
 .login-pf label.pf-v5-c-check {
   align-content: center;
   align-items: center;
-  min-block-size: var(--at-hit);
+  min-block-size: var(--at-hit-target);
 }
 
 .login-pf .pf-v5-c-check__input {
-  accent-color: var(--at-color-action);
+  accent-color: var(--at-primary-bg);
   inline-size: var(--at-checkbox-box);
   block-size: var(--at-checkbox-box);
 }
 
+/*
+ * Parola alanı ve "Parolayı göster" düğmesi. Taslakta düğme alanın içinde, sağ uçtadır (.pw-wrap).
+ * Alanın yazısı düğmenin altına girmez.
+ */
 .login-pf .pf-v5-c-input-group {
-  gap: var(--at-space-2);
+  position: relative;
+  gap: 0;
+}
+
+/* Yazı düğmenin altına girmez. Hata simgesi de düğmenin solunda kalır. */
+.login-pf .pf-v5-c-input-group:has(> .pf-v5-c-input-group__item > [data-password-toggle]) .pf-v5-c-form-control > input {
+  padding-inline-end: calc(var(--at-hit-target) + var(--at-space-xs));
+}
+
+.login-pf .pf-v5-c-input-group:has(> .pf-v5-c-input-group__item > [data-password-toggle]) .pf-v5-c-form-control__utilities {
+  margin-inline-end: var(--at-hit-target);
+}
+
+.login-pf .pf-v5-c-input-group__item:has(> [data-password-toggle]) {
+  /* Temel temanın koyu kipi bu öğeye sol kenarlık çizer. Düğme alanın içinde olduğu için çizgi kalkar. */
+  border: 0;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  align-items: center;
+}
+
+.login-pf .pf-v5-c-button.pf-m-control[data-password-toggle] {
+  background: transparent;
+  color: var(--at-color-text-quiet);
+}
+
+.login-pf .pf-v5-c-button.pf-m-control[data-password-toggle]:hover {
+  background: var(--at-color-bg-button);
+  color: var(--at-color-text);
 }
 
 /* ---------- Düğme ---------- */
 
 .login-pf .pf-v5-c-button {
-  border: var(--at-border-control) solid transparent;
-  border-radius: var(--at-radius-control);
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
-  font-weight: var(--at-weight-bold);
-  line-height: var(--at-leading-tight);
-  min-block-size: var(--at-hit);
-  min-inline-size: var(--at-hit);
+  border: var(--at-border-width) solid transparent;
+  border-radius: var(--at-radius);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
+  font-weight: var(--at-font-weight-md);
+  line-height: var(--at-line-height-tight);
+  min-block-size: var(--at-hit-target);
+  min-inline-size: var(--at-hit-target);
   max-inline-size: 100%;
-  padding-inline: var(--at-space-3);
+  padding-inline: var(--at-space-sm);
   white-space: normal;
   display: inline-flex;
   align-items: center;
@@ -536,9 +652,9 @@
   text-align: center;
   text-decoration: none;
   transition:
-    background-color var(--at-motion-duration) var(--at-motion-ease),
-    border-color var(--at-motion-duration) var(--at-motion-ease),
-    color var(--at-motion-duration) var(--at-motion-ease);
+    background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    border-color var(--at-motion-duration-mid) var(--at-motion-easing-standard),
+    color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .login-pf .pf-v5-c-button.pf-m-block {
@@ -552,39 +668,40 @@
 }
 
 .login-pf .pf-v5-c-button.pf-m-primary {
-  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action);
-  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-color-action-hover);
-  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-color-action);
-  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-color-action-active);
-  --pf-v5-c-button--m-primary--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--focus--Color: var(--at-color-on-action);
-  --pf-v5-c-button--m-primary--active--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-primary-bg);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-primary-bg-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-primary-bg);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-primary-bg-active);
+  --pf-v5-c-button--m-primary--Color: var(--at-primary-text);
+  --pf-v5-c-button--m-primary--hover--Color: var(--at-primary-text-hover);
+  --pf-v5-c-button--m-primary--focus--Color: var(--at-primary-text);
+  --pf-v5-c-button--m-primary--active--Color: var(--at-primary-text-hover);
 }
 
 .login-pf .pf-v5-c-button.pf-m-primary:focus:hover {
-  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action-hover);
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-primary-bg-hover);
 }
 
+/* Taslak: ikincil düğme dolgulu bir yüzeydir, kenarlığı yoktur (.btn). */
 .login-pf .pf-v5-c-button.pf-m-secondary,
 .login-pf .pf-v5-c-button.pf-m-tertiary {
-  background: transparent;
-  border-color: var(--at-color-line);
-  color: var(--at-color-ink);
+  background: var(--at-color-bg-button);
+  border-color: transparent;
+  color: var(--at-color-text);
 }
 
 .login-pf .pf-v5-c-button.pf-m-secondary:hover,
 .login-pf .pf-v5-c-button.pf-m-tertiary:hover {
-  background: var(--at-color-surface-sunken);
-  border-color: var(--at-color-line-strong);
-  color: var(--at-color-ink);
+  background: var(--at-color-bg-button-hover);
+  border-color: transparent;
+  color: var(--at-color-text);
 }
 
 /* Make room for an entire recovery code before adding another column. */
 .login-pf #kc-recovery-codes-list {
   column-count: auto;
   column-width: var(--at-recovery-code-column);
-  column-gap: var(--at-space-5);
+  column-gap: var(--at-space-lg);
 }
 
 .login-pf #kc-recovery-codes-list > li {
@@ -597,28 +714,28 @@
  */
 .login-pf .at-logout-scopes {
   display: grid;
-  gap: var(--at-space-6);
-  margin: var(--at-space-5) 0 0;
+  gap: var(--at-space-xl);
+  margin: var(--at-space-lg) 0 0;
   padding: 0;
   list-style: none;
 }
 
 .login-pf .at-logout-scope {
   display: grid;
-  gap: var(--at-space-2);
+  gap: var(--at-space-xs);
   margin: 0;
 }
 
 .login-pf .at-logout-scope-title {
   margin: 0;
-  font-size: var(--at-text-lg);
-  font-weight: var(--at-weight-bold);
-  color: var(--at-color-ink);
+  font-size: var(--at-font-h3);
+  font-weight: var(--at-font-weight-lg);
+  color: var(--at-color-text);
 }
 
 .login-pf .at-logout-scope-text {
   margin: 0;
-  font-size: var(--at-text-md);
+  font-size: var(--at-font-body);
 }
 
 .login-pf .at-logout-scope .form-actions,
@@ -627,7 +744,7 @@
 }
 
 .login-pf .at-logout-scope .pf-v5-c-button {
-  margin-block-start: var(--at-space-2);
+  margin-block-start: var(--at-space-xs);
   white-space: normal;
 }
 
@@ -642,29 +759,29 @@
   --pf-v5-c-button--m-link--focus--Color: var(--at-color-link);
   --pf-v5-c-button--m-link--focus--BackgroundColor: transparent;
   --pf-v5-c-button--m-link--hover--Color: var(--at-color-link-hover);
-  --pf-v5-c-button--m-link--hover--BackgroundColor: var(--at-color-surface-sunken);
+  --pf-v5-c-button--m-link--hover--BackgroundColor: var(--at-color-bg-panel-alt);
   --pf-v5-c-button--m-link--active--Color: var(--at-color-link-hover);
-  --pf-v5-c-button--m-link--active--BackgroundColor: var(--at-color-surface-sunken-hover);
+  --pf-v5-c-button--m-link--active--BackgroundColor: var(--at-color-bg-button-hover);
 }
 
 .login-pf .pf-v5-c-button.pf-m-control {
-  background: var(--at-color-surface-sunken);
-  color: var(--at-color-ink);
+  background: var(--at-color-bg-panel-alt);
+  color: var(--at-color-text);
 }
 
 .login-pf .pf-v5-c-button.pf-m-control:hover {
-  background: var(--at-color-surface-sunken-hover);
+  background: var(--at-color-bg-button-hover);
 }
 
 .login-pf .pf-v5-c-button:disabled,
 .login-pf .pf-v5-c-button.pf-m-aria-disabled {
-  background: var(--at-color-surface-sunken);
+  background: var(--at-color-bg-panel-alt);
   border-color: transparent;
-  color: var(--at-color-ink-soft);
+  color: var(--at-color-text-quiet);
 }
 
 .login-pf .pf-v5-c-form__actions {
-  gap: var(--at-space-3);
+  gap: var(--at-space-sm);
   margin: 0;
 }
 
@@ -676,35 +793,35 @@
 
 .login-pf .pf-v5-c-alert {
   --pf-v5-c-alert--BoxShadow: none;
-  background: var(--at-color-info-surface);
+  background: var(--at-color-tint);
   border: 0;
-  border-radius: var(--at-radius-control);
+  border-radius: var(--at-radius);
   box-shadow: none;
-  color: var(--at-color-ink);
-  padding: var(--at-space-3) var(--at-space-4);
+  color: var(--at-color-text);
+  padding: var(--at-space-sm) var(--at-space-md);
 }
 
 .login-pf .pf-v5-c-alert.pf-m-danger {
-  background: var(--at-color-danger-surface);
+  background: var(--at-color-error-tint);
 }
 
 .login-pf .pf-v5-c-alert.pf-m-warning {
-  background: var(--at-color-warning-surface);
+  background: var(--at-color-warn-tint);
 }
 
 .login-pf .pf-v5-c-alert.pf-m-success {
-  background: var(--at-color-success-surface);
+  background: var(--at-color-ok-tint);
 }
 
 .login-pf .pf-v5-c-alert__icon,
 .login-pf .pf-v5-c-alert__title {
-  color: var(--at-color-ink);
-  font-size: var(--at-text-md);
-  font-weight: var(--at-weight-medium);
+  color: var(--at-color-text);
+  font-size: var(--at-font-body);
+  font-weight: var(--at-font-weight-md);
 }
 
 .login-pf .pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__icon {
-  color: var(--at-color-danger);
+  color: var(--at-color-error);
 }
 
 /* ---------- Giriş yolu seçenekleri ve bağlantı listesi ---------- */
@@ -712,7 +829,7 @@
 .at-choice-list,
 .at-link-list {
   display: grid;
-  gap: var(--at-space-3);
+  gap: var(--at-space-sm);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -722,58 +839,58 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--at-space-3);
+  gap: var(--at-space-sm);
   inline-size: 100%;
-  min-block-size: var(--at-hit);
-  padding: var(--at-space-3);
-  background: var(--at-color-surface-sunken);
+  min-block-size: var(--at-hit-target);
+  padding: var(--at-space-sm);
+  background: var(--at-color-bg-panel-alt);
   border: 0;
-  border-radius: var(--at-radius-control);
-  color: var(--at-color-ink);
+  border-radius: var(--at-radius);
+  color: var(--at-color-text);
   cursor: pointer;
-  font-family: var(--at-font-text);
-  font-size: var(--at-text-md);
+  font-family: var(--at-font-ui);
+  font-size: var(--at-font-body);
   text-align: start;
-  transition: background-color var(--at-motion-duration) var(--at-motion-ease);
+  transition: background-color var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .at-choice:hover {
-  background: var(--at-color-surface-sunken-hover);
+  background: var(--at-color-bg-button-hover);
 }
 
 .at-choice__text {
   display: grid;
-  gap: var(--at-space-1);
+  gap: var(--at-space-xxs);
 }
 
 .at-choice__title {
-  font-weight: var(--at-weight-bold);
+  font-weight: var(--at-font-weight-lg);
 }
 
 .at-choice__help {
-  color: var(--at-color-ink-soft);
-  font-size: var(--at-text-sm);
+  color: var(--at-color-text-quiet);
+  font-size: var(--at-font-min);
 }
 
 .at-choice__icon {
   display: grid;
   place-items: center;
   inline-size: 2rem;
-  font-size: var(--at-text-lg);
+  font-size: var(--at-font-h3);
 }
 
 .at-link-line {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 var(--at-space-2);
+  gap: 0 var(--at-space-xs);
 }
 
 .login-pf .at-link-line a,
 .login-pf .at-link-list a {
   display: inline-flex;
   align-items: center;
-  min-block-size: var(--at-hit);
+  min-block-size: var(--at-hit-target);
 }
 
 /* ---------- Kayıtlı geçiş anahtarı listesi ---------- */
@@ -786,13 +903,13 @@
   border: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--at-space-2);
+  gap: var(--at-space-xs);
 }
 
 .login-pf .pf-v5-c-data-list__item {
-  background: var(--at-color-surface-sunken);
+  background: var(--at-color-bg-panel-alt);
   border: 0;
-  border-radius: var(--at-radius-control);
+  border-radius: var(--at-radius);
   box-shadow: none;
 }
 
@@ -803,9 +920,9 @@
 .login-pf .pf-v5-c-data-list__item-row {
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--at-space-3);
+  gap: var(--at-space-sm);
   inline-size: 100%;
-  padding: var(--at-space-2) var(--at-space-3);
+  padding: var(--at-space-xs) var(--at-space-sm);
 }
 
 .login-pf .pf-v5-c-data-list__cell {
@@ -816,7 +933,7 @@
 .login-pf .pf-v5-c-data-list__cell.pf-m-no-fill {
   flex: 1 1 8rem;
   min-inline-size: 0;
-  padding-block: var(--at-space-2);
+  padding-block: var(--at-space-xs);
 }
 
 .login-pf .pf-v5-c-data-list__item-action:empty {
@@ -824,23 +941,23 @@
 }
 
 .login-pf .pf-v5-c-data-list__cell.pf-m-icon .pf-v5-c-icon {
-  color: var(--at-color-ink);
+  color: var(--at-color-text);
 }
 
 .login-pf .select-auth-box-headline {
-  font-weight: var(--at-weight-bold);
+  font-weight: var(--at-font-weight-lg);
 }
 
 /* ---------- Ayırıcı, QR kodu, ipucu ---------- */
 
 .kc-login-divider {
-  color: var(--at-color-ink-soft);
-  font-size: var(--at-text-sm);
+  color: var(--at-color-text-quiet);
+  font-size: var(--at-font-min);
 }
 
 .kc-qr-code img {
-  border: var(--at-border-control) solid var(--at-color-line);
-  border-radius: var(--at-radius-control);
+  border: var(--at-border-width) solid var(--at-color-line);
+  border-radius: var(--at-radius);
   box-shadow: none;
   max-inline-size: 100%;
   block-size: auto;
@@ -848,11 +965,11 @@
 
 /* İpucu düğmenin üstünde açılır. Böylece sayfayı yana taşırmaz. */
 .kc-login-tooltip .kc-tooltip-text {
-  inset: auto 0 calc(100% + var(--at-space-1)) auto;
-  border-radius: var(--at-radius-control);
-  font-size: var(--at-text-sm);
-  padding: var(--at-space-1) var(--at-space-2);
-  transition: opacity var(--at-motion-duration) var(--at-motion-ease);
+  inset: auto 0 calc(100% + var(--at-space-xxs)) auto;
+  border-radius: var(--at-radius);
+  font-size: var(--at-font-min);
+  padding: var(--at-space-xxs) var(--at-space-xs);
+  transition: opacity var(--at-motion-duration-mid) var(--at-motion-easing-standard);
 }
 
 .kc-login-tooltip .kc-tooltip-text::after {
@@ -862,7 +979,7 @@
 /* ---------- Dil seçimi ---------- */
 
 .login-pf .pf-v5-c-login__main > .at-locale {
-  padding: 0 var(--at-card-padding) var(--at-space-3);
+  padding: var(--at-space-lg) 0 0;
 }
 
 /* Boş alt bölüm yer tutmaz. */
@@ -874,33 +991,33 @@
 .login-pf .pf-v5-u-mt-md-on-md,
 .login-pf #authenticateWebAuthnButton {
   /* !important: the base theme sets this with a utility class that uses !important. */
-  margin-block-start: var(--at-space-3) !important;
+  margin-block-start: var(--at-space-sm) !important;
 }
 
 .at-locale__list {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--at-space-1) var(--at-space-5);
+  gap: var(--at-space-xxs) var(--at-space-lg);
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .login-pf a.at-locale__link {
-  color: var(--at-color-ink-soft);
-  font-size: var(--at-text-sm);
+  color: var(--at-color-text-quiet);
+  font-size: var(--at-font-min);
   text-decoration: none;
 }
 
 /* Seçili dil renkle değil, kalın yazı ve onay işaretiyle ayrılır. */
 .login-pf a.at-locale__link[aria-current="true"] {
-  color: var(--at-color-ink);
-  font-weight: var(--at-weight-bold);
+  color: var(--at-color-text);
+  font-weight: var(--at-font-weight-lg);
 }
 
 .at-locale__link[aria-current="true"]::before {
   content: "✓";
-  margin-inline-end: var(--at-space-1);
+  margin-inline-end: var(--at-space-xxs);
 }
 
 /* ---------- Odak ---------- */
@@ -940,16 +1057,16 @@
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
   input:is([type="checkbox"], [type="radio"]):focus-visible + label {
   text-decoration-line: underline;
-  text-decoration-thickness: var(--at-focus-thickness);
-  text-decoration-color: var(--at-color-focus);
+  text-decoration-thickness: var(--at-focus-indicator-size);
+  text-decoration-color: var(--at-focus-indicator-color);
   text-underline-offset: var(--at-focus-underline-offset);
 }
 
 /* Metin bağlantıları: kalın alt çizgi */
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf a:not([class*="c-button"]):focus-visible {
   text-decoration-line: underline;
-  text-decoration-thickness: var(--at-focus-thickness);
-  text-decoration-color: var(--at-color-focus);
+  text-decoration-thickness: var(--at-focus-indicator-size);
+  text-decoration-color: var(--at-focus-indicator-color);
   text-underline-offset: var(--at-focus-underline-offset);
 }
 
@@ -966,8 +1083,8 @@
 .login-pf *,
 .login-pf *::before,
 .login-pf *::after {
-  transition-timing-function: var(--at-motion-ease);
-  animation-timing-function: var(--at-motion-ease);
+  transition-timing-function: var(--at-motion-easing-standard);
+  animation-timing-function: var(--at-motion-easing-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -975,7 +1092,7 @@
   .login-pf *::before,
   .login-pf *::after {
     /* !important: reduced motion must win over every transition in the base theme. */
-    transition-duration: var(--at-motion-none) !important;
-    animation-duration: var(--at-motion-none) !important;
+    transition-duration: var(--at-motion-duration-instant) !important;
+    animation-duration: var(--at-motion-duration-instant) !important;
   }
 }

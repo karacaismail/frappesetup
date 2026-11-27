@@ -1,4 +1,4 @@
-"""Every AtonotA Login method is on the allow list its caller needs (AJA-480).
+"""Every atonota_login method is on the allow list its caller needs (AJA-480).
 
 Two branches had the same bug on one day. A method was written, but it was not added to an
 allow list, so the real backend answered 403 (AJA-459, AJA-410). This test reads the source
@@ -73,7 +73,7 @@ EXPECTED = {
     "platform_core.api.auth.list_linked_accounts": PANEL,
     # Keycloak's logout notice. The signed logout token authorizes it.
     "platform_core.api.keycloak_backchannel_logout": GUEST,
-    # AtonotA Login decisions and the verification inbox.
+    # atonota_login decisions and the verification inbox.
     "platform_core.api.atonota_login.evaluate": PANEL,
     "platform_core.api.atonota_login.open_paid_plan": PANEL,
     "platform_core.api.atonota_login.verification_notice": GUEST,
@@ -83,6 +83,15 @@ EXPECTED = {
     "platform_core.api.identity.set_enabled": SERVICE,
     "platform_core.api.identity.change_email": SERVICE,
     "platform_core.api.identity.anonymize_user": SERVICE,
+    # The tenant admin panel invites users and assigns Role Profiles (G-98, AJA-791).
+    "platform_core.api.identity.invite_user": PANEL,
+    "platform_core.api.identity.set_user_role_profiles": PANEL,
+    # Reseller endpoints (G-169, G-170). The reseller panel lists, reads and requests customers.
+    "platform_core.api.reseller.list_customers": PANEL,
+    "platform_core.api.reseller.customer_status": PANEL,
+    "platform_core.api.reseller.request_customer": PANEL,
+    # Only the Platform Operator approves a request, in Desk. It is not on the panel list.
+    "platform_core.api.reseller.approve_customer_request": ADMIN,
     # Corporate provider exceptions. System Manager only.
     "platform_core.identity.enterprise_membership.approve_exception": ADMIN,
     "platform_core.identity.enterprise_membership.revoke_exception": ADMIN,
@@ -98,13 +107,32 @@ EXPECTED = {
     "press_tr.api.identity.anonymize_user": SERVICE,
     "press_tr.api.identity.list_identities": SERVICE,
     "press_tr.api.maintenance.cleanup_expired_sessions": ADMIN,
+    # AI access layer (platform_core.api.ai, AJA-1002). The MCP endpoint and its metadata take
+    # a bearer credential, so Frappe sees a guest. The panel user decides on their own proposals.
+    "platform_core.api.ai.mcp": PUBLIC,
+    "platform_core.api.ai.mcp_resource_metadata": PUBLIC,
+    "platform_core.api.ai.issue_agent_token": PANEL,
+    "platform_core.api.ai.list_proposals": PANEL,
+    "platform_core.api.ai.list_second_approvals": PANEL,
+    "platform_core.api.ai.get_proposal": PANEL,
+    "platform_core.api.ai.approve_proposal": PANEL,
+    "platform_core.api.ai.reject_proposal": PANEL,
+    "platform_core.api.ai.resolve_proposal": PANEL,
+    "platform_core.api.ai.propose_revert": PANEL,
+    "platform_core.api.ai.purge_logs": ADMIN,
+    # G-138 field help. A signed-in panel account reads the help of one field.
+    "platform_core.api.help.get_field_help": PANEL,
+    "platform_core.api.help.get_component_help": PANEL,
+    # G-138 help coverage report. `frappe.only_for("System Manager")` guards it, so only an
+    # administrator calls it. It stays off the Website User list.
+    "platform_core.api.help.get_help_coverage": ADMIN,
 }
 
 # Methods that other open branches add. The test checks them once they are in the tree.
-# The two AtonotA Login reads of AJA-459 are in the tree now, so the list is empty.
+# The two atonota_login reads of AJA-459 are in the tree now, so the list is empty.
 PENDING: dict[str, str] = {}
 
-# Where AtonotA Login methods live. A new file in these places is scanned too.
+# Where atonota_login methods live. A new file in these places is scanned too.
 SCANNED = (
     *sorted((PLATFORM / "api").rglob("*.py")),
     *sorted((PLATFORM / "identity").rglob("*.py")),
@@ -116,7 +144,7 @@ SCANNED = (
 # list, so its methods must be named in EXPECTED.
 NOT_LOGIN_MODULES = frozenset(
     f"platform_core.api.{name}"
-    for name in ("access", "ai", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
+    for name in ("access", "collection", "meta", "mobile", "mobile_pwa", "model", "shell")
 )
 
 # Guest methods without a `rate_limit` decorator, each with its reason.
@@ -272,7 +300,9 @@ class LoginMethodAllowListTests(unittest.TestCase):
 
     def test_every_whitelisted_login_method_has_a_named_caller(self):
         unknown = sorted(set(self.methods) - set(EXPECTED))
-        self.assertEqual(unknown, [], "Name the caller of each new method in EXPECTED and add it to its list.")
+        self.assertEqual(
+            unknown, [], "Name the caller of each new method in EXPECTED and add it to its list."
+        )
 
     def test_every_expected_method_exists_or_waits_for_its_branch(self):
         missing = sorted(set(EXPECTED) - set(self.methods) - set(PENDING))

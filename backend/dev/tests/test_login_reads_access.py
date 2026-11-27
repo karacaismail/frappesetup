@@ -1,4 +1,4 @@
-"""Who may call the two AtonotA Login reads (AJA-459, AJA-516).
+"""Who may call the two atonota_login reads (AJA-459, AJA-516).
 
 The panel account is a Frappe Website User. Frappe answers 403 to every method outside
 `website_user_allowed_methods`. A guest gets 403 and "is not whitelisted" for every method

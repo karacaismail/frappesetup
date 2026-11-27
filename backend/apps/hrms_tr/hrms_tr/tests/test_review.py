@@ -16,6 +16,11 @@ def fixture(name):
 	return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def profiles():
+	# The Role Profiles are not fixtures (AJA-934). `hrms_tr.role_profiles` opens them from this file.
+	return json.loads((FIXTURES.parent / "role_profile.json").read_text(encoding="utf-8"))
+
+
 def raise_with_message(message, *args):
 	raise RuntimeError(message)
 
@@ -25,15 +30,64 @@ class RoleFixtureTest(unittest.TestCase):
 		self.assertTrue(all(role["desk_access"] == 0 for role in fixture("01_role.json")))
 
 	def test_manager_and_hr_profiles_keep_employee_role(self):
-		for profile in fixture("02_role_profile.json"):
+		for profile in profiles():
 			self.assertIn("HRT Employee", {row["role"] for row in profile["roles"]})
 
-	def test_hr_employee_permission_only_grants_read(self):
-		permissions = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Employee"]
-		self.assertEqual(len(permissions), 1)
-		permission = permissions[0]
-		self.assertEqual(permission["role"], "HRT Admin")
-		self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
+	def test_employee_permissions_only_grant_read(self):
+		# HRMS asks for Employee read before a leave is opened. The two panel roles open leaves (AJA-947).
+		permissions = [
+			row
+			for row in fixture("05_custom_docperm.json")
+			if row["parent"] == "Employee" and row["permlevel"] == 0
+		]
+		self.assertEqual(
+			{row["role"] for row in permissions}, {"HRT Admin", "Tenant Admin", "Tenant Admin Assistant"}
+		)
+		for permission in permissions:
+			with self.subTest(role=permission["role"]):
+				self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
+
+	def test_personal_employee_fields_are_on_their_own_level(self):
+		# The two panel roles read level 0 of an employee. The personal fields are above it (AJA-1024).
+		setters = {
+			(row["doc_type"], row["field_name"], row["property"]): row["value"]
+			for row in fixture("04_property_setter.json")
+		}
+		self.assertTrue(setup.EMPLOYEE_PERSONAL_FIELDS)
+		for field in setup.EMPLOYEE_PERSONAL_FIELDS:
+			with self.subTest(field=field):
+				self.assertEqual(
+					setters.get(("Employee", field, "permlevel")), str(setup.EMPLOYEE_PERSONAL_LEVEL)
+				)
+		# The preferred address can be a copy of the personal address.
+		self.assertIn("prefered_email", setup.EMPLOYEE_PERSONAL_FIELDS)
+		for child, fields in setup.EMPLOYEE_PERSONAL_CHILD_FIELDS.items():
+			for field in fields:
+				with self.subTest(child=child, field=field):
+					self.assertEqual(
+						setters.get((child, field, "permlevel")), str(setup.EMPLOYEE_PERSONAL_LEVEL)
+					)
+		# Names stay on level 0: the leave list shows who asked for the leave.
+		for field in ("first_name", "employee_name", "company", "department"):
+			self.assertNotIn(("Employee", field, "permlevel"), setters)
+
+	def test_only_the_hr_roles_read_the_personal_employee_fields(self):
+		# Every role that read the whole employee record before keeps the personal fields.
+		expected = {
+			"Employee": {"read"},
+			"Employee Self Service": {"read", "write"},
+			"HR Manager": {"read", "write"},
+			"HR User": {"read", "write"},
+			"HRT Admin": {"read"},
+		}
+		rows = [
+			row
+			for row in fixture("05_custom_docperm.json")
+			if row["parent"] == "Employee" and row["permlevel"] == setup.EMPLOYEE_PERSONAL_LEVEL
+		]
+		granted = {row["role"]: {k for k, v in row.items() if v == 1 and k != "permlevel"} for row in rows}
+		self.assertEqual(granted, expected)
+		self.assertEqual(len(rows), len(expected))
 
 	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
@@ -52,7 +106,16 @@ class RoleFixtureTest(unittest.TestCase):
 class LinkSearchPermissionTest(unittest.TestCase):
 	"""A role that fills in a leave application can search its "Leave Type" link field."""
 
-	ROLES = frozenset({"HRT Employee", "HRT Manager", "HRT Admin", "System Manager"})
+	ROLES = frozenset(
+		{
+			"HRT Employee",
+			"HRT Manager",
+			"HRT Admin",
+			"System Manager",
+			"Tenant Admin",
+			"Tenant Admin Assistant",
+		}
+	)
 
 	def test_every_leave_role_can_select_leave_types_only(self):
 		rows = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Leave Type"]
@@ -227,7 +290,9 @@ class OperationsRoleTest(unittest.TestCase):
 				rule = next(row for row in rules if row["role"] == role)
 				self.assertEqual(rule["scope"], "all")
 				self.assertTrue(all(rule[f"allow_{name}"] for name in ("read", "write", "submit", "cancel")))
-		self.assertFalse({"Employee", "Leave Approver", "HR User"} & {row["role"] for row in permissions})
+		# Native HRMS roles get no leave rows. Their Employee rows only keep the personal fields (AJA-1024).
+		leave_roles = {row["role"] for row in permissions if row["parent"] == "Leave Application"}
+		self.assertFalse({"Employee", "Leave Approver", "HR User"} & leave_roles)
 
 	def test_operations_roles_can_cancel_natively(self):
 		with patch.object(leave, "frappe") as fake:

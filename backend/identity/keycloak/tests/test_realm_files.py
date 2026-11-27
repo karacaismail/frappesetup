@@ -27,7 +27,7 @@ class RealmFileTest(unittest.TestCase):
         self.assertEqual(REALM_FILE.name, "platform-realm.json")
 
     def test_display_name_and_languages(self):
-        # D-4, O-51: the brand name comes from a variable. The value is "AtonotA Login" (test_realm_backlog).
+        # D-4, O-51: the brand name comes from a variable. The value is PRODUCT_NAME in backend/brand.env (test_realm_backlog).
         self.assertEqual(self.realm["displayName"], "${IDENTITY_BRAND_NAME}")
         self.assertTrue(self.realm["internationalizationEnabled"])
         self.assertEqual(self.realm["defaultLocale"], "tr")

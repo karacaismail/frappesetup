@@ -5,14 +5,14 @@
   Görsel değerler aşağıda tek yerde durur. Giriş temasının tokenlarıyla aynıdır.
 -->
 <#assign
-  pageBg = "#f3f1ec"
+  pageBg = "#f4f5f7"
   cardBg = "#ffffff"
-  ink = "#161d33"
-  quiet = "#4a5268"
-  buttonBg = "#1f2f63"
-  buttonInk = "#ffffff"
-  linkInk = "#24397d"
-  brandDot = "#c2452d"
+  ink = "#1b1f24"
+  quiet = "#4b5563"
+  buttonBg = "#00aacc"
+  buttonInk = "#1b1f24"
+  linkInk = "#006f86"
+  brandDot = "#00aacc"
   fontStack = "Outfit, 'Segoe UI', Helvetica, Arial, sans-serif"
   cardRadius = "16px"
   buttonRadius = "10px"

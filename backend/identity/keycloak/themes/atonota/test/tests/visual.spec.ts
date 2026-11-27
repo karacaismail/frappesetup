@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { screens } from './helpers';
 
 // Bağımsız inceleme için ekran görüntüsü üretir. Karşılaştırma yapmaz.
@@ -15,6 +15,11 @@ for (const scheme of ['light', 'dark'] as const) {
       await item.open(page);
       await page.evaluate(() => document.fonts.ready);
       await page.addStyleTag({ content: '* { caret-color: transparent !important; }' });
+      // A password never shows in a picture. Every password field is empty when the picture is taken.
+      const filled = await page.locator('input[type=password], input[name*=password i]').evaluateAll(
+        (fields) => fields.filter((field) => (field as HTMLInputElement).value !== '').length,
+      );
+      expect(filled, 'filled password field in a picture').toBe(0);
       const dir = `${out}${info.project.name}`;
       mkdirSync(dir, { recursive: true });
       await page.screenshot({ path: `${dir}/${item.name}-${scheme}.png`, fullPage: true });

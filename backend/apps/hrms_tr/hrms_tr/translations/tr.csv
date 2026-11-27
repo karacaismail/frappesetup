@@ -69,3 +69,8 @@ Use a boolean for dry_run.,dry_run için True veya False kullanın.,hrms_tr
 Use a positive integer for limit.,limit için sıfırdan büyük bir tam sayı girin.,hrms_tr
 Set a valid hrms_tr_retention_days site value.,Site ayarında geçerli bir hrms_tr_retention_days değeri girin.,hrms_tr
 The configured retention period exceeds the supported date range.,Saklama süresi desteklenen tarih aralığını aşıyor.,hrms_tr
+You do not have permission to reject leave.,İzin talebini reddetme yetkiniz yok.,hrms_tr
+You cannot reject your own leave.,Kendi izin talebinizi reddedemezsiniz.,hrms_tr
+The leave application changed. Open it again before rejecting.,İzin talebi değişti. Reddetmeden önce talebi yeniden açın.,hrms_tr
+Only open draft leave applications can be rejected.,Yalnız açık izin taslaklarını reddedebilirsiniz.,hrms_tr
+Read the leave application version before rejecting.,Reddetmeden önce izin talebinin güncel kaydını açın.,hrms_tr

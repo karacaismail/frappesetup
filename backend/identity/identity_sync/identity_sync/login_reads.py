@@ -1,4 +1,4 @@
-"""AtonotA Login reads: the sign-in platforms of a tenant and the linked accounts of a member (AJA-459).
+"""`atonota_login` reads: the sign-in platforms of a tenant and the linked accounts of a member (AJA-459).
 
 The replies are built from an allow list. Nothing of a Keycloak row passes through as it is:
 no `config`, no secret, no outside user name, no credential data and no Keycloak id.

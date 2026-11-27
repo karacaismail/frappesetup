@@ -27,7 +27,7 @@ class TestSchemaSource(IntegrationTestCase):
 			{
 				"doctype": "DocType",
 				"name": "PLT Schema Source Probe",
-				"module": "Platform Core",
+				"module": "Identity",
 				"custom": 0,
 				"fields": [{"fieldname": "title", "fieldtype": "Data", "label": "Title"}],
 				"permissions": [{"role": "System Manager", "read": 1}],

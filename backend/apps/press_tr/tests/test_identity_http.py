@@ -1241,7 +1241,21 @@ class IdentityHttpTest(
 		status, _headers, body = self.exchange(
 			"POST", RECOVERY_ROUTE, {"Content-Type": "application/json"}, json.dumps({"email": email})
 		)
+		self.run_short_jobs()
 		return status, body
+
+	def run_short_jobs(self):
+		# AJA-505: a background job opens the review record after the answer.
+		# The test runs the queued jobs here, so it does not wait for a worker.
+		from frappe.utils.background_jobs import get_queue
+		from rq import SimpleWorker
+
+		frappe.init("press.localhost")
+		try:
+			queue = get_queue("short")
+		finally:
+			frappe.destroy()
+		SimpleWorker([queue], connection=queue.connection).work(burst=True, with_scheduler=False)
 
 	def open_recovery_reviews(self, email):
 		frappe.init("press.localhost")
@@ -1280,6 +1294,14 @@ class IdentityHttpTest(
 		frappe.init("press.localhost")
 		frappe.connect()
 		try:
+			# AJA-421: the run copies app files without a migrate, so the setup step and the
+			# DocType permissions run here the same way a migrate runs them. The second call
+			# shows that an existing role raises no error.
+			from press_tr.press_identity.recovery import ensure_reviewer_role
+
+			ensure_reviewer_role()
+			ensure_reviewer_role()
+			frappe.reload_doc("press_identity", "doctype", "ptr_recovery_review", force=True)
 			frappe.get_doc(
 				{
 					"doctype": "User",
@@ -1287,7 +1309,7 @@ class IdentityHttpTest(
 					"first_name": "Reviewer",
 					"user_type": "System User",
 					"send_welcome_email": 0,
-					"roles": [{"role": "System Manager"}],
+					"roles": [{"role": "Recovery Reviewer"}],
 				}
 			).insert(ignore_permissions=True)
 			frappe.db.set_value("User", email, "api_key", key)

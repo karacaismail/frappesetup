@@ -10,8 +10,11 @@ import json
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.tests.test_api import make_request
+from frappe.translate import get_user_lang
 from frappe.utils import get_test_client
 from frappe.utils.password import update_password
+
+from platform_core.ai.errors import CONTEXT
 
 MCP_PATH = "/api/method/platform_core.api.ai.mcp"
 API = "/api/method/platform_core.api.ai."
@@ -21,10 +24,21 @@ RESTRICTED_ROLE = "YZ Kisitli"
 USER_A = "yz.a@example.test"
 USER_B = "yz.b@example.test"
 MANAGER = "yz.yonetici@example.test"
+# A second System Manager. Gives the second approval of R3 proposals (AJA-1003).
+SECOND_MANAGER = "yz.yonetici2@example.test"
 # A desk user without the System Manager role. A Website User is stopped before the endpoint runs.
 DESK_USER = "yz.desk@example.test"
 DESK_ROLE = "YZ Desk"
 PASSWORD = "Sahte-Parola-7391-yz!"
+
+
+def answer_text(message: str, user: str) -> str:
+	"""The fixed text of the layer as a request of the user gets it.
+
+	A logged-in request answers in the user's language, else in the site's language.
+	The test compares against the same translation, so it holds for an English and a Turkish site.
+	"""
+	return frappe._(message, lang=get_user_lang(user), context=CONTEXT)
 
 
 def ensure_fixtures() -> None:
@@ -130,6 +144,7 @@ def ensure_fixtures() -> None:
 		(USER_A, [RESTRICTED_ROLE]),
 		(USER_B, [RESTRICTED_ROLE]),
 		(MANAGER, ["System Manager"]),
+		(SECOND_MANAGER, ["System Manager"]),
 	):
 		if not frappe.db.exists("User", email):
 			frappe.get_doc(
@@ -360,3 +375,25 @@ class AiTestCase(IntegrationTestCase):
 		return self.human(
 			client, "POST", "approve_proposal", body={"proposal_id": proposal_id, "digest": digest}
 		)
+
+	def approve_both(self, client, proposal_id: str, digest: str | None = None, *, around_second=None):
+		"""Approve an R3 proposal as its owner, then as a second System Manager (AJA-1003).
+
+		Returns the response of the second approval. If the first approval does not leave the
+		proposal waiting for a second one, its response is returned. `around_second` is a context
+		manager that wraps only the second approval, for example a patch of the execution.
+		"""
+		from contextlib import nullcontext
+
+		digest = digest or self.digest_of(client, proposal_id)
+		first = self.approve(client, proposal_id, digest)
+		if first.status_code != 200:
+			return first
+		outcome = first.json["message"]
+		if outcome["proposal"]["risk_level"] == "R3" and outcome["deny_reason"] is None:
+			# An accepted first approval of an R3 proposal never runs the action.
+			self.assertEqual(outcome["proposal"]["status"], "awaiting_second_approval", outcome)
+		if outcome["proposal"]["status"] != "awaiting_second_approval":
+			return first
+		with around_second or nullcontext():
+			return self.approve(self.login(SECOND_MANAGER), proposal_id, digest)

@@ -14,13 +14,18 @@ FONT = "style='font-family: var(--mantine-font-family), \"Outfit Variable\", Out
 
 def figure(cls: str, label: str, svg: str, caption: str, source: str) -> str:
     """Kaydırma bölgesi figürün içindeki div'dir: figcaption'lı <figure> role=region alamaz (ARIA in HTML)."""
-    return (
-        f"---\n// {source} — scripts/gen-diagrams.py üretir; elle düzenlemeyin.\n---\n"
+    source_text = (
+        f"---\n// {source} — scripts/gen-diagrams.py üretir; elle düzenlemeyin.\n"
+        + ("import { PRODUCT_NAME, BRAND_DOMAIN } from '../data/site';\n"
+           "import DiagramBrandLabel from './DiagramBrandLabel.astro';\n"
+           if "{{PRODUCT_NAME}}" in svg + caption or "{{BRAND_DOMAIN}}" in svg + caption else "")
+        + "---\n"
         f'<figure class="diagram {cls}">\n'
         f'<div class="diagram-scroll" tabindex="0" role="region" aria-label="{label} (yatay kaydırılabilir)">\n'
         + svg
         + f'\n</div>\n<figcaption class="diagram-note">{caption}</figcaption>\n</figure>\n'
     )
+    return source_text.replace("{{PRODUCT_NAME}}", "{PRODUCT_NAME}").replace("{{BRAND_DOMAIN}}", "{BRAND_DOMAIN}")
 
 
 def timeline() -> str:
@@ -67,7 +72,11 @@ def timeline() -> str:
         fill = "var(--fs-accent-soft)" if acc else "var(--fs-surface)"
         o.append(f"<rect x='{x}' y='{y}' width='{BOX_W}' height='{BOX_H}' rx='10' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>")
         o.append(f"<text x='{x + 16}' y='{y + 26}' font-size='18' font-weight='650' fill='var(--fs-ink)'>{pid}</text>")
-        o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
+        if "{{PRODUCT_NAME}}" in name_of(pid):
+            brand_label = name_of(pid).replace("{{PRODUCT_NAME}}", "${PRODUCT_NAME}")
+            o.append(f"<DiagramBrandLabel name={{`{brand_label}`}} x={{{x + 16}}} y={{{y + 50}}} maxWidth={{{BOX_W - 32}}} />")
+        else:
+            o.append(f"<text x='{x + 16}' y='{y + 50}' fill='var(--fs-ink)'>{name_of(pid)}</text>")
     # P7'ye giden iki ok kendi yolundan gider. Hiçbiri başka fazın okuyla çizgi ya da çıkış noktası paylaşmaz.
     # P1 → P7: P1'in sağından ayrı bir noktadan (y=148) çıkar. x=510 şeridinden iner, P7'ye üst yarıdan girer.
     #   x=510, P1 → P4 şeridinin (x=524) solundadır. Böylece P1 → P4'ün y=222 parçasını kesmez.
@@ -125,7 +134,7 @@ def timeline() -> str:
         "P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. "
         "P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. "
         "P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. "
-        "P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
+        "P7 {{PRODUCT_NAME}} ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır."
     )
     return figure("diagram-timeline", "Yol haritası faz sırası", "\n".join(o), caption, "Yol haritası faz sırası")
 
@@ -166,14 +175,14 @@ def rails() -> str:
     o = [
         f"<svg viewBox='0 0 {W} 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' {FONT}>",
         "<title id='rails-title'>Altı mimari ray ve iki taban bandı</title>",
-        "<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 "
-        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
-        "Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 "
-        "ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, "
-        "kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
-        "rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), "
-        "delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, "
-        "has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>",
+        "<desc id='rails-desc'>Üst sırada Rail 3 headless panel yer alır. Ortada Rail 5 ajan servisi ve model geçidi ile Rail 4 Keycloak yer alır. Alt sırada Rail 1 "
+        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext 16 siteleri ve Rail 6 operasyon sitesi yer alır. Panel, "
+        "Press'e panel adresindeki press.api ve realtime üzerinden ulaşır. Kiracıya aynı kaynaktan /api/v2 ve bootstrap/meta ile ulaşır. Operasyon sitesine customer_360 "
+        "ve HD Ticket ile ulaşır. Ajan servisine SSE ile bağlanır. Panel, Keycloak'a OIDC ile yönlendirir. Sunucu, giriş kodunu belirteçle değiştirir. Ajan servisi Press'e press.mcp ile bağlanır. Ajan servisi "
+        "kiracıya site aracı belirteciyle Kiracı MCP üzerinden bağlanır. Keycloak, Social Login Key ile Press'e ve kiracıya giriş sağlar. Operasyon sitesi operatör realm "
+        "rollerini kullanır. Press ile kiracı arasında site_config sk_app ve Agent Job kullanılır. Press, operasyon sitesine create-fc-invoice (press_tr_finance), "
+        "delete-fc-team ve press_ops_bridge ile ulaşır. Operasyon sitesi Press'e press_tr.api.ops ile ulaşır. Taban bantları ortak sözleşmeleri (host'a bağlı oturum, "
+        "has_permission, tasarım tokenları, audit) ve DevOps sorumlusunun yönettiği Hetzner sunucularını gösterir.</desc>",
         "<defs><marker id='arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'>"
         "<path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>",
         "<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Altı ray, iki taban bandı: her ray kendi alanının tek doğruluk kaynağı</text>",
@@ -192,9 +201,9 @@ def rails() -> str:
     # Satır 3: Press (40..320), Kiracı (360..680), Ops (720..1000), y 570..740
     o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe 16 · press.&lt;marka&gt;",
              ["Team · Site · Plan · Marketplace", "Abonelik · Fatura · Agent Job", "press_tr · press_ops_bridge"])
-    o += box(360, 570, 320, 170, "Rail 2 — Kiracı siteleri", "ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;",
+    o += box(360, 570, 320, 170, "Rail 2 — Kiracı siteleri", "ERPNext 16 · &lt;kiracı&gt;.app.&lt;marka&gt;",
              ["Site + DB kiracı başına", "platform_core · tr_localization", "HRMS TR · CRM · Webshop app'leri"])
-    o += box(720, 570, 280, 170, "Rail 6 — Operasyon", "ERPNext v16 · ops.&lt;marka&gt;",
+    o += box(720, 570, 280, 170, "Rail 6 — Operasyon", "ERPNext 16 · ops.&lt;marka&gt;",
              ["Cari · Sales Invoice · e-belge", "press_tr_finance · CRM · Helpdesk", "Support Session · Hocuspocus"], accent=True)
     # Satır1 → Satır2 (230..300): etiketler y=256 (uzun) ve y=280 (kısa)
     o += arrow(290, 230, 290, 300, "SSE akışı (ai-sidebar)", 300, 280)
@@ -205,7 +214,7 @@ def rails() -> str:
     o += arrow(975, 230, 975, 570, "customer_360 · HD Ticket", 965, 280, "end")
     # Satır2 → Satır3 (470..570): etiketler y=498 / y=522
     o += arrow(190, 470, 190, 570, "press.mcp · press_tr.mcp", 200, 498)
-    o += arrow(420, 470, 420, 570, "frappe_mcp (aracı belirteci)", 432, 522)
+    o += arrow(420, 470, 420, 570, "Kiracı MCP (aracı belirteci)", 432, 522)
     o += arrow(650, 470, 650, 570, "Social Login Key · JWKS · SLO", 662, 498)
     o += arrow(880, 470, 880, 570, "operatör realm rolleri", 868, 522, "end")
     # Keycloak → Press (kesikli dirsek)

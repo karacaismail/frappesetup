@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import frappe
 
-from platform_core.ai.tests.base import DOCTYPE, MANAGER, USER_A, AiTestCase
+from platform_core.ai.tests.base import DOCTYPE, MANAGER, USER_A, AiTestCase, answer_text
 
 HOOK = "platform_core.ai.tests.sample_tools.declare_more"
 REPORT = "Permitted Documents For User"
@@ -46,7 +46,9 @@ class TestAppToolValidation(AiTestCase):
 
 		self.assert_denied(result, "invalid_arguments")
 		# The tool's own text is not returned. It may carry a field value.
-		self.assertEqual(result["structuredContent"]["error"]["message"], "The tool refused the input.")
+		self.assertEqual(
+			result["structuredContent"]["error"]["message"], answer_text("The tool refused the input.", USER_A)
+		)
 		log = self.last_log(tool="plt_checked_title")
 		self.assertEqual((log.decision, log.deny_reason), ("denied", "invalid_arguments"))
 		self.assertEqual(frappe.db.count("PLT AI Action Proposal", {"target_name": name}), 0)

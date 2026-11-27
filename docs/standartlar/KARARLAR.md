@@ -1,6 +1,6 @@
 # Proje sahibinin kararları
 
-Bu dosya dört günün kararlarını toplar. İlk gün 20 Kasım 2026 Cuma günüdür. Son gün 23 Kasım 2026 Pazartesi günüdür.
+Bu dosya sekiz günün kararlarını toplar. İlk gün 20 Kasım 2026 Cuma günüdür. Son gün 27 Kasım 2026 Cuma günüdür.
 
 Çalışma Frappe için kod standartlarıyla başladı. Sonra mobil uygulamaya ve KVKK uyumuna genişledi.
 
@@ -70,6 +70,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 23. Bütün kod adları İngilizce ve ASCII olur. Eski adlar da kurallara göre güncellenir (Karar 40).
 24. Kural dosyasının sınırı varsayılan olarak 36.000 bayttır. Özel durumda en çok 39.000 bayttır (Karar 41).
 25. AtonotA Login bağımsız ve ücretli bir üründür. Ürünün geliştirilmesi MVP sonrasıdır (Karar 42).
+26. Varsayılan dil İngiliz İngilizcesidir (`en-GB`). Ölçü birimi kullanıcının ülkesine göre seçilir (Karar 44).
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -902,6 +903,44 @@ Sitedeki karşılığı şudur:
 - Ürün sayfası sitenin “AtonotA Login” bölümüdür.
 - Sitedeki karar kaydı K-61'dir.
 - Ürünün fazı P7'dir. Gereksinimler G-157 ile başlar.
+
+### Karar 43. GILT kuralları onaylandı
+
+Proje sahibi GILT kuralını 27 Kasım 2026 Cuma günü onayladı.
+GILT, arayüzün birden çok dili desteklemesi için gereken hazırlıkları kapsar.
+Proje sahibi şöyle dedi: "Evet, onaylıyorum".
+Onay kaydı AJA-1350 işindedir.
+
+Kuralları ekleyen Git kaydı (commit) `d8822566` kimliğini taşır.
+Onay şu kapsamı içerir:
+
+- Sunucu tarafındaki `frappe-python-standartlari.md` dosyasının M-9 kuralı onaylandı.
+- Arayüz tarafındaki `headless-frontend-standartlari.md` dosyasının GILT bölümü onaylandı. Bölüm, IC-9 ile IC-16 arasındaki kuralları kapsar. AD-11 ve AX-9 kuralları da onaylandı.
+- G-73 gereksinimindeki GILT altyapısı onaylandı.
+
+Bu onay, G-73 gereksinimindeki kapsamı korur.
+İlk kullanılabilir sürümde yalnız dil altyapısı kurulur.
+Metin çevirisi ve varsayılan dili İngilizce yapma işi sonraya kalır.
+
+Karar 44, varsayılan dili İngilizce yapma işinin ertelenmesi hükmünü kaldırdı.
+Kaynak dil ve kullanıcı tercihi için Karar 44 geçerlidir.
+
+### Karar 44. Varsayılan dil İngiliz İngilizcesi olacak
+
+Proje sahibi dil kararını 27 Kasım 2026 Cuma günü verdi.
+Kararın kaydı AJA-1407 işindedir.
+
+Karar şu beş kuralı içerir:
+
+1. Varsayılan dil İngiliz İngilizcesidir (`en-GB`).
+2. Bütün içerik önce İngiliz İngilizcesiyle yazılır. Türkçe ve diğer diller kullanıcının tercihiyle sunulur.
+3. Bütün kod İngilizce yazılır. Karar 40 bu kuralı zaten belirler.
+4. Ölçü birimi kullanıcının ülkesine göre seçilir. Uzunluk için metre ya da inç kullanılır. Ağırlık için kilogram ya da libre kullanılır.
+5. GILT altyapısı MVP'de tamamlanır. MVP, ürünün ilk kullanılabilir sürümüdür. Mimar, üst yapının kapsamını AJA-1408 işinde araştırır.
+
+Bu karar, Karar 43'teki varsayılan dili İngilizce yapmayı erteleme hükmünü kaldırır.
+Karar 43'ün GILT altyapısına ilişkin onayı geçerlidir.
+Bu karar üst yapının kapsamını belirlemez.
 
 ## Modellerin kararları
 
