@@ -1,6 +1,6 @@
 # Kural uyumunu inceleme yorumuna yazın
 
-QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme sürecini yürüten kişidir. QA ve Committer kendi inceleme yorumlarında kural uyum listesini doldurur.
+QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme kararını yazan kişidir. Dalı `backend` dalına yalnız orkestratör birleştirir. QA ve Committer kendi inceleme yorumlarında kural uyum listesini doldurur.
 
 ## İnceleme adımları
 
@@ -14,8 +14,20 @@ QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme sürecini 
 6. Her satıra kanıtı veya eksikliği ekleyin.
 7. İncelenen son commit kimliğini yazın.
 8. Birleştirme kararını gerekçesiyle yazın.
+9. Karar olumluysa yorumun sonuna “orkestratör birleştirsin” yazın.
 
 Commit, Git içindeki değişiklik kaydıdır. QA ve Committer aynı son commit'i inceler. Geliştirici yeni commit eklerse etkilenen kurallar yeniden incelenir.
+
+## Birleştirmeyi orkestratör yapar
+
+frappesetup dallarını yalnız orkestratör birleştirir. Birleştirme kapıları birleştirmenin parçasıdır. Ajan dalı birleştirirse bu kapılar koşmaz.
+
+- Committer `backend` dalına `git merge` yapmaz.
+- Committer dalı `backend` dalına göndermez.
+- Committer inceleme yorumunu yazar. Karar olumluysa yorumun sonuna “orkestratör birleştirsin” yazar.
+- Orkestratör kapıları çalıştırır. Kapılar geçerse orkestratör dalı birleştirir.
+
+Bu kural orkestratörün 27 Kasım 2026 Cuma günkü kararıdır. Karar AJA-1426 işinde yazılıdır.
 
 ## Yorum şablonu
 
