@@ -47,7 +47,8 @@ const gitOk = (...args: string[]) => {
 };
 const isShallow = () => git('rev-parse', '--is-shallow-repository') === 'true';
 const hasCommit = (c: string) => gitOk('cat-file', '-e', `${c}^{commit}`);
-const inHead = (c: string) => hasCommit(c) && gitOk('merge-base', '--is-ancestor', c, 'HEAD');
+const inRef = (c: string, ref: string) => hasCommit(c) && gitOk('merge-base', '--is-ancestor', c, ref);
+const inHead = (c: string) => inRef(c, 'HEAD');
 // Yayın commit'i backend commit'ini metninde adlandırır: "Birleşmeler" listesinde "- <kısa ad> " satırıyla ya da
 // "Kaynak: <tam ad>" satırıyla. Kısa ad en az 7 karakterdir; iki ad önek olarak karşılaştırılır.
 const samePrefix = (a: string, b: string) => a.length >= 7 && b.length >= 7 && (a.startsWith(b) || b.startsWith(a));
@@ -64,7 +65,7 @@ const releaseMessages = (ref: string) =>
     .filter(Boolean)
     .map((e) => ({ sha: e.slice(0, e.indexOf('\n') < 0 ? e.length : e.indexOf('\n')), body: e }))
     .filter((e) => /^Kaynak: /m.test(e.body));
-// Kanıt commit'leri backend dalındadır. Backend geçmişi GitHub'a gitmez ve CI kopyası sığdır (tek commit).
+// Evidence commits live on the backend branch, which is on GitHub (origin/backend). The CI checkout is shallow (one commit).
 // Yayın commit'lerinin "Kaynak:" satırı backend commit'idir. Bu commit'lerden biri yerelde varsa backend geçmişi vardır.
 const mainRef = () => (gitOk('rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main') ? 'refs/remotes/origin/main' : null);
 let backendCache: boolean | undefined;
@@ -78,7 +79,7 @@ const hasBackendHistory = () => {
   return backendCache;
 };
 // Denetim kopyanın türüne göre ayrılır (inceleme 1 Ö-2, inceleme r2-1 E-1 ve K-1):
-// 1. Commit yerelde varsa HEAD geçmişinde olmalıdır. release doluysa yayın commit'i de yerelde olmalı ve metninde kanıt
+// 1. Commit yerelde varsa HEAD ya da origin/backend geçmişinde olmalıdır. release doluysa yayın commit'i de yerelde olmalı ve metninde kanıt
 //    commit'ini adlandırmalıdır. release null ise origin/main'deki hiçbir yayın commit'i onu adlandırmamalıdır.
 // 2. Commit yerelde yoksa ve backend geçmişi varsa commit uydurmadır.
 // 3. Tam geçmişli main kopyasında commit yoktur. release doluysa yayın commit'i HEAD geçmişinde olmalı ve kanıt commit'ini
@@ -86,7 +87,7 @@ const hasBackendHistory = () => {
 //    getiren yayındır.
 // 4. Sığ kopyada geçmiş yoktur. Yayın commit'i yerelde varsa onu adlandırmalıdır. Yoksa yalnız alan biçimi denetlenir.
 //    release null ise kayıt açıkça "henüz yayımlanmadı" der. Alan eksik olamaz (releaseShape).
-const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
+const evidenceProblems = (label: string, c: string, rel: Release, head = 'HEAD'): string[] => {
   const out: string[] = [];
   const shallow = isShallow();
   const relNames = (r: NonNullable<Release>) => {
@@ -98,7 +99,8 @@ const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
     }
   };
   if (hasCommit(c)) {
-    if (!inHead(c)) out.push(`${label}: ${c} HEAD geçmişinde değil`);
+    if (!inRef(c, head) && !inRef(c, 'refs/remotes/origin/backend'))
+      out.push(`${label}: ${c} HEAD ve origin/backend geçmişinde değil`);
     if (rel) relNames(rel);
     else if (mainRef()) {
       const named = releaseMessages(mainRef()!).filter((e) => namesCommit(e.body, c));
@@ -348,6 +350,22 @@ test.describe('content consistency', () => {
     }
     // Yayın commit'i uydurmaysa da geçmez (inceleme r2-1, K-1).
     expect(evidenceProblems('sahte', '36afb874', { pr: 18, commit: 'abcdef12' }), 'uydurma yayın commit').not.toEqual([]);
+  });
+
+  test('evidence commits on origin/backend pass outside HEAD', () => {
+    // The backend branch lives on GitHub (Decision 47). An evidence commit on origin/backend is accepted
+    // even when HEAD (for example a main checkout) does not contain it.
+    test.skip(isShallow(), 'Sığ kopya: commit geçmişi yok.');
+    const backendRef = 'refs/remotes/origin/backend';
+    test.skip(!gitOk('rev-parse', '--verify', '--quiet', backendRef) || !mainRef(), 'origin/backend ya da origin/main yok.');
+    const named = releaseMessages(mainRef()!);
+    const c = git('rev-list', '--no-merges', backendRef, '^' + mainRef()!)
+      .split('\n')
+      .filter(Boolean)
+      .find((x) => !named.some((e) => namesCommit(e.body, x)));
+    test.skip(!c, 'origin/backend dalında main dışı commit yok.');
+    expect(inRef(c!, mainRef()!), `${c} main geçmişinde olmamalı`).toBe(false);
+    expect(evidenceProblems('backend', c!, null, mainRef()!)).toEqual([]);
   });
 
   test('task board names environments, not staging', () => {

@@ -942,6 +942,28 @@ Bu karar, Karar 43'teki varsayılan dili İngilizce yapmayı erteleme hükmünü
 Karar 43'ün GILT altyapısına ilişkin onayı geçerlidir.
 Bu karar üst yapının kapsamını belirlemez.
 
+### Karar 47. Backend dalı GitHub'da olacak, PR'ları ProPR birleştirecek
+
+Proje sahibi bu kararı 27 Kasım 2026 Cuma günü verdi.
+Proje sahibinin sözü şudur: “backend GitHub'a gitsin”.
+Kararın kaydı AJA-1501 işindedir.
+
+Karar şu altı kuralı içerir:
+
+1. `backend` dalı GitHub'dadır. Uzak dalın adı `origin/backend` olur.
+2. Her iş kendi dalında yapılır. Dal güncel `origin/backend` ucundan açılır.
+3. İş bitince dal GitHub'a gönderilir. Committer dalı `backend` dalına PR olarak açar.
+4. PR'ı ProPR birleştirir. Çakışmayı da ProPR çözer.
+5. Hiçbir ajan `backend` dalına yerelde birleştirme yapmaz. Hiçbir ajan `backend` dalına doğrudan push etmez.
+6. `main` dalına yayın ayrı bir PR ile girer.
+
+ProPR'ın commit'lerinde yazar ve committer `karacaismail` hesabıdır.
+GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar.
+Proje sahibi bu tek istisnayı kabul etti.
+
+Bu karar eski kuralı kaldırır. Eski kural “backend dalı GitHub'a gitmez” diyordu.
+Tutarlılık testi kanıt commit'ini `origin/backend` dalında da arar.
+
 ## Modellerin kararları
 
 Proje sahibi bu konuları cevapsız bıraktı ya da modellere bıraktı. Proje sahibi bu kararları değiştirebilir.

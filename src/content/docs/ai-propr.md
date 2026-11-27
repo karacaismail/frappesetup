@@ -4,50 +4,59 @@ nav: "ProPR"
 order: 26
 ---
 
-Bu sayfa ProPR'ın bu projede nasıl kullanıldığını anlatır. Bilgiler 22 Kasım 2026 Pazar günü yerel kurulumda doğrulandı. Adım adım kurulum belgesi depoda [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
+Bu sayfa ProPR'ın bu projede nasıl kullanıldığını anlatır. Kurulum bilgileri 22 Kasım 2026 Pazar günü yerel kurulumda doğrulandı. PR akışı 27 Kasım 2026 Cuma günü değişti. Yeni akış Karar 47'dir. Adım adım kurulum belgesi depoda [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
 
 ## Kullanım amacı
 
 ProPR, GitHub'daki PR'ları izleyen açık kaynak bir uygulamadır. ProPR bu bilgisayarda yerel olarak çalışır.
 
-Bu projede ProPR yalnız gözlemci olarak çalışır. ProPR şu üç işi yapar:
+ProPR bu projede PR'ları birleştirir. ProPR şu işleri yapar:
 
 - `karacaismail/frappesetup` deposundaki PR'ları ve CI sonuçlarını okur.
 - Durumu kendi panosunda gösterir.
+- PR'ı hedef dala birleştirir. Gerekirse çakışmayı çözer.
 - Yalnız depo sahibinin tetiklemesine izin verir.
 
-ProPR şu işleri yapmaz:
+ProPR'ın yazdığı her commit'in yazarı ve committer'ı depo sahibidir. Kimlik `karacaismail` hesabıdır. Bu kural birleştirme ve çakışma çözme commit'lerini de kapsar. Ayrıntı "Commit kimliği" bölümündedir.
 
-- ProPR kod yazmaz ve commit atmaz.
-- ProPR PR birleştirmez.
-- ProPR CI hatasını kendiliğinden düzeltmeye çalışmaz.
-
-Bu sınırların nedeni yazar kuralıdır. Depodaki her commit'in yazarı ve committer'ı depo sahibi olmalı. ProPR'ın yazdığı bir commit bu kuralı bozardı.
+22 Kasım 2026 Pazar günü ProPR yalnız gözlemciydi. O gün ProPR commit atmıyor ve PR birleştirmiyordu. Bu sınır 27 Kasım 2026 Cuma günü kalktı.
 
 ## PR akışı
 
-PR'lar `main` dalına şu sırayla girer:
+`backend` dalı GitHub'dadır. `backend` dalına girişler PR ile olur. İş şu sırayla ilerler:
 
-1. Pane işçisi işi kendi dalında bitirir.
-2. Bağımsız bir inceleme dalı denetler. Karar `pass` olmalı.
-3. Kapı betiği dalı push eder ve PR açar.
+1. Geliştirici işi kendi dalında yapar. Dal güncel `origin/backend` ucundan açılır.
+2. Geliştirici dalı GitHub'a gönderir.
+3. Committer dalı `backend` dalına PR olarak açar.
 4. GitHub, `ci.yml` iş akışındaki testleri çalıştırır.
-5. ProPR PR'ı ve test sonucunu izler.
-6. Testler geçerse kapı betiği `main` dalını hızlı ileri alır.
+5. QA ve Committer PR'ı kural listesiyle inceler.
+6. ProPR PR'ı `backend` dalına birleştirir. Çakışma varsa ProPR çözer.
 
-Son adımda yeni commit oluşmaz. `main` dalı yalnız PR'ın son commit'ine ilerler. GitHub bu PR'ı birleşmiş olarak gösterir.
+Hiçbir ajan `backend` dalına yerelde birleştirme yapmaz. Hiçbir ajan `backend` dalına doğrudan push etmez.
 
-GitHub'ın birleştirme düğmesi kullanılmaz. Bu düğme committer alanına GitHub yazar. Otomatik birleştirme de kapalıdır.
+`main` dalına yayın ayrı bir PR ile girer. Her yayın `main` dalına tek commit olarak girer.
 
-Testler kalırsa kapı betiği hatayı dalın çalışma klasörüne yazar. Pane işçisi hatayı düzeltir. Sonra iş yeniden incelenir.
+GitHub'ın birleştirme düğmesi kullanılmaz. Otomatik birleştirme de kapalıdır.
 
-Kapı betiği depoda değildir. Betik geliştirici bilgisayarında yerel bir araçtır.
+Testler kalırsa QA işi geliştiriciye geri verir. Geliştirici hatayı düzeltir. Sonra iş yeniden incelenir.
+
+### Commit kimliği
+
+ProPR'ın oluşturduğu her commit'in yazarı ve committer'ı `karacaismail` hesabıdır. Bu commit'ler şunlardır:
+
+- hedef dalı PR dalına birleştiren commit'ler,
+- çakışma çözen commit'ler,
+- ProPR'ın kendi yazdığı düzeltme commit'leri.
+
+ProPR Git'i hook'lar kapalı çalıştırır. Bu yüzden yerel yazar koruması ProPR commit'lerini denetlemez. Kimliği ProPR'ın iki ayar değişkeni verir. Değişkenler ProPR'ın `.env` dosyasındadır. Değişkenler boş kalırsa ProPR yazar olarak kendi bot adını yazar.
+
+PR'ın son birleşme commit'ini GitHub'ın birleştirme servisi oluşturur. Bu commit'in committer alanına GitHub yazılır. Proje sahibi bu tek istisnayı kabul etti.
 
 ## GitHub bağlantısı
 
 ProPR, GitHub'a kendi GitHub uygulamamızla bağlanır. Uygulamanın adı `frappesetup-propr-gate` olur.
 
-Uygulamanın yedi izni vardır. Yedisi de yalnız okumadır:
+22 Kasım 2026 Pazar günü uygulamanın yedi izni vardı. Yedisi de yalnız okumaydı:
 
 - Actions
 - Checks
@@ -103,13 +112,13 @@ Kurulumda beş sorun çıktı. Her sorunun çözümü kurulum belgesinde yazıl�
 
 Paradev, kodlama ajanlarını çalışma alanlarında çalıştıran bir masaüstü uygulamasıdır.
 
-Paradev'de PR akışı için `site-pr-flow` adında bir çalışma alanı vardır. Bu alandaki ajan kapı betiğini çalıştırır. Ajan kod yazmaz. Ajan yalnız PR açma ve birleştirme adımını yürütür.
+Eski akışta Paradev'de `site-pr-flow` adında bir çalışma alanı vardı. Bu alandaki ajan yerel bir kapı betiğini çalıştırırdı. Betik PR açar ve `main` dalını ilerletirdi. 27 Kasım 2026 Cuma gününden beri PR'ları ProPR birleştirir.
 
 Paradev'e birden çok ajan hesabı tanımlıdır. Her hesap ayrı bir ajan olarak eklendi. Hesap, ortam değişkeniyle seçilir.
 
-### Pane
+### Paperclip takımları
 
-Site ve backend kodunu Pane işçileri yazar. Her iş için bağımsız bir inceleme raporu üretilir. Kapı betiği yalnız `pass` kararı alan dalı kabul eder.
+Site ve backend kodunu Paperclip takımları yazar. Geliştirici işi kendi dalında yapar. QA işi kabul ölçütüne göre dener. Committer dalı PR olarak açar.
 
 ### GitHub Actions
 
@@ -151,11 +160,10 @@ Kurulum adımları depodaki [`Propr_setup`](https://github.com/karacaismail/frap
 
 ## Güvenlik kararları
 
-- ProPR'ın GitHub izinleri yalnız okumadır.
 - ProPR MCP kapsamı yalnız okumadır.
 - MCP vekili yalnız bu bilgisayardan açılır.
-- ProPR'da kodlama ajanı tanımlı değildir.
 - CI hatasını otomatik düzeltme kapalıdır.
+- ProPR'ın commit kimliği `karacaismail` hesabıdır.
 - ProPR'ı yalnız depo sahibi tetikleyebilir.
 - Sırlar ProPR'ın `.env` dosyasında durur. Dosyayı yalnız sahibi okuyabilir.
 - Sırlar, anahtarlar ve `.env` dosyası depoya eklenmez.
@@ -165,4 +173,4 @@ Kurulum adımları depodaki [`Propr_setup`](https://github.com/karacaismail/frap
 
 1. ProPR MCP için öteki Claude hesapları ve Codex hesapları bağlanmadı. Araçla okuma denemesi yapılmadı.
 2. `main` dalı için GitHub koruma kuralı yoktur. Kural önerisi DevOps sorumlusuna devredildi. Devir notu [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
-3. Kapı betiği şimdilik yalnız site dallarını kabul eder.
+3. "GitHub bağlantısı" bölümündeki izin listesi 22 Kasım 2026 Pazar günkü durumdur. O gün yedi iznin hepsi yalnız okumaydı. PR birleştirmek yazma izni ister. ProPR'ın güncel izinleri bu sayfa için yeniden doğrulanmadı.
