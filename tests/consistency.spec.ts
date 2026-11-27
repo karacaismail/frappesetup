@@ -192,6 +192,48 @@ test.describe('content consistency', () => {
     expect(processFiles.filter((f) => !existsSync(new URL(f, dir))), 'depoda olmayan süreç belgesi').toEqual([]);
   });
 
+  for (const file of ['radius.md', 'frappe-guvenlik-onlemleri.md']) {
+    test(`standard documents include ${file}`, () => {
+      const path = new URL(`docs/standartlar/${file}`, root);
+      expect(existsSync(path), `Eksik yönerge: ${file}`).toBe(true);
+      expect(statSync(path).isFile(), `Yönerge dosya olmalı: ${file}`).toBe(true);
+      expect(readFileSync(path, 'utf8').trim(), `Boş yönerge: ${file}`).not.toBe('');
+    });
+  }
+
+  test('standard documents have no personal name headings', () => {
+    const directory = new URL('docs/standartlar/', root);
+    const allowedHeading = /^(?:Öneri listesi [1-4]|Ortak tahta)$/u;
+    const offenders: string[] = [];
+    for (const file of readdirSync(directory, { recursive: true })) {
+      if (typeof file !== 'string' || !file.endsWith('.md')) continue;
+      const lines = readFileSync(join(fileURLToPath(directory), file), 'utf8').split(/\r?\n/);
+      lines.forEach((line, index) => {
+        const heading = /^\s{0,3}#{1,6}[\t ]+\*\*([^*]+)\*\*[\t ]*(?:#+[\t ]*)?$/.exec(line);
+        if (heading && !allowedHeading.test(heading[1])) {
+          // Report only the location so a rejected name stays out of test logs.
+          offenders.push(`${file}:${index + 1}`);
+        }
+      });
+    }
+    expect(offenders, 'Kişi adı biçimindeki başlığı değiştirin.').toEqual([]);
+  });
+
+  test('guideline decisions have distinct numbers after GILT approval', () => {
+    const decisions = read('docs/standartlar/KARARLAR.md');
+    const headings = [...decisions.matchAll(/^### Karar (\d+)\. (.+)$/gm)];
+    const numbers = headings.map((heading) => heading[1]);
+    expect(new Set(numbers).size, 'Decision numbers must be unique.').toBe(numbers.length);
+    const titles = new Map(headings.map((heading) => [heading[1], heading[2]]));
+    expect(titles.get('43')).toBe('GILT kuralları onaylandı');
+    expect(titles.get('44')).toBe('Köşe yuvarlaklığının tek kuralı radius.md yönergesidir');
+    expect(titles.get('45')).toBe('Güvenlik yönergesi depoda korunur');
+    expect(numbers.indexOf('44')).toBeGreaterThan(numbers.indexOf('43'));
+    expect(numbers.indexOf('45')).toBeGreaterThan(numbers.indexOf('44'));
+    const security = decisions.split(/^### Karar 45\./m)[1]?.split(/^#{1,3} /m)[0];
+    expect(security).toContain('Karar 44 geçerliliğini korur.');
+  });
+
   test('task board covers every requirement with a valid epic, status and level', () => {
     // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
     expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);

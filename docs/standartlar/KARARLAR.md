@@ -969,6 +969,36 @@ Yönergenin bir kısmı uygulanmaz:
 
 Kaynak iş AJA-1378'dir. Bu kararı AJA-1379 işi yazdı.
 
+### Karar 45. Güvenlik yönergesi depoda korunur
+
+Müşterinin güvenlik yönergesi [frappe-guvenlik-onlemleri.md](frappe-guvenlik-onlemleri.md) dosyasına eklendi.
+Kaynak iş AJA-1387'dir. Bu kararı AJA-1388 işi yazdı.
+
+Sonuç şudur:
+
+- Dört kişi başlığı sırayla “Öneri listesi 1” ile “Öneri listesi 4” arasında adlandırılır.
+- “Tahta” başlığı “Ortak tahta” olur.
+- Başlıklar dışındaki kaynak metin aynen korunur. Metnin gövdesinde kişi adı bulunmadı.
+- README dosyaları güvenlik yönergesine ve köşe yönergesine bağlantı verir.
+- Köşe yönergesi yeniden eklenmez. Karar 44 geçerliliğini korur.
+- Ortak kural klasöründeki iki yönerge, depodaki kopyalarla aynı tutulur.
+- Dosya gereksinimleri anlatır. Dosyanın eklenmesi, güvenlik önlemlerinin uygulandığı anlamına gelmez.
+
+`tests/consistency.spec.ts` iki yönergenin varlığını denetler.
+Test, standart dosyalarında kişi adı biçimindeki kalın başlıkları reddeder.
+Test çıktısında kişi adı yerine dosya adı ve satır numarası gösterilir.
+
+Doğrulama komutları şunlardır:
+
+```bash
+npm run build
+npm run test:e2e -- tests/consistency.spec.ts --project=chromium
+```
+
+Kaynak metindeki uzun cümleler ve terimler aynen koruma şartı nedeniyle değiştirilmedi.
+Kaynağın noktalama işaretleri ve satır sonu boşlukları da korunur.
+Gerçek okurla denenmedi.
+
 ## Modellerin kararları
 
 Proje sahibi bu konuları cevapsız bıraktı ya da modellere bıraktı. Proje sahibi bu kararları değiştirebilir.

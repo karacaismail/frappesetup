@@ -56,6 +56,11 @@ python3 scripts/gen-diagrams.py # diyagramları phases.json'dan yeniden üretir
 - Derleme anında üretilen bloklar `<div data-embed="…">` yer tutucusuna taşınır (`rails`, `timeline`, `phase-table`, `req-summary`, `task-rules`).
 - Sürüm, lisans ve davranış iddiaları [kaynak defterine](https://karacaismail.github.io/frappesetup/izlenebilirlik/) sürüm/commit ve doğrulama türüyle yazılır; "(doğrulanacak)" işaretli maddeler teyit bekler. Kaynak defterindeki sürüm doğrulamaları 8 Ekim 2026 tarihlidir. Backend durumu 23 Kasım 2026 tarihlidir (`AS_OF`, `src/data/site.ts`).
 
+## Ortak yönergeler
+
+- [Köşe yönergesi](docs/standartlar/radius.md) köşe yuvarlaklığı kurallarını içerir.
+- [Güvenlik yönergesi](docs/standartlar/frappe-guvenlik-onlemleri.md) müşterinin güvenlik önerilerini içerir.
+
 ## Doğrulama kapsamı
 
 Kapılar ve son durum [İzlenebilirlik](https://karacaismail.github.io/frappesetup/izlenebilirlik/) sayfasındaki QA tablosundadır. Görsel regresyon testleri (`tests/visual.spec.ts`) yalnız Linux CI'da koşar; referans üretimi ve onay adımları `AGENTS.md`'dedir. axe kapısı otomatik kuralların kapsadığını kanıtlar, tam WCAG AA uyumu iddiası değildir; WebKit ve iPhone 13 emülasyondur, gerçek macOS/iOS Safari ve Android doğrulaması `not_run` olarak ayrı raporlanır; yerel geçiş CI geçişi sayılmaz.
