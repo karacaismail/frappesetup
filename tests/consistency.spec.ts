@@ -193,7 +193,7 @@ test.describe('content consistency', () => {
   });
 
   test('review template follows the 7 step flow and ProPR merges', () => {
-    // Müşteri kararı, 27 Kasım 2026 (AJA-1548): PR main dalına açılır, CI koşar, PR'ı ProPR birleştirir (AJA-1596).
+    // Customer decision, 27 November 2026 (AJA-1548): the PR is opened against main, CI runs and ProPR merges the PR (AJA-1596).
     const text = read('docs/standartlar/review-template.md');
     expect(text, 'orkestratör birleştirir').not.toMatch(/orkestratör[^.\n]*birleştir(ir|sin)\b/i);
     expect(text, 'müşteri kararı bekleniyor').not.toContain('müşteri kararı bekleniyor');
