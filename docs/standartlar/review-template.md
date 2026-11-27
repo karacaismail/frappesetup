@@ -33,6 +33,14 @@ Bu akış [AJA-1548](/AJA/issues/AJA-1548) kararından gelir. Her iş şu 7 adı
 6. İnceleme ve birleştirme ProPR'da yürür. PR'ı ProPR birleştirir.
 7. Hiçbir ajan `main` dalına doğrudan push etmez. Hiçbir ajan PR'ı GitHub düğmesiyle ya da `gh pr merge` ile birleştirmez.
 
+## `auto-merge` etiketi
+
+Etiket, PR'a konan kısa bir işarettir. ProPR, `auto-merge` etiketli PR'ı birleştirir.
+
+1. QA ve Committer onay verince PR'a `auto-merge` etiketi konur.
+2. Etiket onaydan önce konmaz.
+3. Backend deposunda CI henüz yoktur. CI gelmeden backend'de hiçbir PR'a `auto-merge` etiketi konmaz. CI işi [AJA-1528](/AJA/issues/AJA-1528) kapsamındadır.
+
 Birleştirme kapıları birleştirmenin parçasıdır. Ajan dalı kendisi birleştirirse bu kapılar koşmaz. Örneğin CI denetimi atlanır.
 
 Kaynak: müşteri kararı, 27 Kasım 2026 Cuma günü.

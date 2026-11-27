@@ -210,6 +210,23 @@ test.describe('content consistency', () => {
     expect(text, 'sonuç tablosu').toContain('| Sonuç | Anlamı |');
   });
 
+  test('review template sets the auto-merge label rule and the backend CI note', () => {
+    // The auto-merge label goes on only after QA and Committer approve; backend has no CI yet (AJA-1635, AJA-1528).
+    const text = read('docs/standartlar/review-template.md');
+    expect(text, 'auto-merge etiketi onaydan sonra').toContain(
+      'QA ve Committer onay verince PR\'a `auto-merge` etiketi konur.',
+    );
+    expect(text, 'etiket onaydan önce konmaz').toContain('Etiket onaydan önce konmaz.');
+    expect(text, 'gh pr merge yasağı').toContain(
+      'Hiçbir ajan PR\'ı GitHub düğmesiyle ya da `gh pr merge` ile birleştirmez.',
+    );
+    expect(text, 'backend CI notu').toContain('Backend deposunda CI henüz yoktur.');
+    expect(text, 'backend etiket yasağı').toContain(
+      'CI gelmeden backend\'de hiçbir PR\'a `auto-merge` etiketi konmaz.',
+    );
+    expect(text, 'AJA-1528 atfı').toContain('AJA-1528');
+  });
+
   test('task board covers every requirement with a valid epic, status and level', () => {
     // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
     expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);
