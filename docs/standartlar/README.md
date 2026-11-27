@@ -22,6 +22,7 @@ Kopyalar bu klasörden eşitlenir. Kopyada yapılan değişiklik asıl kural say
 3. [headless-frontend-standartlari.md](headless-frontend-standartlari.md) Frappe'nin dışında çalışan ekran uygulaması içindir.
 4. [mobile.md](mobile.md) telefon uygulaması içindir. Uygulama PWA ya da Capacitor paketidir.
 5. [naming_rules_report.md](naming_rules_report.md) koddaki adların nasıl seçileceğini anlatır. Bütün kod adları İngilizce olur.
+6. [radius.md](radius.md) köşe yuvarlaklığı içindir. Dosya müşterinin yönergesidir. Başında bir odak istisnası notu var.
 
 ## Karar dosyaları
 
