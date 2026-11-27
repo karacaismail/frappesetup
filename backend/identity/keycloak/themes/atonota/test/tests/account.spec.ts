@@ -342,7 +342,7 @@ for (const name of ['personal-info', 'signing-in', 'applications']) {
     await openAccount(page, byName(name));
     const motion = await collectMotion(page);
     expect(motion.filter((item) => item.easing.split(/,(?![^(]*\))/).some((part) => part.trim() !== EASE)), 'unapproved curve').toEqual([]);
-    expect(motion.filter((item) => !item.property.startsWith('animation') && Math.abs(item.seconds - 0.16) > 0.001), 'duration outside the token').toEqual([]);
+    expect(motion.filter((item) => !item.property.startsWith('animation') && Math.abs(item.seconds - 0.2) > 0.001), 'duration outside the token').toEqual([]);
     expect(motion.filter((item) => item.property.split(',').some((part) => part.trim() === 'all')), 'transition: all').toEqual([]);
     expect(motion.filter((item) => item.where.includes('pf-v5-c-button')).length, 'buttons have a transition').toBeGreaterThan(0);
   });
@@ -355,7 +355,7 @@ test('account: the sidebar slides with the token curve and duration', async ({ p
     return { property: style.transitionProperty, duration: style.transitionDuration, easing: style.transitionTimingFunction };
   });
   expect(sidebar.property).toContain('transform');
-  expect(sidebar.duration).toBe('0.16s');
+  expect(sidebar.duration).toBe('0.2s');
   expect(sidebar.easing).toBe(EASE);
 });
 
