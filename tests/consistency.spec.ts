@@ -259,6 +259,30 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('brand merge review preserves released product evidence and incomplete delivery', () => {
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const product = board.items['G-157'];
+    expect.soft(product.status).toBe('done');
+    expect.soft(product.evidence).toEqual({
+      commit: '18a9fff8',
+      release: { pr: 23, commit: '22e70ad7' },
+      tests: [
+        'backend/identity/atonota_login/tests/test_product_boundary.py',
+        'backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts',
+      ],
+    });
+    expect.soft(board.update.note).toContain('Marka ayarı 30494610 birleşmesiyle geldi.');
+    expect.soft(board.update.note).toContain('backend/brand.env');
+    expect.soft(board.update.note).toContain('backend/brand-exclusions.txt');
+    // A shared brand setting does not finish mail delivery, theme acceptance or live DNS.
+    for (const id of ['G-47', 'G-80', 'G-158']) {
+      expect.soft(board.items[id].status, id).toBe('in-progress');
+      expect.soft(board.update.note, id).toContain(`${id} için kanıt 30494610`);
+    }
+    expect.soft(board.items['G-17'].status).toBe('not-started');
+    expect.soft(board.items['G-2'].status).toBe('not-started');
+  });
+
   test('fabricated evidence commits fail in full history', () => {
     // Uydurma commit kodu tam geçmişte geçmez (inceleme r2-1, E-1). release null olsa da geçmez.
     // Sığ kopyada geçmiş yoktur; orada bu denetim koşamaz.
