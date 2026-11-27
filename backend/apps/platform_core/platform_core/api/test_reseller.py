@@ -252,6 +252,14 @@ class TestResellerEndpointSecurity(IntegrationTestCase):
 			{"offset": -1},
 			{"offset": "x"},
 			{"page_size": "1.5"},
+			{"page_size": "1_0"},
+			{"offset": "1_0"},
+			{"page_size": "+10"},
+			{"offset": "+1"},
+			{"page_size": " 10"},
+			{"offset": "1 "},
+			{"page_size": "10\n"},
+			{"offset": "1\n"},
 			{"offset": str(2**64)},
 		):
 			with self.subTest(query=query):

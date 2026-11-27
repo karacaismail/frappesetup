@@ -158,7 +158,7 @@ def get_leave_request_context(
 	return result
 
 
-# home_summary reads through frappe.get_list, so each part holds only records the user can read.
+# home_summary uses permission-filtered lists and query-builder reads for both items and counts.
 @frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 @rate_limit(limit=120, seconds=60, methods=["GET"], ip_based=False, user_based=True)
 def get_home_summary() -> dict:

@@ -5,6 +5,8 @@ A reseller sees only the customers linked to that site. The reseller never reads
 data of a customer tenant: these functions return the link fields only.
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, validate_email_address
@@ -37,6 +39,8 @@ def list_customers(offset: int | str = 0, page_size: int | str = DEFAULT_PAGE_SI
 	values = []
 	for value, minimum in ((offset, 0), (page_size, 1)):
 		if isinstance(value, bool) or not isinstance(value, (str, int)):
+			frappe.throw(_("Enter a valid page offset and page size."))
+		if isinstance(value, str) and re.fullmatch(r"^\d+$", value) is None:
 			frappe.throw(_("Enter a valid page offset and page size."))
 		try:
 			value = int(value)

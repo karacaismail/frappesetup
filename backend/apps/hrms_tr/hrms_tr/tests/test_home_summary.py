@@ -88,42 +88,6 @@ def day(offset: int) -> str:
 	return str(add_days(today(), offset))
 
 
-def row(name, team, start, end, **values):
-	return {"name": name, "department": team, "from_date": start, "to_date": end, **values}
-
-
-@unittest.skipIf(frappe is None, "Needs Frappe.")
-class OverlapRuleTest(unittest.TestCase):
-	"""Two open or approved leaves of one team that share a day are one problem."""
-
-	def pairs(self, rows):
-		return [(first["name"], second["name"]) for first, second in home_summary.find_overlaps(rows)]
-
-	def test_shared_day_in_one_team_is_an_overlap(self):
-		rows = [row("L1", "A", "2026-12-07", "2026-12-08"), row("L2", "A", "2026-12-08", "2026-12-09")]
-		self.assertEqual(self.pairs(rows), [("L1", "L2")])
-
-	def test_days_next_to_each_other_do_not_overlap(self):
-		rows = [row("L1", "A", "2026-12-07", "2026-12-08"), row("L2", "A", "2026-12-09", "2026-12-10")]
-		self.assertEqual(self.pairs(rows), [])
-
-	def test_other_team_does_not_overlap(self):
-		rows = [row("L1", "A", "2026-12-07", "2026-12-08"), row("L2", "B", "2026-12-07", "2026-12-08")]
-		self.assertEqual(self.pairs(rows), [])
-
-	def test_leave_without_team_is_skipped(self):
-		rows = [row("L1", None, "2026-12-07", "2026-12-08"), row("L2", None, "2026-12-07", "2026-12-08")]
-		self.assertEqual(self.pairs(rows), [])
-
-	def test_long_leave_overlaps_each_later_leave_inside_it(self):
-		rows = [
-			row("L3", "A", "2026-12-10", "2026-12-10"),
-			row("L1", "A", "2026-12-01", "2026-12-20"),
-			row("L2", "A", "2026-12-05", "2026-12-05"),
-		]
-		self.assertEqual(self.pairs(rows), [("L1", "L2"), ("L1", "L3")])
-
-
 @unittest.skipIf(frappe is None, "Needs Frappe.")
 class ChangeActionRuleTest(unittest.TestCase):
 	"""What the person did to the leave in its last change."""
@@ -602,6 +566,7 @@ class HomeSummaryRequestTest(IntegrationTestCase):
 				("c-next", 62, 63, TEAM_A),
 				("d-other", 52, 53, TEAM_B),
 				("e-no-team", 52, 53, None),
+				("f-no-team", 52, 53, None),
 			):
 				doc = frappe.copy_doc(frappe.get_doc(DOCTYPE, self.leaves["open_a"]))
 				doc.name = f"{self.prefix}-range-{suffix}"
@@ -621,6 +586,34 @@ class HomeSummaryRequestTest(IntegrationTestCase):
 					frozenset((names[0], names[2])),
 				},
 			)
+			ordered_pairs = {
+				tuple(leave["name"] for leave in item["leaves"])
+				for item in data["problems"]
+				if any(leave["name"] in names for leave in item["leaves"])
+			}
+			self.assertEqual(ordered_pairs, {(names[0], names[1]), (names[0], names[2])})
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.delete(DOCTYPE, {"name": ["in", names]})
+
+	def test_overlap_query_orders_same_start_by_name(self):
+		names = []
+		try:
+			for suffix in ("z", "b", "a"):
+				doc = frappe.copy_doc(frappe.get_doc(DOCTYPE, self.leaves["open_a"]))
+				doc.name = f"{self.prefix}-same-start-{suffix}"
+				doc.from_date, doc.to_date = day(80), day(81)
+				doc.db_insert()
+				names.append(doc.name)
+			frappe.set_user(self.users["manager"])
+			data = home_summary.get_summary()
+			self.assertEqual(data["counts"]["problems"], 4)
+			pairs = [
+				tuple(leave["name"] for leave in item["leaves"])
+				for item in data["problems"]
+				if any(leave["name"] in names for leave in item["leaves"])
+			]
+			self.assertEqual(pairs, [(names[2], names[1]), (names[2], names[0]), (names[1], names[0])])
 		finally:
 			frappe.set_user("Administrator")
 			frappe.db.delete(DOCTYPE, {"name": ["in", names]})

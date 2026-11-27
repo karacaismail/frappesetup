@@ -6,7 +6,7 @@ Overlap pairs join two permission-filtered subqueries without loading all leaves
 
 import frappe
 from frappe.query_builder.functions import Count
-from frappe.utils import add_months, get_first_day, get_fullname, getdate, today
+from frappe.utils import add_months, get_first_day, get_fullname, today
 
 from hrms_tr.access import DOCTYPE
 
@@ -26,28 +26,6 @@ PENDING_FIELDS = [
 ]
 # Open drafts and approved leaves take days off the team. Rejected and cancelled ones do not.
 ACTIVE_FILTERS = [["status", "in", ["Open", "Approved"]], ["docstatus", "in", [0, 1]]]
-
-
-def find_overlaps(rows) -> list[tuple]:
-	"""Pairs of leaves of one team that share at least one day.
-
-	The team is the department of the leave application (approved on 26 November 2026, AJA-1165).
-	A leave without a department is never an overlap. Two leaves of one employee also count.
-	"""
-	teams = {}
-	for row in rows:
-		if row.get("department"):
-			teams.setdefault(row["department"], []).append(row)
-	pairs = []
-	for team in sorted(teams):
-		leaves = sorted(teams[team], key=lambda row: (getdate(row["from_date"]), row["name"]))
-		for index, first in enumerate(leaves):
-			for second in leaves[index + 1 :]:
-				# The list is sorted by the first day. A later leave cannot start sooner.
-				if getdate(second["from_date"]) > getdate(first["to_date"]):
-					break
-				pairs.append((first, second))
-	return pairs
 
 
 def change_action(row) -> str:
@@ -118,7 +96,10 @@ def _overlap_problems() -> tuple[list[dict], int]:
 		frappe.qb.from_(first)
 		.join(second)
 		.on(
-			(first.name < second.name)
+			(
+				(first.from_date < second.from_date)
+				| ((first.from_date == second.from_date) & (first.name < second.name))
+			)
 			& (first.department == second.department)
 			& (first.from_date <= second.to_date)
 			& (second.from_date <= first.to_date)
