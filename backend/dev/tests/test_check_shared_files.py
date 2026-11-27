@@ -1,14 +1,27 @@
 """The shared-file gate rejects silent hooks.py overwrites and broken translation CSV files."""
 
-import subprocess
-import sys
+import contextlib
+import importlib.util
+import io
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 CHECKER = Path(__file__).resolve().parents[1] / "check_shared_files.py"
+_spec = importlib.util.spec_from_file_location("check_shared_files", CHECKER)
+check_shared_files = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(check_shared_files)
 HOOKS = "apps/sample_app/sample_app/hooks.py"
 CSV = "apps/sample_app/sample_app/translations/tr.csv"
+
+
+def run_checker(argv):
+    # The checker runs in-process. The security gate rejects subprocess use in tests (Bandit B404, B603).
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        returncode = check_shared_files.main(argv)
+    return SimpleNamespace(returncode=returncode, stdout=output.getvalue(), stderr="")
 
 
 class SharedFilesTests(unittest.TestCase):
@@ -23,12 +36,7 @@ class SharedFilesTests(unittest.TestCase):
         file.write_text(text, encoding="utf-8")
 
     def check(self):
-        return subprocess.run(
-            [sys.executable, "-B", CHECKER, "--root", self.root],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        return run_checker(["--root", str(self.root)])
 
     def test_clean_files_pass(self):
         self.write(HOOKS, 'app_name = "sample_app"\nauth_hooks = ["a.b"]\nauth_hooks += ["c.d"]\n')
@@ -70,9 +78,7 @@ class SharedFilesTests(unittest.TestCase):
         self.assertEqual(self.check().returncode, 1)
 
     def test_real_backend_passes(self):
-        result = subprocess.run(
-            [sys.executable, "-B", CHECKER], check=False, capture_output=True, text=True
-        )
+        result = run_checker([])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
