@@ -880,7 +880,7 @@ You cannot open this exception record.,Bu istisna kaydını açamazsınız.,plat
 The sign-in service is not available. Try again later.,Giriş hizmeti şu anda çalışmıyor. Biraz sonra yeniden deneyin.,platform_core.identity
 This sign-in information cannot be read on this site.,Bu giriş bilgisi bu sitede okunamaz.,platform_core.identity
 This endpoint takes no parameters.,Bu işlem ek bilgi almaz.,platform_core.identity
-This session is not linked to an AtonotA Login account.,Bu oturum bir AtonotA Login hesabına bağlı değil.,platform_core.identity
+This session is not linked to a {0} account.,Bu oturum bir {0} hesabına bağlı değil.,platform_core.identity
 PLT AI File Job,Yapay Zekâ Dosya İşi,
 PLT AI File Chunk,Yapay Zekâ Dosya Parçası,
 Route,Yol,PLT AI File Job
@@ -1006,3 +1006,9 @@ Select a valid target type.,Geçerli bir hedef türü seçin.,
 No help is available for this field.,Bu alan için yardım yok.,shell.help
 A valid field is required.,Geçerli bir alan gerekir.,shell.help
 Select an installed application.,Kurulu bir uygulama seçin.,shell.help
+Tour URL,Tur bağlantısı,PLT Help Topic
+Documentation URL,Belge bağlantısı,PLT Help Topic
+Support URL,Destek bağlantısı,PLT Help Topic
+Optional HTTPS URL or same-site relative path. Leave blank when unavailable.,HTTPS adresini veya site içindeki yolu yazın. Bağlantı yoksa alanı boş bırakın.,PLT Help Topic
+Help links must use HTTPS or a same-site relative path.,Yardım bağlantılarında HTTPS adresi veya site içindeki yol kullanılmalıdır.,
+A valid component identifier is required.,Geçerli bir bileşen kimliği yazın.,

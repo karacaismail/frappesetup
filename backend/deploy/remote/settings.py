@@ -153,6 +153,10 @@ def check_files(env, lists, etc, press=False, offsite_required=False):
             continue
         for problem in compare(parse_list(Path(lists) / target.list_file), present):
             problems.append(f"{path}: {problem}")
+        if name == "keycloak" and "IDENTITY_BRAND_NAME" in present and not any(
+                entry.key == "IDENTITY_BRAND_NAME"
+                for entry in parse_list(Path(lists) / target.list_file)):
+            problems.append(f"{path}: remove IDENTITY_BRAND_NAME; the release supplies it")
     return problems
 
 
@@ -202,8 +206,21 @@ def main(argv=None):
     sites.add_argument("sites", nargs="+")
     fixed = commands.add_parser("site-fixed", help="print the fixed site values for site-probe.py")
     fixed.add_argument("lists")
+    host = commands.add_parser("host-env", help="read generated host values without shell evaluation")
+    host.add_argument("path")
     arguments = parser.parse_args(argv)
     try:
+        if arguments.command == "host-env":
+            for key, value in parse_env(arguments.path).items():
+                if key == "PRODUCT_NAME":
+                    # release.py emits a JSON-quoted Compose value. $$ prevents interpolation.
+                    value = json.loads('"' + value + '"').replace("$$", "$")
+                    print(f"{key}={value}")
+                    continue
+                if not re.fullmatch(r"ATONOTA_[A-Z0-9_]+|RCLONE_CONFIG_OFFSITE_[A-Z0-9_]+", key) or value.expands:
+                    raise SettingsError("unexpected or interpolated host setting")
+                print(f"{key}={value}")
+            return 0
         if arguments.command == "site-fixed":
             print(json.dumps(site_fixed_values(arguments.lists), sort_keys=True))
             return 0

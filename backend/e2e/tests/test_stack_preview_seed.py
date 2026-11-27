@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 STACK = Path(__file__).resolve().parents[1] / "stack"
 PREVIEW = STACK.parent / "preview"
 PORT = "43820"
+PRODUCT_NAME = runpy.run_path(str(STACK.parents[1] / "deploy/brand.py"))["load_brand"]()["PRODUCT_NAME"]
 
 
 def stack_environment():
@@ -27,7 +28,7 @@ def stack_environment():
         "KC_PORT": PORT,
         "KC_PUBLIC_URL": f"http://identity.localhost:{PORT}",
         "ATONOTA_SITE_TENANT1_URL": f"http://tenant1.localhost:{int(PORT) + 1}",
-        "IDENTITY_BRAND_NAME": "AtonotA Login",
+        "IDENTITY_BRAND_NAME": PRODUCT_NAME,
         "IDENTITY_SYNC_EVENTS_URL": "http://identity-sync.localhost:6115/v1/events",
         "ATONOTA_SITE_TENANT1_SECRET": secrets.token_urlsafe(16),
         "ATONOTA_SITE_TENANT1_SERVICE_SECRET": secrets.token_urlsafe(16),

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from './site';
 // Bölüm üst verisi: navigasyon grubu, ikon adı ve tek cümlelik özet.
 // İçeriğin kendisi src/content/docs içindedir; burada yalnızca sunum bilgisi tutulur.
 export type IconName =
@@ -85,7 +86,7 @@ export const SECTIONS: Record<string, SectionMeta> = {
   'atonota-login-tanitim': {
     group: 'Teslim',
     icon: 'key',
-    summary: 'AtonotA Login tanıtım taslağı: değer önerileri, gereksinim bağları, biten ve yakında gelen özellikler.',
+    summary: `${PRODUCT_NAME} tanıtım taslağı: değer önerileri, gereksinim bağları, biten ve yakında gelen özellikler.`,
   },
   'acik-kararlar': { group: 'Teslim', icon: 'alert', summary: 'Açık kararlar, riskler ve dış bağımlılıklar.' },
   izlenebilirlik: {

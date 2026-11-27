@@ -9,7 +9,7 @@ import { getCollection } from 'astro:content';
 import Shell, { type Heading } from '../components/Shell.tsx';
 import { SECTIONS } from '../data/sections';
 import requirements from '../data/requirements.json';
-import { AS_OF, REPO_URL, SITE_TITLE } from '../data/site';
+import { AS_OF, REPO_URL, SITE_TITLE, fillBrand } from '../data/site';
 
 interface Props {
   title: string;
@@ -32,7 +32,7 @@ const nav = [
   { href: `${BASE}/`, label: 'Genel bakış', order: 0, group: '', icon: 'home' },
   ...docs.map((d) => ({
     href: `${BASE}/${d.id}/`,
-    label: d.data.nav,
+    label: fillBrand(d.data.nav),
     order: d.data.order,
     group: SECTIONS[d.id]?.group ?? '',
     icon: SECTIONS[d.id]?.icon ?? 'file',

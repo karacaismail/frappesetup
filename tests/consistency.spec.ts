@@ -1,3 +1,4 @@
+import { parseBrand, fillBrand, fillBrandData } from '../src/lib/brand.mjs';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -7,15 +8,17 @@ import { test, expect } from '@playwright/test';
 // İçerik tutarlılığı (rapor E-15): gereksinim JSON'u, fazlar, açık kararlar ve markdown sayfaları aynı karar setine
 // bağlı kalmalı. Tarayıcı gerektirmez; tek projede koşar.
 const root = new URL('../', import.meta.url);
+const brand = parseBrand(readFileSync(new URL('backend/brand.env', root), 'utf8'));
+const domainPattern = brand.BRAND_DOMAIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 type Req = { id: string; title: string; detail: string; rail: string; priority: string; phase: string; source: string; owner?: string };
-const reqs: Req[] = JSON.parse(read('src/data/requirements.json'));
+const reqs: Req[] = fillBrandData(JSON.parse(read('src/data/requirements.json')), brand);
 type Phase = { id: string; after: string[]; entryGate?: string };
-const phases: Phase[] = JSON.parse(read('src/data/phases.json'));
+const phases: Phase[] = fillBrandData(JSON.parse(read('src/data/phases.json')), brand);
 const docsDir = new URL('src/content/docs/', root);
 const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
-  .map((f) => ({ slug: f.replace(/\.md$/, ''), text: readFileSync(new URL(f, docsDir), 'utf8') }));
+  .map((f) => ({ slug: f.replace(/\.md$/, ''), text: fillBrand(readFileSync(new URL(f, docsDir), 'utf8'), brand) }));
 const ids = new Set(reqs.map((r) => r.id));
 // release: commit'i içeren main yayını (PR numarası ve yayın commit'i); null ise commit henüz yayımlanmadı.
 type Release = { pr: number; commit: string } | null;
@@ -254,6 +257,30 @@ test.describe('content consistency', () => {
     if (hasCommit(u.commit) && hasCommit(a.commit)) {
       expect(gitOk('merge-base', '--is-ancestor', a.commit, u.commit), `update.commit ${u.commit}, audit.commit ${a.commit} torunu`).toBe(true);
     }
+  });
+
+  test('brand merge review preserves released product evidence and incomplete delivery', () => {
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const product = board.items['G-157'];
+    expect.soft(product.status).toBe('done');
+    expect.soft(product.evidence).toEqual({
+      commit: '18a9fff8',
+      release: { pr: 23, commit: '22e70ad7' },
+      tests: [
+        'backend/identity/atonota_login/tests/test_product_boundary.py',
+        'backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts',
+      ],
+    });
+    expect.soft(board.update.note).toContain('Marka ayarı 30494610 birleşmesiyle geldi.');
+    expect.soft(board.update.note).toContain('backend/brand.env');
+    expect.soft(board.update.note).toContain('backend/brand-exclusions.txt');
+    // A shared brand setting does not finish mail delivery, theme acceptance or live DNS.
+    for (const id of ['G-47', 'G-80', 'G-158']) {
+      expect.soft(board.items[id].status, id).toBe('in-progress');
+      expect.soft(board.update.note, id).toContain(`${id} için kanıt 30494610`);
+    }
+    expect.soft(board.items['G-17'].status).toBe('not-started');
+    expect.soft(board.items['G-2'].status).toBe('not-started');
   });
 
   test('fabricated evidence commits fail in full history', () => {
@@ -683,7 +710,7 @@ test.describe('content consistency', () => {
     const RULES: [RegExp, string][] = [
       // Adın geçersiz olduğunu söyleyen yasak cümleleri ("... adı kullanılmaz", "... açılmaz") muaftır.
       [/(?<![_\w])press\.api\.ops(?!.{0,40}(kullanılmaz|açılmaz))/, 'press.api.ops (press_tr.api.ops olmalı)'],
-      [/<marka>\.com\.tr|<kiracı>\.atonota\.net/, 'eski ad: kiracı <kiracı>.app.atonota.net, marka alanı atonota.net olmalı (backend ad haritası)'],
+      [new RegExp(`<marka>\\.com\\.tr|<kiracı>\\.${domainPattern}`), `eski ad: kiracı <kiracı>.app.${brand.BRAND_DOMAIN}, marka alanı ${brand.BRAND_DOMAIN} olmalı (backend ad haritası)`],
       [/buy_credits_iyzico|press\.api\.billing\.create_iyzico/, 'iyzico ucu press_tr.api.billing.create_iyzico_checkout_form olmalı'],
       [/kullanıcının Keycloak token/, 'kiracı verisi kullanıcının Keycloak belirteciyle değil aracı belirteciyle (G-148)'],
     ];

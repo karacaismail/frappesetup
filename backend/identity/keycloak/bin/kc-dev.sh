@@ -9,6 +9,8 @@ BACKEND="$(cd "$SCRIPT_DIR/../.." && pwd)"
 COMPOSE_FILE="$BACKEND/dev/compose.keycloak.yaml"
 # Tests may point to their own environment file with made-up values.
 ENV_FILE="${KC_ENV_FILE:-$SCRIPT_DIR/.env}"
+# The single brand file (AJA-1053). Its PRODUCT_NAME is the visible name on the login screens.
+BRAND_FILE="$BACKEND/brand.env"
 PROJECT="${COMPOSE_PROJECT_NAME:-fs-kimlik-realm}"
 # FS_COLIMA_PROFILE selects the Colima profile. Use "default" for the standard Colima profile.
 # See the disk space guidance in backend/AGENTS.md.
@@ -60,7 +62,7 @@ prepare_env() {
 load_environment() {
   prepare_env
   # The file is read the way "docker run --env-file" and e2e/stack read it: the rest of the line
-  # is the value, with no shell quoting. So a value with a space, like "AtonotA Login", stays whole.
+  # is the value, with no shell quoting. So a value with a space, like "Sample Brand", stays whole.
   # Quotes and a trailing "# comment" stay in the value, as with docker. A final "\r" (CRLF file) is
   # removed. Blank lines and lines starting with "#" are skipped. Any other line must be KEY=value.
   # Two differences from docker make this reader stricter, never silently different:
@@ -81,11 +83,55 @@ load_environment() {
     fi
     export "$key=${line#*=}"
   done < "$ENV_FILE"
+  load_brand
   export KC_PORT="$PANE_PORT"
   export KC_PUBLIC_URL="http://identity.localhost:$PANE_PORT"
   export MAILPIT_UI_PORT="$((PANE_PORT + 6))"
   export ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:$((PANE_PORT + 1))"
   export ATONOTA_PRESS_URL="http://press.localhost:$((PANE_PORT + 3))"
+}
+
+# Reads backend/brand.env with the same rules as .env. Only PRODUCT_NAME and BRAND_DOMAIN are allowed,
+# and both must have a value. Keycloak gets PRODUCT_NAME as IDENTITY_BRAND_NAME (AJA-1062).
+# .env may still hold IDENTITY_BRAND_NAME from an older copy. The same value or the example placeholder
+# is accepted. Any other value stops the script, so two names never compete.
+load_brand() {
+  if [ ! -f "$BRAND_FILE" ]; then
+    printf 'The brand file is missing: %s (backend/brand.env).\n' "$BRAND_FILE" >&2
+    exit 2
+  fi
+  local line key value number=0 product="" domain=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
+    line="${line%$'\r'}"
+    case "${line#"${line%%[![:space:]]*}"}" in
+      '' | '#'*) continue ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    case "$key" in
+      PRODUCT_NAME) [ "$key" != "$line" ] && product="$value" ;;
+      BRAND_DOMAIN) [ "$key" != "$line" ] && domain="$value" ;;
+      *)
+        printf '%s:%s: only PRODUCT_NAME and BRAND_DOMAIN are allowed, found "%s".\n' \
+          "$BRAND_FILE" "$number" "$key" >&2
+        exit 2
+        ;;
+    esac
+  done < "$BRAND_FILE"
+  if [ -z "$product" ] || [ -z "$domain" ]; then
+    printf '%s: PRODUCT_NAME and BRAND_DOMAIN both need a value (backend/brand.env).\n' "$BRAND_FILE" >&2
+    exit 2
+  fi
+  case "${IDENTITY_BRAND_NAME-}" in
+    '' | '<PRODUCT_NAME>' | "$product") ;;
+    *)
+      printf '%s sets IDENTITY_BRAND_NAME to a different name. Delete that line: the name comes from backend/brand.env.\n' \
+        "$ENV_FILE" >&2
+      exit 2
+      ;;
+  esac
+  export IDENTITY_BRAND_NAME="$product"
 }
 
 compose() {
@@ -232,7 +278,7 @@ case "$command" in
       shift 2
       docker --context "$CONTEXT" run -d --name "$name" --env-file "$ENV_FILE" \
         -e KC_HTTP_ENABLED=true -e KC_HOSTNAME="http://127.0.0.1:$prod_port" -e KC_HEALTH_ENABLED=true \
-        -e KC_DB=dev-file -e ATONOTA_SITE_TENANT1_URL -e ATONOTA_PRESS_URL \
+        -e KC_DB=dev-file -e ATONOTA_SITE_TENANT1_URL -e ATONOTA_PRESS_URL -e IDENTITY_BRAND_NAME \
         -e KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET \
         -e KC_SPI_EVENTS_LISTENER__WEBHOOK__URL="$url" "$@" "$prod_tag" start --import-realm >/dev/null
     }

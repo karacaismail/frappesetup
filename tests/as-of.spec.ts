@@ -1,7 +1,10 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
-import { AS_OF } from '../src/data/site';
+// site.ts also imports a Vite raw asset; this file-level check runs in Node.
+const siteSource = readFileSync(new URL('../src/data/site.ts', import.meta.url), 'utf8');
+const AS_OF = /export const AS_OF = '([^']+)'/.exec(siteSource)?.[1] ?? '';
 
 // AS_OF ana sayfada ve kabukta görünen "güncellik" tarihidir. Değer elle yazılır.
 // Bu test, içerik sayfaları değiştiği hâlde tarihin eski kalmasını yakalar.

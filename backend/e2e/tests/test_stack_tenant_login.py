@@ -37,6 +37,7 @@ class StackTenantLoginTest(unittest.TestCase):
             "ATONOTA_SITE_TENANT1_URL": "http://tenant1.localhost:7401",
             "ATONOTA_SITE_TENANT1_SECRET": token_hex(16),
             "KC_PUBLIC_URL": "http://identity.localhost:7400",
+            "IDENTITY_BRAND_NAME": STACK["load_brand"]()["PRODUCT_NAME"],
         }
         for vite, origin in (("0", environment["ATONOTA_SITE_TENANT1_URL"]), ("1", "http://localhost:5180")):
             with self.subTest(vite=vite):

@@ -707,7 +707,7 @@ paths:
       operationId: listLoginProviders
       summary: Lists the sign-in platforms that the calling tenant may show.
       description: |
-        The source is the AtonotA Login security review (AJA-458) and the panel contract, G-159.
+        The source is the security review of the sign-in product (AJA-458) and the panel contract, G-159.
         The login page of a `platform_core` site shows one button for each platform in this list.
         The request names no person and has no body.
 
@@ -759,7 +759,7 @@ paths:
       operationId: listLinkedAccounts
       summary: Lists the linked platforms and the local sign-in ways of one member.
       description: |
-        The source is the AtonotA Login security review (AJA-458) and the panel contract, G-160.
+        The source is the security review of the sign-in product (AJA-458) and the panel contract, G-160.
         The account page of a `platform_core` site shows which platforms the signed-in user has linked.
         The site takes the id of the user from its own session and identity link. The body carries this id.
         The method is POST so that the id of the user is not in the address. The endpoint still only reads.

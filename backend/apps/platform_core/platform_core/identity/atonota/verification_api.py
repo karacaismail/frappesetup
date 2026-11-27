@@ -1,4 +1,4 @@
-"""Frappe link of the AtonotA Login verification inbox (G-164, AJA-231).
+"""Frappe link of the `atonota_login` verification inbox (G-164, AJA-231).
 
 The rules live in the `atonota_login` package (`atonota_login.verification_inbox`). That package has no
 Frappe code. This module is the thin Frappe layer around it:

@@ -6,13 +6,26 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 
 - Geliştirme sunucusu: `astro dev --background` (durdur/izle: `astro dev stop`, `astro dev status`, `astro dev logs`).
 - Üretim: `npm run build` → `dist/`; `npm run preview`.
-- Testler: `npm run build && npm run test:e2e` (Playwright; Chromium, Firefox, WebKit × 320/360/375/390/yatay telefon/tablet/masaüstü; iPhone 13 emülasyonu yalnız `@touch`). 4329 portu doluysa `PW_PORT=<port> npm run test:e2e`. Tarayıcılar yoksa `npx playwright install chromium firefox webkit`.
+- Testleri `npm run build && npm run test:e2e` komutuyla çalıştırın. Playwright, Chromium ve WebKit kullanır. Testler 320, 360, 375 ve 390 piksel genişliklerini kapsar. Yatay telefon, tablet ve masaüstü de denenir. iPhone 13 emülasyonu yalnız `@touch` senaryolarında çalışır. 4329 portu doluysa `PW_PORT=<port> npm run test:e2e` kullanın. Tarayıcılar eksikse `npx playwright install chromium webkit` çalıştırın.
+- Firefox testi yalnız bu iş için açık kullanıcı talimatıyla çalışır. Varsayılan yerel testler ve CI, Firefox çalıştırmaz. Eski test kayıtları korunur.
 - Görsel regresyon: `tests/visual.spec.ts` yalnız Linux'ta koşar (yazı işleme işletim sistemine göre değişir; macOS'ta atlanır, yerel geçiş görsel kapının kanıtı değildir). Referanslar `tests/__screenshots__/<proje>/` altındadır ve yalnız GitHub'ın `ubuntu-24.04` koşucusunda üretilir (test işleri bu etikete sabitlidir; `ubuntu-latest` 19 Ekim 2026'da Ubuntu 26'ya geçer; koşucu imajı ya da Playwright sürümü değişince referanslar aynı prosedürle yeniden üretilip onaylanır): dalı push et, `gh workflow run deploy.yml --ref <dal> -f visual_baseline=true` (bu kip yalnız referans artifact'ı üretir; deploy işi ve Pages adımları main dışında ve bu kipte koşmaz), artifact'ı indir, uygulayıcıdan bağımsız salt okunur görsel onaydan sonra commit et, sonra aynı dalda `visual_baseline=false` ile gerçek karşılaştırmayı koştur. Referans eksikse Linux kapısı başarısız olur; referanslar sessizce veya toplu güncellenmez. Diyagram görüntülerinde sabit başlık `tests/visual-hide-chrome.css` ile gizlenir (`stylePath`). `deploy.yml` eşzamanlılık grubu main dışındaki ref'lerde ayrıdır; dal koşusu bekleyen main dağıtımını iptal ettiremez.
 - Diyagramlar: `python3 scripts/gen-diagrams.py` (`Rails.astro`, `Timeline.astro`; faz sırası çizimi `phases.json`'daki `after` bağımlılıklarından üretilir; elle düzenlenmez).
 - Markdown eklentisi (`src/lib/satteri-table-wrap.mjs`) değişince içerik önbelleğini temizleyin: `rm -rf node_modules/.astro`.
 - Tip denetimi için ayrı bir `astro check` kurulumu yok; derleme ve testler kapıdır.
 
 ## Mimari kararlar
+
+- Site marka ayarını `backend/brand.env` dosyasından okur. Dosyada gizli bilgi bulunmaz.
+- `src/data/site.ts`, `PRODUCT_NAME` ve `BRAND_DOMAIN` değerlerini verir. Ortak ayrıştırıcı `src/lib/brand.mjs` dosyasındadır.
+- Güncel Markdown metinleri `{{PRODUCT_NAME}}` ve `{{BRAND_DOMAIN}}` işaretlerini kullanır. Sätteri eklentisi bu işaretleri derlemede doldurur.
+- Eklenti adı marka ayarından üretilen bir özet taşır. Ayar değişince Astro eski içerik önbelleğini bırakır.
+- Başlıkları, gezinme adlarını ve JSON metinlerini gösteren bileşenler aynı ayarı kullanır. Teknik adresler ve gereksinim kimlikleri değişmez.
+- Tarihsel sayfalar `acik-kararlar.md`, `karar-katalogu.md` ve `izlenebilirlik.md` dosyalarıdır. `task-board.json` içindeki geçmiş notlar da korunur. Tam liste `backend/brand-exclusions.txt` dosyasındadır.
+- Diyagram üreticisi marka değerini çıktıya yazmaz. Üretilen Astro bileşeni marka değerini site ayarından alır. Marka değişince yalnız siteyi derlemek yeterlidir.
+- Diyagram etiketi, gerçek yazı genişliğini ölçer. Ad kutuya sığmazsa etiket “Giriş ürünü” olur. Tam ad, diyagram açıklamasında görünür kalır. Yazı küçültülmez.
+- `npm run build`, önce `npm run test:brand` kontrolünü çalıştırır. `npm run test:brand-build`, farklı ayarla ayrı çıktı üretir. Bu kontrol geçici olarak marka dosyasını değiştirir. Kontrol bitince dosya geri yüklenir. Bu kontrolü aynı klasördeki diğer derlemelerle birlikte çalıştırmayın.
+- Ürün adı yer tutucusundan sonra kesme işaretiyle ek yazılmaz. Cümlede örneğin `{{PRODUCT_NAME}} ürününü` kullanılır. Site taraması bu kuralı denetler. Derleme testi dört sayfayı farklı ürün adlarıyla denetler.
+- Marka derleme testi, Chromium ile uzun adı ve diyagram işaretlerini denetler. Mevcut CI akışları testi ilk tarayıcı parçasında çalıştırır.
 
 - İçerik `src/content/docs/*.md` (glob loader, şema: `title`, `nav`, `order`). Başlıklar `##`/`###`; `<`/`>` kod dışında kaçışlı.
 - `src/data/requirements.json` gereksinimlerin tek doğruluk kaynağıdır (G ve SA serileri, kimlikler korunur, yeni kalem sona eklenir). Gezgin, dağılım özeti (`RequirementSummary.astro`) ve faz tablosundaki kimlik listesi (`PhaseTable.astro`) derleme anında bundan üretilir; markdown'da elle tablo kopyası tutulmaz. `tests/consistency.spec.ts` kimlik bütünlüğünü, G/SA/K atıflarını, iç bağlantıları ve rapor faz kararlarını denetler.

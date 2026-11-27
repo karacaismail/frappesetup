@@ -59,6 +59,11 @@ class ReviewTests(unittest.TestCase):
             self.assertEqual(scans.scan_bandit().status, "fail")
             git.assert_not_called()
 
+    def test_repository_bandit_findings_match_reviewed_exceptions(self):
+        # Exercise the real inventory: new test helpers and stale signatures both fail.
+        result = scans.scan_bandit()
+        self.assertEqual(result.status, "pass", "\n".join(result.findings))
+
     def test_bandit_scans_a_tracked_backend_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

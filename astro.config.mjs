@@ -5,6 +5,10 @@ import sitemap from '@astrojs/sitemap';
 import { satteri } from '@astrojs/markdown-satteri';
 import { tableWrap } from './src/lib/satteri-table-wrap.mjs';
 import { pressAiDownloads } from './scripts/press-ai-downloads.mjs';
+import { readFileSync } from 'node:fs';
+import { parseBrand } from './src/lib/brand.mjs';
+import { brandPlaceholders } from './src/lib/satteri-brand.mjs';
+const brand = parseBrand(readFileSync(new URL('./backend/brand.env', import.meta.url), 'utf8'));
 // GitHub Pages: https://karacaismail.github.io/frappesetup/
 export default defineConfig({
   site: 'https://karacaismail.github.io',
@@ -14,7 +18,7 @@ export default defineConfig({
   integrations: [react(), sitemap(), pressAiDownloads()],
   markdown: {
     // Astro 7 varsayılan işlemcisi Sätteri; tablolar hast eklentisiyle sarmalanır.
-    processor: satteri({ hastPlugins: [tableWrap] }),
+    processor: satteri({ hastPlugins: [brandPlaceholders(brand), tableWrap] }),
     // Mermaid blocks are rendered on the client by src/components/Mermaid.tsx;
     // Shiki must leave them as plain <pre><code class="language-mermaid">.
     syntaxHighlight: { type: 'shiki', excludeLangs: ['mermaid'] },

@@ -4,7 +4,7 @@ nav: "Yol haritası"
 order: 17
 ---
 
-Yol haritası sekiz fazdan oluşur (P0–P5, P6 operasyon düzlemi ve P7 AtonotA Login ürünü); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir. Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) bitince P2 başlar. Fazlara süre, hafta ya da iş yükü tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
+Yol haritası sekiz fazdan oluşur (P0–P5, P6 operasyon düzlemi ve P7 {{PRODUCT_NAME}} ürünü); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir. Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) bitince P2 başlar. Fazlara süre, hafta ya da iş yükü tahmini yazılmaz. Sıra yalnız bağımlılıkla anlatılır. Fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
 
 ## Faz tablosu
 
@@ -18,7 +18,7 @@ Hedef, çıkış ve sahip `phases.json`, gereksinim kimlikleri `requirements.jso
 
 <div data-embed="timeline"></div>
 
-P2 ticari katman, P1'deki Keycloak adımı bitince başlar. P2 operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir. P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür. P6 operasyon düzlemi P2 tamamlanınca açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır. P1 Keycloak girişini kurar. P2 ücretli kullanım için tahsilatı kurar (K-61). Bu kapı P2 ve P4 çıkışına bağlıdır.
+P2 ticari katman, P1'deki Keycloak adımı bitince başlar. P2 operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir. P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür. P6 operasyon düzlemi P2 tamamlanınca açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. P7 {{PRODUCT_NAME}} ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır. P1 Keycloak girişini kurar. P2 ücretli kullanım için tahsilatı kurar (K-61). Bu kapı P2 ve P4 çıkışına bağlıdır.
 
 ## MVP kapsamı ve backend durumu
 
@@ -49,7 +49,7 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 
 ## Bağımlılıklar ve kritik yol
 
-- G-2 DNS kayıtları (değeri DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular) → TLS sertifikası (DevOps sorumlusu doğrular) → ilk test sitesi `demo.app.alpha.atonota.net`. Bu zincir P0'ın ilk işidir. MVP'de Route 53 ve NS devri yoktur. Sertifika her ad için ayrı alınır.
+- G-2 DNS kayıtları (değeri DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular) → TLS sertifikası (DevOps sorumlusu doğrular) → ilk test sitesi `demo.app.alpha.{{BRAND_DOMAIN}}`. Bu zincir P0'ın ilk işidir. MVP'de Route 53 ve NS devri yoktur. Sertifika her ad için ayrı alınır.
 - G-76 Keycloak HA ve G-144 sertleştirme P0'da; G-12 Press girişi, G-16 davet, G-79 kayıt ve G-81 identity-sync P1'dedir (P0 çıkışı Press girişini şart koşmaz).
 - G-5 Agent `upload_offsite_backup` yaması ilk prod kiracıdan önce; G-55 binlog kurtarma tatbikatı P0 çıkışında koşar.
 - G-119 host'a bağlı oturum, G-45 CSRF enjeksiyonu ve G-75 yerleşimi SPA'nın ilk kiracı isteğinden önce hazırdır; G-120 kalıcı kimlik eşlemesi ilk girişten önce.

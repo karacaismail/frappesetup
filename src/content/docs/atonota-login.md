@@ -1,10 +1,10 @@
 ---
-title: "AtonotA Login: bağımsız giriş ürünü"
-nav: "AtonotA Login"
+title: "{{PRODUCT_NAME}}: bağımsız giriş ürünü"
+nav: "{{PRODUCT_NAME}}"
 order: 28
 ---
 
-AtonotA Login bir giriş ürünüdür. Kullanıcı uygulamaya bu ürünle girer. Ürünün adı tam olarak "AtonotA Login" yazılır. Ad büyük A ile başlar ve büyük A ile biter.
+{{PRODUCT_NAME}} bir giriş ürünüdür. Kullanıcı uygulamaya bu ürünle girer. Ürünün adı tam olarak "{{PRODUCT_NAME}}" yazılır. Ürünün görünen adını ortak marka ayarı belirler.
 
 Ürünün kararlarını proje sahibi 23 Kasım 2026 Pazartesi günü verdi. Kararlar kesindir. Sitedeki karar kaydı K-61'dir. Ürün P7 fazındadır.
 
@@ -14,18 +14,18 @@ Bugünkü durum sayfanın sonundaki [Bugünkü durum](#bugünkü-durum) bölüm�
 
 ## Ürün nedir?
 
-AtonotA Login, uygulamalar için ortak bir giriş kapısıdır. Kullanıcı bir uygulamada "AtonotA Login" düğmesine basar. Giriş ekranı açılır. Kullanıcı kimliğini doğrular ve uygulamaya döner.
+{{PRODUCT_NAME}}, uygulamalar için ortak bir giriş kapısıdır. Kullanıcı bir uygulamada "{{PRODUCT_NAME}}" düğmesine basar. Giriş ekranı açılır. Kullanıcı kimliğini doğrular ve uygulamaya döner.
 
 Ürün üç gruba hizmet eder:
 
 - **Platformun kendi uygulamaları.** Panel, kiracı siteleri ve sonraki uygulamalar bu kapıyı kullanır.
-- **Ücretli müşteriler.** Bir şirket kendi uygulaması için AtonotA Login'i satın alabilir.
+- **Ücretli müşteriler.** Bir şirket kendi uygulaması için {{PRODUCT_NAME}} ürününü satın alabilir.
 - **Son kullanıcılar.** Kullanıcı tek hesapla birçok uygulamaya girer.
 
 Ürün bağımsızdır. Bunun üç nedeni vardır:
 
 1. Müşteri ürünü platformun geri kalanını almadan kullanabilir.
-2. Giriş ayrı bir alan adında durur. Bu alan adı `atonota.net` olur.
+2. Giriş ayrı bir alan adında durur. Bu alan adı `{{BRAND_DOMAIN}}` olur.
 3. Ürünün kendi tanıtım sayfası ve kendi fiyatı olur.
 
 ## Önce Keycloak, eksikleri Frappe tamamlar
@@ -65,13 +65,13 @@ Bilinmeyen zorunlu koşul işlemi açmaz. Bu kuralın gereksinimi G-161'dir.
 
 Kullanıcının tarayıcısı şu adreslerden geçer:
 
-1. Kullanıcı bir uygulamada "AtonotA Login" düğmesine basar.
-2. Tarayıcı giriş ekranını açar. Adres çubuğunda `api.login.atonota.net` görünür.
+1. Kullanıcı bir uygulamada "{{PRODUCT_NAME}}" düğmesine basar.
+2. Tarayıcı giriş ekranını açar. Adres çubuğunda `api.login.{{BRAND_DOMAIN}}` görünür.
 3. Kullanıcı "Google ile oturum aç" düğmesine basabilir. O zaman tarayıcı `accounts.google.com` adresine gider. Bu adres Google'ındır ve değiştirilemez.
-4. Google işini bitirir. Tarayıcı `api.login.atonota.net` adresine geri döner.
+4. Google işini bitirir. Tarayıcı `api.login.{{BRAND_DOMAIN}}` adresine geri döner.
 5. Giriş sunucusu tarayıcıyı uygulamaya geri gönderir.
 
-Dönüş yolunun örneği şudur: `https://api.login.atonota.net/realms/platform/broker/google/endpoint`. Yoldaki `platform` realm adıdır. Realm, Keycloak'taki kullanıcı ve ayar kümesidir. MVP'de realm adı değişmez. Öteki platformlar da aynı yolu izler. Tarayıcı önce platformun kendi adresine, sonra `api.login.atonota.net` adresine gider.
+Dönüş yolunun örneği şudur: `https://api.login.{{BRAND_DOMAIN}}/realms/platform/broker/google/endpoint`. Yoldaki `platform` realm adıdır. Realm, Keycloak'taki kullanıcı ve ayar kümesidir. MVP'de realm adı değişmez. Öteki platformlar da aynı yolu izler. Tarayıcı önce platformun kendi adresine, sonra `api.login.{{BRAND_DOMAIN}}` adresine gider.
 
 **Google ile giriş yolu**
 
@@ -80,12 +80,12 @@ sequenceDiagram
   autonumber
   participant U as Kullanıcı
   participant A as Uygulama
-  participant L as AtonotA Login
+  participant L as {{PRODUCT_NAME}}
   participant G as Google
   participant F as Frappe
-  U->>A: AtonotA Login düğmesine basar
+  U->>A: {{PRODUCT_NAME}} düğmesine basar
   A-->>U: Tarayıcıyı giriş ekranına gönderir
-  U->>L: api.login.atonota.net giriş ekranı açılır
+  U->>L: api.login.{{BRAND_DOMAIN}} giriş ekranı açılır
   U->>L: Google ile oturum aç düğmesine basar
   L-->>U: Tarayıcıyı Google'a gönderir
   U->>G: accounts.google.com adresinde Google girişi
@@ -102,14 +102,14 @@ Ortamların adresleri şöyledir:
 
 | Ortam | Giriş adresi |
 | --- | --- |
-| Canlı ortam | `api.login.atonota.net` |
-| alpha | `api.login.alpha.atonota.net` |
-| beta | `api.login.beta.atonota.net` |
-| rc | `api.login.rc.atonota.net` |
+| Canlı ortam | `api.login.{{BRAND_DOMAIN}}` |
+| alpha | `api.login.alpha.{{BRAND_DOMAIN}}` |
+| beta | `api.login.beta.{{BRAND_DOMAIN}}` |
+| rc | `api.login.rc.{{BRAND_DOMAIN}}` |
 
 Ortam adresi `<servis>.<ortam tabanı>` kuralına uyar. Adres koda yazılmaz, ortam ayarından gelir. Eski `id.` adı kalktı. Ürün canlıda olmadığı için yönlendirme gerekmez. Bu kuralların gereksinimi G-158'dir.
 
-DNS kaydını iki kişi hazırlar. DevOps sorumlusu kaydın değerlerini yazar. Alan adı sorumlusu kaydı `atonota.net` bölgesine girer. Sonra DevOps sorumlusu adresin çalıştığını doğrular.
+DNS kaydını iki kişi hazırlar. DevOps sorumlusu kaydın değerlerini yazar. Alan adı sorumlusu kaydı `{{BRAND_DOMAIN}}` bölgesine girer. Sonra DevOps sorumlusu adresin çalıştığını doğrular.
 
 ## Birden çok platformla giriş
 
@@ -237,7 +237,7 @@ Bazı kuralların değeri henüz belirlenmedi. Örneğin doğrulama sağlayıcı
 
 ## Tanıtım sayfası
 
-Ürünün bir tanıtım sayfası olur (G-165). Sayfanın taslağı [AtonotA Login tanıtımı](/frappesetup/atonota-login-tanitim/) sayfasındadır. Ürün sahibi taslağı henüz onaylamadı. Sayfanın kuralları aşağıdadır.
+Ürünün bir tanıtım sayfası olur (G-165). Sayfanın taslağı [{{PRODUCT_NAME}} tanıtımı](/frappesetup/atonota-login-tanitim/) sayfasındadır. Ürün sahibi taslağı henüz onaylamadı. Sayfanın kuralları aşağıdadır.
 
 Sayfa şu değer önerilerini anlatır. Her öneri, yeteneği kurulunca tanıtım sayfasına girer:
 
@@ -270,7 +270,7 @@ Tahsilat P2 ticari katmanının akışını kullanır. Ayrı bir ödeme altyapı
 
 | Parça | Lisans |
 | --- | --- |
-| AtonotA Login'in kodu: tema, eklentiler, Frappe uygulaması ve kurulum dosyaları | MIT |
+| {{PRODUCT_NAME}} ürününün kodu: tema, eklentiler, Frappe uygulaması ve kurulum dosyaları | MIT |
 | Keycloak | Apache-2.0 |
 
 Keycloak'ın kodu ürüne kopyalanmaz ve değiştirilmez. Ürün Keycloak'ın eklenti yollarını kullanır. Bu kuralın gereksinimi G-157'dir.
@@ -288,7 +288,7 @@ Kararın gerekçesi şudur:
 - Ürün ücretlidir. Tahsilat P2'de kurulur.
 - Ürün ayrı satılır. Bu yüzden kendi çıkış ölçütü olmalıdır.
 
-Önce MVP'de yalnız çelişen yerler düzeltildi. Örneğin eski `id.` adresi `api.login.atonota.net` oldu. Proje sahibi sonra ürünün geliştirilmesini başlattı (O-56). Ürün P7 fazında kalır.
+Önce MVP'de yalnız çelişen yerler düzeltildi. Örneğin eski `id.` adresi `api.login.{{BRAND_DOMAIN}}` oldu. Proje sahibi sonra ürünün geliştirilmesini başlattı (O-56). Ürün P7 fazında kalır.
 
 ## Gereksinimler
 
@@ -330,7 +330,7 @@ Bu bölüm 24 Kasım 2026 Salı günkü durumu yazar. Durumlar görev panosundak
 
 Bu sayfa beş kaynağa dayanır:
 
-- Proje sahibinin AtonotA Login kararları, 23 Kasım 2026 Pazartesi günü.
+- Proje sahibinin {{PRODUCT_NAME}} kararları, 23 Kasım 2026 Pazartesi günü.
 - Backend proje kaydındaki O-51 ve O-56 kararları ve ürün klasörünün belgesi.
 - Backend dalındaki `e7130aaa` ve `6730160f` birleşmeleri. Birinci birleşme işlem kararını Frappe'ye bağladı. İkinci birleşme bildirim ucunu ekledi. İki birleşme PR 25 ile yayımlandı.
 - Backend dalındaki `43f13477` birleşmesi. Bu birleşme şirket sağlayıcısının istisna kaydını ekledi. Birleşme PR 27 ile yayımlandı.

@@ -23,6 +23,24 @@ test('login screens show the brand name from the variable', async ({ page }) => 
   }
 });
 
+// AJA-1062: on a 320 px phone the brand name and the sign-in button are both on screen.
+test('@matrix sign-in shows the brand name and a visible sign-in button', async ({ page }) => {
+  await screen('sign-in').open(page);
+  await expect(page).toHaveTitle(new RegExp(BRAND));
+  const name = page.locator('#kc-header-wrapper .at-brand__name');
+  await expect(name).toHaveText(BRAND);
+  await expect(name).toBeVisible();
+  const button = page.locator('#kc-login');
+  await button.scrollIntoViewIfNeeded();
+  await expect(button).toBeVisible();
+  await expect(button).toBeInViewport({ ratio: 1 });
+  const width = page.viewportSize()?.width ?? 0;
+  const box = await button.boundingBox();
+  expect(box, 'the sign-in button has a box').not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+});
+
 test('@matrix account console shows the brand name from the variable', async ({ page }) => {
   const email = await createUser();
   await page.goto(`${KC}/realms/${REALM}/account/`);
@@ -112,10 +130,10 @@ test('theme source: no user-visible brand name outside comments', () => {
       .replace(/<!--[\s\S]*?-->/g, '') // HTML comments
       .split('\n')
       .filter((line) => !/^\s*(#|\/\/)/.test(line)) // .properties and JS line comments
-      // A message key is an identifier, not text shown to the user. Only the value after "=" is checked.
-      .map((line) => (file.endsWith('.properties') ? line.slice(line.indexOf('=') + 1) : line))
       // File and folder names of the theme are identifiers, not text shown to the user.
-      .map((line) => line.replace(/atonota(-account|-focus|-form)?\.(css|js)/g, '').replace(/themes\/atonota/g, ''));
+      .map((line) => line.replace(/atonota(-account|-focus|-form)?\.(css|js)/g, '').replace(/themes\/atonota/g, ''))
+      // A message key is an identifier too, for example atonotaEnterpriseSsoRequired. Only the value is shown.
+      .map((line) => (file.endsWith('.properties') ? line.replace(/^[^=]*=/, '') : line));
     text.forEach((line, index) => {
       if (/atonota/i.test(line)) hits.push(`${file.replace(themeRoot, '')}:${index + 1}: ${line.trim().slice(0, 80)}`);
     });

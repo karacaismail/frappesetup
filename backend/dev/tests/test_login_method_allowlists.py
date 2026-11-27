@@ -1,4 +1,4 @@
-"""Every AtonotA Login method is on the allow list its caller needs (AJA-480).
+"""Every atonota_login method is on the allow list its caller needs (AJA-480).
 
 Two branches had the same bug on one day. A method was written, but it was not added to an
 allow list, so the real backend answered 403 (AJA-459, AJA-410). This test reads the source
@@ -73,7 +73,7 @@ EXPECTED = {
     "platform_core.api.auth.list_linked_accounts": PANEL,
     # Keycloak's logout notice. The signed logout token authorizes it.
     "platform_core.api.keycloak_backchannel_logout": GUEST,
-    # AtonotA Login decisions and the verification inbox.
+    # atonota_login decisions and the verification inbox.
     "platform_core.api.atonota_login.evaluate": PANEL,
     "platform_core.api.atonota_login.open_paid_plan": PANEL,
     "platform_core.api.atonota_login.verification_notice": GUEST,
@@ -122,16 +122,17 @@ EXPECTED = {
     "platform_core.api.ai.purge_logs": ADMIN,
     # G-138 field help. A signed-in panel account reads the help of one field.
     "platform_core.api.help.get_field_help": PANEL,
+    "platform_core.api.help.get_component_help": PANEL,
     # G-138 help coverage report. `frappe.only_for("System Manager")` guards it, so only an
     # administrator calls it. It stays off the Website User list.
     "platform_core.api.help.get_help_coverage": ADMIN,
 }
 
 # Methods that other open branches add. The test checks them once they are in the tree.
-# The two AtonotA Login reads of AJA-459 are in the tree now, so the list is empty.
+# The two atonota_login reads of AJA-459 are in the tree now, so the list is empty.
 PENDING: dict[str, str] = {}
 
-# Where AtonotA Login methods live. A new file in these places is scanned too.
+# Where atonota_login methods live. A new file in these places is scanned too.
 SCANNED = (
     *sorted((PLATFORM / "api").rglob("*.py")),
     *sorted((PLATFORM / "identity").rglob("*.py")),

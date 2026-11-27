@@ -10,15 +10,14 @@ fail() {
     exit 1
 }
 
-# Validate deploy/environments/<env>.env with release.py, then load it into the shell.
+# Resolve the brand and environment with release.py. Read data without shell evaluation.
 load_env() {
-    local env="$1"
+    local env="$1" settings key value
     case "$env" in alpha | beta | rc | prod) ;; *) fail "unknown environment: $env" ;; esac
-    release_py env-check "$env" || fail "invalid environment file: $env"
-    set -a
-    # shellcheck source=/dev/null
-    . "$DEPLOY_DIR/environments/$env.env"
-    set +a
+    settings="$(release_py env-show "$env")" || fail "invalid environment file: $env"
+    while IFS='=' read -r key value; do
+        export "$key=$value"
+    done <<<"$settings"
 }
 
 release_py() {

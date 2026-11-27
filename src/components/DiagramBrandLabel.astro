@@ -1,0 +1,27 @@
+---
+interface Props { name: string; x: number; y: number; maxWidth: number }
+const { name, x, y, maxWidth } = Astro.props;
+---
+<text {x} {y} fill="var(--fs-ink)" data-brand-label data-product-name={name} data-max-width={maxWidth}>
+  <title>{name}</title><tspan>Giriş ürünü</tspan>
+</text>
+<script>
+  // The full name always remains in the visible caption and the accessible title.
+  // Measure in SVG units after the actual font loads; never shrink the type.
+  document.fonts.ready.then(() => {
+    for (const text of document.querySelectorAll<SVGTextElement>('[data-brand-label]')) {
+      const span = text.querySelector<SVGTSpanElement>('tspan');
+      if (!span) continue;
+      const observer = new ResizeObserver(() => {
+        span.textContent = text.dataset.productName ?? '';
+        const width = span.getComputedTextLength();
+        if (width === 0 || width > Number(text.dataset.maxWidth)) span.textContent = 'Giriş ürünü';
+        if (width > 0) {
+          text.dataset.brandReady = 'true';
+          observer.disconnect();
+        }
+      });
+      observer.observe(text.ownerSVGElement!);
+    }
+  });
+</script>

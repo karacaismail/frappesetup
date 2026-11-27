@@ -1,16 +1,16 @@
 ---
-title: "AtonotA Login ile güvenle giriş yapın"
-nav: "AtonotA Login tanıtımı"
+title: "{{PRODUCT_NAME}} ile güvenle giriş yapın"
+nav: "{{PRODUCT_NAME}} tanıtımı"
 order: 29
 ---
 
-Bu sayfa AtonotA Login ürününü tanıtır. Sayfa bir taslaktır. Ürün sahibi metni henüz onaylamadı. Ürün canlıda değildir. Ürünün ayrıntıları [AtonotA Login](/frappesetup/atonota-login/) sayfasındadır.
+Bu sayfa {{PRODUCT_NAME}} ürününü tanıtır. Sayfa bir taslaktır. Ürün sahibi metni henüz onaylamadı. Ürün canlıda değildir. Ürünün ayrıntıları [{{PRODUCT_NAME}}](/frappesetup/atonota-login/) sayfasındadır.
 
 Sayfada fiyat yazmaz. Fiyat kararı açıktır. Bu kararın gereksinimi G-166'dır.
 
 ## Kısa tanıtım
 
-AtonotA Login bir giriş ürünüdür. Ürün Keycloak üzerine kurulur. Keycloak, açık kaynaklı bir giriş sistemidir. Ürünün kendi kodu da açık kaynaktır. Bu kuralın gereksinimi G-157'dir.
+{{PRODUCT_NAME}} bir giriş ürünüdür. Ürün Keycloak üzerine kurulur. Keycloak, açık kaynaklı bir giriş sistemidir. Ürünün kendi kodu da açık kaynaktır. Bu kuralın gereksinimi G-157'dir.
 
 ## Değer önerileri
 
@@ -39,7 +39,7 @@ Bu satırların kodu ve testi vardır. Testler yalnız yerel yığında geçti.
 
 ### Kodu yazıldı, iş sürüyor
 
-Bu satırların kodu yazıldı ve yerel testten geçti. Ama her kalemde kalan bir iş vardır. Kalan iş [AtonotA Login](/frappesetup/atonota-login/) sayfasının sonundadır.
+Bu satırların kodu yazıldı ve yerel testten geçti. Ama her kalemde kalan bir iş vardır. Kalan iş [{{PRODUCT_NAME}}](/frappesetup/atonota-login/) sayfasının sonundadır.
 
 | Özellik | Kimlik | Commit | Kanıt dosyası |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ Bu özellikler yapılmadı. Ürün bunları bugün sunmaz.
 
 | Özellik | Kimlik | Neden henüz yok? |
 | --- | --- | --- |
-| `api.login.atonota.net` adresinden giriş | G-158 | DNS kaydı ve canlı adres denemesi yapılmadı. |
+| `api.login.{{BRAND_DOMAIN}}` adresinden giriş | G-158 | DNS kaydı ve canlı adres denemesi yapılmadı. |
 | Facebook ve X ile giriş | G-159 | Bu iki platform e-postanın doğrulandığını bildirmez. Ek denetim yazılmadı. |
 | Gerçek platform hesapları | G-159 | DevOps sorumlusu platform panellerinde istemci açmadı. |
 | Şirket alan adının DNS ile denetlenmesi | G-160 | Bu kod yazılmadı. |

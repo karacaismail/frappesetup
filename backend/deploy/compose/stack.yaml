@@ -1,7 +1,7 @@
 # One environment (alpha, beta, rc or prod) on a Hetzner server. Design: docs/dagitim/ortamlar.md.
 # remote/apply runs this file as project "atonota-<env>" with two env files:
 #   release.env  image references pinned by digest (from release.json, written by remote/apply)
-#   host.env     the non-secret environment file of deploy/environments/<env>.env
+#   host.env     resolved environment and brand values, frozen by release.py pack-deploy
 # Secrets live only on the server in /etc/atonota/<env>/<service>.env (mode 0600). Nothing here
 # publishes a host port. The edge proxy (edge.yaml) reaches tenant-frontend, keycloak and
 # press-frontend over the network "atonota-edge-<env>" by the aliases <env>-tenant, <env>-keycloak
@@ -193,6 +193,7 @@ services:
     command: ["start", "--import-realm"]
     env_file: ["/etc/atonota/${ATONOTA_ENV:?}/keycloak.env"]
     environment:
+      IDENTITY_BRAND_NAME: ${PRODUCT_NAME:?host.env is missing PRODUCT_NAME}
       KC_HOSTNAME: https://${ATONOTA_ID_HOST:?}
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded

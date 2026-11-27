@@ -68,6 +68,12 @@ class HelpTopicSourceTest(unittest.TestCase):
 		self.assertEqual([p["role"] for p in permissions], ["System Manager"])
 		self.assertTrue(all(p.get(key) for p in permissions for key in ("read", "write", "create", "delete")))
 
+	def test_help_links_are_optional_data_fields(self):
+		fields = {field["fieldname"]: field for field in load(TOPIC)["fields"]}
+		for name in ("tour_url", "doc_url", "support_url"):
+			self.assertEqual(fields[name]["fieldtype"], "Data")
+			self.assertFalse(fields[name].get("reqd"))
+
 	def test_role_table_is_a_child_table(self):
 		definition = load(ROLE)
 		self.assertEqual(definition["name"], "PLT Help Topic Role")
