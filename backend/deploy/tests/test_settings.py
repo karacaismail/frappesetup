@@ -370,13 +370,17 @@ class CodeScan(unittest.TestCase):
         block = re.search(r"REQUIRED = \((.*?)\)", source, re.S).group(1)
         needed = set(re.findall(r'"([a-z_]+)"', block))
         self.assertTrue(needed)
-        self.assertLessEqual(needed, required("tenant-site"))
+        self.assertLessEqual(needed - {"identity_brand_name"}, required("tenant-site"))
+        # The release owns this setting and writes it before migration.
+        self.assertIn("identity_brand_name", listed("tenant-site"))
+        self.assertIn('set-config -- identity_brand_name "$PRODUCT_NAME"',
+                      (DEPLOY / "remote/apply").read_text())
 
     def test_press_site_settings(self):
         self.check_site_list("press-site", ("press_tr",))
 
     def test_compose_variables(self):
-        known = release.ENV_KEYS | RELEASE_ENV | COMPOSE_DEFAULT_ONLY | listed("edge")
+        known = set(release.load_environments()["alpha"]) | RELEASE_ENV | COMPOSE_DEFAULT_ONLY | listed("edge")
         for path in (STACK, EDGE):
             for name in re.findall(r"\$\{([A-Z0-9_]+)", path.read_text()):
                 with self.subTest(file=path.name, name=name):
@@ -386,7 +390,7 @@ class CodeScan(unittest.TestCase):
         self.assertIn("ATONOTA_ACME_EMAIL", required("edge"))
 
     def test_remote_script_variables(self):
-        known = release.ENV_KEYS | SCRIPT_CONTROLS | listed("offsite")
+        known = set(release.load_environments()["alpha"]) | SCRIPT_CONTROLS | listed("offsite")
         for path in sorted((DEPLOY / "remote").iterdir()):
             if path.suffix == ".py":
                 continue
@@ -560,7 +564,7 @@ class FileCheck(unittest.TestCase):
 
 
 class SiteCheck(unittest.TestCase):
-    SITE = "demo.app.alpha.atonota.net"
+    SITE = "demo.app.alpha." + release.load_brand()["BRAND_DOMAIN"]
 
     def complete(self, differs=()):
         return {"set": sorted(required("tenant-site")), "differs": list(differs)}
@@ -585,6 +589,8 @@ class SiteCheck(unittest.TestCase):
         # developer_mode=1 or mobile_allow_development_http=1 opens plain HTTP paths (review 1).
         fixed = settings.site_fixed_values(SETTINGS)
         self.assertEqual(fixed.get("developer_mode"), "0")
+        self.assertEqual(fixed.get("server_script_enabled"), "0")
+        self.assertEqual(fixed.get("allow_tests"), "0")
         self.assertEqual(fixed.get("mobile_allow_development_http"), "0")
 
     def test_site_value_that_differs_from_its_fixed_value_is_refused(self):
@@ -621,14 +627,152 @@ class SiteCheck(unittest.TestCase):
                            common={"developer_mode": 1})
         self.assertEqual(found[self.SITE]["differs"], ["developer_mode", "mobile_allow_development_http"])
         self.assertEqual(self.probe({"developer_mode": 0})[self.SITE]["differs"], [])
-        self.assertEqual(self.probe({"developer_mode": "0"})[self.SITE]["differs"], [])
+        self.assertEqual(self.probe({"developer_mode": "0"})[self.SITE]["differs"], ["developer_mode"])
         self.assertEqual(self.probe({"developer_mode": False})[self.SITE]["differs"], [])
         self.assertEqual(self.probe({"developer_mode": True})[self.SITE]["differs"], ["developer_mode"])
+
+    def test_development_switches_stop_release_when_enabled(self):
+        for key in ("developer_mode", "server_script_enabled", "allow_tests"):
+            for site_config, common in (({key: True}, {}), ({}, {key: 1})):
+                with self.subTest(key=key, site_config=site_config, common=common):
+                    report = self.probe(site_config, common)[self.SITE]
+                    self.assertEqual(report["differs"], [key])
+                    problems = settings.check_sites(
+                        SETTINGS, {self.SITE: self.complete(differs=report["differs"])}, [self.SITE]
+                    )
+                    self.assertEqual(problems, [f"site {self.SITE}, site_config.json: {key} (must be 0)"])
+
+    def test_server_script_flag_is_not_masked_by_site_override_or_string_zero(self):
+        for bench_value in (True, "0"):
+            with self.subTest(bench_value=bench_value):
+                report = self.probe({"server_script_enabled": 0}, {"server_script_enabled": bench_value})
+                self.assertEqual(report[self.SITE]["differs"], ["server_script_enabled"])
+        report = self.probe({"server_script_enabled": False}, {"server_script_enabled": 0})
+        self.assertEqual(report[self.SITE]["differs"], [])
+
+    def test_allow_tests_requires_numeric_zero_or_false(self):
+        self.assertEqual(self.probe({"allow_tests": "0"})[self.SITE]["differs"], ["allow_tests"])
+        for value in (0, False):
+            with self.subTest(value=value):
+                self.assertEqual(self.probe({"allow_tests": value})[self.SITE]["differs"], [])
 
     def test_press_site_list_is_not_checked_until_the_press_image_exists(self):
         # E-2: no Press image, so no Press site to probe. The list waits; this test says so.
         self.assertEqual(settings.LISTS["press-site"].when, "press-image")
         self.assertIn("press-site", settings.NOT_CHECKED)
+
+
+class WorkerSizingProposal(unittest.TestCase):
+    """G-50: keep the unmeasured proposal and both resource limits visible."""
+
+    def proposal_sources(self):
+        return (STACK, BACKEND / "docs" / "dagitim" / "ortamlar.md")
+
+    def test_proposal_is_explicitly_unverified(self):
+        for path in self.proposal_sources():
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                section = text.split("G-50 önerisi", 1)
+                self.assertEqual(len(section), 2, f"{path.name}: missing G-50 proposal")
+                self.assertIn("doğrulanmadı", section[1].splitlines()[0])
+                self.assertIn("Çekirdek sayısı bilinmiyor", section[1])
+
+    def test_proposal_explains_cpu_and_shared_memory_limits(self):
+        # Independent budget: reserve half of 128 GB, split the rest across four
+        # environments. Deduct scheduler and backup reserves before sizing workers.
+        for path in self.proposal_sources():
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                for calculation in (
+                    "(128 - 64) / 4 = 16 GB",
+                    "16 - 1 - 3 = 12 GB",
+                    "6 / 1 = 6", "2 / 1 = 2", "4 / 2 = 2",
+                    "min(2 * C_t + 1, 6)",
+                    "min(2 * C_p + 1, 2)",
+                    "min(C_q, 2)",
+                ):
+                    self.assertTrue(calculation in text, f"{path.name}: missing {calculation}")
+                self.assertIn("1 GB", text)
+                self.assertIn("2 GB", text)
+
+    def all_proposal_sources(self):
+        return self.proposal_sources() + tuple(
+            DEPLOY / "environments" / f"{name}.env" for name in release.ORDER
+        )
+
+    def test_scheduler_reserves_memory_and_cpu_on_servers(self):
+        for path in self.all_proposal_sources():
+            with self.subTest(path=str(path.relative_to(BACKEND))):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("Sunucularda zamanlayıcı ve düzenli yedek açık kabul edilir.", text)
+                self.assertRegex(text, r"tenant-scheduler`? için 1 GB ayrılır\. Bu pay doğrulanmadı\.")
+                self.assertIn("C_s > 0", text)
+                self.assertIn("C_t + C_p + C_q <= C_env - C_s - C_b", text)
+                self.assertNotIn("Bu öneri zamanlayıcı açmaz.", text)
+
+    def test_backup_reserve_is_unverified_and_deducted_from_both_budgets(self):
+        for path in self.all_proposal_sources():
+            with self.subTest(path=str(path.relative_to(BACKEND))):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("Yedek işi için 3 GB ayrılır. Bu pay doğrulanmadı.", text)
+                self.assertIn("C_b > 0", text)
+                self.assertIn("C_t + C_p + C_q <= C_env - C_s - C_b", text)
+                self.assertIn("16 - 1 - 3 = 12 GB", text)
+
+    def test_peak_memory_totals_include_both_reserves(self):
+        for path in self.proposal_sources():
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                # Read the published operands. Catch stale totals and allocations
+                # that exceed the host budget when all four backups overlap.
+                match = re.search(
+                    r"\(4 \+ 2\) \* 1 \+ 2 \* 2 \+ (\d+) \+ (\d+) = (\d+) GB", text
+                )
+                self.assertIsNotNone(match, "missing concurrent scheduler/backup peak")
+                scheduler, backup, per_environment = map(int, match.groups())
+                self.assertEqual(per_environment, (4 + 2) + 2 * 2 + scheduler + backup)
+                self.assertIn(f"64 + 4 * {per_environment} = 120 GB", text)
+                self.assertLessEqual(64 + 4 * per_environment, 128)
+                limits = re.search(r"\(6 \+ 2\) \* 1 \+ 2 \* 2 \+ 1 \+ 3 = (\d+) GB", text)
+                self.assertIsNotNone(limits, "missing peak at worker memory limits")
+                self.assertEqual(int(limits.group(1)), 6 + 2 + 2 * 2 + scheduler + backup)
+                self.assertLessEqual(64 + 4 * int(limits.group(1)), 128)
+
+    def test_prod_proposal_is_limited_to_test_data(self):
+        document = (BACKEND / "docs" / "dagitim" / "ortamlar.md").read_text(encoding="utf-8")
+        proposal = document.split("### İşçi ve kuyruk önerisi", 1)[1].split("### ", 1)[0]
+        prod = (DEPLOY / "environments" / "prod.env").read_text(encoding="utf-8")
+        for text in (proposal, prod):
+            self.assertIn("prod ortamına yalnız deneme verisi girer.", text)
+            self.assertIn("Öneri gerçek müşteri yükünü kapsamaz.", text)
+
+    def test_environment_proposals_preserve_readable_settings(self):
+        environments = release.load_environments()
+        for name in release.ORDER:
+            with self.subTest(environment=name):
+                text = (DEPLOY / "environments" / f"{name}.env").read_text(encoding="utf-8")
+                self.assertTrue("G-50 önerisi doğrulanmadı" in text, f"{name}: missing unverified note")
+                self.assertIn("# ATONOTA_GUNICORN_WORKERS=4", text)
+                self.assertIn("# ATONOTA_PRESS_GUNICORN_WORKERS=2", text)
+                self.assertIn("(128 - 64) / 4 = 16 GB", text)
+                self.assertNotIn("ATONOTA_GUNICORN_WORKERS", environments[name])
+                self.assertNotIn("ATONOTA_PRESS_GUNICORN_WORKERS", environments[name])
+
+    def test_existing_worker_commands_remain_the_provisional_values(self):
+        text = STACK.read_text(encoding="utf-8")
+        for service, variable, value in (
+            ("tenant-web", "ATONOTA_GUNICORN_WORKERS", 4),
+            ("press-web", "ATONOTA_PRESS_GUNICORN_WORKERS", 2),
+        ):
+            with self.subTest(service=service):
+                block = re.search(rf"(?ms)^  {service}:\n(.*?)(?=^  [a-z]|\Z)", text).group(1)
+                self.assertIn(f"--workers=${{{variable}:-{value}}}", block)
+                self.assertIn("--threads=4", block)
+                self.assertIn("--worker-class=gthread", block)
+        for service in ("tenant-worker", "press-worker"):
+            with self.subTest(service=service):
+                block = re.search(rf"(?ms)^  {service}:\n(.*?)(?=^  [a-z]|\Z)", text).group(1)
+                self.assertIn('["bench", "worker", "--queue", "short,default,long"]', block)
 
 
 class Packing(unittest.TestCase):

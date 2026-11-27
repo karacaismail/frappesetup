@@ -554,6 +554,40 @@ class ConnectionRecordTests(IntegrationTestCase):
 		# Restart the loopback server so tearDown can stop it again.
 		self.provider = self.enterContext(FakeProvider())
 
+	def test_check_reports_permission_and_provider_failures(self):
+		# G-155: every check result is tested against the fake provider.
+		saved = self.save("ollama", {"base_url": self.provider.url})
+		for status, expected in ((403, "permission_denied"), (500, "provider_error")):
+			with self.subTest(status=status):
+				self.provider.server.status = status
+				with self.approve():
+					self.assertEqual(connections.check_connection(saved["api"])["status"], expected)
+				frappe.db.commit()
+				self.assertEqual(
+					frappe.db.get_value("PLT AI API", saved["api"], "connection_status"), expected
+				)
+
+	def test_check_reports_a_missing_address_without_a_request(self):
+		saved = self.save("ollama", {"base_url": self.provider.url})
+		frappe.db.set_value("PLT AI API", saved["api"], "base_url", None, update_modified=False)
+		frappe.db.commit()
+		with self.approve():
+			result = connections.check_connection(saved["api"])
+		self.assertEqual(result["status"], "configuration_error")
+		self.assertEqual(self.provider.requests, [])
+		self.assertEqual(
+			frappe.db.get_value("PLT AI API", saved["api"], "connection_status"), "configuration_error"
+		)
+
+	def test_connected_result_does_not_report_quota(self):
+		# G-155: "connected" proves only a valid key. The result carries no quota value.
+		saved = self.save("ollama", {"base_url": self.provider.url})
+		with self.approve():
+			result = connections.check_connection(saved["api"])
+		self.assertEqual(result["status"], "connected")
+		self.assertEqual(set(result), {"api", "status", "checked_at", "models_visible"})
+		self.assertNotIn("quota", json.dumps(result).lower())
+
 	def test_unapproved_address_is_not_contacted(self):
 		saved = self.save("ollama", {"base_url": self.provider.url})
 		with patch.dict(frappe.conf, {"model_gateway_endpoints": {}}):

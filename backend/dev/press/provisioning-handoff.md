@@ -125,3 +125,7 @@ Kalan 101 görev “Pending” durumunda kaldı.
 Hazırlık sunucusu tek kullanımlıktır. Geri alma sunucuyu silmektir.
 Press sitesinde "Server" kaydını "Archived" yapın. Sonra sunucuyu sağlayıcıda silin.
 Ansible sürümünü geri almak için [karar notundaki](../../docs/decisions/0018-press-ansible-python314.md) adımları izleyin.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

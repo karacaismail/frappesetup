@@ -44,8 +44,8 @@ test('ileti dosyalarında marka adı sabit yazılmaz', () => {
 test('varsayılan dil Türkçedir ve dil bağlantısı İngilizceye geçirir', async ({ page }) => {
   await openLogin(page);
   await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
-  await expect(page.locator('#kc-page-title')).toHaveText('Oturum açın');
-  await expect(page.locator('#kc-login')).toHaveText('Oturum açın');
+  await expect(page.locator('#kc-page-title')).toHaveText('Giriş yapın');
+  await expect(page.locator('#kc-login')).toHaveText('Giriş yap');
   await expect(page.locator('#kc-header-wrapper')).toContainText(BRAND);
   await expect(page.locator('#at-locale-tr')).toHaveAttribute('aria-current', 'true');
 
@@ -55,5 +55,5 @@ test('varsayılan dil Türkçedir ve dil bağlantısı İngilizceye geçirir', a
   await expect(page.locator('#at-locale-en')).toHaveAttribute('aria-current', 'true');
 
   await page.locator('#at-locale-tr').click();
-  await expect(page.locator('#kc-login')).toHaveText('Oturum açın');
+  await expect(page.locator('#kc-login')).toHaveText('Giriş yap');
 });

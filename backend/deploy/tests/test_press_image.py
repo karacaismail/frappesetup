@@ -384,6 +384,8 @@ class StackServesPress(unittest.TestCase):
         "/api/method/press_tr.api.auth.keycloak_callback",
         "/api/method/press_tr.api.keycloak_backchannel_logout",
         "/api/method/press_tr.api.account.request_deletion",
+        # G-163 (O-55, item 7): a person who lost their key is not on Tailscale and cannot sign in.
+        "/api/method/press_tr.api.account.request_recovery",
     }
 
     def press_block(self):

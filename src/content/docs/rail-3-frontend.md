@@ -4,7 +4,7 @@ nav: "Rail 3 · Frontend"
 order: 6
 ---
 
-Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.atonota.net/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.atonota.net`, MVP sonrası hedef, MVP'de Press `press.atonota.net` adresindedir; `press.api.*` / `press_tr.api.*`, Frappe 16). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.atonota.net` origin'inde (MVP sonrası hedef, backend ad haritasında yok), operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
+Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.{{BRAND_DOMAIN}}/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.{{BRAND_DOMAIN}}`, MVP sonrası hedef, MVP'de Press `press.{{BRAND_DOMAIN}}` adresindedir; `press.api.*` / `press_tr.api.*`, Frappe 16). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.{{BRAND_DOMAIN}}` origin'inde (MVP sonrası hedef, backend ad haritasında yok), operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
 
 ## 1. Monorepo ve paket sınırları (G-66, G-103)
 
@@ -62,7 +62,7 @@ Sidebar şu veriden kurulur: kurulu uygulama → üst öğe (Marketplace App iko
 
 ## 5. Veri katmanı ve realtime (G-68, G-13, G-15, G-45)
 
-| İşlem | Kiracı (Frappe v16) | Press (v15) |
+| İşlem | Kiracı (Frappe v16) | Press (Frappe 16, proje kaydı O-9) |
 | --- | --- | --- |
 | Liste / sayım | `GET /api/v2/document/<dt>`, `GET /api/v2/doctype/<dt>/count` | `press.api.client.get_list` |
 | Belge CRUD | `GET/POST/PATCH/DELETE /api/v2/document/<dt>/<name>` | `press.api.client.get/insert/set_value/delete` |
@@ -74,17 +74,22 @@ SDK kuralları: `credentials: include` + `X-Frappe-CSRF-Token` (token `www/<pane
 
 ## 6. GILT altyapısı (G-73)
 
-GILT dört işin ortak adıdır: küreselleştirme, i18n, yerelleştirme ve çeviri. MVP'de yalnız altyapı kurulur. Metin çevirisi ve varsayılan dilin İngilizce olması MVP dışıdır.
+GILT dört işin ortak adıdır: küreselleştirme, çok dilli yazılım hazırlığı, yerelleştirme ve çeviri.
+GILT altyapısı MVP'de, yani ilk kullanılabilir sürümde tamamlanır.
+Varsayılan dil İngiliz İngilizcesidir (`en-GB`). Karar 44 bu kuralı belirler.
 
-- Panel metinleri arayüzün kendi kataloğundadır. Katalog anahtarı İngilizce ve ASCII olur.
-- Var olan Türkçe metin `tr` kataloğuna harfi harfine girer. İngilizce metin çeviri işinde girer.
-- Katalog yerli ve küçüktür. Mesaj sözdizimi ICU MessageFormat'ın bir alt kümesidir. Çoğul biçimi `Intl.PluralRules` ile seçilir.
-- Dil açılış verisindeki kullanıcı dilinden gelir. Dil boşsa arayüz `tr` yedek dilini kullanır. Backend'in yedek dili `en` kalır.
+- Kaynak katalog `en-GB` kataloğudur. Panel metinleri arayüzün kendi kataloğunda tutulur. Katalog anahtarı İngilizce ve ASCII olur.
+- Bütün içerik önce İngiliz İngilizcesiyle yazılır. Türkçe ve diğer diller kullanıcının tercihiyle sunulur. Var olan Türkçe metin `tr` kataloğunda harfi harfine korunur.
+- Katalog uygulamanın içinde tutulur ve küçüktür. Mesaj sözdizimi ICU MessageFormat'ın bir alt kümesidir. Çoğul biçimi `Intl.PluralRules` ile seçilir.
+- Dil, açılış verisindeki kullanıcı tercihinden gelir. Dil boşsa arayüz `en-GB` yedek dilini kullanır.
 - AntD, Ant Design X, dayjs ve `<html lang dir>` aynı dile bağlanır.
 - Tarih, saat, sayı ve para `Intl` ile biçimlenir. Saat dilimi ve para birimi açılış verisinden gelir.
+- Ölçü birimi kullanıcının ülkesine göre seçilir. Uzunluk için metre ya da inç kullanılır. Ağırlık için kilogram ya da libre kullanılır.
 - Gömülü metin denetimi izin listesiyle başlar. Yeni kod gömülü metin ekleyemez. Ekranlar sözde dilde denenir.
 
 Frappe etiketleri meta ucundan çevrilmiş gelir. Bu yüzden MVP'de ayrı bir çeviri ucu yoktur. Backend Select değerleri (`NEFT` gibi) yalnız etiket katmanında çevrilir (G-19).
+
+Mimar, GILT üst yapısının kapsamını AJA-1408 işinde araştırır.
 
 ## 7. Token sistemi AntD üzerinde (G-67)
 

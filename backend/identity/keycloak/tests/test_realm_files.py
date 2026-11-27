@@ -27,7 +27,7 @@ class RealmFileTest(unittest.TestCase):
         self.assertEqual(REALM_FILE.name, "platform-realm.json")
 
     def test_display_name_and_languages(self):
-        # D-4, O-51: the brand name comes from a variable. The value is "AtonotA Login" (test_realm_backlog).
+        # D-4, O-51: the brand name comes from a variable. The value is PRODUCT_NAME in backend/brand.env (test_realm_backlog).
         self.assertEqual(self.realm["displayName"], "${IDENTITY_BRAND_NAME}")
         self.assertTrue(self.realm["internationalizationEnabled"])
         self.assertEqual(self.realm["defaultLocale"], "tr")
@@ -172,7 +172,7 @@ class RealmFileTest(unittest.TestCase):
     def test_identity_sync_has_least_privilege(self):
         # Contract 26a274c: identity-sync writes users (invites) and organizations (membership).
         # Minimum set verified in Keycloak 26.8.2 (docs/kararlar/0003-keycloak-eklentileri.md).
-        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"}
+        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations", "view-identity-providers"}
         mappers = self.realm["clientScopeMappings"]["realm-management"]
         self.assertEqual(set(mappers[0]["roles"]), beklenen)
         account = [u for u in self.realm["users"] if u.get("serviceAccountClientId") == "identity-sync"][0]

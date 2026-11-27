@@ -33,11 +33,12 @@ check_env_name() {
 }
 
 load_host_env() {
-    local file="$1"
-    set -a
-    # shellcheck source=/dev/null
-    . "$file"
-    set +a
+    local file="$1" settings key value
+    settings="$(python3 -I "$(dirname -- "${BASH_SOURCE[0]}")/settings.py" host-env "$file")" ||
+        fail "invalid host environment"
+    while IFS='=' read -r key value; do
+        export "$key=$value"
+    done <<<"$settings"
 }
 
 # Press runs only when the environment switch is 1 and the release carries the Press image.

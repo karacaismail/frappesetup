@@ -1,7 +1,7 @@
 # One environment (alpha, beta, rc or prod) on a Hetzner server. Design: docs/dagitim/ortamlar.md.
 # remote/apply runs this file as project "atonota-<env>" with two env files:
 #   release.env  image references pinned by digest (from release.json, written by remote/apply)
-#   host.env     the non-secret environment file of deploy/environments/<env>.env
+#   host.env     resolved environment and brand values, frozen by release.py pack-deploy
 # Secrets live only on the server in /etc/atonota/<env>/<service>.env (mode 0600). Nothing here
 # publishes a host port. The edge proxy (edge.yaml) reaches tenant-frontend, keycloak and
 # press-frontend over the network "atonota-edge-<env>" by the aliases <env>-tenant, <env>-keycloak
@@ -71,8 +71,44 @@ services:
     volumes: [tenant-redis-queue:/data]
     networks: [internal]
 
+  # G-50 önerisi doğrulanmadı. Bildirilen sunucu 128 GB bellek ve AMD EPYC işlemci kullanır.
+  # Çekirdek sayısı bilinmiyor. Bu öneri yalnız 128 GB sunucu içindir.
+  # Diğer servisler ve güvenlik payı için 64 GB ayrılır.
+  # En çok dört ortamın bellek hesabı: (128 - 64) / 4 = 16 GB.
+  # Sunucularda zamanlayıcı ve düzenli yedek açık kabul edilir.
+  # tenant-scheduler için 1 GB ayrılır. Bu pay doğrulanmadı.
+  # Yedek işi için 3 GB ayrılır. Bu pay doğrulanmadı.
+  # Her ortamda eşzamanlı tek yedek işi varsayılır. Dört ortam aynı anda yedek alabilir.
+  # İşçilere kalan bellek 16 - 1 - 3 = 12 GB olur.
+  # Ortam başına kiracı web payı 6 GB, Press web payı 2 GB olur.
+  # Web işçisi başına 1 GB varsayılır. Kiracı sınırı 6 / 1 = 6 olur.
+  # Press sınırı 2 / 1 = 2 olur.
+  # Kuyruk payı 4 GB olur. Süreç başına 2 GB varsayılır. Sınır 4 / 2 = 2 olur.
+  # C_t, C_p ve C_q, ortamın kiracı, Press ve kuyruk süreçlerine ayrılan çekirdek paylarıdır.
+  # C_env, diğer servislerden sonra ortama ayrılan çekirdek payıdır.
+  # C_s zamanlayıcı payıdır. C_b yedek payıdır. İki işlemci payı da doğrulanmadı.
+  # C_s > 0 ve C_b > 0 olmalıdır. Sayıları ölçüm belirler.
+  # İşçi payı C_t + C_p + C_q <= C_env - C_s - C_b koşulunu sağlar.
+  # Ortamların C_env toplamı, diğer servislerden kalan çekirdek sayısını aşamaz.
+  # Kiracı sınırı min(2 * C_t + 1, 6) olur.
+  # Press sınırı min(2 * C_p + 1, 2) olur.
+  # Kuyruk toplamı min(C_q, 2) olur. min iki sınırdan küçüğünü seçer.
+  # 4 ve 2 geçici web değerleridir. Çekirdek bilinmediğinden formül sonucu değildir.
+  # gthread ve --threads=4 korunur. Kuyruklar aşağıdaki mevcut komutla çalışır.
+  # Geçici toplam (4 + 2) * 1 + 2 * 2 + 1 + 3 = 14 GB olur.
+  # Sunucu toplamı 64 + 4 * 14 = 120 GB olur. Kalan bellek 8 GB olur.
+  # Bellek sınırlarında (6 + 2) * 1 + 2 * 2 + 1 + 3 = 16 GB olur.
+  # Bu durumda sunucu toplamı 64 + 4 * 16 = 128 GB olur.
+  # prod ortamına yalnız deneme verisi girer. Öneri gerçek müşteri yükünü kapsamaz.
+  # Bu hesap kota uygulamaz. Bellek varsayımları ve sayılar yük altında ölçülmelidir.
+  # Ayrıntı ve kabul adımları `backend/docs/dagitim/ortamlar.md` belgesindedir.
   tenant-web:
     <<: *tenant
+    # --forwarded-allow-ips: nginx runs in the frontend container and sends X-Forwarded-Proto.
+    # Without the option gunicorn keeps http and Frappe writes the sid cookie without Secure
+    # (G-13). Other containers on the same networks also reach this port. The boundary is that the
+    # service publishes no port and Caddy drops the client's X-Forwarded-Proto: it has no
+    # trusted_proxies (tests/test_panel_session.py).
     command:
       - env/bin/gunicorn
       - --chdir=/home/frappe/frappe-bench/sites
@@ -83,6 +119,7 @@ services:
       - --worker-tmp-dir=/dev/shm
       - --timeout=120
       - --preload
+      - --forwarded-allow-ips=*
       - frappe.app:application
     healthcheck:
       test:
@@ -105,11 +142,14 @@ services:
 
   tenant-worker:
     <<: *tenant
+    # G-50 doğrulanmadı. Geçici öneri bir süreçtir. Üç kuyruk adı üç süreç anlamına gelmez.
+    # Press açıksa iki kuyruk servisi toplam iki süreçtir. Bellek hesabı yukarıdadır.
     command: ["bench", "worker", "--queue", "short,default,long"]
     depends_on: [tenant-web]
 
-  # Frappe's own scheduler. Off until the project owner decides on scheduled work
-  # (cron rule in backend/CLAUDE.md). Turn on with COMPOSE_PROFILES=scheduler.
+  # Frappe's own scheduler. The project owner approved it on the servers on
+  # 26 November 2026 (D-16). The DevOps lead turns it on with COMPOSE_PROFILES=scheduler.
+  # Its resource reserve is above. This proposal changes no activation.
   tenant-scheduler:
     <<: *tenant
     profiles: [scheduler]
@@ -153,6 +193,7 @@ services:
     command: ["start", "--import-realm"]
     env_file: ["/etc/atonota/${ATONOTA_ENV:?}/keycloak.env"]
     environment:
+      IDENTITY_BRAND_NAME: ${PRODUCT_NAME:?host.env is missing PRODUCT_NAME}
       KC_HOSTNAME: https://${ATONOTA_ID_HOST:?}
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
@@ -203,9 +244,15 @@ services:
     volumes: [press-redis-queue:/data]
     networks: [press-internal]
 
+  # G-50 doğrulanmadı. 2 geçici değerdir. Ortak bellek ve çekirdek hesabı yukarıdadır.
   press-web:
     <<: *press
     profiles: [press]
+    # --forwarded-allow-ips: nginx runs in the frontend container and sends X-Forwarded-Proto.
+    # Without the option gunicorn keeps http and Frappe writes the sid cookie without Secure
+    # (G-13). Other containers on the same networks also reach this port. The boundary is that the
+    # service publishes no port and Caddy drops the client's X-Forwarded-Proto: it has no
+    # trusted_proxies (tests/test_panel_session.py).
     command:
       - env/bin/gunicorn
       - --chdir=/home/frappe/frappe-bench/sites
@@ -216,6 +263,7 @@ services:
       - --worker-tmp-dir=/dev/shm
       - --timeout=120
       - --preload
+      - --forwarded-allow-ips=*
       - frappe.app:application
     healthcheck:
       test:
@@ -237,6 +285,7 @@ services:
   press-worker:
     <<: *press
     profiles: [press]
+    # G-50 doğrulanmadı. Geçici öneri bir süreçtir. Kiracıyla ortak kuyruk sınırı yukarıdadır.
     command: ["bench", "worker", "--queue", "short,default,long"]
     depends_on: [press-web]
 

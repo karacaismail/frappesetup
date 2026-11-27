@@ -92,6 +92,10 @@ class _Bench:
         for subject in self.subjects:
             self.add_account(subject)
         self.keycloak.serve_directory()
+        # Sign-in platforms for the `atonota_login` reads: general ones and one of the tenant.
+        for alias in ("google", "facebook", "linkedin", "apple"):
+            self.keycloak.add_identity_provider(alias, display_name=alias.title())
+        self.keycloak.add_identity_provider("tenant1-sso", display_name="Tenant One SSO", organization_id=ORG_ID)
         listed = self.stack.app.settings.known_azp
 
         def verifier(token: str) -> dict[str, object]:
@@ -198,6 +202,16 @@ class _Bench:
         subject, sid = self.subjects[self.counter % len(self.subjects)], self.fresh("sid")
         self.keycloak.add_session(subject, sid)
         return self.call("POST", "/v1/sessions/revoke", {"sid": sid, "subject": subject}, SITE)
+
+    def login_providers(self) -> Callable[[], int]:
+        return self.call("GET", "/v1/login-providers", None, SITE)
+
+    def linked_accounts(self) -> Callable[[], int]:
+        subject = self.subjects[self.counter % len(self.subjects)]
+        self.counter += 1
+        self.keycloak.link_account(subject, "google", f"{subject}@example.test")
+        self.keycloak.add_credential(subject, "password")
+        return self.call("POST", "/v1/linked-accounts", {"subject": subject}, SITE)
 
     def delete_account(self) -> Callable[[], int]:
         # Accounts outside the sample set, so the sample keeps its size for the other endpoints.
@@ -347,6 +361,8 @@ def run(
             # The reads are measured first, on the untouched sample.
             ("POST /v1/reconcile (preview)", "read", bench.preview_reconcile),
             ("POST /v1/invitations (preview)", "read", bench.preview_invitation),
+            ("GET /v1/login-providers", "read", bench.login_providers),
+            ("POST /v1/linked-accounts", "read", bench.linked_accounts),
         ]
         rows = [{"endpoint": name, "kind": kind, **_measure(prepare, samples, concurrency)} for name, kind, prepare in plan]
         # The two list endpoints and the replay preview are measured on a filled queue and journal.

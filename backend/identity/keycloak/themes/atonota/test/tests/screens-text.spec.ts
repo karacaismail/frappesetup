@@ -17,7 +17,7 @@ const expected: Record<string, Expectation> = {
   'recovery-codes-setup': {
     title: 'Kurtarma kodlarınız',
     texts: [
-      'Kurtarma kodu, telefonunuza ulaşamadığınızda oturum açmanızı sağlar. Devam etmek için kodlarınızı kaydedin.',
+      'Kurtarma kodu, telefonunuza ulaşamadığınızda giriş yapmanızı sağlar. Devam etmek için kodlarınızı kaydedin.',
       'Bu kodları bir daha göremezsiniz.',
       'Kodları yazdırın, indirin ya da kopyalayın. Sonra güvenli bir yerde saklayın. Kurulumdan vazgeçerseniz bu kodlar silinir.',
       'Kodları güvenli bir yere kaydettim',

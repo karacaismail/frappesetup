@@ -13,7 +13,7 @@ import frappe
 from frappe.utils import add_days, now_datetime
 
 from platform_core.ai import retention
-from platform_core.ai.tests.base import DESK_USER, MANAGER, USER_A, AiTestCase
+from platform_core.ai.tests.base import DESK_USER, MANAGER, SECOND_MANAGER, USER_A, AiTestCase
 
 USAGE_LOG = "PLT AI Usage Log"
 # Names of the usage records this test made. Only these are cleaned up.
@@ -119,11 +119,23 @@ class TestRetentionEntries(AiTestCase):
 		result = self.call_tool(manager, "plt_purge_action_log", {})
 		proposal = result["structuredContent"]
 		untouched = self.exists(old)
-		outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
+		digest = self.digest_of(manager, proposal["proposal_id"])
+		first = self.approve(manager, proposal["proposal_id"], digest)
+		self.assertEqual(first.status_code, 200, "First retention approval failed")
 
 		self.assertEqual(proposal["preview"]["details"]["usage_logs"]["to_delete"], 1)
 		self.assertTrue(untouched)
-		self.assertTrue(outcome["executed"], outcome)
+		self.assertEqual(proposal["risk_level"], "R3")
+		self.assertFalse(first.json["message"]["executed"])
+		self.assertEqual(first.json["message"]["proposal"]["status"], "awaiting_second_approval")
+		self.assertTrue(self.exists(old), "The old record must remain until the second approval")
+		self.assertTrue(self.exists(young), "The young record must remain after the first approval")
+
+		second = self.approve(self.login(SECOND_MANAGER), proposal["proposal_id"], digest)
+		self.assertEqual(second.status_code, 200, "Second retention approval failed")
+		outcome = second.json["message"]
+		self.assertTrue(outcome["executed"], "Retention was not executed after the second approval")
+		self.assertEqual(outcome["proposal"]["second_approver"], SECOND_MANAGER)
 		self.assert_only_the_old_one_went(young, old)
 
 	def test_callers_without_the_role_delete_nothing(self):

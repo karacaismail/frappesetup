@@ -164,7 +164,8 @@ class ShellHTTPFixture(unittest.TestCase):
 		for email, roles in (
 			(READER, ["Kabuk Test Reader"]),
 			(PRIVILEGED, ["Kabuk Test Reader", "Kabuk Test Privileged"]),
-			(DESK, ["Shell Test Desk", "Kabuk Test Reader", "Kabuk Test Privileged"]),
+			# G-53: only a Platform Operator keeps the Desk; other users are sent to the panel.
+			(DESK, ["Shell Test Desk", "Kabuk Test Reader", "Kabuk Test Privileged", "Platform Operator"]),
 			*cls.additional_users,
 		):
 			if not frappe.db.exists("User", email):

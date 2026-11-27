@@ -702,6 +702,121 @@ paths:
                 $ref: "#/components/schemas/Error"
         "502":
           $ref: "#/components/responses/UpstreamFailed"
+  /v1/login-providers:
+    get:
+      operationId: listLoginProviders
+      summary: Lists the sign-in platforms that the calling tenant may show.
+      description: |
+        The source is the security review of the sign-in product (AJA-458) and the panel contract, G-159.
+        The login page of a `platform_core` site shows one button for each platform in this list.
+        The request names no person and has no body.
+
+        The service finds the tenant from the `azp` value of the token and the tenant list. The request cannot choose the tenant.
+        The list has two kinds of platforms. The first kind is a general platform that is enabled and not hidden on the login page.
+        The second kind is a platform that belongs to the Organization of the calling tenant.
+        A platform of another tenant is never in the list. A platform without a stored secret is never in the list.
+        A disabled platform and a platform that only links accounts are not in the list either.
+
+        The reply is built from an allow list. It carries only `alias` and `display_name`.
+        It never carries `config`, a secret, or a Keycloak id.
+        The service may keep the platform list of the realm for 30 seconds. The list holds no personal data.
+
+        Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint. These are the service clients of the tenant sites.
+        Operator, preview and deletion clients get 403. The service needs the `view-identity-providers` role in Keycloak.
+        The endpoint only reads. It writes nothing in Keycloak or on a target.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-okur
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: The platforms the calling tenant may show, in the order of the realm.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginProviderList"
+        "400":
+          description: The request has a body. This endpoint takes no body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            The client is not in the session list, or no tenant in the tenant list belongs to the client.
+            The error code is `forbidden`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
+  /v1/linked-accounts:
+    post:
+      operationId: listLinkedAccounts
+      summary: Lists the linked platforms and the local sign-in ways of one member.
+      description: |
+        The source is the security review of the sign-in product (AJA-458) and the panel contract, G-160.
+        The account page of a `platform_core` site shows which platforms the signed-in user has linked.
+        The site takes the id of the user from its own session and identity link. The body carries this id.
+        The method is POST so that the id of the user is not in the address. The endpoint still only reads.
+
+        The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
+        The user must be a member of the Organization of the calling tenant. If not, the service returns 403.
+        An unknown user gets the same 403. So the reply does not tell whether a person exists.
+
+        The platform list is the same list as in `GET /v1/login-providers`. Each platform carries a `linked` flag.
+        A link to a platform outside this list is left out of the reply.
+        `local_sign_in_methods` is the number of sign-in ways without a platform. Examples are a password and a passkey.
+        A second factor, such as a one-time code, is not counted.
+
+        The reply is built from an allow list. It never carries the outside user name, credential data, or a Keycloak id.
+        The reply is never kept. The log names the endpoint, the caller and the result. It never names the person.
+
+        Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
+        Operator, preview and deletion clients get 403.
+        Remaining risk: a taken-over tenant site can read the linked platforms of its own members.
+        It cannot read the members of another tenant. The decision record is `docs/decisions/0003-keycloak-extensions.md`.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-okur
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkedAccountsRequest"
+      responses:
+        "200":
+          description: The linked platforms of the member and the number of local sign-in ways.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkedAccounts"
+        "400":
+          description: The body is invalid. For example, `subject` is missing or invalid, or the body has another field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            The client is not in the session list, or no tenant in the tenant list belongs to the client.
+            The response is the same when the user is unknown or is not a member of the Organization of the calling tenant.
+            The error code is `forbidden`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
   /v1/account-deletions:
     post:
       operationId: requestAccountDeletion
@@ -847,14 +962,14 @@ components:
         The token the service uses when it goes to the Keycloak Admin API is a separate one.
         That token is requested with `scope=admin-api kc-admin-api` (the shared contract, `docs/sozlesmeler.md`, section 2).
         The Keycloak roles of the service account go only into that token.
-        The roles are `view-users`, `query-users`, `manage-users` and the minimum role needed for organizations.
+        The roles are `view-users`, `query-users`, `manage-users`, `view-identity-providers` and the minimum role needed for organizations.
         The token that goes to the tenant and to Press does not carry these roles.
         The service verifies the token with the shared `oidc_verify` library.
         The `aud` value of the token must be only `identity-sync`.
         The `azp` value of the token must be in one of five lists.
         The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to preview invitations.
         The `IDENTITY_SYNC_EXECUTE_AZP` list gives permission to execute within the caller tenant organization.
-        The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
+        The `IDENTITY_SYNC_SESSION_AZP` list opens only `/v1/sessions/revoke`, `/v1/login-providers` and `/v1/linked-accounts`.
         The OPERATOR list alone opens platform reconciliation, replay and queue lists.
         The DELETION list opens only global account deletion for Press.
         EXECUTE and SESSION contain the same tenant clients. All other lists are disjoint.
@@ -1388,6 +1503,68 @@ components:
           type: boolean
           const: true
           description: The session no longer exists.
+    LoginProvider:
+      type: object
+      required: [alias, display_name]
+      properties:
+        alias:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+          description: The alias of the platform in Keycloak. An example is `google`.
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: The name of the platform on the button. If Keycloak has no display name, it is the alias.
+      additionalProperties: false
+    LoginProviderList:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/LoginProvider"
+      additionalProperties: false
+    LinkedAccountsRequest:
+      type: object
+      required: [subject]
+      properties:
+        subject:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: false
+    LinkedProvider:
+      type: object
+      required: [alias, display_name, linked]
+      properties:
+        alias:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+          description: The alias of the platform in Keycloak.
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: The name of the platform on the account page.
+        linked:
+          type: boolean
+          description: True when the member has linked an account of this platform.
+      additionalProperties: false
+    LinkedAccounts:
+      type: object
+      required: [providers, local_sign_in_methods]
+      properties:
+        providers:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/LinkedProvider"
+        local_sign_in_methods:
+          type: integer
+          minimum: 0
+          description: The number of sign-in ways without a platform. Only a password and a passkey count.
+      additionalProperties: false
     AccountDeletionRequest:
       type: object
       required: [issuer, subject, reauthenticated_at]

@@ -24,7 +24,7 @@ def declarations() -> list[dict]:
 			"kind": "write",
 			"destructive": True,
 			"versioned": True,
-			"roles": list(leave.APPROVER_ROLES),
+			"roles": list(leave.TOOL_APPROVER_ROLES),
 			"handler": "hrms_tr.ai_tools.execute_approval",
 			"preview": "hrms_tr.ai_tools.preview_approval",
 		}

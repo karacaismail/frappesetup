@@ -222,8 +222,11 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 200)
 
 	def test_website_user_cannot_open_desk(self):
-		status, _unused_headers, _unused_body = self.request("/desk", self.reader_sid)
-		self.assertEqual(status, 403)
+		# G-53: the Desk request is sent to the panel instead of answering 403.
+		status, headers, body = self.request("/desk", self.reader_sid)
+		self.assertEqual(status, 302)
+		self.assertEqual(headers["Location"], "/panel")
+		self.assertNotIn(b"frappe.boot =", body)
 
 	def test_website_user_cannot_read_native_form_rpc_or_alias(self):
 		method = "frappe.desk.form.load.getdoctype"

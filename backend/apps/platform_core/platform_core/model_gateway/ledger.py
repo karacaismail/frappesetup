@@ -103,7 +103,7 @@ def api_quota(api, conservative_tokens):
 	return True
 
 
-def begin(route, api, account, provider, model, *, cost, tokens):
+def begin(route, api, account, provider, model, *, cost, tokens, file_job=None, chunk_index=None):
 	# This internal audit writer only inserts fields assembled from authorized records.
 	# No caller can supply values directly or grant creation rights to their REST identity.
 	log = frappe.get_doc(
@@ -123,6 +123,8 @@ def begin(route, api, account, provider, model, *, cost, tokens):
 			"reserved_cost": cost if cost is not None else 0,
 			"reservation_known": int(cost is not None),
 			"reserved_tokens": tokens,
+			"file_job": file_job,
+			"chunk_index": chunk_index,
 		}
 	)
 	log.db_insert()

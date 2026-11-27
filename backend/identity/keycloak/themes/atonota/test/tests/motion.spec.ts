@@ -5,6 +5,8 @@ import { screen } from './helpers';
 
 const EASE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 const readCss = () => readFileSync(fileURLToPath(new URL('../../login/resources/css/atonota.css', import.meta.url)), 'utf8');
+/** Duration of every transition: the central --at-motion-duration-mid token, in seconds. */
+const tokenSeconds = () => Number.parseFloat(/--at-motion-duration-mid:\s*(\d+)ms/.exec(readCss())![1]) / 1000;
 
 /** Süresi sıfırdan büyük her geçiş ve animasyonu, öğeler ve sözde öğeler için toplar. */
 const collectMotion = (page: Page) =>
@@ -31,8 +33,9 @@ for (const name of ['sign-in', 'totp-setup', 'passkey-sign-in', 'sign-in-method'
     const motion = await collectMotion(page);
     const wrong = motion.filter((item) => item.easing.split(/,(?![^(]*\))/).some((part) => part.trim() !== EASE));
     expect(wrong, 'onaysız eğri').toEqual([]);
-    // Süre merkezi tokena eşittir (160 ms). Temel temadan başka süre ve "transition: all" sızmaz.
-    expect(motion.filter((item) => Math.abs(item.seconds - 0.16) > 0.001), 'token dışı süre').toEqual([]);
+    // Süre merkezi tokena eşittir (--at-motion-duration-mid, 200 ms). Temel temadan başka süre ve "transition: all" sızmaz.
+    expect(tokenSeconds()).toBeGreaterThan(0);
+    expect(motion.filter((item) => Math.abs(item.seconds - tokenSeconds()) > 0.001), 'token dışı süre').toEqual([]);
     expect(motion.filter((item) => item.property.split(',').some((part) => part.trim() === 'all')), 'transition: all').toEqual([]);
     // Ana düğmenin rengi iki yönde de yumuşak değişir. Geçiş temel kuraldadır, yalnız hover dalında değildir.
     const button = motion.filter((item) => item.where.includes('pf-m-primary') || item.where.includes('at-choice'));
@@ -53,7 +56,7 @@ test('stil kaynağı: hareket yalnız merkezi değişkenlerden gelir', () => {
   const declarations = body.match(/(transition|animation)(-timing-function|-duration)?\s*:[^;]+;/g) ?? [];
   const local = declarations.filter((line) => /\b(ease|ease-in|ease-out|ease-in-out|linear|steps)\b|\d+m?s\b/.test(line.replace(/var\([^)]*\)/g, '')));
   expect(local, 'yerel eğri ya da süre').toEqual([]);
-  expect(body).toContain('--at-motion-ease: cubic-bezier(.65, 0, .35, 1)');
+  expect(body).toContain('--at-motion-easing-standard: cubic-bezier(.65, 0, .35, 1)');
 });
 
 test('stil kaynağı: yuvarlak kutuya renkli kenar çizgisi ve çevreleyen odak yok', () => {

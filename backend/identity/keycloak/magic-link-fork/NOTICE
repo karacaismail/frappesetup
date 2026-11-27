@@ -19,3 +19,16 @@ Changed on 24 November 2026 for G-162 (design: backend/docs/decisions/0003-keycl
 - Added: src/main/java/io/cloudflight/keycloak/magiclink/sending/MagicLinkSendLimiter.java
   Counts sent mails per address in Keycloak's single use object store.
   Settings: magiclink.send.limit (default 3) and magiclink.send.window.seconds (default 900).
+
+Changed on 24 November 2026 for AJA-440 (design: section "G-162 ek iş" in 0003-keycloak-extensions.md):
+
+- Modified: AbstractMagicLinkAuthenticator.java
+  The request reads the client source (IPv4 address or IPv6 /64) and gives it to the mail job.
+  The job checks the source ceiling, then the source share, then the address limit.
+  The number of waiting mail jobs has a ceiling.
+- Modified: AbstractMagicLinkAuthenticatorFactory.java
+  Declares the three new settings.
+- Modified: MagicLinkSendLimiter.java
+  Source share, source ceiling and queue ceiling. Private addresses are no source.
+  Settings: magiclink.send.source.share (default 2), magiclink.request.source.limit (default 20)
+  and magiclink.send.queue.max (default 1000).

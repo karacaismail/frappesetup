@@ -9,7 +9,7 @@
 // karacaismail/frappesetup, branch */main, script path backend/deploy/jenkins/web.Jenkinsfile,
 // "GitHub hook trigger" on. The job checks out atonota-web itself, so a push to either repository
 // starts it. The "Skip unchanged" stage stops a run whose atonota-web commit already runs in alpha.
-// Credentials and plugins as in backend.Jenkinsfile. Agents with label atonota-build need Node 24
+// Credentials and plugins as in backend.Jenkinsfile (list: backend/docs/handoff/jenkins-credentials.md). Agents with label atonota-build need Node 24
 // and the Playwright system packages.
 
 // DEPLOYING names the environment whose deployment has started. A failure before that point
@@ -98,16 +98,46 @@ pipeline {
                         }
                     }
                 }
-                stage('Gates') {
+                // Each gate is its own stage. The list equals the table "Jenkins kapıları" in
+                // backend/docs/handoff/ci-security.md (test_jenkins_gates.py).
+                stage('Web dependencies') {
                     when { environment name: 'WEB_UNCHANGED', value: 'false' }
                     steps {
                         dir('web') {
                             sh 'npm ci'
+                        }
+                    }
+                }
+                stage('Gate: lint') {
+                    when { environment name: 'WEB_UNCHANGED', value: 'false' }
+                    steps {
+                        dir('web') {
                             sh 'npm run lint'
+                        }
+                    }
+                }
+                stage('Gate: typecheck') {
+                    when { environment name: 'WEB_UNCHANGED', value: 'false' }
+                    steps {
+                        dir('web') {
                             sh 'npm run typecheck'
+                        }
+                    }
+                }
+                stage('Gate: unit tests') {
+                    when { environment name: 'WEB_UNCHANGED', value: 'false' }
+                    steps {
+                        dir('web') {
                             sh 'npm test'
-                            // The panel is served under /panel/ on each tenant host (ortamlar.md).
-                            // The /panel page of Frappe reads dist/.vite/manifest.json (E-3).
+                        }
+                    }
+                }
+                stage('Build bundle') {
+                    when { environment name: 'WEB_UNCHANGED', value: 'false' }
+                    steps {
+                        // The panel is served under /panel/ on each tenant host (ortamlar.md).
+                        // The /panel page of Frappe reads dist/.vite/manifest.json (E-3).
+                        dir('web') {
                             sh 'npm run build -- --base=/panel/ --manifest'
                         }
                     }

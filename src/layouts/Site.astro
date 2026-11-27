@@ -9,7 +9,7 @@ import { getCollection } from 'astro:content';
 import Shell, { type Heading } from '../components/Shell.tsx';
 import { SECTIONS } from '../data/sections';
 import requirements from '../data/requirements.json';
-import { AS_OF, REPO_URL, SITE_TITLE } from '../data/site';
+import { AS_OF, REPO_URL, SITE_TITLE, fillBrand } from '../data/site';
 
 interface Props {
   title: string;
@@ -32,7 +32,7 @@ const nav = [
   { href: `${BASE}/`, label: 'Genel bakış', order: 0, group: '', icon: 'home' },
   ...docs.map((d) => ({
     href: `${BASE}/${d.id}/`,
-    label: d.data.nav,
+    label: fillBrand(d.data.nav),
     order: d.data.order,
     group: SECTIONS[d.id]?.group ?? '',
     icon: SECTIONS[d.id]?.icon ?? 'file',
@@ -58,6 +58,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <link rel="icon" href={`${BASE}/favicon.svg`} type="image/svg+xml" />
     <link rel="sitemap" href={`${BASE}/sitemap-index.xml`} />
     <ColorSchemeScript defaultColorScheme="auto" />
+    <noscript>
+      <style is:inline>
+        #site-nav .nav-wrapper { display: none; }
+        #site-nav .nav-wrapper-panel[hidden] { display: block; }
+      </style>
+    </noscript>
+    <slot name="head" />
   </head>
   <body>
     <Shell
@@ -69,6 +76,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
       headings={headings}
       asOf={AS_OF}
     >
+      <noscript>
+        <a class="footer-link mantine-hidden-from-md" href={`${BASE}/#sections-h`}>Doküman bölümlerini aç</a>
+      </noscript>
       <slot />
     </Shell>
   </body>

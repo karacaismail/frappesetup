@@ -92,7 +92,7 @@ if [[ "$kind" == web ]]; then
     # Web scripts live apart from the backend ones: an older web release must not replace the
     # backend rollback (each release brings the scripts of its own commit).
     install -d -m 0750 "$ATONOTA_ROOT/web/$env/bin"
-    cp "$here"/{common.sh,status,rollback} "$ATONOTA_ROOT/web/$env/bin/"
+    cp "$here"/{common.sh,status,rollback,settings.py} "$ATONOTA_ROOT/web/$env/bin/"
     say "web release $id is current in $env"
     exit 0
 fi
@@ -209,6 +209,7 @@ if [[ "$resume" == 0 || "$reached" == migrating ]]; then
         stack "$folder" run --rm --no-deps tenant-web bench --site "$site" list-apps >/dev/null ||
             fail "site $site does not exist; create it with the first install steps"
         say "migrate $site"
+        stack "$folder" run --rm --no-deps tenant-web bench --site "$site" set-config -- identity_brand_name "$PRODUCT_NAME"
         stack "$folder" run --rm --no-deps tenant-web bench --site "$site" migrate
     done
     phase "$folder" migrated
@@ -252,6 +253,6 @@ fi
 rm -f "$base/health/backend.json"
 switch_link "releases/$id" "$current"
 rm -f "$pending"
-cp "$folder/bin"/{common.sh,status,rollback,backup,restore} "$base/bin/"
+cp "$folder/bin"/{common.sh,status,rollback,backup,restore,settings.py} "$base/bin/"
 phase "$folder" "done"
 say "backend release $id is current in $env"

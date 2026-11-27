@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 import frappe
 
-from platform_core.ai.errors import SERVER_LOG
+from platform_core.ai.errors import CONTEXT, SERVER_LOG
 from platform_core.ai.tests import sample_tools_errors as samples
-from platform_core.ai.tests.base import USER_A, AiTestCase
+from platform_core.ai.tests.base import USER_A, AiTestCase, answer_text
 
 HOOK = "platform_core.ai.tests.sample_tools_errors.declare"
 MARKER = samples.MARKER
@@ -58,9 +58,33 @@ class TestToolErrorText(AiTestCase):
 				result = response.json["result"]
 				self.assertNotIn(MARKER, raw, tool)
 				self.assert_denied(result, code)
-				self.assertEqual(result["structuredContent"]["error"]["message"], text, tool)
+				self.assertEqual(result["structuredContent"]["error"]["message"], answer_text(text, USER_A), tool)
 
 		self.assertNotIn(MARKER, stored_text())
+
+	def test_fixed_text_follows_the_language_of_the_user(self):
+		"""The same refusal is English for an English user and the Turkish row for a Turkish user."""
+		name = self.make_record(USER_A)
+		source = "The tool refused the input."
+		original = frappe.db.get_value("User", USER_A, "language")
+		self.addCleanup(self.set_language, USER_A, original)
+		answers = {}
+
+		for lang in ("en", "tr"):
+			self.set_language(USER_A, lang)
+			client = self.login(USER_A)
+			with with_tools():
+				response = self.rpc(client, "tools/call", {"name": "plt_leaky_validation", "arguments": {"name": name}})
+			answers[lang] = response.json["result"]["structuredContent"]["error"]["message"]
+
+		self.assertEqual(answers["en"], source)
+		self.assertEqual(answers["tr"], frappe._(source, lang="tr", context=CONTEXT))
+		self.assertNotEqual(answers["tr"], source)
+
+	def set_language(self, user: str, lang: str | None) -> None:
+		frappe.db.set_value("User", user, "language", lang)
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+		frappe.clear_cache(user=user)
 
 	def test_execution_errors_store_a_fixed_code(self):
 		name = self.make_record(USER_A)

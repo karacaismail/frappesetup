@@ -57,3 +57,23 @@ class SessionRelayTest(unittest.TestCase):
             ("POST", "/realms/platform/protocol/openid-connect/token"),
             ("GET", "/realms/platform/protocol/openid-connect/certs"),
         })
+
+    def test_session_relay_also_forwards_the_two_login_reads(self):
+        """The tenant reaches identity-sync through this relay. The login reads use the same origin (AJA-459).
+
+        The tenant admin panel sends invitations to the same origin (G-98, AJA-791, AJA-939).
+        """
+        self.assertEqual(RELAY_TARGETS["sessions"], {
+            ("POST", "/v1/sessions/revoke"),
+            ("GET", "/v1/login-providers"),
+            ("POST", "/v1/linked-accounts"),
+            ("POST", "/v1/invitations"),
+        })
+
+    def test_setup_script_finds_python_in_both_identity_sync_images(self):
+        """The merge preview image has env/bin/python. The local stack image has only python on PATH."""
+        script = (Path(__file__).resolve().parents[1] / "preview" / "session-tls.sh").read_text()
+        self.assertRegex(script, r"sync_python=")
+        self.assertNotRegex(script, r'exec(?: -d)? "\$sync" env/bin/python')
+        self.assertIn('"$sync_python"', script)
+

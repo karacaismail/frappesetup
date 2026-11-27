@@ -167,12 +167,19 @@ RUN_REPORT = {
 	},
 }
 
+RISK_LEVEL = {
+	"type": "string",
+	"enum": ["R0", "R1", "R2", "R3"],
+	"description": "Set by the server from the tool. The model cannot set it.",
+}
+
 APPROVAL_REQUIRED = {
 	"type": "object",
-	"required": ["status", "proposal_id", "preview", "expires_at", "created_at"],
+	"required": ["status", "proposal_id", "risk_level", "preview", "expires_at", "created_at"],
 	"properties": {
 		"status": {"type": "string", "enum": ["approval_required"]},
 		"proposal_id": _STRING,
+		"risk_level": RISK_LEVEL,
 		"preview": PREVIEW,
 		"expires_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 		"created_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
@@ -188,24 +195,33 @@ PROPOSAL_STATE = {
 		"tool",
 		"destructive",
 		"billable",
+		"risk_level",
 		"preview",
 		"expires_at",
 		"created_at",
 	],
 	"properties": {
 		"proposal_id": _STRING,
-		"status": {"type": "string", "enum": ["pending", "rejected", "expired", "consumed"]},
+		"status": {
+			"type": "string",
+			"enum": ["pending", "awaiting_second_approval", "rejected", "expired", "consumed"],
+		},
 		"result": {"type": "string", "enum": ["", "unknown", "succeeded", "failed"]},
 		"tool": _STRING,
 		"target_doctype": _NULLABLE_STRING,
 		"target_name": _NULLABLE_STRING,
 		"destructive": _BOOLEAN,
 		"billable": _BOOLEAN,
+		"risk_level": RISK_LEVEL,
+		"source_proposal": _NULLABLE_STRING,
 		"preview": PREVIEW,
 		"expires_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 		"created_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 		"result_document": _NULLABLE_STRING,
 		"error": _NULLABLE_STRING,
+		"first_approved_at": _NULLABLE_STRING,
+		"second_approver": _NULLABLE_STRING,
+		"second_approved_at": _NULLABLE_STRING,
 	},
 }
 

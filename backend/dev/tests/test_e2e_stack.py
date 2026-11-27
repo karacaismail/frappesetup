@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "backend/e2e/stack"
+PRODUCT_NAME = runpy.run_path(str(ROOT / "backend/deploy/brand.py"))["load_brand"]()["PRODUCT_NAME"]
 CONTAINER_ID = "0123456789ab"
 # setup() derives the URLs. The credential file supplies the two fake client values.
 PRESS_ENVIRONMENT = {
@@ -33,7 +34,7 @@ PRESS_ENVIRONMENT.update(
     ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:7151",
     ATONOTA_SITE_TENANT1_SECRET=secrets.token_urlsafe(16),
     ATONOTA_SITE_TENANT1_SERVICE_SECRET=secrets.token_urlsafe(16),
-    IDENTITY_BRAND_NAME="AtonotA Login",
+    IDENTITY_BRAND_NAME=PRODUCT_NAME,
 )
 STACK_ENVIRONMENT = dict(
     PRESS_ENVIRONMENT,

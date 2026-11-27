@@ -647,6 +647,7 @@ Your roles do not allow tool {0}.,Rolleriniz {0} aracını kullanmaya izin vermi
 An earlier action on this target has an unknown result. A human must resolve it first.,Bu hedefteki önceki işlemin sonucu bilinmiyor. Önce bir insan o işlemi kapatmalı.,platform_core.ai
 Proposal not found.,Öneri bulunamadı.,platform_core.ai
 This proposal belongs to another user.,Bu öneri başka bir kullanıcıya ait.,platform_core.ai
+You may not approve this proposal.,Bu öneriyi onaylama izniniz yok.,platform_core.ai
 Unknown status.,Bilinmeyen durum.,platform_core.ai
 start must be between 0 and {0}.,start değeri 0 ile {0} arasında olmalı.,platform_core.ai
 The target changed after the preview.,"Hedef, önizlemeden sonra değişti.",platform_core.ai
@@ -744,7 +745,7 @@ Duration (ms),Süre (ms),PLT AI Action Log
 How long the step took in milliseconds.,Adımın milisaniye cinsinden süresi.,PLT AI Action Log
 "A write that an AI asked for and that waits for a human. It holds the preview the human sees, the digest that binds the approval to that preview, and the outcome. Nothing is written to the target until the owner approves the proposal.","Yapay zekânın istediği ve insan kararını bekleyen yazma işidir. İnsanın gördüğü önizlemeyi, onayı o önizlemeye bağlayan özeti ve sonucu tutar. Sahibi öneriyi onaylayana kadar hedefe hiçbir şey yazılmaz.",PLT AI Action Proposal
 User,Kullanıcı,PLT AI Action Proposal
-User who asked for the write and who alone may approve it.,Yazmayı isteyen kullanıcı. Öneriyi yalnız bu kullanıcı onaylayabilir.,PLT AI Action Proposal
+User who asked for the write. Only this user gives the first approval.,Yazmayı isteyen kullanıcı. İlk onayı yalnız bu kullanıcı verir.,PLT AI Action Proposal
 Principal,Kimlik türü,PLT AI Action Proposal
 Identity type that opened the proposal.,Öneriyi açan kimlik türü.,PLT AI Action Proposal
 Session ID,Konuşma kimliği,PLT AI Action Proposal
@@ -771,10 +772,18 @@ Destructive,Yıkıcı,PLT AI Action Proposal
 Set when the tool may destroy or overwrite data.,Araç veriyi silebiliyor ya da üstüne yazabiliyorsa işaretlenir.,PLT AI Action Proposal
 Billable,Ücretli,PLT AI Action Proposal
 Set when the tool may cost money.,Araç ücret doğurabiliyorsa işaretlenir.,PLT AI Action Proposal
+Risk Level,Risk düzeyi,PLT AI Action Proposal
+"Risk level from R0 to R3. The server sets it from the tool when the proposal opens. The model cannot set it.","R0 ile R3 arasındaki risk düzeyi. Sunucu düzeyi öneri açılırken araçtan belirler. Model düzeyi belirleyemez.",PLT AI Action Proposal
+Source Proposal,Kaynak öneri,PLT AI Action Proposal
+The applied proposal this proposal reverts. Empty on an ordinary proposal.,Bu önerinin geri aldığı uygulanmış öneri. Sıradan öneride boştur.,PLT AI Action Proposal
+Revert Values,Geri alma değerleri,PLT AI Action Proposal
+Old values of the fields the applied action changed. A revert proposal is built from them.,Uygulanan işlemin değiştirdiği alanların eski değerleri. Geri alma önerisi bu değerlerden kurulur.,PLT AI Action Proposal
+Applied Version,Uygulama sonrası sürüm,PLT AI Action Proposal
+"The target's version right after the applied action. A revert is refused if the target changed since.","Uygulanan işlemden hemen sonraki kayıt sürümü. Kayıt o andan sonra değiştiyse geri alma reddedilir.",PLT AI Action Proposal
 Expires At,Son geçerlilik zamanı,PLT AI Action Proposal
 Moment after which the proposal can no longer be approved.,Bu andan sonra öneri onaylanamaz.,PLT AI Action Proposal
 Status,Durum,PLT AI Action Proposal
-Where the proposal stands. Consumed means execution has started.,"Önerinin durumu. consumed, yürütmenin başladığını gösterir.",PLT AI Action Proposal
+"Where the proposal stands. An R3 proposal waits for a second approval after the owner approves it. Consumed means execution has started.","Önerinin durumu. Sahibi R3 öneriyi onaylayınca öneri ikinci onayı bekler. consumed, yürütmenin başladığını gösterir.",PLT AI Action Proposal
 Result,Sonuç,PLT AI Action Proposal
 Outcome of the execution. Unknown blocks new proposals on the same target.,"Yürütmenin sonucu. unknown, aynı hedefte yeni öneriyi engeller.",PLT AI Action Proposal
 Result Document,Sonuç kaydı,PLT AI Action Proposal
@@ -783,6 +792,12 @@ Error,Hata,PLT AI Action Proposal
 Why the proposal was rejected or the execution failed.,Önerinin neden reddedildiği ya da yürütmenin neden hata verdiği.,PLT AI Action Proposal
 Decided At,Karar zamanı,PLT AI Action Proposal
 "When a human approved, rejected or resolved the proposal.","İnsanın öneriyi onayladığı, reddettiği ya da kapattığı zaman.",PLT AI Action Proposal
+First Approved At,İlk onay zamanı,PLT AI Action Proposal
+When the owner gave the first approval of an R3 proposal. Nothing runs at that moment.,Sahibin R3 öneriye ilk onayı verdiği zaman. Bu anda hiçbir şey çalışmaz.,PLT AI Action Proposal
+Second Approver,İkinci onaylayan,PLT AI Action Proposal
+Second person who approved an R3 proposal. Not the owner. Has write permission on the target.,R3 öneriyi onaylayan ikinci kişi. Bu kişi öneriyi açan kişi değildir. Hedefte yazma izni vardır.,PLT AI Action Proposal
+Second Approved At,İkinci onay zamanı,PLT AI Action Proposal
+When the second person approved the R3 proposal.,İkinci kişinin R3 öneriyi onayladığı zaman.,PLT AI Action Proposal
 Preview Digest,Önizleme özeti,PLT AI Action Proposal
 SHA-256 of the whole preview and its target. The server previews again at approval and compares.,Önizlemenin tamamının ve hedefinin SHA-256 özeti. Sunucu onayda önizlemeyi yeniden üretir ve karşılaştırır.,PLT AI Action Proposal
 You do not have permission for this action.,Bu işlem için izniniz yok.,platform_core.ai
@@ -862,3 +877,139 @@ An exception record cannot be deleted. Open a revocation record instead.,İstisn
 Only a grant record waiting for approval can be approved.,Yalnız onay bekleyen izin kaydı onaylanabilir.,platform_core.identity
 This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.identity
 Connected App,Bağlı Uygulamalar,
+You cannot open this exception record.,Bu istisna kaydını açamazsınız.,platform_core.identity
+The sign-in service is not available. Try again later.,Giriş hizmeti şu anda çalışmıyor. Biraz sonra yeniden deneyin.,platform_core.identity
+This sign-in information cannot be read on this site.,Bu giriş bilgisi bu sitede okunamaz.,platform_core.identity
+This endpoint takes no parameters.,Bu işlem ek bilgi almaz.,platform_core.identity
+This session is not linked to a {0} account.,Bu oturum bir {0} hesabına bağlı değil.,platform_core.identity
+PLT AI File Job,Yapay Zekâ Dosya İşi,
+PLT AI File Chunk,Yapay Zekâ Dosya Parçası,
+Route,Yol,PLT AI File Job
+Source File,Kaynak Dosya,PLT AI File Job
+Instruction,Talimat,PLT AI File Job
+Output Limit,Çıktı Sınırı,PLT AI File Job
+Status,Durum,PLT AI File Job
+Failure Code,Hata Kodu,PLT AI File Job
+Chunk Count,Parça Sayısı,PLT AI File Job
+Estimate Known,Tahmin Biliniyor,PLT AI File Job
+Estimated Cost,Tahmini Maliyet,PLT AI File Job
+Currency,Para Birimi,PLT AI File Job
+Chunks,Parçalar,PLT AI File Job
+Chunk Index,Parça Sırası,PLT AI File Chunk
+First Page,İlk Sayfa,PLT AI File Chunk
+Last Page,Son Sayfa,PLT AI File Chunk
+Content,İçerik,PLT AI File Chunk
+Status,Durum,PLT AI File Chunk
+Failure Code,Hata Kodu,PLT AI File Chunk
+Result,Sonuç,PLT AI File Chunk
+File Job,Dosya İşi,PLT AI Usage Log
+Chunk Index,Parça Sırası,PLT AI Usage Log
+No permission to explain permissions.,İzinleri açıklama yetkiniz yok.,
+Not permitted,İzin verilmedi,
+Only a System Manager can give or change the System Manager and Administrator roles.,System Manager ve Administrator rollerini yalnız System Manager verebilir ve değiştirebilir.,
+Only a System Manager can give a role desk access.,Bir role masa erişimini yalnız System Manager verebilir.,
+Only a System Manager can change the permissions of {0}.,{0} izinlerini yalnız System Manager değiştirebilir.,
+No permission to manage role permissions.,Rol izinlerini yönetme yetkiniz yok.,
+Child tables take the permissions of their parent type.,Alt tablolar üst kayıt türünün izinlerini kullanır.,
+permlevel and if_owner must be whole numbers.,permlevel ve if_owner tam sayı olmalıdır.,
+permlevel must be from 0 to 9 and if_owner must be 0 or 1.,permlevel 0 ile 9 arasında olmalıdır. if_owner 0 ya da 1 olmalıdır.,
+permissions must name only these rights: {0},permissions yalnız şu hakları içermelidir: {0},
+The role has no permission row at this level.,Rolün bu düzeyde izin satırı yok.,
+Only a System Manager can give or change the role {0}.,{0} rolünü yalnız System Manager verebilir ve değiştirebilir.,
+A run needs the preview_digest of its preview.,Yürütme isteği önizlemenin preview_digest değerini taşımalıdır.,
+No permission to manage users.,Kullanıcıları yönetme izniniz yok.,
+Only a System Manager can give the role {0}.,{0} rolünü yalnız System Manager verebilir.,
+Role profile {0} not found.,{0} rol profili bulunamadı.,
+The invitation changed after the preview. Preview it again.,Davet önizlemeden sonra değişti. Daveti yeniden önizleyin.,
+The invitation service is not available. Try again later.,Davet hizmeti şu an çalışmıyor. Daha sonra yeniden deneyin.,
+The invitation service refused the invitation fields.,Davet hizmeti davet alanlarını kabul etmedi.,
+This e-mail belongs to a desk user and cannot be invited.,Bu e-posta bir masaüstü kullanıcısına ait. Bu adrese davet gönderilemez.,
+This site cannot invite into this organization.,Bu site bu kuruluşa davet gönderemez.,
+This user is not a user of this tenant.,Bu kullanıcı bu kiracının kullanıcısı değil.,
+dry_run must be true or false.,dry_run değeri true ya da false olmalıdır.,
+email must be an e-mail address.,email alanı bir e-posta adresi olmalıdır.,
+role_profiles must be a list of role profile names.,role_profiles alanı rol profili adlarından oluşan bir liste olmalıdır.,
+{0} must be a name.,{0} alanı bir ad olmalıdır.,
+{0} must be a text of at most {1} characters.,{0} alanı en çok {1} karakterlik bir metin olmalıdır.,
+{0} must be a whole number in range.,{0} alanı izin verilen aralıkta bir tam sayı olmalıdır.,
+Reseller Customer Link,Bayi Müşteri Bağı,
+Reseller Customer Request,Bayi Müşteri İsteği,
+Platform Operator,Platform Operatörü,
+Reseller Tenant,Bayi kiracısı,
+Customer Tenant,Müşteri kiracısı,
+Customer Name,Müşteri adı,
+Site Status,Site durumu,Reseller Customer Link
+Pending,Bekliyor,Reseller Customer Link
+Active,Etkin,Reseller Customer Link
+Suspended,Durduruldu,Reseller Customer Link
+Contact Email,İletişim e-postası,
+Status,Durum,Reseller Customer Request
+Pending,Bekliyor,Reseller Customer Request
+Approved,Onaylandı,Reseller Customer Request
+Requested By,İsteyen,
+Approved By,Onaylayan,
+Approved On,Onay zamanı,
+You are not permitted to do this.,Bu işi yapma izniniz yok.,
+You are not permitted to see this customer.,Bu müşteriyi görme izniniz yok.,
+Enter the customer name. It can have at most {0} characters.,Müşteri adını yazın. Ad en çok {0} karakter olabilir.,
+Enter a valid contact e-mail address.,Geçerli bir iletişim e-postası yazın.,
+The customer request does not exist.,Bu müşteri isteği yok.,
+Only a pending customer request can be approved.,Yalnız bekleyen müşteri isteği onaylanır.,
+PLT Help Topic,Yardım Konusu,PLT Help Topic
+"Help content linked to a field, component or route of the user interface. The help panel shows tenant content first, then application content, then the field description.","Arayüzdeki bir alana, bileşene ya da sayfa yoluna bağlı yardım içeriği. Yardım paneli önce kiracı içeriğini gösterir. Sonra uygulama içeriğini gösterir. En son alan açıklamasını gösterir.",PLT Help Topic
+Title,Başlık,PLT Help Topic
+Short name of the help topic. Shown as the heading in the help panel.,Yardım konusunun kısa adı. Yardım panelinde başlık olarak görünür.,PLT Help Topic
+Status,Durum,PLT Help Topic
+"Publishing state. Only published topics are shown to users. A topic is written as a draft, reviewed and then published.",Yayın durumu. Kullanıcılar yalnız yayımlanan konuları görür. Konu önce taslak olarak yazılır. Sonra gözden geçirilir ve yayımlanır.,PLT Help Topic
+Draft,Taslak,PLT Help Topic
+In Review,İncelemede,PLT Help Topic
+Published,Yayımlandı,PLT Help Topic
+Archived,Arşivlendi,PLT Help Topic
+Layer,Katman,PLT Help Topic
+"Who provides the content. Tenant content comes first, then application content. Help on a custom field must be tenant content.",İçeriği kimin verdiğini gösterir. Önce kiracı içeriği gelir. Sonra uygulama içeriği gelir. Özel alanın yardımı kiracı içeriği olmalıdır.,PLT Help Topic
+Tenant,Kiracı,PLT Help Topic
+App,Uygulama,PLT Help Topic
+Content Owner,İçerik Sahibi,PLT Help Topic
+"User responsible for this content. Standard fields belong to the application team, custom fields to the tenant administrator.",Bu içerikten sorumlu kullanıcı. Standart alanlar uygulama ekibine aittir. Özel alanlar kiracı yöneticisine aittir.,PLT Help Topic
+Target Type,Hedef Türü,PLT Help Topic
+"What the topic explains: a field of a document type, a user interface component or a route.","Konunun neyi anlattığını gösterir. Bu bir kayıt türü alanı, arayüz bileşeni ya da sayfa yolu olabilir.",PLT Help Topic
+Field,Alan,PLT Help Topic
+Component,Bileşen,PLT Help Topic
+Route,Sayfa Yolu,PLT Help Topic
+Document Type,Kayıt Türü,PLT Help Topic
+Document type of the field. Required when the target type is Field.,Alanın kayıt türü. Hedef türü “Alan” ise zorunludur.,PLT Help Topic
+Field Name,Alan Adı,PLT Help Topic
+"Field name in the document type, custom fields included. Required when the target type is Field.",Kayıt türündeki alanın adı. Özel alanlar da kabul edilir. Hedef türü “Alan” ise zorunludur.,PLT Help Topic
+Component ID,Bileşen Kimliği,PLT Help Topic
+Identifier of the user interface component. Required when the target type is Component.,Arayüz bileşeninin kimliği. Hedef türü “Bileşen” ise zorunludur.,PLT Help Topic
+Route Pattern,Sayfa Yolu Kalıbı,PLT Help Topic
+"Route the topic applies to, for example /app/sales-invoice. Required when the target type is Route.",Konunun geçerli olduğu sayfa yolu. Örnek: /app/sales-invoice. Hedef türü “Sayfa Yolu” ise zorunludur.,PLT Help Topic
+Application that owns the target. For a field it is filled from the document type when the topic is saved.,Hedefin ait olduğu uygulama. Hedef bir alansa konu kaydedilince kayıt türünden doldurulur.,PLT Help Topic
+Language,Dil,PLT Help Topic
+Language of the content. Leave empty to show the topic in every language.,İçeriğin dili. Konu her dilde görünsün diye boş bırakabilirsiniz.,PLT Help Topic
+Version,Sürüm,PLT Help Topic
+Application version the content applies to. Leave empty to show the topic in every version.,İçeriğin geçerli olduğu uygulama sürümü. Konu her sürümde görünsün diye boş bırakabilirsiniz.,PLT Help Topic
+Target Roles,Hedef Roller,PLT Help Topic
+Roles that see the topic. Leave empty to show the topic to every role.,Konuyu gören roller. Konuyu her rol görsün diye boş bırakabilirsiniz.,PLT Help Topic
+Content,İçerik,PLT Help Topic
+"Help text in plain text. Do not write record data, personal data or secrets here.","Düz metin yardım yazısı. Buraya kayıt verisi, kişisel veri ya da gizli bilgi yazmayın.",PLT Help Topic
+PLT Help Topic Role,Yardım Konusu Rolü,PLT Help Topic Role
+A role that sees a help topic.,Yardım konusunu gören rol.,PLT Help Topic Role
+Role,Rol,PLT Help Topic Role
+Role that sees the help topic.,Yardım konusunu gören rol.,PLT Help Topic Role
+Select the document type of the field.,Alanın kayıt türünü seçin.,
+Enter the field name.,Alan adını yazın.,
+Field {1} does not exist in {0}.,{0} kayıt türünde {1} alanı yok.,
+Help on custom field {1} of {0} must be tenant content.,{0} kayıt türündeki {1} özel alanının yardımı kiracı içeriği olmalıdır.,
+Enter the component identifier.,Bileşen kimliğini yazın.,
+Enter the route pattern.,Sayfa yolu kalıbını yazın.,
+Select a valid target type.,Geçerli bir hedef türü seçin.,
+No help is available for this field.,Bu alan için yardım yok.,shell.help
+A valid field is required.,Geçerli bir alan gerekir.,shell.help
+Select an installed application.,Kurulu bir uygulama seçin.,shell.help
+Tour URL,Tur bağlantısı,PLT Help Topic
+Documentation URL,Belge bağlantısı,PLT Help Topic
+Support URL,Destek bağlantısı,PLT Help Topic
+Optional HTTPS URL or same-site relative path. Leave blank when unavailable.,HTTPS adresini veya site içindeki yolu yazın. Bağlantı yoksa alanı boş bırakın.,PLT Help Topic
+Help links must use HTTPS or a same-site relative path.,Yardım bağlantılarında HTTPS adresi veya site içindeki yol kullanılmalıdır.,
+A valid component identifier is required.,Geçerli bir bileşen kimliği yazın.,

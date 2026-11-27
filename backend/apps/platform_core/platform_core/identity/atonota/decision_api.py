@@ -1,4 +1,4 @@
-"""Frappe link of the AtonotA Login action decision (G-161, G-166, G-167).
+"""Frappe link of the `atonota_login` action decision (G-161, G-166, G-167).
 
 The rules live in the `atonota_login` package (`atonota_login.decision`). That package has no Frappe
 code. This module is the thin Frappe layer around it:
@@ -28,7 +28,7 @@ MAX_ACTION_LENGTH = 140
 # (the "proof-lifetimes" rule has no value yet). The final step collects the evidence again.
 SNAPSHOT = timedelta(microseconds=1)
 TASK_ROLE = "System Manager"
-TASK_MARK = "[AtonotA Login rule]"
+TASK_MARK = "[atonota_login rule]"
 
 
 class ActionRefused(frappe.PermissionError):

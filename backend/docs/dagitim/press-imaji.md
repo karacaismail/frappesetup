@@ -1,5 +1,9 @@
 # Press üretim imajı
 
+Ürün adı `PRODUCT_NAME` ayarından gelir. Alan adı `BRAND_DOMAIN` ayarından gelir.
+İki değer [ortak marka dosyasında](../../brand.env) tutulur.
+Bu belgedeki `<PRODUCT_NAME>` ve `<BRAND_DOMAIN>` alanlarını bu değerlerle doldurun.
+
 Bu belge Press'in üretim imajını anlatır. Belge 23 Kasım 2026 Pazartesi günü yazıldı. İş, [dağıtım belgesindeki](ortamlar.md) E-2 engelidir.
 
 İmaj, konteynerin çalıştığı değişmez paketidir. Press imajının adı `atonota-press` olur. Sürüm paketi bu imajı dördüncü parça olarak taşır.
@@ -118,7 +122,7 @@ Press servisleri ayrı bir ağdadır. Ağın adı `press-internal` olur. Kiracı
 
 Press, Keycloak'a ve identity-sync servisine genel HTTPS adresiyle ulaşır. Bu iki servis `press-internal` ağında değildir. Bu yüzden `keycloak_internal_url` ayarı üretimde boş kalır.
 
-Ön vekil `press.<taban>` adını `press-frontend` servisine iletir. Örneğin alpha'da ad `press.alpha.atonota.net` olur.
+Ön vekil `press.<taban>` adını `press-frontend` servisine iletir. Örneğin alpha'da ad `press.alpha.<BRAND_DOMAIN>` olur.
 
 Press'in site adı, Press'in alan adıyla aynı olmalıdır. Ön yüz siteyi istekteki alan adından seçer.
 
