@@ -154,6 +154,25 @@ Yerel Playwright işçi sayısı 4 olur. CI'daki işçi sayısı değişmez.
 
 Kilidi atlatmayın. Kilit dosyasını elle silmeyin.
 
+#### Yerelde hızlı test, tam matris GitHub CI'da
+
+Bu kural 28 Kasım 2026 Cumartesi günü eklendi. Kaynak iş AJA-2153 kaydıdır.
+
+Yerelde yalnız hızlı testleri koşun. Hızlı testler şunlardır:
+
+- birim testleri,
+- lint,
+- tip denetimi,
+- tek bir Playwright projesi ve yalnız 320 px genişlik.
+
+Tam tarayıcı matrisi GitHub CI'da koşar. PR açılınca CI bu matrisi kendisi koşar.
+
+Yerelde tam matrisi yalnız gerekçe yazınca koşun. Gerekçeyi testten önce göreve yorum olarak yazın.
+
+Playwright testi ağır test kilidinden geçer. Aynı anda en çok 2 ajan Playwright koşar. Test bitince açtığınız ortamı kapatın.
+
+Hızlı Playwright komutu `npm run test:e2e:hizli` olur. Komut yalnız `chromium` projesinde adında 320 geçen testleri koşar.
+
 #### Sınırlar
 
 - Başka ajanın ortamını kapatmayın. Yalnız kendi açtığınız ortamı kapatın.
