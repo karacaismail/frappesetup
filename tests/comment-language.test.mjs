@@ -82,7 +82,7 @@ test('string // and regex # are not comments', () => {
 });
 
 test('only changed lines are checked, a touched comment is checked as a whole block', () => {
-  const text = '// Eski yorum bir\n// eski yorum iki\nexport const a = 1;\n\n// New English note\nexport const b = 2;\n';
+  const text = '// Eski yorum: değer\n// eski yorum: ölçü\nexport const a = 1;\n\n// New English note\nexport const b = 2;\n';
   assert.deepEqual(check('a.ts', text, { changedLines: new Set([5, 6]) }).errors, []);
   const touched = check('a.ts', text, { changedLines: new Set([2]) });
   assert.deepEqual(touched.errors.map(error => error.line), [1, 2]);

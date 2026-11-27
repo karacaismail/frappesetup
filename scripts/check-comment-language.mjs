@@ -30,7 +30,7 @@ export const TURKISH_WORDS = new Set([
   'icin', 'degil', 'olarak', 'gore', 'eger', 'artik', 'yoksa', 'veya', 'cunku', 'sonra',
   'simdi', 'burada', 'sadece', 'yani', 'bunu', 'buna', 'boyle', 'gibi', 'kadar', 'ancak',
   'hata', 'dosya', 'satir', 'deger', 'yorum', 'eski', 'yeni', 'bir', 'iki', 'olur',
-  'olsun', 'yapar', 'icinde', 'zaten', 'henuz', 'hemen', 'daha', 'ilk', 'tum', 'hic',
+  'olsun', 'yapar', 'icinde', 'zaten', 'henuz', 'hemen', 'daha',
   'neden', 'nasil', 'olmali', 'gerekir', 'varsa', 'degilse', 'ise', 'kullanici', 'sayfa',
 ]);
 
@@ -178,6 +178,15 @@ function scanShell(text, base = 0) {
     } else if (c === "'" || c === '"') {
       quote = c;
       i++;
+    } else if (text.startsWith('$((', i)) {
+      // Arithmetic such as $((1<<x)) holds no here-document and no comment.
+      let depth = 2;
+      i += 3;
+      while (i < text.length && depth > 0) {
+        if (text[i] === '(') depth++;
+        else if (text[i] === ')') depth--;
+        i++;
+      }
     } else if (text.startsWith('<<', i) && text[i + 2] !== '<') {
       const match = /^<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(text.slice(i));
       if (match) {
@@ -282,15 +291,16 @@ SKIP = {tokenize.NL, tokenize.COMMENT}
 OPEN = {tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING}
 def read(src):
     tokens = list(tokenize.generate_tokens(io.StringIO(src).readline))
-    out = []
-    for i, tok in enumerate(tokens):
-        if tok.type == tokenize.COMMENT:
-            out.append([tok.start[0], tok.end[0], tok.string[1:], tok.line[:tok.start[1]].strip() == ""])
-        elif tok.type == tokenize.STRING:
-            prev = next((t for t in reversed(tokens[:i]) if t.type not in SKIP), None)
-            nxt = next((t for t in tokens[i + 1:] if t.type not in SKIP), None)
-            if (prev is None or prev.type in OPEN) and (nxt is None or nxt.type in (tokenize.NEWLINE, tokenize.ENDMARKER)):
-                out.append([tok.start[0], tok.end[0], tok.string, True])
+    significant = [t for t in tokens if t.type not in SKIP]
+    out = [[t.start[0], t.end[0], t.string[1:], t.line[:t.start[1]].strip() == ""] for t in tokens if t.type == tokenize.COMMENT]
+    for i, tok in enumerate(significant):
+        if tok.type != tokenize.STRING:
+            continue
+        prev = significant[i - 1] if i else None
+        nxt = significant[i + 1] if i + 1 < len(significant) else None
+        if (prev is None or prev.type in OPEN) and (nxt is None or nxt.type in (tokenize.NEWLINE, tokenize.ENDMARKER)):
+            out.append([tok.start[0], tok.end[0], tok.string, True])
+    out.sort()
     return out
 result = {}
 for path, src in json.loads(sys.stdin.buffer.read().decode("utf-8")).items():
@@ -337,30 +347,36 @@ export function extractComments(path, text, python) {
 
 const maskBackticks = body => body.replace(/(`+)[\s\S]*?\1/g, span => span.replace(/[^\n]/g, ' '));
 
+// Letters and lang-ok are checked per comment. Words are counted over the whole block later.
 function inspect(path, comment) {
-  const errors = [];
   const langOk = [...comment.body.matchAll(/\blang-ok:([^\n]*)/g)].at(-1);
   if (langOk) {
-    const reason = langOk[1].replace(/(\*\/|-->|\})\s*$/, '').trim();
-    if (reason) return { errors, note: { path, line: comment.startLine + countLines(comment.body, langOk.index), reason } };
-    return { errors: [{ path, line: comment.startLine + countLines(comment.body, langOk.index), kind: 'lang-ok', found: [] }] };
+    const line = comment.startLine + countLines(comment.body, langOk.index);
+    const reason = langOk[1].replace(/(\*\/|-->|\}|"""|'''|"|')\s*$/, '').trim();
+    if (reason) return { errors: [], note: { path, line, reason }, words: false };
+    return { errors: [{ path, line, kind: 'lang-ok', found: [] }], words: false };
   }
-  const body = maskBackticks(comment.body);
-  body.split('\n').forEach((text, n) => {
+  const errors = [];
+  maskBackticks(comment.body).split('\n').forEach((text, n) => {
     const letters = [...new Set(text.match(TURKISH_LETTERS) ?? [])];
     if (letters.length) errors.push({ path, line: comment.startLine + n, kind: 'letter', found: letters });
   });
-  if (errors.length) return { errors };
+  return { errors, words: errors.length === 0 };
+}
+
+function wordError(path, comments) {
   const words = [];
-  let first = null;
-  for (const match of body.toLowerCase().matchAll(/[a-z]+/g)) {
-    if (TURKISH_WORDS.has(match[0]) && !words.includes(match[0])) {
-      words.push(match[0]);
-      first ??= match.index;
-    }
+  let line = null;
+  for (const comment of comments) {
+    maskBackticks(comment.body).toLowerCase().split('\n').forEach((text, n) => {
+      for (const [word] of text.matchAll(/[a-z]+/g)) {
+        if (!TURKISH_WORDS.has(word) || words.includes(word)) continue;
+        words.push(word);
+        line ??= comment.startLine + n;
+      }
+    });
   }
-  if (words.length >= 2) errors.push({ path, line: comment.startLine + countLines(body, first), kind: 'words', found: words });
-  return { errors };
+  return words.length >= 2 ? { path, line, kind: 'words', found: words } : null;
 }
 
 const countLines = (text, offset) => text.slice(0, offset).split('\n').length - 1;
@@ -385,19 +401,25 @@ export function checkFile(path, text, { changedLines = null, python } = {}) {
       return false;
     });
     if (!touched) continue;
+    const plain = [];
     for (const comment of block) {
       const result = inspect(path, comment);
       errors.push(...result.errors);
       if (result.note) langOk.push(result.note);
+      if (result.words) plain.push(comment);
     }
+    const words = wordError(path, plain);
+    if (words) errors.push(words);
   }
   return { errors, langOk };
 }
 
 export function formatError({ path, line, kind, found }) {
   const list = found.map(item => `"${item}"`).join(', ');
-  if (kind === 'letter') return `${path}:${line}: Turkish letter ${list} in a comment. Write the comment in English, or add "lang-ok: <reason>" for a name.`;
-  if (kind === 'words') return `${path}:${line}: Turkish words ${list} in a comment. Write the comment in English.`;
+  const hint = 'Code names in backticks are skipped.';
+  if (kind === 'letter') return `${path}:${line}: Turkish letter ${list} in a comment. Write the comment in English, or add "lang-ok: <reason>" for a name. ${hint}`;
+  if (kind === 'words') return `${path}:${line}: Turkish words ${list} in a comment. Write the comment in English. ${hint}`;
+  if (kind === 'parse') return `${path}:${line}: the file could not be read: ${found.join(' ')} Run npm ci, fix the file, or add an exclusion with a reason.`;
   if (kind === 'lang-ok') return `${path}:${line}: "lang-ok:" needs a reason, for example "lang-ok: German surname".`;
   return `${path}:${line}: ${found.join(' ')}`;
 }
@@ -437,20 +459,53 @@ function git(cwd, args, { allowFail = false } = {}) {
   return run.status === 0 ? run.stdout : null;
 }
 
+// Turns a path from a diff header into a plain path. Git quotes odd names C-style.
+function headerPath(raw) {
+  let path = raw.replace(/\t$/, '');
+  if (path.startsWith('"') && path.endsWith('"')) {
+    const bytes = [];
+    const body = path.slice(1, -1);
+    const escapes = { n: 10, t: 9, r: 13, b: 8, f: 12, v: 11, a: 7, '"': 34, '\\': 92 };
+    for (let i = 0; i < body.length; i++) {
+      if (body[i] !== '\\') { bytes.push(...Buffer.from(body[i])); continue; }
+      const next = body[++i];
+      if (/[0-7]/.test(next)) { bytes.push(parseInt(body.slice(i, i + 3), 8)); i += 2; }
+      else bytes.push(escapes[next] ?? next.charCodeAt(0));
+    }
+    path = Buffer.from(bytes).toString('utf8');
+  }
+  return path.startsWith('b/') ? path.slice(2) : path;
+}
+
 // Parses `git diff --unified=0` into a map of path to the set of added or changed lines.
+// Hunk bodies are skipped by count, so a content line that looks like a header is never read as one.
 export function parseDiff(diff) {
   const files = new Map();
+  const lines = diff.split('\n');
   let current = null;
-  for (const line of diff.split('\n')) {
-    if (line.startsWith('+++ ')) {
-      current = line === '+++ /dev/null' ? null : line.slice(6);
+  let inHeader = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('diff --git ')) {
+      current = null;
+      inHeader = true;
+    } else if (inHeader && line.startsWith('+++ ')) {
+      current = line === '+++ /dev/null' ? null : headerPath(line.slice(4));
       if (current !== null && !files.has(current)) files.set(current, new Set());
-    } else if (current !== null && line.startsWith('@@')) {
-      const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    } else if (line.startsWith('@@')) {
+      inHeader = false;
+      const match = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
       if (!match) continue;
-      const start = Number(match[1]);
-      const count = match[2] === undefined ? 1 : Number(match[2]);
-      for (let n = start; n < start + count; n++) files.get(current).add(n);
+      const removed = match[1] === undefined ? 1 : Number(match[1]);
+      const start = Number(match[2]);
+      const added = match[3] === undefined ? 1 : Number(match[3]);
+      if (current !== null) for (let n = start; n < start + added; n++) files.get(current).add(n);
+      let skip = removed + added;
+      while (skip > 0 && i + 1 < lines.length) {
+        i++;
+        if (!lines[i].startsWith('\\')) skip--;
+      }
+      while (i + 1 < lines.length && lines[i + 1].startsWith('\\')) i++;
     }
   }
   return files;
@@ -506,10 +561,18 @@ export function main(argv, { cwd = process.cwd(), out = console.log, err = conso
     err(`comment-language: ${error.message}`);
     return 2;
   }
-  const config = loadConfig(options.config ? resolve(cwd, options.config) : join(top, 'scripts/comment-language.config.json'));
-  const files = collect(top, options.mode).filter(file => languageOf(file.path) && !config.isExcluded(file.path));
-  const texts = new Map(files.map(file => [file.path, file.read()]));
-  const python = readPython(Object.fromEntries(files.filter(f => languageOf(f.path) === 'python').map(f => [f.path, texts.get(f.path)])));
+  let files;
+  let texts;
+  let python;
+  try {
+    const config = loadConfig(options.config ? resolve(cwd, options.config) : join(top, 'scripts/comment-language.config.json'));
+    files = collect(top, options.mode).filter(file => languageOf(file.path) && !config.isExcluded(file.path));
+    texts = new Map(files.map(file => [file.path, file.read()]));
+    python = readPython(Object.fromEntries(files.filter(f => languageOf(f.path) === 'python').map(f => [f.path, texts.get(f.path)])));
+  } catch (error) {
+    err(`comment-language: ${error.message}`);
+    return 2;
+  }
   const errors = [];
   const notes = [];
   for (const file of files) {

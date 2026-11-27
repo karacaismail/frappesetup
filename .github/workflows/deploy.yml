@@ -39,14 +39,18 @@ jobs:
       - name: comment-language tests
         run: npm run test:comments
 
-      # A push is compared with the previous commit. A new branch or a manual run
-      # is compared with the merge base of origin/main.
+      # A push is compared with the previous commit. When that commit is gone
+      # (a force-push), main checks at least its last commit. Other refs are
+      # compared with the merge base of origin/main.
       - name: New comments are in English (changed lines only)
         env:
           BEFORE: ${{ github.event.before }}
         run: |
           if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             npm run lint:comments -- --base "$BEFORE"
+          elif [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then
+            echo "::warning::The previous commit is not available. Only the last commit is checked."
+            npm run lint:comments -- --base HEAD^
           else
             npm run lint:comments -- --merge-base-with origin/main
           fi
