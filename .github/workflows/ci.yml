@@ -10,8 +10,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Akış: press-ai ve build paralel → e2e (4 parça, aynı dist) → build-and-test (toplayıcı).
+# Akış: backend kapıları, press-ai ve build paralel → e2e (4 parça, aynı dist) → build-and-test (toplayıcı).
 # ProPR kapısı `build-and-test` denetimini bekler; bu iş yalnız bütün işler geçince yeşil olur.
+# Kapı listesi `.github/tests/test_backend_ci.py` içinde denetlenir.
 jobs:
   press-ai:
     runs-on: ubuntu-24.04
@@ -24,9 +25,109 @@ jobs:
           python3 --version
           python3 -I -m unittest discover -s packages/press-ai/tests
           python3 -I packages/press-ai/server.py check-contract
-      # Jenkins dağıtım hattının sürüm ve sunucu betiği testleri (backend/deploy). Yalnız stdlib ve GNU araçları.
-      - name: deploy gate (release manifest + remote scripts)
+
+  # hooks.py aynı adı iki kez atamasın; çeviri CSV dosyaları bozuk ya da çakışma izli olmasın.
+  backend-shared-files:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.14'
+      - name: hooks.py and translation CSV check
+        run: python3.14 -B backend/dev/check_shared_files.py
+
+  # check_boundaries.py Python 3.14 sözdizimini okur; sistemdeki eski python3 yanlış ihlal verir.
+  backend-module-boundaries:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.14'
+      - name: Module boundaries
+        run: backend/dev/bin/module-boundaries
+
+  backend-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      FS_COLIMA_PROFILE: ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.14'
+      # Ağ gerektiren hazırlık burada biter; denetimin kendisi çevrimdışı koşar.
+      - name: Prepare offline security tools
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # security-audit bu ref'i karşılaştırma tabanı olarak kullanır.
+          git update-ref refs/heads/backend "$BASE_SHA"
+          python3.14 -m pip install uv==0.13.9
+          source backend/dev/security/tool-versions.env
+          uv python install 3.12
+          uvx --python 3.12 --exclude-newer "$TOOL_CUTOFF" "bandit@$BANDIT_VERSION" --version
+          SEMGREP_ENABLE_VERSION_CHECK=0 uvx --python 3.12 --exclude-newer "$TOOL_CUTOFF" "semgrep@$SEMGREP_VERSION" --version
+          docker pull "ghcr.io/gitleaks/gitleaks:v${GITLEAKS_VERSION}@${GITLEAKS_DIGEST}"
+          backend/dev/security/osv-setup --if-stale
+      - name: Security audit
+        env:
+          UV_OFFLINE: '1'
+        run: backend/dev/bin/security-audit
+
+  backend-ai-readiness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      FS_COLIMA_PROFILE: ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.14'
+      # ShellCheck adımı imajı --pull never ile çalıştırır; imaj önceden çekilir.
+      - name: Pull ShellCheck image
+        run: docker pull "$(python3.14 -B -c 'import sys; sys.path.insert(0, "backend/dev/ai_readiness"); from shellcheck_step import SHELLCHECK_IMAGE; print(SHELLCHECK_IMAGE)')"
+      - name: AI readiness
+        run: backend/dev/bin/ai-readiness
+
+  backend-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.14'
+      - name: Install backend test dependencies
+        run: python3.14 -m pip install -r backend/dev/requirements-contract-tests.txt
+      - name: Prepare Docker context for Compose tests
+        # test_e2e_stack.py bu adı Linux koşucusunda da kullanır.
+        run: docker context create colima-factory --docker host=unix:///var/run/docker.sock
+      - name: Backend development tests
+        run: python3.14 -B -m unittest discover -s backend/dev/tests
+      - name: Naming tests
+        run: python3.14 -B -m unittest discover -s backend/dev/naming/tests
+      # Jenkins dağıtım hattının sürüm ve sunucu betiği testleri. Yalnız stdlib ve GNU araçları.
+      - name: Deploy tests (release manifest + remote scripts)
         run: python3 -I -m unittest discover -s backend/deploy/tests -v
+      - name: CI workflow tests
+        run: python3.14 -B -m unittest discover -s .github/tests
 
   build:
     runs-on: ubuntu-24.04
@@ -88,7 +189,15 @@ jobs:
           retention-days: 1
 
   build-and-test:
-    needs: [press-ai, build, e2e]
+    needs:
+      - backend-shared-files
+      - backend-module-boundaries
+      - backend-security
+      - backend-ai-readiness
+      - backend-tests
+      - press-ai
+      - build
+      - e2e
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -122,7 +231,7 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "press-ai, build, e2e: $RESULTS"
+          echo "İş sonuçları: $RESULTS"
           for r in $RESULTS; do
             if [ "$r" != "success" ]; then
               echo "::error::Bir iş başarısız, iptal ya da atlandı: $r"
