@@ -70,6 +70,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 23. Bütün kod adları İngilizce ve ASCII olur. Eski adlar da kurallara göre güncellenir (Karar 40).
 24. Kural dosyasının sınırı varsayılan olarak 36.000 bayttır. Özel durumda en çok 39.000 bayttır (Karar 41).
 25. AtonotA Login bağımsız ve ücretli bir üründür. Ürünün geliştirilmesi MVP sonrasıdır (Karar 42).
+26. Köşe yuvarlaklığının tek kuralı `radius.md` yönergesidir. Çevreleyen odak halkası yine yasaktır (Karar 44).
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -920,6 +921,34 @@ Onay şu kapsamı içerir:
 Bu onay, G-73 gereksinimindeki kapsamı korur.
 İlk kullanılabilir sürümde yalnız dil altyapısı kurulur.
 Metin çevirisi ve varsayılan dili İngilizce yapma işi sonraya kalır.
+
+## 27 Kasım 2026 Cuma günü
+
+### Karar 44. Köşe yuvarlaklığının tek kuralı radius.md yönergesidir
+
+Müşteri köşelerin birbirine uymasını istedi. Müşteri bunun için bir yönerge hazırlamıştı. Müşterinin sözü şudur:
+
+> ben dedim ki, apple gibi birbirine uyan, mükemmel köşe radius'lar olsun. bununla ilgili araştırmalar sonucunda md dosyası hazırladım. ... yönerge vermiştim zaten.
+
+Sonuç şudur:
+
+- Köşe yuvarlaklığının tek kuralı `radius.md` yönergesidir. Kopyası bu klasördedir.
+- Yönerge iç içe kutuların köşelerini bir formülle hesaplar. Başlangıç değeri 5 px'tir.
+- Her köşe bu başlangıç değerinden ve aradaki boşluktan hesaplanır.
+- İzin verilen köşe değerleri 0, 3, 5, 7, 9, 13, 17, 21, 25 ve 29 px'tir.
+- Kapsül biçimli öğeler bu listenin dışındadır. Örneğin yuvarlak düğme ve profil resmi kapsüldür.
+- atonota-web `control-size-config.json` dosyasında kart köşesi 10 px'tir. Bu değer bir karar değildir.
+- 10 px değeri dışa aktarılan bir tasarım dosyasından geldi. Yönerge bu değerin önüne geçer.
+- Örneğin 24 px iç boşluklu kart 21 px köşe alır.
+
+Yönergenin bir kısmı uygulanmaz:
+
+- Yönerge iki yerde "özel focus ring" anar. Bu odak halkası kısmı uygulanmaz.
+- Çevreleyen odak halkası müşterinin kalıcı kuralıyla yasaktır.
+- `--r-ring` değeri yalnız Segmented ve Radio.Group sarmalayıcısında kullanılır.
+- Bu istisna `radius.md` dosyasının başında da yazılıdır.
+
+Kaynak iş AJA-1378'dir. Bu kararı AJA-1379 işi yazdı.
 
 ## Modellerin kararları
 
