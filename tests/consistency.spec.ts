@@ -296,6 +296,37 @@ test.describe('content consistency', () => {
     expect(evidenceProblems('sahte', '36afb874', { pr: 18, commit: 'abcdef12' }), 'uydurma yayın commit').not.toEqual([]);
   });
 
+  test('main copy with local backend history accepts released evidence (AJA-1371)', () => {
+    // Ana dal kopyasında yerel backend dalı da olabilir. Kanıt commit'i o zaman yerelde vardır.
+    // Commit ana dalın geçmişinde yoktur, çünkü ana dala yayın commit'iyle gelir. Bu commit'i yayın kabul ettirir.
+    // Denetim ana dal ucunun pano dosyasıyla, HEAD yerine ana dal ucuna göre koşar.
+    test.skip(isShallow(), 'Sığ kopya: commit geçmişi yok.');
+    const main = mainRef();
+    test.skip(main === null, 'origin/main yok.');
+    test.skip(!hasBackendHistory(), 'Yerel backend geçmişi yok.');
+    const board: TaskBoard = JSON.parse(git('show', `${main}:src/data/task-board.json`));
+    const done = Object.entries(board.items).filter(([, it]) => it.status === 'done');
+    const evidence = done.map(([id, it]) => [id, it.evidence!.commit, it.evidence!.release] as const);
+    evidence.push(['update', board.update.commit, board.update.release], ['audit', board.audit.commit, board.audit.release]);
+    // Senaryo gerçek olmalı: en az bir kanıt commit'i yerelde var ama ana dal geçmişinde yok.
+    expect(
+      evidence.some(([, c]) => hasCommit(c) && !gitOk('merge-base', '--is-ancestor', c, main!)),
+      'ana dal geçmişinde olmayan yerel kanıt commit',
+    ).toBe(true);
+    expect(evidence.flatMap(([id, c, rel]) => evidenceProblems(id, c, rel, main!)), 'ana dal kopyası').toEqual([]);
+    // Kural gevşemez: uydurma commit yine düşer.
+    for (const c of ['deadbeef', 'abcdef12']) {
+      expect(evidenceProblems('sahte', c, null, main!), `${c}, release null`).not.toEqual([]);
+      expect(evidenceProblems('sahte', c, { pr: 18, commit: '1d3e6344' }, main!), `${c}, release dolu`).not.toEqual([]);
+    }
+    // Yayımlanmamış backend commit'i de yine düşer. Örnek: hiçbir ana dal yayınının adlandırmadığı backend ucu.
+    const tip = gitOk('rev-parse', '--verify', '--quiet', 'refs/heads/backend') ? git('rev-parse', 'refs/heads/backend') : null;
+    if (tip && !gitOk('merge-base', '--is-ancestor', tip, main!) && !releaseMessages(main!).some((e) => namesCommit(e.body, tip))) {
+      expect(evidenceProblems('yayımlanmamış', tip, null, main!), 'yayımlanmamış, release null').not.toEqual([]);
+      expect(evidenceProblems('yayımlanmamış', tip, { pr: 18, commit: '1d3e6344' }, main!), 'yayımlanmamış, uydurma yayın').not.toEqual([]);
+    }
+  });
+
   test('task board names environments, not staging', () => {
     // Backend'de staging ortamı yoktur; canlı ortamlar alpha, beta, rc ve prod'dur. Pano kuralları ortam adını yazar.
     expect(read('src/data/task-board.json')).not.toMatch(/staging/i);
