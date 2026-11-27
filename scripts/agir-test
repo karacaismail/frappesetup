@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Ağır test komutunu ortak bir kilitle çalıştırır. Kilidin 2 yeri vardır.
+# Kullanım: scripts/agir-test playwright test
+#
+# Kurallar (AJA-1804 mimari karar, AJA-1807 kural metni):
+# - Kilit klasörü kullanıcı adından bulunur. HOME değişkenine bakılmaz.
+# - Klasörün adı ve yer sayısı sabittir. Bütün çalışma ağaçları aynı klasörü kullanır.
+# - GITHUB_ACTIONS=true ise kilit atlanır. CI değişkenine bakılmaz.
+# - AGIR_TEST_YER varsa yeni kilit alınmaz. İç içe çağrı kendini bekletmez.
+# - Betik komutun çıkış kodunu aynen döndürür.
+#
+# Yalnız testler için:
+# - AGIR_TEST_KILIT_KLASORU: geçici kilit klasörü.
+# - AGIR_TEST_BEKLEME_SN: denemeler arasındaki sabit bekleme süresi.
+set -u
+
+if [ "$#" -eq 0 ]; then
+  echo "Kullanım: scripts/agir-test <komut> [argümanlar]" >&2
+  exit 64
+fi
+
+# CI işleri ayrı makinede koşar. Kilit gerekmez.
+if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+  exec "$@"
+fi
+
+# Bu süreç zaten bir yerin içinde koşuyor. Yeni yer istenmez.
+if [ -n "${AGIR_TEST_YER:-}" ]; then
+  exec "$@"
+fi
+
+LOCKF=/usr/bin/lockf
+if [ ! -x "$LOCKF" ]; then
+  echo "agir-test: $LOCKF bulunamadı. Kilit yalnız macOS'ta çalışır." >&2
+  exit 69
+fi
+
+if [ -n "${AGIR_TEST_KILIT_KLASORU:-}" ]; then
+  KLASOR=$AGIR_TEST_KILIT_KLASORU
+else
+  KULLANICI=$(id -un)
+  case "$KULLANICI" in
+    ''|*[!A-Za-z0-9._-]*)
+      echo "agir-test: kullanıcı adı okunamadı." >&2
+      exit 69
+      ;;
+  esac
+  eval "EV=~$KULLANICI"
+  KLASOR="$EV/.cache/frappesetup-test-kilidi"
+fi
+mkdir -p "$KLASOR" || exit 73
+
+ISARET_KLASORU=$(mktemp -d "${TMPDIR:-/tmp}/agir-test.XXXXXX") || exit 73
+ISARET="$ISARET_KLASORU/alindi"
+trap 'rm -rf "$ISARET_KLASORU"' EXIT
+
+# Kilidi alan iç adım. lockf bu adımı yalnız kilidi alınca çalıştırır.
+# İç adım önce işaret dosyasını yazar. Böylece 75 kodu testten de gelebilir.
+# Sonra kilit dosyasına iş bilgisini yazar ve komutu exec ile başlatır.
+IC_ADIM='
+isaret=$1; yer=$2; dosya=$3; shift 3
+: > "$isaret"
+{
+  echo "pid=$$"
+  echo "basladi=$(date "+%Y-%m-%dT%H:%M:%S%z")"
+  echo "klasor=$PWD"
+  echo "is=${PAPERCLIP_TASK_ID:-}"
+  echo "komut=$*"
+} > "$dosya"
+export AGIR_TEST_YER=$yer
+exec "$@"
+'
+
+bekleme_yazildi=0
+while :; do
+  for yer in yer-1 yer-2; do
+    rm -f "$ISARET"
+    "$LOCKF" -k -s -t 0 "$KLASOR/$yer" /bin/bash -c "$IC_ADIM" agir-test-ic "$ISARET" "$yer" "$KLASOR/$yer" "$@"
+    rc=$?
+    if [ -e "$ISARET" ]; then
+      exit "$rc"
+    fi
+    if [ "$rc" -ne 75 ]; then
+      echo "agir-test: lockf $rc koduyla döndü." >&2
+      exit "$rc"
+    fi
+  done
+  if [ "$bekleme_yazildi" -eq 0 ]; then
+    echo "Test sırası bekleniyor. İki yer de dolu: $KLASOR" >&2
+    bekleme_yazildi=1
+  fi
+  sleep "${AGIR_TEST_BEKLEME_SN:-$((10 + RANDOM % 11))}"
+done

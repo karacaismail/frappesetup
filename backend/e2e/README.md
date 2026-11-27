@@ -218,10 +218,16 @@ Varsayılan profilde `down`, geçici birimleri ve bu ortamın imaj etiketini sil
 Factory'de `down`, yeniden kullanılan mevcut veri birimlerini korur.
 Aynı Pane için bir seferde tek ortam açın.
 
+Playwright yerelde yalnız `scripts/agir-test` içinden koşar.
+Bu betik ortak test kilidini alır. Aynı anda en çok 2 ağır test koşar.
+Doğrudan `npx playwright test` komutu yerelde hata verir.
+`backend/e2e/bin/merge-preview` kilidi kendisi alır.
+Yığının açılışı, testi ve kapanışı aynı kilidin içindedir.
+
 ```sh
-npx --no-install playwright test -c backend/e2e/playwright.config.ts --list
-npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium --project=webkit
-npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=api
+scripts/agir-test npx --no-install playwright test -c backend/e2e/playwright.config.ts --list
+scripts/agir-test npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium --project=webkit
+scripts/agir-test npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=api
 ```
 
 Silme testinin ayar dosyası yüklüyken iki motorlu genel komutu çalıştırmayın. `E2E_PRESS_DELETION=1` ayarı silme testlerini açar.
@@ -304,7 +310,7 @@ Komutları depo kökünden çalıştırın.
 ```sh
 backend/e2e/stack seed-deletion
 set -a; . .pane/scratch/e2e-deletion.env; set +a
-npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium press-deletion.spec.ts
+scripts/agir-test npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium press-deletion.spec.ts
 ```
 
 WebKit için komutları yeniden çalıştırın. Önce yeni `seed-deletion`, sonra `--project=webkit` ile test. Bir deneme hesabı tek motor için yeter.
@@ -341,7 +347,7 @@ Silme ve iptal için her koşuda yeni örnek veri hazırlayın.
 - **Keycloak okuma yetkisi.** İlk iki senaryo `E2E_LIFECYCLE_KEYCLOAK_READER_TOKEN` ayarını ister. Bu belirteç yerel örnek kullanıcı ve oturumlarını okumalıdır.
 - **Çalışan oturumu.** `E2E_EMPLOYEE_IDLE=1` kullanın. Çalışan hesabı `e2e-employee-` ile başlamalı ve `@example.test` ile bitmeli. Hesabı `E2E_EMPLOYEE_EMAIL` ile verin. Parolayı `E2E_EMPLOYEE_PASSWORD` ile verin. Test gerçek saatte bir saat bekler. Test bu sırada yalnız Keycloak oturumunu kontrol eder.
 
-`playwright test -c backend/e2e/playwright.config.ts --project=chromium lifecycle.spec.ts` komutunu kullanın.
+`scripts/agir-test npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=chromium lifecycle.spec.ts` komutunu kullanın.
 
 ### Press silme sayfası test sözleşmesi
 

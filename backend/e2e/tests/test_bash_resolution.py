@@ -33,7 +33,10 @@ class BashResolutionTest(unittest.TestCase):
             worktree = root / "worktree"
             with patch("subprocess.Popen") as popen:
                 preview["run_live"](worktree, {}, root.resolve())
-            self.assertEqual(popen.call_args.args[0][0], "/tools/bash")
+            # The shared heavy test lock starts first and then runs Bash (AJA-1813).
+            command = popen.call_args.args[0]
+            self.assertEqual(command[0], str(root / "scripts" / "agir-test"))
+            self.assertEqual(command[1], "/tools/bash")
         self.assertEqual(sum(call.args == ("bash",) for call in find.call_args_list), 1)
 
     def test_refuses_missing_or_relative_bash_before_preparing_the_worktree(self):

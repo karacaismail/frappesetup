@@ -113,6 +113,12 @@ def trusted_scratch(repo, value):
     return scratch
 
 
+def live_command(runtime, worktree):
+    # The shared heavy test lock wraps the stack start, the tests and the stop.
+    lock = SUITE.parents[1] / "scripts" / "agir-test"
+    return [str(lock), BASH_PATH, str(runtime), str(worktree)]
+
+
 def run_live(worktree, environment, root):
     if not BASH_PATH or not Path(BASH_PATH).is_absolute():
         raise MergeError("An absolute Bash executable path is required. Check PATH.")
@@ -129,7 +135,7 @@ def run_live(worktree, environment, root):
         raise MergeError("Install the checkout's Playwright dependencies first.")
     (worktree / "node_modules").symlink_to(dependencies, target_is_directory=True)
     runtime = SUITE / "preview" / "runtime.sh"
-    with subprocess.Popen([BASH_PATH, str(runtime), str(worktree)], env=environment, start_new_session=True) as child:
+    with subprocess.Popen(live_command(runtime, worktree), env=environment, start_new_session=True) as child:
         try:
             return child.wait()
         except KeyboardInterrupt:

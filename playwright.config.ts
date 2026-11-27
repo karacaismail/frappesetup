@@ -3,6 +3,16 @@ import { defineConfig, devices } from '@playwright/test';
 // Üretim çıktısına (astro build → astro preview) karşı çalışır; base '/frappesetup/'.
 // `--ignore-lock`: Astro 7 preview kilit dosyası tutar; test sunucusu ondan bağımsız ön planda çalışır.
 // PW_PORT: aynı makinede başka bir preview sunucusu (ör. ikinci çalışma ağacı) 4329'u tutuyorsa.
+// Ağır test kilidi (AJA-1807). Yerelde Playwright yalnız scripts/agir-test içinden koşar.
+// GITHUB_ACTIONS=true iken kilit gerekmez. CI değişkeni tek başına kilidi atlatmaz.
+const CI_KOSUSU = process.env.GITHUB_ACTIONS === 'true';
+if (!CI_KOSUSU && !process.env.AGIR_TEST_YER) {
+  throw new Error(
+    'Playwright yerelde doğrudan koşmaz. Test kilitle koşmalıdır.\n'
+    + 'Bu komutu kullanın: npm run test:e2e',
+  );
+}
+
 const PORT = process.env.PW_PORT ? Number(process.env.PW_PORT) : 4329;
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error(`Geçersiz PW_PORT: ${process.env.PW_PORT}`);
 export const BASE_URL = `http://127.0.0.1:${PORT}/frappesetup/`;
@@ -14,6 +24,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
+  // Yerelde en çok 4 işçi açılır. CI'da Playwright varsayılanı kalır.
+  workers: CI_KOSUSU ? undefined : 4,
   // CI'da parçalı koşu (PW_BLOB=1): her parça blob raporu yazar, toplayıcı iş tek HTML rapora birleştirir.
   reporter: process.env.CI
     ? [['github'], process.env.PW_BLOB ? ['blob'] : ['html', { open: 'never' }]]
