@@ -22,6 +22,35 @@ concurrency:
 # Pages artifact'ı yalnız bütün testler geçince ve test edilen aynı dist'ten yüklenir.
 # visual_baseline kipinde yalnız visual-baseline işi koşar.
 jobs:
+  comment-language:
+    if: ${{ !inputs.visual_baseline }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, so the previous commit and the merge base are available.
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: comment-language tests
+        run: npm run test:comments
+
+      # A push is compared with the previous commit. A new branch or a manual run
+      # is compared with the merge base of origin/main.
+      - name: New comments are in English (changed lines only)
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            npm run lint:comments -- --base "$BEFORE"
+          else
+            npm run lint:comments -- --merge-base-with origin/main
+          fi
+
   press-ai:
     if: ${{ !inputs.visual_baseline }}
     runs-on: ubuntu-24.04
@@ -99,7 +128,7 @@ jobs:
 
   build:
     name: Build and test
-    needs: [press-ai, dist, e2e]
+    needs: [comment-language, press-ai, dist, e2e]
     if: ${{ always() && !inputs.visual_baseline }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -133,7 +162,7 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "press-ai, dist, e2e: $RESULTS"
+          echo "comment-language, press-ai, dist, e2e: $RESULTS"
           for r in $RESULTS; do
             if [ "$r" != "success" ]; then
               echo "::error::Bir iş başarısız, iptal ya da atlandı: $r"

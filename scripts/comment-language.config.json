@@ -1,0 +1,16 @@
+{
+  "exclude": [
+    { "pattern": "node_modules/**", "reason": "Installed third-party packages, not our code." },
+    { "pattern": "dist/**", "reason": "Build output written by astro build." },
+    { "pattern": "package-lock.json", "reason": "Lock file written by npm." },
+    { "pattern": "tests/__screenshots__/**", "reason": "Generated visual reference images." },
+    { "pattern": "**/*.patch", "reason": "Patch files carry third-party code." },
+    { "pattern": "src/content/docs/**", "reason": "Documentation pages, not code." },
+    { "pattern": "docs/**", "reason": "Documentation pages, not code." },
+    { "pattern": "**/translations/*.csv", "reason": "Translation catalogues hold Turkish text on purpose." },
+    { "pattern": "**/*_tr.properties", "reason": "Turkish translation catalogues." },
+    { "pattern": "**/locales/tr*.json", "reason": "Turkish translation catalogues." },
+    { "pattern": "**/*.po", "reason": "Gettext translation catalogues." },
+    { "pattern": "tests/comment-language/fixtures/**", "reason": "Test samples for this check. The Turkish samples must keep Turkish comments." }
+  ]
+}
