@@ -27,10 +27,10 @@
   ]
  },
  "update": {
-  "date": "2026-11-27",
+  "date": "2026-11-28",
   "commit": "30494610",
   "release": null,
-  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-11 Press erişim izinleri 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 2c21c9f5 birleşmesi ve test_press_access.py dosyasıdır. Testleri 3a918f8b commit'i ekledi. Gerçek Frappe denemesinde 8 testin 8'i geçti. Birleşme PR 42 ile yayımlandı ama canlıda denenmedi. G-13 Sürüyor kalır. Kod kanıtı 9f128360 commit'i ve test_panel_session.py dosyasıdır. Bu kanıt fed71b33 birleşmesiyle PR 43 üzerinden main dalına yayımlandı. Canlı madde açıktır: panel alan adında oturum çerezi ve anlık olay denenmedi. Bu denemeyi DevOps sorumlusu yapacak. G-81 kimlik eşitleme 24 Kasım 2026 Salı günü Bitti oldu. Kanıt b9c07e62 birleşmesi ve test_g81_closure.py dosyasıdır. Kanıt notunu 763dfab4 commit'i ekledi. Yerel ortamda kimlik eşitlemede 6 testin 6'sı geçti. Java eklentisinde 40 testin 40'ı geçti. Birleşme PR 44 ile yayımlandı ama canlıda denenmedi. G-104 İK yetki sözleşmesi 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 4abc0cb3 birleşmesi ve test_permission_matrix.py dosyasıdır. Yetki tablosu notunu 96509586 commit'i ekledi. Gerçek Frappe denemesinde İK yetki testlerinde 8 testin 8'i geçti. Yetki tablosunda 7 testin 7'si geçti. Birleşme PR 45 ile yayımlandı ama canlıda denenmedi. 25 Kasım 2026 Çarşamba günü PR 49 yayını okundu. Yayın commit'i d3e8e891 commit'idir. G-155 Bitti oldu. Kanıt c9725c79 birleşmesi ve iki test dosyasıdır. Testler yerel Frappe yığınında geçti. G-40 ve G-41 Sürüyor durumundadır. Kod ve testler 52c05bff birleşmesindedir. Gerçek Frappe sitesi isteyen testler koşmadı. Canlıda denenmeyen dağıtım işi de Sürüyor kalır. Yayındaki üç işin gereksinim bağı bulunamadı. Bunlar ef5e0a5c, ab55d7c5 ve 116a5f6e birleşmeleridir. Bu işler için kayıt yazılmadı. Aynı gün PR 54 yayını okundu. Yayın commit'i 877cfb18 commit'idir. Kaynak ff22c889 birleşmesidir. G-38 Sürüyor oldu. Kod 63b67808 birleşmesindedir. Gerçek bench'te bench show-config kanıtı yoktur. G-50 Sürüyor oldu. Kod 360a0c99 birleşmesindedir. Beş canlı adım yapılmadı. O-55 IPv6 notu 1db5a37a birleşmesindedir. G-163 Sürüyor kalır. Canlı deneme listesi 8d54750d birleşmesindedir. Bu işin gereksinim kaydı yoktur. PR 38 ve PR 52 site işleri 42211a43 ve ff22c889 birleşmeleridir. Bu işlerin gereksinim bağı bulunamadı. Bu işler için kayıt yazılmadı. G-49 Sürüyor oldu. Kod 8c80e673 commit'indedir. Test backend/apps/press_tr/tests/test_backup_keys.py dosyasıdır. Bu bilgi ayrı bir pano denetiminden gelir. 26 Kasım 2026 Perşembe günü PR 57 yayını okundu. Yayın commit'i d5ec6fe5 commit'idir. Kaynak de653610 birleşmesidir. G-156 Sürüyor oldu. Kod ve testler 3b907289 birleşmesindedir. Sunucuda yazı tanıma aracı kurulmadı. G-163 Sürüyor kalır. Kurtarma isteği 291e8b35 birleşmesindedir. İş canlıda denenmedi. G-62 Sürüyor kalır. Rol uçları 6213b596 birleşmesindedir. Permission Log ucu a00eaf8e birleşmesindedir. Frappe, User Permission ve Access Rule değişikliğini Permission Log'a yazmaz. G-98 Sürüyor kalır. Davet ve Permission Log uçları a00eaf8e birleşmesindedir. Yönetim ekranları henüz yoktur. G-53 Sürüyor kalır. Deneme betiği 7a3417e1 birleşmesindedir. Masaüstü yönlendirmesi ve ayar değerleri depoda bulunamadı. G-168, G-169 ve G-170 bu dalın gereksinim listesinde yoktur. Bu yüzden panoya kayıt yazılmadı. Kod de653610 ve 1344311a birleşmelerindedir. 8f681889 ve 1e20a838 test düzeltmeleridir. Bu işlerin gereksinim bağı yoktur. G-11, G-81 ve G-104 kayıtları 971b6b32 ve 6a326701 birleşmeleriyle yazıldı. Bu kayıtların yayın alanı değişmedi. 25 Kasım 2026 Çarşamba günü G-80 için bir hata düzeltildi (AJA-648). Parola formlarına gizli bir kullanıcı adı alanı eklendi. Tarayıcı bu alanla yeni parolayı doğru hesaba bağlar. Gerçek parola yöneticisiyle deneme yapılmadı. G-80 bu yüzden sürüyor. 27 Kasım 2026 Cuma günü ana sayfa özelliği okundu (AJA-984, AJA-1244). Arka uç kodu 2ea78d4f birleşmesindedir. Bu birleşme izin talebini reddeden ucu ve ana sayfa özeti ucunu getirdi. Testler test_home_summary.py ve test_api.py dosyalarındadır. Ekran tarafı atonota-web deposunda PR 38 ile main dalına girdi. Ana sayfa artık bekleyen izin talepleri ekranıdır. Bu iş G-108 kalemini ilerletir ama bitirmez. G-108 bordro, SGK ve vergi işlerini de kapsar. Bu işlerin kodu yoktur. G-108 bu yüzden Sürüyor kalır. Birleşme henüz main dalına yayımlanmadı ve canlıda denenmedi. 27 Kasım 2026 Cuma günü kayıt formu birleşmesi okundu (AJA-986, AJA-1258). Arka uç kodu 8127ca66 birleşmesindedir. İzin ön bilgisi yolu hrms_tr.api.get_leave_request_context adını taşır. Testler backend/apps/hrms_tr/hrms_tr/test_api.py ve backend/dev/hrms/test_contract.py dosyalarındadır. Ekran kodu atonota-web deposunda PR 35 ile main dalına girdi. Birleşme commit'i 28e2f24 olur. Yeni izin talebinde bilinen alanlar kendiliğinden dolar. Alanın altında bilginin kaynağı görünür. Bu iş G-69 kalemini ilerletir. Bu kanıt bütün alan türlerini kapsamaz. PR 31 ve PR 33 form bölümlerini ve alan altı hataları getirdi. Bu iş G-71 kalemini ilerletir. Bu kanıt belge yaşam döngüsünün tamamını kapsamaz. Kişiye özel izin ön bilgisi G-108 kalemini ilerletir. Bu kanıt bordro ve SGK işlerini kapsamaz. G-69, G-71 ve G-108 bu yüzden Sürüyor kalır. Arka uç birleşmesi henüz main dalına yayımlanmadı. Bu özellik canlıda denenmedi. 27 Kasım 2026 Cuma günü marka birleşmesi okundu (AJA-1053, AJA-1287). Marka kodu 30494610 birleşmesiyle yerel backend dalına girdi. Birleşen dalın ucu b8d70d06 commit'idir. Ürün adı ve alan adı backend/brand.env dosyasından okunur. Taramaya alınmayan yollar backend/brand-exclusions.txt dosyasında gerekçeleriyle yazılıdır. Dokuz birleştirme kapısı geçti. G-157 Bitti kalır. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve eski iki test dosyasıdır. Marka ayarı 30494610 birleşmesiyle geldi. Ek marka testleri test_brand_texts.py ve test_brand_hardcode.py dosyalarındadır. Bu testler G-157 kanıt listesine eklenmedi. G-47 için kanıt 30494610 birleşmesidir. Frappe karşılama e-postası ürün adını ortak ayardan alır. Test backend/apps/platform_core/platform_core/identity/tests/test_brand_texts.py dosyasındadır. G-47 Sürüyor oldu. Gerçek e-posta gönderimi, kiracı gönderici alanı ve gönderim kotası doğrulanmadı. G-17 Başlanmadı kalır. Bu birleşme Press işlemsel e-posta şablonlarını ve gönderim ayarlarını tamamlamaz. G-80 için kanıt 30494610 birleşmesidir. Test backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts dosyasındadır. Tema marka adını ortak ayardan gösterir. G-80 Sürüyor kalır. Bu değişiklik bütün giriş ekranlarının kabulünü tamamlamaz. G-158 için kanıt 30494610 birleşmesidir. Ortam adresleri ortak alan adı ayarından üretilir. Testler backend/deploy/tests/test_brand.py ve backend/identity/atonota_login/tests/test_redirect_brand.py dosyalarındadır. G-158 Sürüyor kalır. Canlı giriş adresi ve keşif belgesindeki issuer değeri doğrulanmadı. Bu değer, giriş hizmetinin hangi adreste olduğunu belirtir. G-159 Sürüyor kalır. 30494610 birleşmesi dönüş adreslerini ortak ayara bağlar. Test backend/identity/atonota_login/tests/test_redirect_brand.py dosyasındadır. Gerçek platform hesaplarıyla giriş denenmedi. G-165 Sürüyor kalır. 30494610 birleşmesi tanıtım sayfasındaki ürün adını ortak ayara bağlar. Test tests/brand-build.test.mjs dosyasındadır. Bu birleşme ürün sahibinin metin onayı yerine geçmez. G-2 Başlanmadı kalır. Bu birleşme alan adı kayıtlarını ve yetki devrini uygulamaz. Birleşme henüz main dalına yayımlanmadı. Canlı sunucu denemesi yapılmadı. Canlıda denenmemiş dağıtım işi Bitti sayılmadı.",
+  "note": "Güncelleme denetimden sonra birleşen işleri okudu. Kanıt birleşme metni, değişen dosyalar ve testlerdir. Canlı sunucuda denenmemiş dağıtım işi bitti sayılmadı. AtonotA Login kalemleri 24 Kasım 2026 Salı günü okundu. Kanıt, PR 23, PR 25 ve PR 27 ile yayımlanan birleşmelerdir. İşlem kararının Frappe ucu e7130aaa birleşmesindedir. Bu uç PR 25 ile yayımlandı ama canlıda denenmedi. Şirket sağlayıcısının istisna kaydı 43f13477 birleşmesindedir. Bu birleşme PR 27 ile yayımlandı ama canlıda denenmedi. G-160 bu yüzden sürüyor. Bu okumada kalemlerin hiçbiri bitti sayılmadı. Gerçek platform hesapları henüz yoktur. Aynı gün G-157 Bitti oldu. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve iki test dosyasıdır. G-165 Sürüyor oldu. Tanıtım sayfası yazıldı ama ürün sahibi metni onaylamadı. G-11 Press erişim izinleri 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 2c21c9f5 birleşmesi ve test_press_access.py dosyasıdır. Testleri 3a918f8b commit'i ekledi. Gerçek Frappe denemesinde 8 testin 8'i geçti. Birleşme PR 42 ile yayımlandı ama canlıda denenmedi. G-13 Sürüyor kalır. Kod kanıtı 9f128360 commit'i ve test_panel_session.py dosyasıdır. Bu kanıt fed71b33 birleşmesiyle PR 43 üzerinden main dalına yayımlandı. Canlı madde açıktır: panel alan adında oturum çerezi ve anlık olay denenmedi. Bu denemeyi DevOps sorumlusu yapacak. G-81 kimlik eşitleme 24 Kasım 2026 Salı günü Bitti oldu. Kanıt b9c07e62 birleşmesi ve test_g81_closure.py dosyasıdır. Kanıt notunu 763dfab4 commit'i ekledi. Yerel ortamda kimlik eşitlemede 6 testin 6'sı geçti. Java eklentisinde 40 testin 40'ı geçti. Birleşme PR 44 ile yayımlandı ama canlıda denenmedi. G-104 İK yetki sözleşmesi 24 Kasım 2026 Salı günü Bitti oldu. Kanıt 4abc0cb3 birleşmesi ve test_permission_matrix.py dosyasıdır. Yetki tablosu notunu 96509586 commit'i ekledi. Gerçek Frappe denemesinde İK yetki testlerinde 8 testin 8'i geçti. Yetki tablosunda 7 testin 7'si geçti. Birleşme PR 45 ile yayımlandı ama canlıda denenmedi. 25 Kasım 2026 Çarşamba günü PR 49 yayını okundu. Yayın commit'i d3e8e891 commit'idir. G-155 Bitti oldu. Kanıt c9725c79 birleşmesi ve iki test dosyasıdır. Testler yerel Frappe yığınında geçti. G-40 ve G-41 Sürüyor durumundadır. Kod ve testler 52c05bff birleşmesindedir. Gerçek Frappe sitesi isteyen testler koşmadı. Canlıda denenmeyen dağıtım işi de Sürüyor kalır. Yayındaki üç işin gereksinim bağı bulunamadı. Bunlar ef5e0a5c, ab55d7c5 ve 116a5f6e birleşmeleridir. Bu işler için kayıt yazılmadı. Aynı gün PR 54 yayını okundu. Yayın commit'i 877cfb18 commit'idir. Kaynak ff22c889 birleşmesidir. G-38 Sürüyor oldu. Kod 63b67808 birleşmesindedir. Gerçek bench'te bench show-config kanıtı yoktur. G-50 Sürüyor oldu. Kod 360a0c99 birleşmesindedir. Beş canlı adım yapılmadı. O-55 IPv6 notu 1db5a37a birleşmesindedir. G-163 Sürüyor kalır. Canlı deneme listesi 8d54750d birleşmesindedir. Bu işin gereksinim kaydı yoktur. PR 38 ve PR 52 site işleri 42211a43 ve ff22c889 birleşmeleridir. Bu işlerin gereksinim bağı bulunamadı. Bu işler için kayıt yazılmadı. G-49 Sürüyor oldu. Kod 8c80e673 commit'indedir. Test backend/apps/press_tr/tests/test_backup_keys.py dosyasıdır. Bu bilgi ayrı bir pano denetiminden gelir. 26 Kasım 2026 Perşembe günü PR 57 yayını okundu. Yayın commit'i d5ec6fe5 commit'idir. Kaynak de653610 birleşmesidir. G-156 Sürüyor oldu. Kod ve testler 3b907289 birleşmesindedir. Sunucuda yazı tanıma aracı kurulmadı. G-163 Sürüyor kalır. Kurtarma isteği 291e8b35 birleşmesindedir. İş canlıda denenmedi. G-62 Sürüyor kalır. Rol uçları 6213b596 birleşmesindedir. Permission Log ucu a00eaf8e birleşmesindedir. Frappe, User Permission ve Access Rule değişikliğini Permission Log'a yazmaz. G-98 Sürüyor kalır. Davet ve Permission Log uçları a00eaf8e birleşmesindedir. Yönetim ekranları henüz yoktur. G-53 Sürüyor kalır. Deneme betiği 7a3417e1 birleşmesindedir. Masaüstü yönlendirmesi ve ayar değerleri depoda bulunamadı. G-168, G-169 ve G-170 bu dalın gereksinim listesinde yoktur. Bu yüzden panoya kayıt yazılmadı. Kod de653610 ve 1344311a birleşmelerindedir. 8f681889 ve 1e20a838 test düzeltmeleridir. Bu işlerin gereksinim bağı yoktur. G-11, G-81 ve G-104 kayıtları 971b6b32 ve 6a326701 birleşmeleriyle yazıldı. Bu kayıtların yayın alanı değişmedi. 25 Kasım 2026 Çarşamba günü G-80 için bir hata düzeltildi (AJA-648). Parola formlarına gizli bir kullanıcı adı alanı eklendi. Tarayıcı bu alanla yeni parolayı doğru hesaba bağlar. Gerçek parola yöneticisiyle deneme yapılmadı. G-80 bu yüzden sürüyor. 27 Kasım 2026 Cuma günü ana sayfa özelliği okundu (AJA-984, AJA-1244). Arka uç kodu 2ea78d4f birleşmesindedir. Bu birleşme izin talebini reddeden ucu ve ana sayfa özeti ucunu getirdi. Testler test_home_summary.py ve test_api.py dosyalarındadır. Ekran tarafı atonota-web deposunda PR 38 ile main dalına girdi. Ana sayfa artık bekleyen izin talepleri ekranıdır. Bu iş G-108 kalemini ilerletir ama bitirmez. G-108 bordro, SGK ve vergi işlerini de kapsar. Bu işlerin kodu yoktur. G-108 bu yüzden Sürüyor kalır. Birleşme henüz main dalına yayımlanmadı ve canlıda denenmedi. 27 Kasım 2026 Cuma günü kayıt formu birleşmesi okundu (AJA-986, AJA-1258). Arka uç kodu 8127ca66 birleşmesindedir. İzin ön bilgisi yolu hrms_tr.api.get_leave_request_context adını taşır. Testler backend/apps/hrms_tr/hrms_tr/test_api.py ve backend/dev/hrms/test_contract.py dosyalarındadır. Ekran kodu atonota-web deposunda PR 35 ile main dalına girdi. Birleşme commit'i 28e2f24 olur. Yeni izin talebinde bilinen alanlar kendiliğinden dolar. Alanın altında bilginin kaynağı görünür. Bu iş G-69 kalemini ilerletir. Bu kanıt bütün alan türlerini kapsamaz. PR 31 ve PR 33 form bölümlerini ve alan altı hataları getirdi. Bu iş G-71 kalemini ilerletir. Bu kanıt belge yaşam döngüsünün tamamını kapsamaz. Kişiye özel izin ön bilgisi G-108 kalemini ilerletir. Bu kanıt bordro ve SGK işlerini kapsamaz. G-69, G-71 ve G-108 bu yüzden Sürüyor kalır. Arka uç birleşmesi henüz main dalına yayımlanmadı. Bu özellik canlıda denenmedi. 27 Kasım 2026 Cuma günü marka birleşmesi okundu (AJA-1053, AJA-1287). Marka kodu 30494610 birleşmesiyle yerel backend dalına girdi. Birleşen dalın ucu b8d70d06 commit'idir. Ürün adı ve alan adı backend/brand.env dosyasından okunur. Taramaya alınmayan yollar backend/brand-exclusions.txt dosyasında gerekçeleriyle yazılıdır. Dokuz birleştirme kapısı geçti. G-157 Bitti kalır. Kanıt PR 23 ile yayımlanan 18a9fff8 birleşmesi ve eski iki test dosyasıdır. Marka ayarı 30494610 birleşmesiyle geldi. Ek marka testleri test_brand_texts.py ve test_brand_hardcode.py dosyalarındadır. Bu testler G-157 kanıt listesine eklenmedi. G-47 için kanıt 30494610 birleşmesidir. Frappe karşılama e-postası ürün adını ortak ayardan alır. Test backend/apps/platform_core/platform_core/identity/tests/test_brand_texts.py dosyasındadır. G-47 Sürüyor oldu. Gerçek e-posta gönderimi, kiracı gönderici alanı ve gönderim kotası doğrulanmadı. G-17 Başlanmadı kalır. Bu birleşme Press işlemsel e-posta şablonlarını ve gönderim ayarlarını tamamlamaz. G-80 için kanıt 30494610 birleşmesidir. Test backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts dosyasındadır. Tema marka adını ortak ayardan gösterir. G-80 Sürüyor kalır. Bu değişiklik bütün giriş ekranlarının kabulünü tamamlamaz. G-158 için kanıt 30494610 birleşmesidir. Ortam adresleri ortak alan adı ayarından üretilir. Testler backend/deploy/tests/test_brand.py ve backend/identity/atonota_login/tests/test_redirect_brand.py dosyalarındadır. G-158 Sürüyor kalır. Canlı giriş adresi ve keşif belgesindeki issuer değeri doğrulanmadı. Bu değer, giriş hizmetinin hangi adreste olduğunu belirtir. G-159 Sürüyor kalır. 30494610 birleşmesi dönüş adreslerini ortak ayara bağlar. Test backend/identity/atonota_login/tests/test_redirect_brand.py dosyasındadır. Gerçek platform hesaplarıyla giriş denenmedi. G-165 Sürüyor kalır. 30494610 birleşmesi tanıtım sayfasındaki ürün adını ortak ayara bağlar. Test tests/brand-build.test.mjs dosyasındadır. Bu birleşme ürün sahibinin metin onayı yerine geçmez. G-2 Başlanmadı kalır. Bu birleşme alan adı kayıtlarını ve yetki devrini uygulamaz. Birleşme henüz main dalına yayımlanmadı. Canlı sunucu denemesi yapılmadı. Canlıda denenmemiş dağıtım işi Bitti sayılmadı. 28 Kasım 2026 Cumartesi günü 15 MVP kalemi denetlendi (AJA-2202). Denetim üç depoyu okudu. Bunlar frappesetup, metafrappe/backend ve metafrappe/frontend depolarıdır. G-168, G-169 ve G-170 Bitti oldu. Kanıt de653610 birleşmesidir. Bu birleşme PR 57 ile yayımlandı. Testler panel rolleri, bayi kayıtları ve kurulum adımı dosyalarındadır. Frappe sitesi istemeyen testler yerelde geçti. Site isteyen HTTP testleri yerelde koşmadı. Birleşme metnine göre QA işleri AJA-903 ve AJA-921 geçti. Roller canlıda denenmedi. G-54 Sürüyor oldu. İmajlar sabit bir Frappe 16 sürümüne bağlıdır. Press Release Group ayarı ve ilk Deploy Candidate canlı sunucu ister. G-99 Sürüyor oldu. Panelde profil okuma, bağlı hesaplar ve hesap silme yolu vardır. Bu kod ve testleri metafrappe/frontend deposundadır. Profil düzenleme ve bildirim tercihleri yoktur. G-118 Sürüyor oldu. Bu depoda MIT lisansı ve içerik lisansı vardır. metafrappe/backend ve metafrappe/frontend depolarında lisans dosyası yoktur. SPDX başlıkları ve CI lisans taraması da yoktur. G-36, G-51, G-72, G-91, G-92, G-100, G-140, G-153 ve SA-39 Başlamadı oldu. Bu kalemlerin kodu bulunamadı. G-36 için Press imajında Telegram istemcisi kapalıdır. G-72 için yalnız rapor izin kapısı vardır. Rapor ekranı, grafik ve yazdırma yoktur. SA-39 için press-ai yalnız enable_mcp alanını okur. Press MCP açılmadı.",
   "reviewed": [
    "G-155",
    "G-156",
@@ -44,7 +44,22 @@
    "G-164",
    "G-165",
    "G-166",
-   "G-167"
+   "G-167",
+   "G-36",
+   "G-51",
+   "G-54",
+   "G-72",
+   "G-91",
+   "G-92",
+   "G-99",
+   "G-100",
+   "G-118",
+   "G-140",
+   "G-153",
+   "SA-39",
+   "G-168",
+   "G-169",
+   "G-170"
   ]
  },
  "statuses": [
@@ -433,7 +448,7 @@
   },
   "G-36": {
    "epic": "resilience",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-37": {
@@ -531,7 +546,7 @@
   },
   "G-51": {
    "epic": "tenant-config",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-52": {
@@ -546,7 +561,7 @@
   },
   "G-54": {
    "epic": "infra",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-55": {
@@ -678,7 +693,7 @@
   },
   "G-72": {
    "epic": "panel-core",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-73": {
@@ -804,12 +819,12 @@
   },
   "G-91": {
    "epic": "ai",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-92": {
    "epic": "ai",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-93": {
@@ -844,12 +859,12 @@
   },
   "G-99": {
    "epic": "shell",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-100": {
    "epic": "shell",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-101": {
@@ -949,7 +964,7 @@
   },
   "G-118": {
    "epic": "delivery",
-   "status": "unverified",
+   "status": "in-progress",
    "level": "mvp"
   },
   "G-119": {
@@ -1069,7 +1084,7 @@
   },
   "G-140": {
    "epic": "help",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-141": {
@@ -1144,7 +1159,7 @@
   },
   "G-153": {
    "epic": "tenant-config",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "G-154": {
@@ -1344,7 +1359,7 @@
   },
   "SA-39": {
    "epic": "ai",
-   "status": "unverified",
+   "status": "not-started",
    "level": "mvp"
   },
   "SA-40": {
@@ -1461,18 +1476,54 @@
   },
   "G-168": {
    "epic": "access",
-   "status": "unverified",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "de653610",
+    "release": {
+     "pr": 57,
+     "commit": "d5ec6fe5"
+    },
+    "tests": [
+     "backend/apps/platform_core/platform_core/setup/tests/test_panel_roles.py",
+     "backend/apps/platform_core/platform_core/access/tests/test_role_tenant_admin_assistant.py"
+    ]
+   }
   },
   "G-169": {
    "epic": "access",
-   "status": "unverified",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "de653610",
+    "release": {
+     "pr": 57,
+     "commit": "d5ec6fe5"
+    },
+    "tests": [
+     "backend/apps/platform_core/platform_core/setup/tests/test_panel_roles.py",
+     "backend/apps/platform_core/platform_core/access/tests/test_role_reseller_admin.py",
+     "backend/apps/platform_core/platform_core/reseller/tests/test_reseller_contract.py",
+     "backend/apps/platform_core/platform_core/reseller/tests/test_reseller_operator.py"
+    ]
+   }
   },
   "G-170": {
    "epic": "access",
-   "status": "unverified",
-   "level": "mvp"
+   "status": "done",
+   "level": "mvp",
+   "evidence": {
+    "commit": "de653610",
+    "release": {
+     "pr": 57,
+     "commit": "d5ec6fe5"
+    },
+    "tests": [
+     "backend/apps/platform_core/platform_core/setup/tests/test_panel_roles.py",
+     "backend/apps/platform_core/platform_core/access/tests/test_role_reseller_assistant.py",
+     "backend/apps/platform_core/platform_core/reseller/tests/test_reseller_contract.py"
+    ]
+   }
   }
  }
 }
