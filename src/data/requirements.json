@@ -101,8 +101,8 @@
  },
  {
   "id": "G-11",
-  "title": "Press auth allowlist, client ALLOWED_DOCTYPES ve Method Permission eklemeleri",
-  "detail": "press/auth.py System User olmayanlar için `/api/` altını reddeder; `press_tr` `before_request` kancası (sıra Frappe v15'te doğrulandı: kanca validate_auth'tan önce çalışır; Press artık Frappe 16 üzerindedir (backend O-9), bu sıra Frappe 16'da yeniden doğrulanmalıdır) her istekte idempotent olarak `ALLOWED_WILDCARD_PATHS` (`/api/method/press_tr.api.`), iyzico callback/webhook yolları ve `press_tr.mcp.handler` için `ALLOWED_PATHS` ve `ALLOWED_OPTIONS_ENDPOINTS` girişlerini garanti eder. Aynı yerde `press.api.client.ALLOWED_DOCTYPES` listesine Iyzico Payment Record, Iyzico Stored Card vb. eklenir; her sınıfta `dashboard_fields` ve takım filtreli `get_list_query`; doc method'lar için Press Method Permission `press_tr` fixture'ı; yetkisiz doctype erişimi negatif testle doğrulanır.",
+  "title": "Press auth yöntem listesi, client ALLOWED_DOCTYPES ve Method Permission eklemeleri",
+  "detail": "press/auth.py, System User olmayanlar için `/api/` altını reddeder. `press_tr` `before_request` kancası bu izinleri her istekte idempotent olarak ekler. Kanca Frappe v15'te validate_auth'tan önce çalışır, bu sıra doğrulandı. Press artık Frappe 16 üzerindedir (backend O-9). Bu sıra Frappe 16'da yeniden doğrulanmalıdır. İzinli `press_tr.api` yöntemleri `ALLOWED_PATHS` içinde tek tek listelenir. Joker yol kullanılmaz. Kanca iyzico callback ve webhook yollarını da ekler. `press_tr.mcp.handler` için `ALLOWED_PATHS` ve `ALLOWED_OPTIONS_ENDPOINTS` girişleri de eklenir. Aynı yerde `press.api.client.ALLOWED_DOCTYPES` listesine Iyzico Payment Record, Iyzico Stored Card vb. eklenir. Her sınıfta `dashboard_fields` ve takım filtreli `get_list_query` bulunur. Doc method'lar için Press Method Permission `press_tr` fixture'ı eklenir. Yetkisiz doctype erişimi negatif testle doğrulanır.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
