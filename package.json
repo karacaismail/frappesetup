@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "test:brand": "node --test tests/brand.test.mjs && python3 -m unittest discover -s tests -p test_site_brand.py",
     "test:brand-build": "node --test tests/brand-build.test.mjs",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:rules": "node --test tests/agent-rules.test.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.1",
