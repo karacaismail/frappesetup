@@ -16,9 +16,15 @@ PO şu koşulların tamamını doğrular:
 8. “Kapsam dışı” satırlarının gerekçesini QA ve Committer doğrular.
 9. Kural değişikliği varsa müşterinin kararı kayıtlıdır.
 
-QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme sürecini yürüten kişidir. Commit, Git içindeki değişiklik kaydıdır.
+QA, işi deneyen kişidir. Committer dalı inceler ve onay verir. Commit, Git içindeki değişiklik kaydıdır.
 
 Bir koşul eksikse PO işi kapatmaz. PO eksik kanıtı veya düzeltmeyi ilgili kişiden ister. PO yalnız geliştiricinin “tamamlandı” yorumuna dayanarak işi kapatmaz.
+
+## Birleştirme
+
+Ajanlar `backend` dalına kendileri birleştirme yapmaz. Committer onay verince göreve “birleştirmeye hazır” yazar. Birleştirmeyi kimin yapacağı henüz belli değildir.
+
+Kaynak: orkestratör çalışma düzeni, müşteri kararı bekleniyor.
 
 ## Kabul edilen kanıt
 
