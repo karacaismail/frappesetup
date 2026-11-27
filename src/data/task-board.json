@@ -1476,6 +1476,11 @@
    "epic": "access",
    "status": "unverified",
    "level": "mvp"
+  },
+  "G-171": {
+   "epic": "panel-core",
+   "status": "not-started",
+   "level": "mvp"
   }
  }
 }
