@@ -29,6 +29,16 @@ Kopyalar bu klasörden eşitlenir. Kopyada yapılan değişiklik asıl kural say
 2. [SURECLER-VE-SONUCLAR.md](SURECLER-VE-SONUCLAR.md) dosyaların nasıl yazıldığını ve denetlendiğini anlatır.
 3. [ACIK-ISLER.md](ACIK-ISLER.md) bekleyen kararları ve bitmemiş işleri toplar.
 
+## Süreç belgeleri
+
+Bu belgeler işin her adımında kurallara nasıl uyulacağını anlatır. Belgeleri A Takımı yazdı.
+
+1. [task-template.md](task-template.md) PO'nun yeni işe kuralları nasıl yazacağını anlatır.
+2. [developer-first-comment.md](developer-first-comment.md) geliştiricinin ilk yorumda hangi kuralları yazacağını anlatır.
+3. [review-template.md](review-template.md) QA ile Committer'ın kural uyumunu nasıl inceleyeceğini anlatır.
+4. [definition-of-done.md](definition-of-done.md) bir işin ne zaman “Bitti” olacağını anlatır.
+5. [rule-change-process.md](rule-change-process.md) bir kuralın değişmesinin nasıl isteneceğini anlatır.
+
 ## Bilmeniz gerekenler
 
 - Bu klasör sitenin bir parçası değildir. Site sayfaları bu dosyalardan üretilmez.
