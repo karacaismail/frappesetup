@@ -34,7 +34,7 @@ done
 docker_preview exec "$container" ln -s ../@playwright/test/cli.js /suite/node_modules/.bin/playwright
 docker_preview cp "$PREVIEW_DIR/fixtures.json" "$container:/results/fixtures.json"
 
-settings=(--env PANE_PORT --env E2E_BROWSER_RUNTIME=container --env PREVIEW_DIR=/results)
+settings=(--env PANE_PORT --env AGIR_TEST_YER --env E2E_BROWSER_RUNTIME=container --env PREVIEW_DIR=/results)
 while IFS= read -r name; do
     if [[ "$name" =~ ^E2E_[A-Z0-9_]+$ ]]; then
         settings+=(--env "$name")
