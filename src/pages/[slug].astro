@@ -54,8 +54,42 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
         if (location.hash.startsWith('#req-')) {
           const root = document.documentElement;
           root.dataset.initialRequirementLink = '';
+          // Sayfa yüklenirken tarayıcı bağlantının satırını ekranda tutar. Betik sayfayı kaydırırsa WebKit ve
+          // Chromium bu kaydırmayı geri alabilir: sıradaki çapa kaydırması okuru satıra döndürür. Burada betiğin
+          // seçtiği yer saklanır ve yükleme bitene kadar korunur. Okur fareyle, dokunarak ya da klavyeyle
+          // kaydırırsa tarayıcı çapayı kendisi bırakır. O zaman saklanan yer de bırakılır.
+          const native = { scroll: window.scroll, scrollTo: window.scrollTo, scrollBy: window.scrollBy };
+          let wanted = null;
+          const keep = () => {
+            if (wanted && (Math.abs(scrollX - wanted.left) > 1 || Math.abs(scrollY - wanted.top) > 1)) {
+              native.scrollTo.call(window, { left: wanted.left, top: wanted.top, behavior: 'instant' });
+            }
+          };
+          const release = () => { wanted = null; };
+          const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+          for (const name of Object.keys(native)) {
+            window[name] = function (...args) {
+              native[name].apply(this, args);
+              // Yumuşak kaydırma bir süre sürer. Onun hedefi burada bilinmez, bu yüzden korunmaz.
+              const behavior = args[0]?.behavior;
+              const smooth = behavior === 'smooth'
+                || (behavior !== 'instant' && getComputedStyle(root).scrollBehavior === 'smooth');
+              wanted = smooth ? null : { left: scrollX, top: scrollY };
+            };
+          }
+          window.addEventListener('scroll', keep, { passive: true });
+          for (const type of inputs) window.addEventListener(type, release, { capture: true, passive: true });
           window.addEventListener('load', () => {
-            requestAnimationFrame(() => delete root.dataset.initialRequirementLink);
+            requestAnimationFrame(() => {
+              delete root.dataset.initialRequirementLink;
+              // Yükleme bitmeden sıraya giren son çapa kaydırması da çalışsın. Sonra bekçi kalkar.
+              requestAnimationFrame(() => requestAnimationFrame(() => {
+                keep();
+                Object.assign(window, native);
+                window.removeEventListener('scroll', keep);
+                for (const type of inputs) window.removeEventListener(type, release, { capture: true });
+              }));
+            });
           }, { once: true });
         }
       </script>

@@ -247,8 +247,11 @@ function Explorer({ items, meta: board }: Props) {
     if (!row || getComputedStyle(row).display !== 'table-row') return;
     // Ada geç bağlanabilir. Okur bu sırada satırdan uzaklaştıysa okurun yeri korunur. Satır ekranda değilse gezgin
     // kaydırmaz ve odak vermez.
-    const bounds = row.getBoundingClientRect();
-    if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) return;
+    const inView = () => {
+      const bounds = row.getBoundingClientRect();
+      return bounds.bottom > 0 && bounds.top < window.innerHeight;
+    };
+    if (!inView()) return;
 
     // Yazı tiplerini ve sayfanın sonraki karede ölçtüğü satır içi kodu bekle.
     let cancelled = false;
@@ -259,6 +262,8 @@ function Explorer({ items, meta: board }: Props) {
         frame = requestAnimationFrame(() => {
           if (window.location.hash !== hash) return;
           if (!row.isConnected || getComputedStyle(row).display !== 'table-row') return;
+          // Okur bu iki kare içinde satırdan uzaklaşmış olabilir. O zaman da yeri korunur.
+          if (!inView()) return;
           row.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
           row.tabIndex = -1;
           row.focus({ preventScroll: true });
