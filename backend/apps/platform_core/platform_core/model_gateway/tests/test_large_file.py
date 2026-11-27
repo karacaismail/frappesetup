@@ -588,8 +588,16 @@ class ExpiryStore:
 				return False
 		return True
 
-	def get_all(self, doctype, filters=None, fields=None, pluck=None, **kwargs):
+	def get_all(self, doctype, filters=None, fields=None, pluck=None, order_by=None, limit=None, **kwargs):
+		if kwargs:
+			raise AssertionError(kwargs)
 		rows = [row for row in self._rows(doctype) if self._matches(row, filters or {})]
+		if order_by is not None:
+			if order_by != "modified asc":
+				raise AssertionError(order_by)
+			rows.sort(key=lambda row: row.modified)
+		if limit is not None:
+			rows = rows[:limit]
 		if pluck:
 			return [getattr(row, pluck) for row in rows]
 		return [SimpleNamespace(**{field: getattr(row, field) for field in fields}) for row in rows]
@@ -717,7 +725,59 @@ class ExpiryTests(unittest.TestCase):
 					large_file.expire_stale_jobs()
 				self.assertEqual(job.status, "planned")
 		self.roles = ["System Manager"]
-		self.assertEqual(large_file.expire_stale_jobs(), {"expired_jobs": 1, "lost_chunks": 0})
+		self.assertEqual(
+			large_file.expire_stale_jobs(), {"expired_jobs": 1, "lost_chunks": 0, "more": False}
+		)
+
+	def _old_jobs(self, count):
+		return [
+			self.store.add(f"old-{index:03}", "planned", self.DAY + 1 + index, [("planned", self.DAY + 1)])
+			for index in range(count)
+		]
+
+	def _lost_chunks(self, count):
+		return [
+			self.store.add(f"lost-{index:03}", "running", self.HOUR + 1, [("running", self.HOUR + 1 + index)])
+			for index in range(count)
+		]
+
+	def test_one_turn_expires_at_most_the_batch_size_of_planned_jobs(self):
+		jobs = self._old_jobs(large_file.CLEANUP_BATCH + 3)
+		result = large_file.expire_stale_jobs()
+		self.assertEqual(result, {"expired_jobs": large_file.CLEANUP_BATCH, "lost_chunks": 0, "more": True})
+		expired = [job for job in jobs if job.failure_code == "expired"]
+		self.assertEqual(len(expired), large_file.CLEANUP_BATCH)
+		# The oldest jobs go first, so no job waits behind newer ones forever.
+		self.assertEqual(
+			sorted(job.name for job in expired),
+			sorted(job.name for job in sorted(jobs, key=lambda job: job.modified)[: large_file.CLEANUP_BATCH]),
+		)
+
+	def test_one_turn_fails_at_most_the_batch_size_of_lost_chunks(self):
+		jobs = self._lost_chunks(large_file.CLEANUP_BATCH + 2)
+		result = large_file.expire_stale_jobs()
+		self.assertEqual(result, {"expired_jobs": 0, "lost_chunks": large_file.CLEANUP_BATCH, "more": True})
+		lost = [job for job in jobs if job.chunks[0].failure_code == "worker_lost"]
+		self.assertEqual(len(lost), large_file.CLEANUP_BATCH)
+
+	def test_exactly_the_batch_size_reports_nothing_left(self):
+		self._old_jobs(large_file.CLEANUP_BATCH)
+		result = large_file.expire_stale_jobs()
+		self.assertEqual(result, {"expired_jobs": large_file.CLEANUP_BATCH, "lost_chunks": 0, "more": False})
+
+	def test_turns_in_a_row_finish_every_stale_job(self):
+		jobs = self._old_jobs(2 * large_file.CLEANUP_BATCH + 1)
+		chunks = self._lost_chunks(large_file.CLEANUP_BATCH + 1)
+		results = []
+		while not results or results[-1]["more"]:
+			results.append(large_file.expire_stale_jobs())
+			self.assertLessEqual(len(results), 5)
+		self.assertEqual(len(results), 3)
+		self.assertEqual(sum(result["expired_jobs"] for result in results), len(jobs))
+		self.assertEqual(sum(result["lost_chunks"] for result in results), len(chunks))
+		self.assertTrue(all(job.failure_code == "expired" for job in jobs))
+		self.assertTrue(all(job.chunks[0].failure_code == "worker_lost" for job in chunks))
+		self.assertEqual(large_file.expire_stale_jobs(), {"expired_jobs": 0, "lost_chunks": 0, "more": False})
 
 	def test_start_refuses_an_expired_job(self):
 		job = self.store.add("old", "planned", self.DAY + 1, [("planned", self.DAY + 1)])
