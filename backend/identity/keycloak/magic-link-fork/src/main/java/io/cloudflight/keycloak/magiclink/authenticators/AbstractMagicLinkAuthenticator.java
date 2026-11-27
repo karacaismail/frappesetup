@@ -14,7 +14,7 @@
  *   The row is written before the mail, so a link never arrives before its row.
  * - The job sends only within the per-address send limit (MagicLinkSendLimiter).
  * - A failed mail is logged without the link or the key. The answer is not a 500 error any more.
- * - AJA-440 (design "G-162 ek iş" in 0003): the request reads the client source and gives it to the
+ * - AJA-440 (design: the "G-162 follow-up work" section in 0003): the request reads the client source and gives it to the
  *   job. The job checks the source ceiling, the source share and then the address limit, so one
  *   source cannot use up another person's mails. scheduleSend() counts the waiting jobs and queues
  *   none above the queue ceiling. The answer and its time stay the same in every case.

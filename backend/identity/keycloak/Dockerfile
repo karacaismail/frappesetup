@@ -1,7 +1,7 @@
-# Atonota Keycloak imajı. Sahibi kimlik-realm işidir.
-# Realm dosyası ve parola listesi imajın içine kopyalanır. Böylece container'ın
-# ana bilgisayar klasörüne erişmesi gerekmez. Colima profilleri her klasörü bağlamaz.
-# Keycloak'ın kendi kodu değişmez. Yalnız veri dosyaları eklenir.
+# Atonota Keycloak image. Owned by the kimlik-realm work stream.
+# The realm file and the password list are copied into the image. So the container
+# does not need access to a host folder. Colima profiles do not mount every folder.
+# Keycloak's own code is unchanged. Only data files are added.
 # Versions are written once here (standard H-7). event-listener/pom.xml carries the same Keycloak
 # version as its default for builds outside Docker; a test keeps the two equal.
 ARG KEYCLOAK_VERSION=26.8.2
@@ -46,7 +46,7 @@ FROM keycloak-base AS prod
 COPY --from=account-provider-build --chown=1000:0 /out/account-deletion-link-provider.jar /opt/keycloak/providers/account-deletion-link-provider.jar
 COPY --from=event-listener-build --chown=1000:0 /build/keycloak-webhook-listener.jar /opt/keycloak/providers/keycloak-webhook-listener-identity-sync.jar
 COPY --from=magiclink-build --chown=1000:0 /build/keycloak-magic-link.jar /opt/keycloak/providers/keycloak-magic-link-7b4ee94.jar
-# Eklenti (docs/decisions/0003-keycloak-extensions.md). Sürüm ve SHA-256 özeti sabittir.
+# Extension (docs/decisions/0003-keycloak-extensions.md). The version and SHA-256 digest are pinned.
 ADD --checksum=sha256:4091dee2a1ec9e0771bef4bd46005197d86b0a2b1f25198c41738476b1d102bb --chown=1000:0 \
     https://github.com/klausbetz/apple-identity-provider-keycloak/releases/download/1.17.0/apple-identity-provider-1.17.0.jar \
     /opt/keycloak/providers/apple-identity-provider-1.17.0.jar
@@ -54,10 +54,10 @@ ADD --checksum=sha256:4091dee2a1ec9e0771bef4bd46005197d86b0a2b1f25198c41738476b1
 COPY --chown=1000:0 conf/keycloak.conf /opt/keycloak/conf/keycloak.conf
 COPY --chown=1000:0 realm/platform-realm.json /opt/keycloak/data/import/platform-realm.json
 COPY --chown=1000:0 realm/password-blacklists/common-passwords.txt /opt/keycloak/data/password-blacklists/common-passwords.txt
-# Temalar (themes/README.md). atonota teması kimlik-tema işinindir. test klasörü .dockerignore ile dışarıda kalır.
+# Themes (themes/README.md). The atonota theme belongs to the kimlik-tema work stream. The test folder is excluded by .dockerignore.
 COPY --chown=1000:0 themes/ /opt/keycloak/themes/
 
-# Geliştirme hedefi örnek kullanıcıları da taşır. Üretim imajı prod hedefinden alınır.
+# The development target also carries sample users. The production image is taken from the prod target.
 FROM prod AS dev
 COPY --chown=1000:0 realm/dev-users/platform-users-0.json /opt/keycloak/data/import/platform-users-0.json
 # Plain HTTP for events only to the listed development hosts (contract section 11). Not in prod.
