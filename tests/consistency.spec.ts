@@ -168,6 +168,30 @@ test.describe('content consistency', () => {
     test.skip(browserName !== 'chromium', 'Dosya düzeyi denetim; tek motorda koşar.');
   });
 
+  test('standards folder holds the naming report and README lists every file', () => {
+    // docs/standartlar kuralların tek doğruluk kaynağıdır (AJA-1310). README klasördeki her .md dosyasına bağlantı verir.
+    const dir = new URL('docs/standartlar/', root);
+    expect(existsSync(new URL('naming_rules_report.md', dir)), 'naming_rules_report.md yok').toBe(true);
+    const readme = readFileSync(new URL('README.md', dir), 'utf8');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md');
+    expect(files.filter((f) => !readme.includes(`](${f})`)), "README'de bağlantısı olmayan dosya").toEqual([]);
+  });
+
+  test('standards README links the five rule process documents', () => {
+    // A Takımının beş süreç belgesi (AJA-1309) README'den bağlantı alır; her hedef dosya depoda vardır (AJA-1336).
+    const dir = new URL('docs/standartlar/', root);
+    const readme = readFileSync(new URL('README.md', dir), 'utf8');
+    const processFiles = [
+      'task-template.md',
+      'developer-first-comment.md',
+      'review-template.md',
+      'definition-of-done.md',
+      'rule-change-process.md',
+    ];
+    expect(processFiles.filter((f) => !readme.includes(`](${f})`)), "README'de bağlantısı olmayan süreç belgesi").toEqual([]);
+    expect(processFiles.filter((f) => !existsSync(new URL(f, dir))), 'depoda olmayan süreç belgesi').toEqual([]);
+  });
+
   test('task board covers every requirement with a valid epic, status and level', () => {
     // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
     expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);
