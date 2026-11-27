@@ -138,6 +138,15 @@ test.describe('content consistency', () => {
     test.skip(browserName !== 'chromium', 'Dosya düzeyi denetim; tek motorda koşar.');
   });
 
+  test('standards folder holds the naming report and README lists every file', () => {
+    // docs/standartlar kuralların tek doğruluk kaynağıdır (AJA-1310). README klasördeki her .md dosyasına bağlantı verir.
+    const dir = new URL('docs/standartlar/', root);
+    expect(existsSync(new URL('naming_rules_report.md', dir)), 'naming_rules_report.md yok').toBe(true);
+    const readme = readFileSync(new URL('README.md', dir), 'utf8');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md');
+    expect(files.filter((f) => !readme.includes(`](${f})`)), "README'de bağlantısı olmayan dosya").toEqual([]);
+  });
+
   test('task board covers every requirement with a valid epic, status and level', () => {
     // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
     expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);
