@@ -594,6 +594,43 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('G-73 requires British English source content and fallbacks (AJA-1414)', () => {
+    const g73 = reqs.find((r) => r.id === 'G-73');
+    expect(g73, 'G-73 keeps its identity').toBeDefined();
+    const detail = g73!.detail;
+    for (const required of [
+      "Varsayılan dil MVP'de İngiliz İngilizcesidir (`en-GB`).",
+      'Kaynak katalog İngiliz İngilizcesidir (`en-GB`).',
+      'Bütün içerik önce İngiliz İngilizcesiyle yazılır.',
+      'Türkçe ve öteki diller kullanıcının tercihiyle gelir.',
+      'İngilizce metin özenle yazılır ve gözden geçirilir.',
+      'Arayüzün yedek dili `en-GB` olur.',
+      "Backend'in yedek dili `en` kalır.",
+    ]) expect.soft(detail, required).toContain(required);
+    for (const superseded of [
+      'Varsayılan dilin İngilizce olması da MVP dışıdır.',
+      'İngilizce metin uydurulmaz.',
+      'Varsayılan dil sonra İngilizce yapılır.',
+      "Arayüzün yedek dili MVP'de `tr` olur.",
+      'Var olan Türkçe metin bugün `tr` kataloğuna harfi harfine girer.',
+      'İngilizce metin çeviri işinde girer.',
+    ]) expect.soft(detail, superseded).not.toContain(superseded);
+  });
+
+  test('G-171 appends country-based units with an unstarted board item (AJA-1414)', () => {
+    const units = reqs.find((r) => r.id === 'G-171');
+    const g73 = reqs.find((r) => r.id === 'G-73');
+    expect(units, 'Country-based units have a requirement').toBeDefined();
+    expect(g73).toBeDefined();
+    expect(reqs.at(-1)?.id, 'New requirements are appended').toBe('G-171');
+    expect(units).toMatchObject({ rail: 'R3 Frontend', priority: g73!.priority, phase: g73!.phase });
+    expect(units!.detail).toContain('Ölçü birimi kullanıcının ülkesine göre değişir.');
+    expect(units!.detail).toContain('metre ya da inç');
+    expect(units!.detail).toContain('kilogram ya da libre');
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    expect(board.items['G-171']).toMatchObject({ epic: 'panel-core', status: 'not-started', level: 'mvp' });
+  });
+
   test('GILT approval is recorded in decision 43 (AJA-1358)', () => {
     const decisions = read('docs/standartlar/KARARLAR.md');
     expect(decisions).toMatch(/^### Karar 43\./m);

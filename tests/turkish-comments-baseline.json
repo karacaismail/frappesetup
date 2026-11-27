@@ -1,8 +1,8 @@
 {
   "note": "Upper limit of Turkish code comments per folder. Lower it as comments are translated; the target is 0. Update with: python3 scripts/turkish_comments.py --update-baseline",
-  "total": 986,
+  "total": 683,
   "folders": {
-    "backend": 639,
+    "backend": 336,
     "packages": 282,
     "scripts": 0,
     "src": 0,

@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-// Atonota giriş temasının testleri. Firefox bilinçli olarak yoktur (kalıcı proje kuralı).
-// Önce `bin/theme-dev.sh up` ve `bin/theme-dev.sh tunnel` çalışmalıdır.
+// Tests for the Atonota sign-in theme. Firefox is left out on purpose (standing project rule).
+// Run `bin/theme-dev.sh up` and `bin/theme-dev.sh tunnel` first.
 const viewports = {
   '320': { width: 320, height: 568 },
   '360': { width: 360, height: 740 },
@@ -12,8 +12,8 @@ const viewports = {
   desktop: { width: 1280, height: 800 },
 } as const;
 
-// Akış ve klavye testleri yalnız en dar ve en geniş görünümde koşar.
-// @matrix etiketli yerleşim testleri bütün görünümlerde koşar.
+// Flow and keyboard tests run only in the narrowest and the widest view.
+// Layout tests tagged @matrix run in every view.
 const fullRun = new Set(['320', 'desktop']);
 
 export default defineConfig({

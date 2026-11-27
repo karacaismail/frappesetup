@@ -5,15 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { KC, MAILPIT, REALM, admin, createUser, loginUrl, screen } from './helpers';
 
-// Atonota e-posta temasının testleri. E-postalar Mailpit kutusundan okunur.
-// Her test kendi uydurma alıcısını açar ve yalnız o alıcının postasını arar.
-// Beklenen metinler görev belgesinden ve yalın Türkçe yazım kurallarından gelir.
+// Tests for the Atonota email theme. Emails are read from the Mailpit inbox.
+// Each test opens its own made-up recipient and looks only for that recipient's mail.
+// Expected texts come from the task document and the plain Turkish writing rules.
 
 const emailDir = fileURLToPath(new URL('../../email/', import.meta.url));
-// Dolu ise her e-postanın 320 ve 600 piksel görüntüsü bu klasöre yazılır.
+// When set, a 320 and a 600 pixel screenshot of each email is written to this folder.
 const shotDir = process.env.KC_THEME_EMAIL_SCREENSHOTS;
-// Sihirli bağlantı eklentisi tema deneme ortamında kurulu değildir.
-// Eklentili ikinci bir Keycloak varsa adresi bu değişkenle verilir.
+// The magic link extension is not installed in the theme test environment.
+// If a second Keycloak with the extension exists, give its address in this variable.
 const magicKc = process.env.MAGIC_LINK_KC_URL;
 
 type Lang = 'tr' | 'en';
@@ -108,7 +108,7 @@ async function realm(): Promise<RealmInfo> {
   return realmInfo;
 }
 
-/** Keycloak süreyi dakika olarak verir ve en büyük tam birimle yazar. */
+/** Keycloak gives the period in minutes and writes it in the largest whole unit. */
 function period(seconds: number, lang: Lang): string {
   const minutes = Math.floor(seconds / 60);
   const units = { tr: ['gün', 'saat', 'dakika'], en: ['day', 'hour', 'minute'] }[lang];
@@ -123,7 +123,7 @@ async function userId(email: string): Promise<string> {
   return users[0].id;
 }
 
-/** Alıcının kutusuna düşen tek e-postayı bekler ve okur. Başka alıcının postasına bakmaz. */
+/** Waits for and reads the single email in the recipient's inbox. Never looks at another recipient's mail. */
 async function waitMail(to: string, base = MAILPIT): Promise<Mail> {
   const until = Date.now() + 20_000;
   while (Date.now() < until) {
@@ -163,7 +163,7 @@ async function sendActions(lang: Lang): Promise<string> {
   return email;
 }
 
-/** Parola sıfırlamayı kullanıcının gerçek yolundan ister: giriş ekranındaki bağlantı. */
+/** Requests a password reset the way a real user does: the link on the login screen. */
 async function sendReset(page: Page, lang: Lang): Promise<string> {
   const email = await createUser({ locale: lang });
   await screen('password-reset').open(page);
@@ -183,7 +183,7 @@ function linkOf(mail: Mail): string {
   return links[0];
 }
 
-/** Dış betik, dış stil, dış yazı tipi ve dış görsel yoktur. Tek dış adres işlem bağlantısıdır. */
+/** No external script, style, font or image. The only external address is the action link. */
 function expectSelfContained(html: string, link: string): void {
   expect(html).not.toMatch(/<script/i);
   expect(html).not.toMatch(/<link/i);
@@ -196,10 +196,10 @@ function expectSelfContained(html: string, link: string): void {
   expect(urlsIn(html), 'HTML gövdedeki dış adresler').toEqual([link]);
 }
 
-/** HTML gövdeyi tarayıcıda açar. Ağ isteği atılmamalıdır. */
+/** Opens the HTML body in the browser. No network request may be sent. */
 async function render(page: Page, html: string, width: number): Promise<string[]> {
   const requests: string[] = [];
-  // Önceki sayfanın süren istekleri sayıma karışmasın.
+  // Do not let pending requests from the previous page join the count.
   await page.goto('about:blank');
   await page.route('**/*', (route) => {
     requests.push(route.request().url());
@@ -306,7 +306,7 @@ test.describe('e-posta ileti dosyaları', () => {
       const entries = [...readMessages(lang)];
       expect(entries.filter(([, value]) => /atonota/i.test(value)).map(([key]) => key), `${lang}: marka adı`).toEqual([]);
       expect(entries.filter(([, value]) => /<[a-z/]/i.test(value)).map(([key]) => key), `${lang}: HTML etiketi`).toEqual([]);
-      // Noktalı virgül ve uzun çizgi yalın yazım kuralına aykırıdır.
+      // Semicolons and long dashes break the plain writing rule.
       expect(entries.filter(([, value]) => /[;—–]/.test(value)).map(([key]) => key), `${lang}: yasak işaret`).toEqual([]);
     }
   });
@@ -317,7 +317,7 @@ test.describe('e-posta ileti dosyaları', () => {
       expect(htmlFiles, file).toContain(file);
     }
     for (const file of htmlFiles) {
-      // Açıklama satırları e-postaya çıkmaz. Denetim yalnız çıktıya giden bölüme bakar.
+      // Comment lines do not reach the email. The check looks only at the part sent to the output.
       const source = readFileSync(join(emailDir, 'html', file), 'utf8').replace(/<#--[\s\S]*?-->/g, '');
       expect(source, file).not.toMatch(/<script|<link|<style|@import|<img|\ssrc\s*=|url\(|https?:\/\//i);
       expect(source, `${file}: sabit marka adı`).not.toMatch(/atonota/i);
@@ -410,7 +410,7 @@ test.describe('e-postadaki bağlantı', () => {
     const email = await sendVerify('tr');
     const mail = await waitMail(email);
     await page.goto(linkOf(mail));
-    // Keycloak yöneticinin gönderdiği bağlantıda önce onay ister.
+    // Keycloak first asks for confirmation on a link sent by an admin.
     if (await proceed(page).count()) await proceed(page).first().click();
     const id = await userId(email);
     await expect
@@ -421,7 +421,7 @@ test.describe('e-postadaki bağlantı', () => {
   test('gerekli işlem bağlantısı istenen işlemin formunu açar', async ({ page }) => {
     const mail = await waitMail(await sendActions('tr'));
     await page.goto(linkOf(mail));
-    // İki işlem istendi. Keycloak sırayı kendi belirler ve ilk işlemin formunu açar.
+    // Two actions were requested. Keycloak sets the order itself and opens the form of the first action.
     const form = page.locator('#kc-passwd-update-form, #kc-totp-settings-form');
     await expect(form.or(proceed(page)).first()).toBeVisible();
     if (!(await form.isVisible())) await proceed(page).first().click();
