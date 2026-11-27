@@ -18,6 +18,9 @@ GUEST_METHODS = (
 	"press_tr.api.auth.get_login_url",
 	"press_tr.api.auth.keycloak_callback",
 	"press_tr.api.keycloak_backchannel_logout",
+	# G-163: a person who lost their key cannot sign in. The method is rate limited and gives the
+	# same answer for every address.
+	"press_tr.api.account.request_recovery",
 )
 LOCAL_IDENTITY_METHODS = (
 	"frappe.core.doctype.user.user.sign_up",

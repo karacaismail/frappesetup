@@ -1,5 +1,8 @@
 """identity-sync endpoints. Only the `identity-sync` service token is accepted (docs/sozlesmeler.md, section 5).
 
+The two user management endpoints at the end are different: the panel calls them with the
+session of a “System Manager” or a “Tenant Admin” (G-98).
+
 Parameters are typed `object` (G-8): Frappe's type check then accepts every value, and `provisioning`
 validates each field itself and answers 400 `InvalidInput` (the contract's single shape). A narrower hint
 would let Frappe answer a wrong type with its own 417 first."""
@@ -8,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
-from platform_core.identity import anonymization, provisioning, service_token, sign_in
+from platform_core.identity import anonymization, provisioning, service_token, sign_in, user_admin
 from platform_core.identity.exceptions import InvalidInput
 from platform_core.identity.reconciliation import list_linked_identities
 from platform_core.identity.safe_errors import safe_errors
@@ -17,6 +20,10 @@ SERVICE = "identity-sync"
 # identity-sync is one client. The limit leaves room for a reconciliation run (G-7, S-GIR-4).
 SERVICE_LIMIT = 300
 SERVICE_WINDOW = 60
+# A manager may send this many invitation requests in the window (AJA-890). A preview and its run
+# are two requests, so this is ten invitations in ten minutes. The counter belongs to the user.
+INVITE_LIMIT = 20
+INVITE_WINDOW = 600
 
 
 def _only(*fields: str) -> None:
@@ -108,3 +115,34 @@ def anonymize_user(issuer: object = None, subject: object = None) -> dict:
 	_only("issuer", "subject")
 	sign_in.guard_guest_request()
 	return anonymization.anonymize_user({"issuer": issuer, "subject": subject})
+
+
+# --- user management of the panel (G-98). The session's role is checked in `user_admin`. ---
+
+
+@frappe.whitelist(methods=["POST"])
+def set_user_role_profiles(user: object = None, role_profiles: object = None) -> dict:
+	"""Gives a user of this tenant exactly these role profiles (G-98).
+
+	“System Manager” and “Tenant Admin” only. A profile with a protected or desk role is refused.
+	"""
+	_only("user", "role_profiles")
+	return user_admin.set_user_role_profiles(user, role_profiles)
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limit(limit=INVITE_LIMIT, seconds=INVITE_WINDOW, user_based=True)
+def invite_user(
+	email: object = None,
+	first_name: object = None,
+	last_name: object = None,
+	dry_run: object = None,
+	preview_digest: object = None,
+) -> dict:
+	"""Previews or runs the invitation of a person into this tenant (G-16, G-79, G-98).
+
+	“System Manager” and “Tenant Admin” only. The run needs the digest of its preview.
+	Too many requests of one user in a short time get 429.
+	"""
+	_only("email", "first_name", "last_name", "dry_run", "preview_digest")
+	return user_admin.invite_user(email, first_name, last_name, dry_run, preview_digest)

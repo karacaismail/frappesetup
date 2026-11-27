@@ -1,0 +1,288 @@
+openapi: 3.1.0
+info:
+  title: platform_core reseller customers
+  version: 0.1.0
+  summary: Endpoints for the customer list, the customer site status and new customer requests.
+  description: |
+    This contract describes the endpoints of the `platform_core.reseller` module (G-169, G-170).
+
+    A reseller sells the platform to customers. A tenant is its own Frappe site.
+    The reseller tenant of a call is always the site that serves it. The request body cannot change it.
+
+    A “Reseller Customer Link” record links one reseller tenant to one customer tenant.
+    A reseller sees only its linked customers. One customer tenant belongs to one reseller only.
+    Only the “Platform Operator” role opens, changes and closes a link. It uses Frappe's built-in
+    endpoint: `/api/v2/document/Reseller Customer Link`. A reseller role gets 403 there.
+
+    A reseller never reads the business data of a customer tenant. For example a leave record
+    request is refused. The endpoints return the link fields only.
+    No endpoint carries a price, a discount or a commission rate. These terms stay with the project owner.
+
+    Roles:
+
+    - “Reseller Admin” calls `list_customers`, `customer_status` and `request_customer`.
+    - “Reseller Assistant” calls `list_customers` and `customer_status`. It only reads.
+    - “Platform Operator” calls `approve_customer_request`. It works in Desk.
+
+    The three reseller endpoints are on the shell's Website User allow-list (`website_user_allowed_methods`).
+
+    Identity: the Frappe session cookie. A POST request needs the `X-Frappe-CSRF-Token` header.
+    A guest without a session receives 403. A missing or expired session referenced by a cookie
+    receives 401 with `exc_type: SessionExpired` (shared contract SZ-8).
+
+    The error response has Frappe's usual format. A permission error returns 403.
+    Invalid input returns 417. A record that is not found returns 404.
+servers:
+  - url: /api/method
+    description: Frappe endpoint root of the reseller tenant site
+tags:
+  - name: customers
+    description: Read-only endpoints for the reseller roles.
+  - name: requests
+    description: New customer requests and their approval.
+paths:
+  /platform_core.api.reseller.list_customers:
+    get:
+      tags: [customers]
+      operationId: listResellerCustomers
+      summary: Returns the customers linked to the reseller tenant.
+      description: |
+        The list holds only the customers linked to the serving site. It is sorted by `customer_tenant`.
+        An empty list means the reseller has no linked customer yet.
+        The endpoint does not change records.
+
+        Only “Reseller Admin” and “Reseller Assistant” can call it. Every other role gets 403.
+      security:
+        - frappeSession: []
+      responses:
+        "200":
+          description: The linked customers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items: {$ref: "#/components/schemas/Customer"}
+              examples:
+                twoCustomers:
+                  summary: A reseller with two customers.
+                  value:
+                    message:
+                      - customer_tenant: musteri-a.example.test
+                        customer_name: Örnek Müşteri A
+                        status: Active
+                      - customer_tenant: musteri-b.example.test
+                        customer_name: null
+                        status: Pending
+        "401":
+          $ref: "#/components/responses/SessionExpired"
+        "403":
+          description: A guest request, or the caller holds no reseller role.
+
+  /platform_core.api.reseller.customer_status:
+    get:
+      tags: [customers]
+      operationId: getResellerCustomerStatus
+      summary: Returns the site status of one linked customer.
+      description: |
+        The endpoint returns the site status of one customer of the reseller.
+        The endpoint does not change records.
+
+        A customer of another reseller gets 403. An unknown customer gets the same 403 with the
+        same message. This way the endpoint does not reveal that another reseller's customer exists.
+
+        Only “Reseller Admin” and “Reseller Assistant” can call it. Every other role gets 403.
+      security:
+        - frappeSession: []
+      parameters:
+        - name: customer_tenant
+          in: query
+          required: true
+          description: Site name of the customer tenant. For example `musteri-a.example.test`.
+          schema: {type: string, maxLength: 140}
+      responses:
+        "200":
+          description: The customer and its site status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Customer"}
+              examples:
+                active:
+                  value:
+                    message:
+                      customer_tenant: musteri-a.example.test
+                      customer_name: Örnek Müşteri A
+                      status: Active
+        "401":
+          $ref: "#/components/responses/SessionExpired"
+        "403":
+          description: |
+            A guest request, the caller holds no reseller role, or the customer is not linked
+            to this reseller. The message is "You are not permitted to see this customer."
+
+  /platform_core.api.reseller.request_customer:
+    post:
+      tags: [requests]
+      operationId: requestResellerCustomer
+      summary: Opens a request for a new customer tenant.
+      description: |
+        The endpoint opens a “Reseller Customer Request” record with the status `Pending`.
+        The request belongs to the serving site. A `reseller_tenant` value in the body is ignored.
+        The request does not create a site. A Platform Operator approves it later.
+
+        Only “Reseller Admin” can call it. “Reseller Assistant” and every other role get 403.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_name, contact_email]
+              properties:
+                customer_name:
+                  type: string
+                  minLength: 1
+                  maxLength: 140
+                  description: Name of the new customer company. Spaces at both ends are removed.
+                contact_email:
+                  type: string
+                  format: email
+                  maxLength: 140
+                  description: E-mail address of the contact person at the customer.
+            examples:
+              newCustomer:
+                value:
+                  customer_name: Yeni Örnek Müşteri
+                  contact_email: yeni.musteri@example.test
+      responses:
+        "200":
+          description: The request was opened.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/RequestState"}
+              examples:
+                pending:
+                  value:
+                    message: {name: 8f3a2c1b7d, status: Pending}
+        "401":
+          $ref: "#/components/responses/SessionExpired"
+        "403":
+          description: A guest request, or the caller does not hold “Reseller Admin”.
+        "417":
+          description: The customer name is empty or too long, or the e-mail address is not valid.
+
+  /platform_core.api.reseller.approve_customer_request:
+    post:
+      tags: [requests]
+      operationId: approveResellerCustomerRequest
+      summary: Approves one pending customer request.
+      description: |
+        The endpoint sets the status of the request to `Approved`. It records the approving user and the time.
+        Approval does not create a site and does not open a link. The Platform Operator opens the link
+        when the customer site exists.
+
+        Only “Platform Operator” can call it. Every reseller role gets 403.
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request]
+              properties:
+                request:
+                  type: string
+                  maxLength: 140
+                  description: Name of the “Reseller Customer Request” record.
+      responses:
+        "200":
+          description: The request was approved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/RequestState"}
+              examples:
+                approved:
+                  value:
+                    message: {name: 8f3a2c1b7d, status: Approved}
+        "401":
+          $ref: "#/components/responses/SessionExpired"
+        "403":
+          description: A guest request, or the caller does not hold “Platform Operator”.
+        "404":
+          description: The request does not exist.
+        "417":
+          description: The request is not pending. For example it was approved before.
+
+components:
+  responses:
+    SessionExpired:
+      description: The session cookie refers to a missing or expired session. Sign in again.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [exc_type]
+            properties:
+              session_expired:
+                type: integer
+                const: 1
+                description: Present when Frappe cannot restore the session. Absent for the identity idle timeout.
+              exc_type:
+                type: string
+                const: SessionExpired
+  securitySchemes:
+    frappeSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: The Frappe session cookie. A POST request also needs the `X-Frappe-CSRF-Token` header.
+  schemas:
+    Customer:
+      type: object
+      required: [customer_tenant, customer_name, status]
+      description: One customer linked to the reseller. It carries no business data of the customer.
+      properties:
+        customer_tenant:
+          type: string
+          description: Site name of the customer tenant.
+        customer_name:
+          type: [string, "null"]
+          description: Display name of the customer company. It may be empty.
+        status:
+          $ref: "#/components/schemas/SiteStatus"
+    SiteStatus:
+      type: string
+      enum: [Pending, Active, Suspended]
+      description: |
+        State of the customer site. `Pending`: the site is not ready yet.
+        `Active`: the site is in use. `Suspended`: the site is stopped.
+    RequestState:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          description: Name of the “Reseller Customer Request” record.
+        status:
+          type: string
+          enum: [Pending, Approved]
+          description: Status of the request.

@@ -4,7 +4,7 @@ nav: "URL ve paylaşım"
 order: 11
 ---
 
-Kapsam: kiracı paneli (`https://<kiracı>.app.atonota.net/panel` ya da kiracının özel alan adı) ve kiracı öncesi akışlarla Press ekranlarının çalıştığı `panel.atonota.net`. `panel.atonota.net` MVP sonrası hedeftir ve backend ad haritasında yoktur. MVP'de Press `press.atonota.net` adresindedir. Hedefte bu host Press sitesinin public alan adıdır; panel → Press istekleri aynı origin'dedir, CORS gerekmez (G-75, G-119). Hedef: insan URL'yi okuyup ekranı anlar ve düzenleyerek gezinir (G-132); paylaşılan bağlantı doğru önizlenir ama yetkisiz hiçbir istemciye kiracı ya da kayıt verisi dönmez (G-130, G-131). Bu dokümantasyon sitesinin ve pazarlama sitesinin SEO'su ayrı konudur; panel yanıtları dizin dışıdır. Fazlar: URL sözleşmesi ve asgari koruma P1, kampanya atfı P2, önizleme kartı ve Paylaş P4.
+Kapsam: kiracı paneli (`https://<kiracı>.app.{{BRAND_DOMAIN}}/panel` ya da kiracının özel alan adı) ve kiracı öncesi akışlarla Press ekranlarının çalıştığı `panel.{{BRAND_DOMAIN}}`. `panel.{{BRAND_DOMAIN}}` MVP sonrası hedeftir ve backend ad haritasında yoktur. MVP'de Press `press.{{BRAND_DOMAIN}}` adresindedir. Hedefte bu host Press sitesinin public alan adıdır; panel → Press istekleri aynı origin'dedir, CORS gerekmez (G-75, G-119). Hedef: insan URL'yi okuyup ekranı anlar ve düzenleyerek gezinir (G-132); paylaşılan bağlantı doğru önizlenir ama yetkisiz hiçbir istemciye kiracı ya da kayıt verisi dönmez (G-130, G-131). Bu dokümantasyon sitesinin ve pazarlama sitesinin SEO'su ayrı konudur; panel yanıtları dizin dışıdır. Fazlar: URL sözleşmesi ve asgari koruma P1, kampanya atfı P2, önizleme kartı ve Paylaş P4.
 
 Bu sayfa tasarım sözleşmesidir; önizleme ucu, URL kuralları ve paylaşım henüz uygulanmadı ve test edilmedi.
 
@@ -22,7 +22,7 @@ Bu sayfa tasarım sözleşmesidir; önizleme ucu, URL kuralları ve paylaşım h
 
 İK yöneticisi bir izin talebini muhasebeciye gönderir. Sınırlar [WhatsApp link önizleme belgesinden](https://developers.facebook.com/documentation/business-messaging/whatsapp/link-previews/); belge önizlemeyi garanti etmez, betik çalıştırma, robots.txt ve önbellek davranışını söylemez (doğrulanacak), bu yüzden akış önizlemesiz de çalışır.
 
-1. **Paylaş → Bağlantıyı kopyala** (mobilde **Paylaş…**) yalın kanonik adresi verir: `https://acme.app.atonota.net/panel/ik/izin-talebi/HR-LAP-2026-00042`. Meta'nın istediği gibi oturum değişkeni, kullanıcıyı tanıtan parametre ve sayaç yoktur.
+1. **Paylaş → Bağlantıyı kopyala** (mobilde **Paylaş…**) yalın kanonik adresi verir: `https://acme.app.{{BRAND_DOMAIN}}/panel/ik/izin-talebi/HR-LAP-2026-00042`. Meta'nın istediği gibi oturum değişkeni, kullanıcıyı tanıtan parametre ve sayaç yoktur.
 2. WhatsApp adresi HTTP GET ile çeker. Sistem User-Agent'a bakmaz: geçerli oturumu olmayan her istek aynı yanıtı alır.
 3. Site rota kalıbından genel HTML döner (200): `og:title` "İzin talebi", `og:description`, `og:url`, `og:image`, `og:image:alt`. Etiketler `<head>` içinde ve ilk 300 KB'ta; `og:image` mutlak URL, en az 300 px genişlik, en-boy oranı en çok 4:1, 600 KB altı. Kayıt okunmaz; var olan ve olmayan kayıt için yanıt aynıdır.
 4. Muhasebeci dokunur; bu host'ta oturumu yoksa doğrulanmış dönüş adresiyle Keycloak girişine gider ve aynı kayda döner (G-119).
@@ -36,7 +36,7 @@ Bu sayfa tasarım sözleşmesidir; önizleme ucu, URL kuralları ve paylaşım h
 | Yanıt yalnız oturuma göre seçilir, User-Agent'a göre değişmez; içerik ürün genelindeki rota kaydından üretilir, kayıt ve kiracının kurulu uygulamaları okunmaz | MUST | Platform ekibi | Farklı User-Agent'larda ve uygulaması kurulu olan/olmayan kiracıda gövde aynı |
 | Yoldaki kimlik yalnız kaçışlanarak `og:url` ve canonical'a yansır; ikisi mutlak, slug'sız ve sorgusuzdur, liste rotasında da: oturumsuz yanıt sorgu değerini yansıtmaz. Oturumlu SPA'daki liste canonical'ı ise tanınan filtreleri taşır (aşağıda, G-132) ([OGP](https://ogp.me/)) | MUST | Frontend ekibi | Slug'lı, `?utm_source=x` ve `?durum=acik` taşıyan istekte `og:url` sorgusuz; gövdede kayıt başlığı ve alan değeri yok |
 | `og:image` ekran türüne ait statik, oturumsuz erişilebilir HTTPS görseldir; öneri 1200×600 PNG/JPEG; Meta görseli URL'ye göre önbelleklediği için URL içerik özeti taşır ([Meta](https://developers.facebook.com/docs/sharing/webmasters/)) | MUST (WhatsApp sınırları), SHOULD (öneri) | Frontend ekibi | CI görselin boyutunu, oranını ve ağırlığını denetler |
-| Başlıklar: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store`, `Vary: Cookie`; robots.txt panel yollarını engellemez | MUST | Platform ekibi + DevOps sorumlusu (nginx) | Başlık testi; oturumlu yanıt hiçbir katmanda oturumsuz isteğe dönmez |
+| Başlıklar: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store`, `Vary: Cookie` başlıkları kullanılır. robots.txt panel yollarını engellemez. | MUST | Platform ekibi + DevOps sorumlusu (nginx) | Ekip başlıkları sınar. Oturumlu yanıt hiçbir katmanda oturumsuz isteğe dönmez. |
 | Kiracı adı ve logosu yalnız kiracı ayarı açıksa görünür; varsayılan ürün markasıdır | MUST | Ürün sahibi + Frontend ekibi | Ayarı kapalı kiracıda host adı dışında kiracı izi yok |
 | Önizleme API çağırmaz, satıcı betiği yüklemez, `page_view` üretmez; SPA kabuğu HTML'i de kayıt verisi gömmez | MUST | Frontend ekibi | Ağ kaydı ve kabuk HTML denetimi |
 | Dönüş adresi aynı host'ta, `/` ile başlayan, `//`, şema ve ters bölü içermeyen, rota kaydındaki bir yoldur; değilse panel ana sayfası ([OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html)); Frappe'nin kendi denetimi (doğrulanacak) | MUST | Platform ekibi | `//kotu.example`, `https://kotu.example`, `/\kotu.example` reddedilir |
@@ -47,7 +47,7 @@ Sahip: Frontend ekibi (rota kaydı, SPA), Platform ekibi (çözümleme, yönlend
 
 | Öğe | Kural | Örnek | Düzey |
 | --- | --- | --- | --- |
-| Kiracı | Kapsam host'tur; kiracı kimliği yola ve sorguya girmez; özel alan adı birincil host olabilir, diğer host'lar ona yönlenir (G-26) | `acme.app.atonota.net` | MUST |
+| Kiracı | Kapsam host'tur; kiracı kimliği yola ve sorguya girmez; özel alan adı birincil host olabilir, diğer host'lar ona yönlenir (G-26) | `acme.app.{{BRAND_DOMAIN}}` | MUST |
 | Panel host'u | Takım yolu `press_tr`'deki tekil, okunur takım kısa adıyla kurulur; Press Team adı [hash'tir](https://github.com/frappe/press/blob/v0.155.3/press/press/doctype/team/team.json) | `/t/acme/faturalama` | MUST |
 | Liste ve kayıt | `/<uygulama>/<belge-türü>` ve `/<uygulama>/<belge-türü>/<kimlik>`; Türkçe, ASCII küçük harf, kısa çizgili okunur kelimeler ([Google](https://developers.google.com/search/docs/crawling-indexing/url-structure)); kimlik Frappe belge adıdır ([`HR-LAP-.YYYY.-`](https://github.com/frappe/hrms/blob/v16.50.0/hrms/hr/doctype/leave_application/leave_application.json)) | `/ik/izin-talebi/HR-LAP-2026-00042` | MUST |
 | Okunur slug | İsteğe bağlı, kalıcı kimliğin önünde (`<slug>--<kimlik>`); yalnız kişisel veri içermeyen, URL'ye uygun işaretli başlık alanından; çözümleme kimlikle yapılır | `…/aylik-kapanis--a1b2c3d4e5` | MAY; kişisel veri yasağı MUST |

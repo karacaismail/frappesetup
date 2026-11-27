@@ -2717,9 +2717,9 @@
     "rule": "B603",
     "file": "backend/identity/keycloak/tests/test_dev_script_env_file.py",
     "code": "return subprocess.run(",
-    "statementSha256": "5d3bafac377137b4a63e1da199131a0621a62fa4274accea27f29e7706490e92",
+    "statementSha256": "9012d0b4b3f294dd03429556e9fc34f3de16b4f27610bdfe426b74bf7f50fc47",
     "owner": "kimlik-realm",
-    "reason": "The test starts its fixture command with an argument list and no implicit host shell.",
+    "reason": "The helper moved into KcDevScriptCase. Resolved bash runs a copied local script with fixed config --quiet arguments; the controlled PATH selects a temporary docker stand-in, so no container runs.",
     "ignoreUntil": "2027-02-22"
   },
   {
@@ -2815,8 +2815,8 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/test_review.py",
-    "code": "result = subprocess.run([bin_dir / \"security-audit\"], env={**env, \"BASE\": base,",
-    "statementSha256": "4db293247e0beb9845602bf3759d4986a5abe0126e55cd21ba1fd48baed07444",
+    "code": "return subprocess.run([gate], env=env, capture_output=True, text=True)",
+    "statementSha256": "cfd7f33308cf182261a972846eb048d749fa342c6a87cb1140286071c138516c",
     "owner": "security-tooling",
     "reason": "The regression test invokes the copied security gate with an absolute fixture path and mock tools.",
     "ignoreUntil": "2027-02-22"
@@ -2978,8 +2978,8 @@
     "rule": "B105",
     "file": "backend/e2e/tests/test_preview_fixtures.py",
     "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"synthetic-client\",",
-    "statementSha256": "495de8d67d756462e523d447613f2bdc19e7349d1f08c847c03ad7d5ed493893",
-    "reason": "The test supplies a synthetic Keycloak client credential.",
+    "statementSha256": "07621b755cb1aa4a5916c82de3f93b6d7fc2138501a1264a64da5a9357304e81",
+    "reason": "Synthetic client credential in the preview fixture settings. The dictionary now also loads the shared product name; Frappe and file writes remain mocked.",
     "owner": "integration-e2e",
     "ignoreUntil": "2027-02-22"
   },
@@ -2987,8 +2987,8 @@
     "rule": "B105",
     "file": "backend/e2e/tests/test_site_seed.py",
     "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"synthetic-secret\",",
-    "statementSha256": "7e97e4701a70df270086a404a8e0aef1a6d8909294bbf26213aca1c9687d27cf",
-    "reason": "The seed test supplies a synthetic Keycloak client credential.",
+    "statementSha256": "44e05ce75a65707090ff5a5426a51f508646da1cf9c8ae91b01ae1c1c5022446",
+    "reason": "Synthetic client credential in the seed fixture settings. The dictionary now also loads the shared product name; Frappe initialization stops before site access and file writes are mocked.",
     "owner": "integration-e2e",
     "ignoreUntil": "2027-02-22"
   },
@@ -3360,5 +3360,248 @@
     "reason": "The developer test runner supplies the executable PATH for this docker command.",
     "owner": "kimlik-realm",
     "ignoreUntil": "2027-02-24"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_config_layers.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for the config audit command-line test.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_config_layers.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "4ff2442aef40878afc2de2e7fe077e075c54c07c2c0d98db51d77a15627418e9",
+    "reason": "Test runs its own Python on a fixed audit script with a temporary directory.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/verify_config_layers_bench.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for the disposable bench verification script.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/verify_config_layers_bench.py",
+    "code": "return subprocess.check_output([\"bench\", *args], text=True)",
+    "statementSha256": "44ea437c97f9b038f874e75037d0bd583874a8722cce2a34e3cdf0b1c8ef6a27",
+    "reason": "Fixed bench command with argument list and no shell, run only in a disposable container.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/tests/verify_config_layers_bench.py",
+    "code": "return subprocess.check_output([\"bench\", *args], text=True)",
+    "statementSha256": "44ea437c97f9b038f874e75037d0bd583874a8722cce2a34e3cdf0b1c8ef6a27",
+    "reason": "The disposable bench container supplies bench on PATH.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_worker_sizing.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for the G-50 sizing audit command-line test.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_worker_sizing.py",
+    "code": "return subprocess.run(args, capture_output=True, text=True, check=False)",
+    "statementSha256": "4d9fc0a5716daab698ed3f926a5d5835def7737eea60a5def28da981ffbeba9c",
+    "reason": "Test runs its own Python on a fixed audit script with temporary input files.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/e2e/tests/test_tenant_ca_trust.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import is used by the inspected subprocess call and does not execute a command itself.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/tests/test_tenant_ca_trust.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "616dceedc5f4bda7d0e1c835162f8d3074414d1b9026c7264a232ef9b2d6a2e3",
+    "reason": "The test runs the tenant entrypoint from compose.tenant.yaml with sh, without a shell string from outside, in a temporary directory.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-25"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test-only import for local brand readers, Compose rendering and health checks with fake network tools.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "b558d7e7a8c1ea5bc833c34cefe9289677214973a0269f52e6f325cd67fee399",
+    "reason": "Fixed bash program reads copied release fixtures through quoted positional arguments. Brand values remain data; executable lookup uses the trusted test runner PATH.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "b558d7e7a8c1ea5bc833c34cefe9289677214973a0269f52e6f325cd67fee399",
+    "reason": "Fixed bash program reads copied release fixtures through quoted positional arguments. Brand values remain data; executable lookup uses the trusted test runner PATH.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "cf1f188ec618b087b027ce15afa4fadd230a614c84067c87e7eeb5bde3ceb3f4",
+    "reason": "Fixed bash program loads a copied local reader through a quoted positional argument. The injection payload is fixture data and the test checks that its marker was not created.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "cf1f188ec618b087b027ce15afa4fadd230a614c84067c87e7eeb5bde3ceb3f4",
+    "reason": "Fixed bash program loads a copied local reader through a quoted positional argument. The injection payload is fixture data and the test checks that its marker was not created.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "7ec675f584c1e870faed178c70f7a0e5602ae145896f46ae849c2a5daac1374f",
+    "reason": "The test invokes docker compose config --environment on temporary fixture files with an argument list. It only renders configuration and does not start containers.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "39327c82fda85fbbb00efbca706d26893c0cfac0de2feac0626f4e67bb21b98e",
+    "reason": "Fixed bash program reads a temporary offsite fixture through quoted positional arguments. The fixture credential is synthetic; no backup or network command runs.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "39327c82fda85fbbb00efbca706d26893c0cfac0de2feac0626f4e67bb21b98e",
+    "reason": "Fixed bash program reads a temporary offsite fixture through quoted positional arguments. The fixture credential is synthetic; no backup or network command runs.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "21931dc9525be3d64dd3ceda40aaf1be5e8ac84e90a74d53f2876c45d756aaa2",
+    "reason": "The copied health script receives test-owned paths as arguments. PATH selects temporary ssh, scp and curl stand-ins that only read or write fixture files; no live host is contacted.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/deploy/tests/test_brand_hardcode.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test-only subprocess import for read-only Git queries that enumerate tracked files for the brand regression.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_brand_hardcode.py",
+    "code": "top = subprocess.run(",
+    "statementSha256": "9f19bc702a9f0cc116ad8b170e55e9d139b9b2eb6e7db2875dc12509b8c21bda",
+    "reason": "Fixed git rev-parse or ls-files arguments read repository metadata without a shell. The path comes from the checked-out test location; Git resolves through the trusted test runner PATH.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand_hardcode.py",
+    "code": "top = subprocess.run(",
+    "statementSha256": "9f19bc702a9f0cc116ad8b170e55e9d139b9b2eb6e7db2875dc12509b8c21bda",
+    "reason": "Fixed git rev-parse or ls-files arguments read repository metadata without a shell. The path comes from the checked-out test location; Git resolves through the trusted test runner PATH.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/deploy/tests/test_brand_hardcode.py",
+    "code": "out = subprocess.run(",
+    "statementSha256": "9cd96ab64e5af0698d7095bf7e94851340609a53338f5ea8f0fe8db9373eaa02",
+    "reason": "Fixed git rev-parse or ls-files arguments read repository metadata without a shell. The path comes from the checked-out test location; Git resolves through the trusted test runner PATH.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/deploy/tests/test_brand_hardcode.py",
+    "code": "out = subprocess.run(",
+    "statementSha256": "9cd96ab64e5af0698d7095bf7e94851340609a53338f5ea8f0fe8db9373eaa02",
+    "reason": "Fixed git rev-parse or ls-files arguments read repository metadata without a shell. The path comes from the checked-out test location; Git resolves through the trusted test runner PATH.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_brand_settings.py",
+    "code": "\"ATONOTA_SITE_TENANT1_SECRET\": \"synthetic-client\",",
+    "statementSha256": "6fc336c318ff324f3688ca136006acc1cd80fd30c1bcf22e2f88e25d06a5f51f",
+    "reason": "Synthetic client credential in a unit-test dictionary. The test only builds login settings and does not authenticate or contact a service.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_brand_settings.py",
+    "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"synthetic-client\",",
+    "statementSha256": "bad922e60adffada91bb9066db589c663eed6e545fd8befee6f4fc7d3272b2a8",
+    "reason": "Synthetic client credential supplied to a mocked preview seed. Frappe initialization stops the fixture before site access, and file writes are mocked.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/identity/atonota_login/tests/test_redirect_brand.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Test-only subprocess import for the copied login CLI redirect renderer. These cases generate local JSON and do not contact Keycloak.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/atonota_login/tests/test_redirect_brand.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "bb4d56e9d58e1aa9fac6eec9bcef954869484fb8be44aebfe399fc5c4d3ead7e",
+    "reason": "The current Python interpreter runs the copied login CLI with isolated mode and test-owned redirect arguments. It renders JSON from temporary brand fixtures without a shell or service access.",
+    "owner": "brand-settings",
+    "ignoreUntil": "2027-02-22"
   }
 ]

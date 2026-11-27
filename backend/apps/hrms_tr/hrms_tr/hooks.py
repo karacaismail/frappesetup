@@ -12,17 +12,26 @@ website_user_allowed_methods = [
 	"hrms_tr.api.approve_leave",
 	"hrms_tr.api.cancel_leave",
 	"hrms_tr.api.get_leave_approver",
+	"hrms_tr.api.get_leave_request_context",
+	"hrms_tr.api.reject_leave",
+	"hrms_tr.api.get_home_summary",
 ]
 
 before_install = "hrms_tr.setup.check_install"
 before_migrate = "hrms_tr.setup.before_migrate"
-after_migrate = "hrms_tr.setup.after_migrate"
+# The Role Profiles are not fixtures: a profile write leaves a lock (AJA-934). The setup step opens
+# only the missing ones. `after_sync` runs on install after the fixtures, so the roles exist.
+after_sync = ["hrms_tr.role_profiles.ensure"]
+after_migrate = ["hrms_tr.role_profiles.ensure", "hrms_tr.setup.after_migrate"]
 before_uninstall = "hrms_tr.setup.before_uninstall"
 after_uninstall = "hrms_tr.setup.after_uninstall"
 
 ai_tools = ["hrms_tr.ai_tools.declarations"]
 permission_query_conditions = {"Leave Application": "hrms_tr.access.query_condition"}
-has_permission = {"Leave Application": "hrms_tr.access.has_permission"}
+has_permission = {
+	"Leave Application": "hrms_tr.access.has_permission",
+	"File": "hrms_tr.employee_privacy.file_has_permission",
+}
 doc_events = {
 	"Leave Application": {
 		"autoname": "hrms_tr.leave.name_portal_leave",

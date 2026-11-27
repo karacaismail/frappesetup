@@ -146,6 +146,61 @@ class TestApprovalContract(unittest.TestCase):
                 )
 
 
+class TestHomeContract(unittest.TestCase):
+    """The reject endpoint and the home page summary (AJA-1165)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+        cls.schemas = cls.contract["components"]["schemas"]
+
+    def test_reject_endpoint_takes_the_approval_request(self):
+        path = self.contract["paths"]["/method/hrms_tr.api.reject_leave"]
+        self.assertEqual(set(path), {"post"})
+        body = path["post"]["requestBody"]["content"]["application/json"]["schema"]
+        self.assertEqual(body, {"$ref": "#/components/schemas/ApproveLeaveRequest"})
+        self.assertEqual(set(path["post"]["responses"]), {"200", "401", "403", "404", "417", "429"})
+
+    def test_summary_endpoint_takes_get_only(self):
+        path = self.contract["paths"]["/method/hrms_tr.api.get_home_summary"]
+        self.assertEqual(set(path), {"get"})
+        self.assertEqual(set(path["get"]["responses"]), {"200", "401", "403", "429"})
+
+    def test_summary_parts_match_the_request_test(self):
+        from hrms_tr.tests import test_home_summary as runtime
+
+        for schema, fields in (
+            ("HomeSummary", runtime.SUMMARY_PARTS),
+            ("PendingApproval", runtime.PENDING_FIELDS),
+            ("RecentChange", runtime.RECENT_FIELDS),
+            ("HomeCounts", runtime.COUNT_FIELDS),
+        ):
+            with self.subTest(schema=schema):
+                self.assertEqual(set(self.schemas[schema]["required"]), fields)
+                self.assertFalse(self.schemas[schema].get("additionalProperties", True))
+
+    def test_summary_states_the_team_rule(self):
+        # The orchestrator approved this rule on 26 November 2026 (AJA-1165).
+        operation = self.contract["paths"]["/method/hrms_tr.api.get_home_summary"]["get"]
+        text = " ".join(operation["description"].split())
+        for sentence in (
+            "The team is the department of the leave application.",
+            "An application without a department is never an overlap.",
+            "Only applications that end today or later count.",
+            "Two applications of the same employee also count.",
+        ):
+            with self.subTest(sentence=sentence):
+                self.assertIn(sentence, text)
+
+    def test_problem_kinds_and_change_actions_are_listed(self):
+        kinds = {item["properties"]["kind"]["const"] for item in self.schemas["HomeProblem"]["oneOf"]}
+        self.assertEqual(kinds, {"overlap", "missing_joining_date"})
+        self.assertEqual(
+            set(self.schemas["RecentChange"]["properties"]["action"]["enum"]),
+            {"created", "updated", "approved", "rejected", "cancelled"},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -189,3 +244,45 @@ class TestFrappeResponses(unittest.TestCase):
                     self.contract["paths"][route][method]["responses"]["404"],
                     {"$ref": "#/components/responses/NotFoundV2"},
                 )
+
+
+class TestLeaveRequestContextContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+
+    def test_context_is_get_only_and_accepts_only_leave_type(self):
+        route = self.contract["paths"]["/method/hrms_tr.api.get_leave_request_context"]
+        self.assertEqual(set(route), {"get"})
+        (parameter,) = route["get"]["parameters"]
+        self.assertEqual((parameter["name"], parameter["in"]), ("leave_type", "query"))
+        self.assertFalse(parameter["required"])
+        self.assertNotIn("default", parameter["schema"])
+        self.assertEqual(parameter["schema"]["maxLength"], 140)
+
+    def test_leave_type_source_accepts_explicit_type_and_allocation(self):
+        schema = self.contract["components"]["schemas"]["LeaveRequestContextResponse"]
+        source = schema["properties"]["message"]["properties"]["sources"]["properties"]["leave_type"]
+        self.assertEqual(set(source["enum"]), {"Leave Type", "Leave Allocation", None})
+
+    def test_context_accepts_absent_data_and_real_zero(self):
+        route = self.contract["paths"]["/method/hrms_tr.api.get_leave_request_context"]["get"]
+        response = route["responses"]["200"]["content"]["application/json"]
+        validator = Draft202012Validator({**response["schema"], "components": self.contract["components"]})
+        validator.validate(response["example"])
+        fields = ("employee", "employee_name", "leave_type", "leave_balance")
+        validator.validate({"message": {**dict.fromkeys(fields), "sources": dict.fromkeys(fields)}})
+        example = response["example"]["message"].copy()
+        example["leave_balance"] = 0
+        validator.validate({"message": example})
+        self.assertEqual(set(example["sources"]), set(fields))
+        self.assertEqual(example["employee_name"], "Örnek Kişi 1")
+
+    def test_existing_balance_routes_remain_denied(self):
+        operation = self.contract["paths"]["/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"]["get"]
+        for path in [
+            "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
+            "hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on",
+            "hrms.api.get_leave_balance_map",
+        ]:
+            self.assertIn(path, operation["x-frappe-original"])

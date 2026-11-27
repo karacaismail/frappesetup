@@ -53,9 +53,84 @@ def check_install():
 	preserve_employee_permissions()
 
 
+# Personal fields of an employee record sit on their own permission level (AJA-1024).
+# The two tenant panel roles read level 0 of an employee: HRMS asks for it before a leave is
+# opened. The HR roles that read the whole record before also read this level.
+# `04_property_setter.json` moves the fields, `05_custom_docperm.json` gives the level.
+EMPLOYEE_PERSONAL_LEVEL = 1
+EMPLOYEE_PERSONAL_FIELDS = (
+	"personal_email",
+	# HRMS copies the preferred contact address here. It can be the personal address.
+	"prefered_email",
+	"cell_number",
+	"date_of_birth",
+	"date_of_retirement",
+	"image",
+	"current_address",
+	"current_accommodation_type",
+	"permanent_address",
+	"permanent_accommodation_type",
+	"person_to_be_contacted",
+	"emergency_phone_number",
+	"relation",
+	"ctc",
+	"salary_currency",
+	"salary_mode",
+	"bank_name",
+	"bank_ac_no",
+	"iban",
+	"marital_status",
+	"family_background",
+	"blood_group",
+	"health_details",
+	"health_insurance_provider",
+	"health_insurance_no",
+	"passport_number",
+	"valid_upto",
+	"date_of_issue",
+	"place_of_issue",
+	"bio",
+	"education",
+	"external_work_history",
+	"reason_for_leaving",
+	"feedback",
+	"new_workplace",
+	"held_on",
+	"resignation_letter_date",
+	"leave_encashed",
+	"encashment_date",
+)
+# The fields of the two personal child tables sit on the same level. Frappe checks a child
+# table query against the field levels of the child type, not of the parent's table field.
+EMPLOYEE_PERSONAL_CHILD_FIELDS = {
+	"Employee Education": (
+		"school_univ",
+		"qualification",
+		"level",
+		"year_of_passing",
+		"class_per",
+		"maj_opt_subj",
+	),
+	"Employee External Work History": (
+		"company_name",
+		"designation",
+		"salary",
+		"address",
+		"contact",
+		"total_experience",
+	),
+}
+EMPLOYEE_PERSONAL_CHILD_TYPES = tuple(EMPLOYEE_PERSONAL_CHILD_FIELDS)
+
+# Types that get HRMS TR custom permission rows next to their standard ones.
+# "Leave Type" gets "select" so a leave role can search the link field of a leave application.
+PRESERVED_PERMISSION_DOCTYPES = ("Employee", "Leave Type")
+
+
 def preserve_employee_permissions():
 	# Frappe uses custom rows instead of the standard permissions once any custom row exists.
-	setup_custom_perms("Employee")
+	for doctype in PRESERVED_PERMISSION_DOCTYPES:
+		setup_custom_perms(doctype)
 
 
 def before_migrate():
@@ -155,4 +230,5 @@ def remove_policy_fixtures(keys=None):
 	# The framework commits app removal before after_uninstall and does not commit again.
 	frappe.db.commit()
 	frappe.clear_cache(doctype=DOCTYPE)
-	frappe.clear_cache(doctype="Employee")
+	for doctype in PRESERVED_PERMISSION_DOCTYPES:
+		frappe.clear_cache(doctype=doctype)

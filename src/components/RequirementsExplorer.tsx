@@ -1,4 +1,4 @@
-import { Fragment, startTransition, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Badge,
   Box,
@@ -9,7 +9,6 @@ import {
   Table,
   Text,
   TextInput,
-  useMantineTheme,
   type MantineColorScheme,
 } from '@mantine/core';
 import { IconFilterOff, IconSearch } from '@tabler/icons-react';
@@ -230,12 +229,8 @@ function Explorer({ items, meta: board }: Props) {
   const [level, setLevel] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'grouped'>('table');
   const [showDetail, setShowDetail] = useState(true);
-  const [hasTable, setHasTable] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const detailRef = useRef<HTMLInputElement>(null);
-  const cardsRef = useRef<HTMLUListElement>(null);
-  const tableRef = useRef<HTMLDivElement>(null);
-  const { sm } = useMantineTheme().breakpoints;
 
   // Ada JS'i inmeden önce sunucu HTML'ine yazılan metin DOM'da kalır, ama React durumu boş başlar:
   // React 19 hidrasyonda DOM değerini korur, değer izleyicisini bu değerle başlatır ve değişikliği
@@ -246,68 +241,35 @@ function Explorer({ items, meta: board }: Props) {
   }, []);
 
   useEffect(() => {
-    const desktop = window.matchMedia(`(min-width: ${sm})`);
-    const cards = view === 'table' ? cardsRef.current : null;
-    let cancelPending: (() => void) | undefined;
-    let switching = false;
-    let disposed = false;
-    const canShowTable = () => desktop.matches && cards &&
-      !cards.contains(document.activeElement) && cards.getBoundingClientRect().top >= 0;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#req-')) return;
+    const row = document.getElementById(hash.slice(1));
+    if (!row || getComputedStyle(row).display !== 'table-row') return;
+    // Ada geç bağlanabilir. Okur bu sırada satırdan uzaklaştıysa okurun yeri korunur. Satır ekranda değilse gezgin
+    // kaydırmaz ve odak vermez.
+    const bounds = row.getBoundingClientRect();
+    if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) return;
 
-    const updateLayout = () => {
-      if (disposed) return;
-      if (!desktop.matches) {
-        cancelPending?.();
-        cancelPending = undefined;
-        if (tableRef.current?.contains(document.activeElement)) {
-          searchRef.current?.focus({ preventScroll: true });
-        }
-        if (hasTable || switching) setHasTable(false);
-        switching = false;
-        return;
-      }
-      if (hasTable) return;
-      if (!canShowTable()) {
-        if (switching) {
-          switching = false;
-          setHasTable(false);
-        }
-        return;
-      }
-      if (cancelPending || switching) return;
-
-      const showTable = () => {
-        cancelPending = undefined;
-        if (!canShowTable()) return;
-        switching = true;
-        startTransition(() => setHasTable(true));
-      };
-      if (typeof window.requestIdleCallback === 'function') {
-        const id = window.requestIdleCallback(showTable, { timeout: 1500 });
-        cancelPending = () => window.cancelIdleCallback(id);
-      } else {
-        const id = window.setTimeout(showTable, 32);
-        cancelPending = () => window.clearTimeout(id);
-      }
-    };
-
-    updateLayout();
-    desktop.addEventListener('change', updateLayout);
-    if (cards) window.addEventListener('scroll', updateLayout, { passive: true });
-    const handleBlur = () => {
-      queueMicrotask(updateLayout);
-    };
-    cards?.addEventListener('focusin', updateLayout);
-    cards?.addEventListener('focusout', handleBlur);
+    // Yazı tiplerini ve sayfanın sonraki karede ölçtüğü satır içi kodu bekle.
+    let cancelled = false;
+    let frame = 0;
+    void document.fonts.ready.then(() => {
+      if (cancelled) return;
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          if (window.location.hash !== hash) return;
+          if (!row.isConnected || getComputedStyle(row).display !== 'table-row') return;
+          row.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
+          row.tabIndex = -1;
+          row.focus({ preventScroll: true });
+        });
+      });
+    });
     return () => {
-      disposed = true;
-      cancelPending?.();
-      desktop.removeEventListener('change', updateLayout);
-      window.removeEventListener('scroll', updateLayout);
-      cards?.removeEventListener('focusin', updateLayout);
-      cards?.removeEventListener('focusout', handleBlur);
+      cancelled = true;
+      cancelAnimationFrame(frame);
     };
-  }, [hasTable, sm, view]);
+  }, []);
 
   const sorted = useMemo(() => [...items].sort(byId), [items]);
 
@@ -322,7 +284,7 @@ function Explorer({ items, meta: board }: Props) {
       if (status && r.status !== status) return false;
       if (level && r.level !== level) return false;
       if (!needle) return true;
-      const hay = `${r.id} ${r.title} ${r.detail.replaceAll('`', '')} ${r.owner ?? ''}`.toLocaleLowerCase('tr');
+      const hay = `${r.id} ${r.title} ${r.detail} ${r.owner ?? ''}`.toLocaleLowerCase('tr');
       return hay.includes(needle);
     });
   }, [sorted, q, priority, phase, rail, source, epic, status, level]);
@@ -410,8 +372,8 @@ function Explorer({ items, meta: board }: Props) {
         <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
       </div>
       {/* Liste satırlarında Mantine Text yerine sade <p>: aynı görünüm global.css'teki sınıf kurallarından. */}
-      <p className={r.status === DONE ? 'req-card-title is-done' : 'req-card-title'}>{r.title}</p>
-      {showDetail && <p className="req-card-detail">{inlineCode(r.detail)}</p>}
+      <p className={r.status === DONE ? 'req-card-title req-title is-done' : 'req-card-title req-title'}>{r.title}</p>
+      {showDetail && <p className="req-card-detail req-detail">{inlineCode(r.detail)}</p>}
       <div className="req-meta">{meta(r)}</div>
       {evidence(r, 'task-evidence')}
     </li>
@@ -424,12 +386,12 @@ function Explorer({ items, meta: board }: Props) {
           <Text component="h2" id="req-explorer-title" fw={650} size="xl" mb={4}>
             Görev panosu
           </Text>
-          <Text c="dimmed">
+          <Text c="dimmed" className="req-search-help">
             Her gereksinim bir görevdir. {items.length} görevi faz, olgunluk düzeyi, epic, ray, durum ve önceliğe
             göre süzebilirsiniz. Arama başlıkta, ayrıntıda ve sahipte çalışır.
           </Text>
         </div>
-        <Group gap="xs" wrap="wrap" role="group" aria-label="Önceliğe göre süz">
+        <Group gap="xs" wrap="wrap" role="group" aria-label="Önceliğe göre süz" className="req-priority">
           {PRIORITIES.map((p) => (
             <Button
               key={p}
@@ -538,6 +500,7 @@ function Explorer({ items, meta: board }: Props) {
           </Group>
           <Switch
             ref={detailRef}
+            className="req-detail-toggle"
             label="Ayrıntıları göster"
             checked={showDetail}
             onChange={(e) => setShowDetail(e.currentTarget.checked)}
@@ -577,83 +540,61 @@ function Explorer({ items, meta: board }: Props) {
         </div>
       )}
 
-      {/* Sunucu önce kartları gönderir. Tablo tarayıcıda hazırlanır. */}
-      {view === 'table' && !hasTable && (
-        <Box
-          ref={cardsRef}
-          component="ul"
-          className="req-cards"
-          aria-label="Gereksinimler (kart görünümü)"
+      {view === 'table' && (
+        <Table.ScrollContainer
+          minWidth={showDetail ? 936 : 808}
+          type="native"
+          className="req-results"
+          classNames={{ scrollContainerInner: 'req-results-inner' }}
         >
-          {filtered.map(card)}
-          {filtered.length === 0 && (
-            <li className="req-card">
-              <Text c="dimmed">Bu filtrelerle eşleşen görev yok.</Text>
-            </li>
-          )}
-        </Box>
-      )}
-
-      {/* Geniş ekran: tablo, kendi kapsayıcısında yatay kayar */}
-      {view === 'table' && hasTable && (
-        <Box ref={tableRef}>
-          <Table.ScrollContainer
-            minWidth={showDetail ? 936 : 808}
-            type="native"
-            tabIndex={0}
-            role="region"
-            aria-label="Gereksinim tablosu (yatay kaydırılabilir)"
-          >
-            <Table highlightOnHover withRowBorders data-testid="req-table" className="req-table">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th style={{ minWidth: '5.5rem' }}>ID</Table.Th>
-                  <Table.Th style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Görev ve durum</Table.Th>
-                  <Table.Th style={{ minWidth: '10rem' }}>Ray</Table.Th>
-                  <Table.Th style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
-                  <Table.Th style={{ minWidth: '5rem' }}>Faz</Table.Th>
-                  <Table.Th style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
+          <Table highlightOnHover withRowBorders data-testid="req-table" className="req-table" role="table" aria-label="Gereksinimler">
+            <Table.Thead role="rowgroup">
+              <Table.Tr role="row">
+                <Table.Th scope="col" role="columnheader" style={{ minWidth: '5.5rem' }}>ID</Table.Th>
+                <Table.Th scope="col" role="columnheader" style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Görev ve durum</Table.Th>
+                <Table.Th scope="col" role="columnheader" style={{ minWidth: '10rem' }}>Ray</Table.Th>
+                <Table.Th scope="col" role="columnheader" style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
+                <Table.Th scope="col" role="columnheader" style={{ minWidth: '5rem' }}>Faz</Table.Th>
+                <Table.Th scope="col" role="columnheader" style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody role="rowgroup">
+              {filtered.map((r) => (
+                <Table.Tr key={r.id} id={`req-${r.id}`} role="row" className="req-card">
+                  <Table.Td role="cell">
+                    <code className="req-id">{r.id}</code>
+                  </Table.Td>
+                  <Table.Td role="cell">
+                    <p className="task-row-status">
+                      <StatusLabel status={r.status} label={statusName.get(r.status) ?? r.status} />
+                    </p>
+                    <p className={r.status === DONE ? 'req-title is-done' : 'req-title'}>{r.title}</p>
+                    {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
+                    {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
+                    {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
+                    <p className="req-owner">
+                      Epic: {epicName.get(r.epic)} · Düzey: {levelName.get(r.level)}
+                    </p>
+                    {evidence(r, 'req-owner task-evidence')}
+                  </Table.Td>
+                  <Table.Td role="cell" className="req-meta"><span className="req-meta-label">Ray: </span>{r.rail}</Table.Td>
+                  <Table.Td role="cell">
+                    <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
+                  </Table.Td>
+                  <Table.Td role="cell" className="req-meta"><span className="req-meta-label">Faz: </span>{r.phase}</Table.Td>
+                  <Table.Td role="cell" className="req-meta"><span className="req-meta-label">Kaynak: </span>{r.source}</Table.Td>
                 </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filtered.map((r) => (
-                  <Table.Tr key={r.id}>
-                    <Table.Td>
-                      <code className="req-id">{r.id}</code>
-                    </Table.Td>
-                    <Table.Td>
-                      {/* Durum, düzey ve epic ayrı sütun değildir: altı sütun 1280 px'te kapsayıcıya sığar. */}
-                      <p className="task-row-status">
-                        <StatusLabel status={r.status} label={statusName.get(r.status) ?? r.status} />
-                      </p>
-                      <p className={r.status === DONE ? 'req-title is-done' : 'req-title'}>{r.title}</p>
-                      {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
-                      {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
-                      {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
-                      <p className="req-owner">
-                        Epic: {epicName.get(r.epic)} · Düzey: {levelName.get(r.level)}
-                      </p>
-                      {evidence(r, 'req-owner task-evidence')}
-                    </Table.Td>
-                    <Table.Td>{r.rail}</Table.Td>
-                    <Table.Td>
-                      <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
-                    </Table.Td>
-                    <Table.Td>{r.phase}</Table.Td>
-                    <Table.Td>{r.source}</Table.Td>
-                  </Table.Tr>
-                ))}
-                {filtered.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td colSpan={6}>
-                      <Text c="dimmed">Bu filtrelerle eşleşen görev yok.</Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-        </Box>
+              ))}
+              {filtered.length === 0 && (
+                <Table.Tr role="row">
+                  <Table.Td role="cell" colSpan={6}>
+                    <Text c="dimmed">Bu filtrelerle eşleşen görev yok.</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       )}
     </Box>
   );

@@ -26,6 +26,14 @@ MAX_TARGETS = 12
 
 
 @dataclass(frozen=True)
+class ChunkTag:
+	"""Ties an attempt to one chunk of a large file job (G-156)."""
+
+	job: str
+	index: int
+
+
+@dataclass(frozen=True)
 class Target:
 	api: object
 	account: object
@@ -253,7 +261,7 @@ def _attempt(candidate, target, request, timeout, deadline, log):
 		outcome, usage = "success", result["usage"]
 		if target.api.health_status != "healthy":
 			_set_health(target.api.name, "healthy")
-		return result, False
+		return result, False, None
 	except adapters.GatewayError as failure:
 		code = failure_code = failure.code
 		if code in {"reservation_lost", "endpoint_unavailable"}:
@@ -275,7 +283,7 @@ def _attempt(candidate, target, request, timeout, deadline, log):
 		retry = retry_allowed(code, capped=target.account.has_monthly_budget)
 		if code == "timeout" and not retry:
 			raise Denied(503, "provider_timeout") from None
-		return None, retry and decision.try_next
+		return None, retry and decision.try_next, code
 	finally:
 		ledger.finish(
 			log,
@@ -310,7 +318,9 @@ def lock_row(doctype, name, fields):
 	# a consistent read before the locks would establish an old snapshot.
 	table = frappe.qb.DocType(doctype)
 	columns = [
-		ledger.money_as_text(table, field) if doctype == "PLT AI Account" and field == "monthly_budget" else field
+		ledger.money_as_text(table, field)
+		if doctype == "PLT AI Account" and field == "monthly_budget"
+		else field
 		for field in fields
 	]
 	rows = frappe.qb.from_(table).select(*columns).where(table.name == name).for_update().run(as_dict=True)
@@ -319,7 +329,7 @@ def lock_row(doctype, name, fields):
 	return rows[0]
 
 
-def _reserve(route, target, request):
+def _reserve(route, target, request, tag=None):
 	input_tokens = input_token_bound(target.model, request)
 	tokens = input_tokens + request.limit
 	cost = ledger.price(target.model, input_tokens, request.limit)
@@ -363,19 +373,23 @@ def _reserve(route, target, request):
 				target.model,
 				cost=cost,
 				tokens=tokens,
+				file_job=tag.job if tag else None,
+				chunk_index=tag.index if tag else None,
 			)
 		except Exception:
 			frappe.db.rollback()
 			raise
 
 
-def _dispatch(route, targets, request, deadline):
+def _dispatch(route, targets, request, deadline, tag=None):
 	# Leave time for the usage write and the HTTP response after provider I/O.
 	provider_deadline = deadline - FINALIZATION_SECONDS
 	failed_apis = set()
+	# A 429 is an account limit: the request moves to another account.
+	limited_accounts = set()
 	last_denial = None
 	for candidate, target in _choose(targets, route, request):
-		if target.api.name in failed_apis:
+		if target.api.name in failed_apis or (limited_accounts and target.account.name in limited_accounts):
 			continue
 		try:
 			current = _target(target.api.name, target.model.name)
@@ -392,8 +406,8 @@ def _dispatch(route, targets, request, deadline):
 				last_denial = Denied(503, "provider_unavailable")
 				continue
 			outbound = policy.outbound(current.base_url, current.oauth_url, route, request)
-			log = _reserve(route, current, outbound)
-			result, retry = _attempt(candidate, current, outbound, timeout, provider_deadline, log)
+			log = _reserve(route, current, outbound, tag)
+			result, retry, code = _attempt(candidate, current, outbound, timeout, provider_deadline, log)
 		except Denied as failure:
 			if failure.code in {"gateway_unavailable", "provider_timeout"}:
 				raise
@@ -404,6 +418,8 @@ def _dispatch(route, targets, request, deadline):
 		if not retry:
 			raise Denied(503, "provider_unavailable")
 		failed_apis.add(target.api.name)
+		if code == "rate_limit":
+			limited_accounts.add(current.account.name)
 	if last_denial:
 		raise last_denial
 	raise Denied(503, "provider_unavailable")
@@ -415,20 +431,30 @@ def _require_clean_transaction():
 		raise Denied(409, "transaction_active")
 
 
-def complete(route, messages, tools=None, schema=None, limit=1024):
-	deadline = monotonic() + MAX_ROUTE_SECONDS
-	policy.require_user()
-	_require_clean_transaction()
-	request = policy.parse(messages, tools, schema, limit)
+def route_targets(route):
+	"""Return an authorized route and its targets without contacting a provider."""
 	route = _document("PLT AI Route", route)
 	policy.require_route(route)
 	if len(route.targets) > MAX_TARGETS:
 		raise Denied(400, "invalid_route")
-	targets = _route_targets(route.targets)
+	return route, _route_targets(route.targets)
+
+
+def complete(route, messages, tools=None, schema=None, limit=1024, *, tag=None):
+	deadline = monotonic() + MAX_ROUTE_SECONDS
+	policy.require_user()
+	_require_clean_transaction()
+	request = policy.parse(messages, tools, schema, limit)
+	route, targets = route_targets(route)
 	try:
-		return _dispatch(route, targets, request, deadline)
+		return _dispatch(route, targets, request, deadline, tag)
 	except RedisError:
 		raise Denied(503, "gateway_unavailable") from None
+
+
+def complete_chunk(route, tag, messages, limit):
+	"""Send one large file chunk. Its usage log carries the job and the chunk order."""
+	return complete(route, messages, limit=limit, tag=tag)
 
 
 def test_api(api, model):

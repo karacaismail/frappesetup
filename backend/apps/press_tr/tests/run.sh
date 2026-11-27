@@ -29,8 +29,16 @@ docker --context "$press_context" cp "$repo_app/tests/." "$container:$container_
 docker --context "$press_context" cp backend/contracts/press_tr.openapi.yaml "$container:$container_app/tests/"
 docker --context "$press_context" exec -i -e PRESS_TEST_PORT -e PRESS_TEST_PANEL_URL \
     -e PRESS_TEST_MEASURE_ANONYMIZATION "$container" bash -s <<'BENCH'
-set -euo pipefail
+set -eu
 bench_root=/home/frappe/benches/frappe-bench
+tests=/home/frappe/benches/source/press_tr/tests
+baseline="$(mktemp /dev/shm/press-core.XXXXXX)"
+trap 'rm -f "$baseline"' EXIT
+"$bench_root/env/bin/python" -B "$tests/press_core_guard.py" "$bench_root/apps/press" > "$baseline"
+
+set +e
+(
+set -euo pipefail
 cd "$bench_root/sites"
 "$bench_root/env/bin/python" - <<'PY'
 import frappe
@@ -82,10 +90,14 @@ if [ "$ready" != yes ]; then
 fi
 
 export PANE_PORT="$((PRESS_TEST_PORT - 3))"
-tests=/home/frappe/benches/source/press_tr/tests
 if [ "$PRESS_TEST_MEASURE_ANONYMIZATION" = 1 ]; then
     "$bench_root/env/bin/python" -B "$tests/measure_anonymization.py"
 else
     "$bench_root/env/bin/python" -B -m unittest discover -s "$tests"
 fi
+)
+test_status=$?
+set -e
+"$bench_root/env/bin/python" -B "$tests/press_core_guard.py" "$bench_root/apps/press" "$baseline"
+exit "$test_status"
 BENCH

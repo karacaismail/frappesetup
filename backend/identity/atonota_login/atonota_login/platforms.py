@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""AtonotA Login sign-in platforms (G-159).
+"""`atonota_login` sign-in platforms (G-159).
 
 Each JSON file in ``platforms/`` describes one sign-in platform. In Keycloak a platform is an
 identity provider. The list of platforms is data: this module holds no platform names, so a new

@@ -1,4 +1,4 @@
-Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabıyla açın. Parola `backend/e2e/review-accounts.json` dosyasının `password` alanındadır.
+Headless paneli `http://localhost:5180` adresinde `inceleme-panel@example.test` hesabıyla açın. Parola `backend/e2e/.env` dosyasındaki `E2E_REVIEW_PASSWORD` değeridir.
 
 # Uçtan uca entegrasyon testleri
 
@@ -15,14 +15,27 @@ PANE_PORT=<port> backend/e2e/stack review-accounts
 ```
 
 Bütün hesapların parolası aynıdır.
-Parola tek bir dosyada durur: `backend/e2e/review-accounts.json`.
-Parola o dosyanın `password` alanındadır.
-Hesap listesi de bu dosyadadır.
+Parola depoda durmaz, çünkü depo herkese açıktır.
+Parola `backend/e2e/.env` dosyasındaki `E2E_REVIEW_PASSWORD` değeridir.
+Git bu dosyayı yok sayar. Dosyayı yalnız siz okuyabilirsiniz.
+Yığın ilk açılışta bu dosyayı kendisi yazar.
+O sırada `E2E_REVIEW_PASSWORD` için rastgele bir parola üretir.
+Kendi parolanızı kullanmak isterseniz değeri bu dosyada değiştirin.
+Parola en az 8 karakter olmalıdır.
+Eski bir `.env` dosyasında bu satır yoksa satırı siz ekleyin.
+Satır yoksa komut durur. Komut o durumda hiçbir hesabı değiştirmez.
+Değeri değiştirince komutu yeniden çalıştırın.
+Komut parolayı hesaplara yeniden yazar.
+Hesap listesi `backend/e2e/review-accounts.json` dosyasındadır.
+Bu dosyaya parola yazmayın. Gizli bilgi testi dosyadaki parolayı yakalar.
 
 | Hesap | Nerede | Ne için |
 | --- | --- | --- |
 | `inceleme-panel@example.test` | Keycloak `platform` realm'i ve kiracı | Headless paneli inceler. Kiracıda “Employee” ve “HR User” rolleri vardır. Bir örnek çalışan kaydına bağlıdır. |
-| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Kiracıda “System Manager” rolü vardır. |
+| `inceleme-yonetici@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracıyı yönetir. Hesap kiracıda “Website User” türündedir. Tek rolü “Tenant Admin” rolüdür. Rolü “Tenant Admin” Role Profile kaydı verir. |
+| `inceleme-yonetici-yardimci@example.test` | Keycloak `platform` realm'i ve kiracı | Kiracı yöneticisine yardım eder. Hesap kiracıda “Website User” türündedir. Tek rolü “Tenant Admin Assistant” rolüdür. Rolü aynı adlı Role Profile kaydı verir. |
+| `inceleme-bayi@example.test` | Keycloak `platform` realm'i ve kiracı | Bayiyi yönetir. Hesap kiracıda “Website User” türündedir. Tek rolü “Reseller Admin” rolüdür. Rolü aynı adlı Role Profile kaydı verir. |
+| `inceleme-bayi-yardimci@example.test` | Keycloak `platform` realm'i ve kiracı | Bayi yöneticisine yardım eder. Hesap kiracıda “Website User” türündedir. Tek rolü “Reseller Assistant” rolüdür. Rolü aynı adlı Role Profile kaydı verir. |
 | `inceleme-yerel-yonetici` | Keycloak `master` realm'i | Keycloak yönetim konsolunu açar. “admin” rolü vardır. |
 | `inceleme-press@example.test` | Keycloak `platform` realm'i ve Press | Press kullanıcısı olarak girer. |
 
@@ -31,6 +44,38 @@ Keycloak yönetim konsolu `http://identity.localhost:<PANE_PORT>/admin/` adresin
 
 Komut önce yığının adreslerini denetler.
 Adres `localhost` ya da `*.localhost` değilse komut durur.
+
+Komut sonra kiracıdaki rolleri denetler.
+Kiracıda “Tenant Admin” rolü yoksa komut bir hata verir ve durur.
+Komut o zaman hiçbir hesabı değiştirmez.
+Komut yönetici hesabını başka bir rolle açmaz.
+
+Dört panel rolü vardır.
+Her rolün bir deneme hesabı vardır.
+Rolü hesaba Role Profile kaydı verir.
+Hiçbir deneme hesabında “System Manager” rolü yoktur.
+Dosyaya bu rol yazılırsa komut durur.
+Önceki bir koşu bu rolü verdiyse komut rolü geri alır.
+Kiracıda bir rol ya da Role Profile kaydı yoksa komut durur.
+Komut o zaman hiçbir hesabı değiştirmez.
+
+Dosyada iki örnek bayi vardır.
+Her bayinin bir örnek müşterisi vardır.
+Komut her bağ için bir “Reseller Customer Link” kaydı açar.
+Bu kayıt bayi kiracısını müşteri kiracısına bağlar.
+Birinci bayi yığının kiracısıdır: `tenant1.localhost`.
+Bayi hesapları bu kiracıda oturum açar.
+İkinci bayi `bayi-iki.example.test` adını taşır.
+İkinci bayi yalnız bağ kaydında durur.
+Yığında ikinci bayinin sitesi yoktur.
+Bu kayıt bir şeyi göstermek için vardır.
+Birinci bayi ikinci bayinin müşterisini görmez.
+Müşteri adları ve adresleri örnektir.
+Adresler `.example.test` ile biter.
+Kiracıda “Reseller Customer Link” türü yoksa komut durur.
+
+Komutu iki kez çalıştırabilirsiniz.
+İkinci koşu aynı kayıtları bulur ve hata vermez.
 
 `platform` realm'inin parola kuralı en az 12 karakter ister.
 Bu kural üretim kuralıdır ve realm dosyasında değişmez.

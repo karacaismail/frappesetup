@@ -10,7 +10,7 @@ from frappe.tests.test_api import FrappeAPITestCase
 from frappe.utils import add_days, now_datetime
 from frappe.utils.password import update_password
 
-from platform_core.identity import provider_setup, session_policy
+from platform_core.identity import login_accounts, provider_setup, session_policy
 from platform_core.identity.tests import helpers as h
 
 PREFIX = "/api/method/platform_core.api.auth."
@@ -119,6 +119,59 @@ class TestAuthEndpointAccess(FrappeAPITestCase):
 		client = self.login(h.AYSE, "fixture-first")
 		response = h.request(client.post, PREFIX + "setup_keycloak_login", headers=h.csrf_headers(client))
 		self.assertEqual(response.status_code, 403)
+
+	# --- `atonota_login` reads (AJA-459): api/test_login_reads.py covers them in full ---
+
+	def _refusing_identity_sync(self):
+		"""No request may reach identity-sync in the refusal tests below."""
+		calls = []
+		transport = patch.object(login_accounts, "_send", lambda *args: calls.append(args) or (200, {}))
+		transport.start()
+		self.addCleanup(transport.stop)
+		return calls
+
+	def test_list_login_providers_guest_denied(self):
+		"""Guests may read the platform list (AJA-516). A guest POST or a guest parameter is refused."""
+		calls = self._refusing_identity_sync()
+		response = h.request(h.new_client().post, PREFIX + "list_login_providers")
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(response.json["exc_type"], "PermissionError")
+		response = h.request(
+			h.new_client().get, PREFIX + "list_login_providers", query_string={"subject": "fixture-second"}
+		)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json["exc_type"], "InvalidInput")
+		self.assertEqual(calls, [])
+
+	def test_list_login_providers_foreign_data_denied(self):
+		"""The platform list takes no person. Another user's subject is refused."""
+		calls = self._refusing_identity_sync()
+		caller = self.login(h.AYSE, "fixture-first")
+		response = h.request(
+			caller.get, PREFIX + "list_login_providers", query_string={"subject": "fixture-second"}
+		)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json["exc_type"], "InvalidInput")
+		self.assertEqual(calls, [])
+
+	def test_list_linked_accounts_guest_denied(self):
+		calls = self._refusing_identity_sync()
+		response = h.request(h.new_client().get, PREFIX + "list_linked_accounts")
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(response.json["exc_type"], "PermissionError")
+		self.assertEqual(calls, [])
+
+	def test_list_linked_accounts_foreign_data_denied(self):
+		"""Ayşe cannot read Mehmet's linked accounts by naming him."""
+		calls = self._refusing_identity_sync()
+		self.login(h.MEHMET, "fixture-second")
+		caller = self.login(h.AYSE, "fixture-first")
+		for name, value in (("subject", "fixture-second"), ("user", h.MEHMET)):
+			with self.subTest(name=name):
+				response = h.request(caller.get, PREFIX + "list_linked_accounts", query_string={name: value})
+				self.assertEqual(response.status_code, 400)
+				self.assertEqual(response.json["exc_type"], "InvalidInput")
+		self.assertEqual(calls, [])
 
 	# --- get_csrf_token: the separate frontend reads the token from this endpoint, not from the page ---
 

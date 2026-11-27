@@ -14,6 +14,13 @@ SPEC.loader.exec_module(CHECKER)
 
 
 class BoundaryTests(unittest.TestCase):
+    def test_component_help_is_inside_the_shell_public_boundary(self):
+        policy = json.loads((DEV / "module-boundaries.json").read_text())
+        self.assertEqual(policy["path_owners"]["platform_core.api.help"], "platform_core.shell")
+        self.assertIn(
+            "platform_core.api.help.get_component_help", policy["public_paths"]["platform_core.shell"]
+        )
+
     def setUp(self):
         scratch = Path(os.environ.get("PANE_SCRATCH_DIR", DEV.parents[1] / ".pane/scratch"))
         scratch.mkdir(parents=True, exist_ok=True)
@@ -73,9 +80,7 @@ class BoundaryTests(unittest.TestCase):
     def test_ai_calls_public_model_gateway_completion(self):
         self.write("ai/tools.py", "from platform_core.model_gateway.api import complete")
         self.assertEqual(self.errors(), [])
-        self.assertTrue(
-            (DEV.parent / "apps/platform_core/platform_core/model_gateway/api.py").is_file()
-        )
+        self.assertTrue((DEV.parent / "apps/platform_core/platform_core/model_gateway/api.py").is_file())
 
     def test_ai_cannot_import_the_internal_model_gateway(self):
         self.write("ai/tools.py", "from platform_core.model_gateway.gateway import complete")

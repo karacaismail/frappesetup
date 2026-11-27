@@ -5,7 +5,7 @@
 <div class="diagram-scroll" tabindex="0" role="region" aria-label="Mimari raylar diyagramı (yatay kaydırılabilir)">
 <svg viewBox='0 0 1040 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' style='font-family: var(--mantine-font-family), "Outfit Variable", Outfit, system-ui, sans-serif'>
 <title id='rails-title'>Altı mimari ray ve iki taban bandı</title>
-<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>
+<desc id='rails-desc'>Üst sırada Rail 3 headless panel yer alır. Ortada Rail 5 ajan servisi ve model geçidi ile Rail 4 Keycloak yer alır. Alt sırada Rail 1 Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext 16 siteleri ve Rail 6 operasyon sitesi yer alır. Panel, Press'e panel adresindeki press.api ve realtime üzerinden ulaşır. Kiracıya aynı kaynaktan /api/v2 ve bootstrap/meta ile ulaşır. Operasyon sitesine customer_360 ve HD Ticket ile ulaşır. Ajan servisine SSE ile bağlanır. Panel, Keycloak'a OIDC ile yönlendirir. Sunucu, giriş kodunu belirteçle değiştirir. Ajan servisi Press'e press.mcp ile bağlanır. Ajan servisi kiracıya site aracı belirteciyle Kiracı MCP üzerinden bağlanır. Keycloak, Social Login Key ile Press'e ve kiracıya giriş sağlar. Operasyon sitesi operatör realm rollerini kullanır. Press ile kiracı arasında site_config sk_app ve Agent Job kullanılır. Press, operasyon sitesine create-fc-invoice (press_tr_finance), delete-fc-team ve press_ops_bridge ile ulaşır. Operasyon sitesi Press'e press_tr.api.ops ile ulaşır. Taban bantları ortak sözleşmeleri (host'a bağlı oturum, has_permission, tasarım tokenları, audit) ve DevOps sorumlusunun yönettiği Hetzner sunucularını gösterir.</desc>
 <defs><marker id='arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>
 <text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Altı ray, iki taban bandı: her ray kendi alanının tek doğruluk kaynağı</text>
 <text x='24' y='60' fill='var(--fs-quiet)'>Oklar adlandırılmış sözleşmeleri gösterir; yatay sözleşmeler altta listelenir</text>
@@ -48,7 +48,7 @@
 <rect x='360' y='570' width='320' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='360' y='570' width='6' height='170' rx='3' fill='var(--fs-line)'/>
 <text x='380' y='600' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 2 — Kiracı siteleri</text>
-<text x='380' y='624' fill='var(--fs-quiet)'>ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;</text>
+<text x='380' y='624' fill='var(--fs-quiet)'>ERPNext 16 · &lt;kiracı&gt;.app.&lt;marka&gt;</text>
 <text x='380' y='654' fill='var(--fs-ink)'>Site + DB kiracı başına</text>
 <text x='380' y='678' fill='var(--fs-ink)'>platform_core · tr_localization</text>
 <text x='380' y='702' fill='var(--fs-ink)'>HRMS TR · CRM · Webshop app'leri</text>
@@ -57,7 +57,7 @@
 <rect x='720' y='570' width='280' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-accent)' stroke-width='1.5'/>
 <rect x='720' y='570' width='6' height='170' rx='3' fill='var(--fs-accent)'/>
 <text x='740' y='600' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 6 — Operasyon</text>
-<text x='740' y='624' fill='var(--fs-quiet)'>ERPNext v16 · ops.&lt;marka&gt;</text>
+<text x='740' y='624' fill='var(--fs-quiet)'>ERPNext 16 · ops.&lt;marka&gt;</text>
 <text x='740' y='654' fill='var(--fs-ink)'>Cari · Sales Invoice · e-belge</text>
 <text x='740' y='678' fill='var(--fs-ink)'>press_tr_finance · CRM · Helpdesk</text>
 <text x='740' y='702' fill='var(--fs-ink)'>Support Session · Hocuspocus</text>
@@ -81,8 +81,8 @@
 <text class='halo' aria-hidden='true' x='200' y='498' text-anchor='start' fill='none' stroke='var(--fs-surface)' stroke-width='6' stroke-linejoin='round'>press.mcp · press_tr.mcp</text>
 <text x='200' y='498' text-anchor='start' fill='var(--fs-quiet)'>press.mcp · press_tr.mcp</text>
 <line x1='420' y1='470' x2='420' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
-<text class='halo' aria-hidden='true' x='432' y='522' text-anchor='start' fill='none' stroke='var(--fs-surface)' stroke-width='6' stroke-linejoin='round'>frappe_mcp (aracı belirteci)</text>
-<text x='432' y='522' text-anchor='start' fill='var(--fs-quiet)'>frappe_mcp (aracı belirteci)</text>
+<text class='halo' aria-hidden='true' x='432' y='522' text-anchor='start' fill='none' stroke='var(--fs-surface)' stroke-width='6' stroke-linejoin='round'>Kiracı MCP (aracı belirteci)</text>
+<text x='432' y='522' text-anchor='start' fill='var(--fs-quiet)'>Kiracı MCP (aracı belirteci)</text>
 <line x1='650' y1='470' x2='650' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
 <text class='halo' aria-hidden='true' x='662' y='498' text-anchor='start' fill='none' stroke='var(--fs-surface)' stroke-width='6' stroke-linejoin='round'>Social Login Key · JWKS · SLO</text>
 <text x='662' y='498' text-anchor='start' fill='var(--fs-quiet)'>Social Login Key · JWKS · SLO</text>

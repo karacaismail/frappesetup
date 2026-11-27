@@ -4,10 +4,10 @@ nav: "Karar kataloğu"
 order: 26
 ---
 
-Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez, bir satırda. Notlar karardır: repodaki aktif veriyle çelişenler **Çelişki** olarak işaretlendi ve repo verisi değişmedi. Repoda zaten yazılı kararlar (320-first, `issuer + sub`, ROPC yasağı, belirteç tarayıcıya inmez, hibrit giriş, gerçek cihaz ayrı rapor vb.) tekrar edilmedi. Açık ve çelişkili satırlar [Açık kararlar](/frappesetup/acik-kararlar/) sayfasındaki K-37..K-60'a bağlıdır. AtonotA Login kararı K-61'dir.
+Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez, bir satırda. Notlar karardır: repodaki aktif veriyle çelişenler **Çelişki** olarak işaretlendi ve repo verisi değişmedi. Repoda zaten yazılı kararlar (320-first, `issuer + sub`, ROPC yasağı, belirteç tarayıcıya inmez, hibrit giriş, gerçek cihaz ayrı rapor vb.) tekrar edilmedi. Açık ve çelişkili satırlar ilgili kararlara bağlanır. Açık konular [Açık kararlar](/frappesetup/acik-kararlar/) sayfasındadır. AtonotA Login kararı K-61'dir.
 
 **Durum:** Kesin · Koşullu (koşul sağlanınca) · Açık (karar bekliyor) · Çelişki (repo verisiyle zıt, onay bekliyor).
-**Kaynak:** KC kimlik rehberi · AE AI ekosistemi · KS Kaizen şartnamesi · KP Kaizen paketi · AM, A1, A2 adaptif arayüz notları. Dosya adları: [İzlenebilirlik](/frappesetup/izlenebilirlik/) KD-38..KD-44.
+KC kimlik rehberini, AE yapay zekâ ekosistemi notunu gösterir. KS Kaizen şartnamesini, KP Kaizen paketini gösterir. AM, A1 ve A2 uyarlanan arayüz notlarını gösterir. Dosya adları [İzlenebilirlik](/frappesetup/izlenebilirlik/) sayfasında KD-38 ile KD-44 arasındadır.
 
 ## Kimlik (KM)
 
@@ -34,7 +34,7 @@ Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez,
 | KM-19 | Eklenti seçimi altı koşulla: lisans kapısı, sabit sürümle derleme, kendi testleri, yakın sürüm ve güvenlik yolu, bağımsız kod incelemesi, kabul testleri. Başarısızlıkta özel kod yazılmaz; önce neden, sonra başka bileşen, daraltma ya da güvenlik incelemeli özgün geliştirme. | Kesin | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
 | KM-20 | Kimlik kabul testleri gruplar hâlinde: giriş yöntemleri, SSO, tek çıkış, köprü, eşleme, şirket izolasyonu, yetki ve KYC/KYB, oturum, kötüye kullanım, yapılandırma ve yükseltme, yük. Kapsam yüzdesi tek başına kanıt değildir. | Kesin | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
 | KM-21 | Branding (giriş, kayıt, sıfırlama ekranları ve e-postalarda üçüncü taraf ad/logo) ve güvenlik (imaj, bağımlılık, kötüye kullanım testi) kapıları CI'dadır; her kapıda insan adımı kalır. | Kesin | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
-| KM-22 | Realm yapılandırması git'te `keycloak-config-cli` ile, yönetici parolası yerine servis hesabıyla uygulanır; panelden elle değişiklik yasak, gecelik fark raporu. | Kesin | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
+| KM-22 | Keycloak ayarları Git’te tutulur. Not, `keycloak-config-cli` ve servis hesabı önerir. Not panelde elle değişikliği kapatır. Eski gecelik fark raporu önerisi D-6 ile çelişir. Operatör fark denetimini elle başlatır. | Kesin | KC | [Rail 4](/frappesetup/rail-4-keycloak/) ve SUS-03 |
 | KM-23 | OTP gateway kod üretmez ve doğrulamaz; kod saklanmaz, numara hash'lenir, sağlayıcı anahtarı ortam değişkenindedir; numara, IP ve ülke başına gönderim sınırı ve maliyet alarmı. | Koşullu | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
 | KM-24 | Yapay zekâ kimlik kodunu yazar; çekirdeğe (eklenti, realm akışı, köprü, OTP sınırı) dokunan değişikliği yazmayan ajan ve teknik kişi inceler. main'e doğrudan push yok, kimse kendi PR'ını onaylamaz. | Kesin | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
 | KM-25 | KVKK ve İYS satırları hukuki görüş değildir; dağıtım modeli ve lisanslarla birlikte hukukçuya teyit ettirilir. | Koşullu | KC | [Rail 4](/frappesetup/rail-4-keycloak/) |
@@ -43,7 +43,7 @@ Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez,
 
 | ID | Karar | Durum | Kaynak | Yer |
 | --- | --- | --- | --- | --- |
-| AI-01 | Resmi AI katmanı üretime hazır değil (`frappe/mcp` ve Flow deneysel, `frappe/skills` geliştirici aracı). Raven 1 Ocak 2026'dan resmi: mesajlaşma sınıf A, Raven AI ajanları B ve kapalı. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
+| AI-01 | Resmi AI katmanı üretime hazır değil (`frappe/mcp` arşivlendi, Flow deneysel, `frappe/skills` geliştirici aracı). Raven 1 Ocak 2026'dan resmi: mesajlaşma sınıf A, Raven AI ajanları B ve kapalı. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
 | AI-02 | Sınıf üretim güvenliği ve olgunluktur (A, B, C), depo başına gerekçeli. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
 | AI-03 | Dört yetki seviyesi: yalnız okur, öneri verir, veriyi değiştirir, otomatik aksiyon alır. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-04 | Seviye 3 ve 4 yalnız taslak üretir, submit yetkisi olmaz; öğrenci, ücret ve muhasebe doctype'larında kapalıdır (EDU sitesi). | Çelişki | AE | K-53 |
@@ -51,7 +51,7 @@ Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez,
 | AI-06 | Frappe Assistant Core en olgun MCP (sınıf B, tek kişiye bağlı); yalnız beta ortamında Python, SQL ve silme araçları kapalı denenir. Lisans v2.0.0'da MIT'den AGPL'ye geçti. | Koşullu | AE | [MCP](/frappesetup/ai-mcp/) |
 | AI-07 | Geliştirici skill paketleri geliştirme ortamında kurulur, siteye kurulmaz; üretilen kod yine incelenir. | Kesin | AE | [Skills](/frappesetup/ai-skills/) |
 | AI-08 | beta ortamında denenecek: Jarvis (hazırla-onayla, Trigger kapalı), Huf (Ollama, LiteLLM sürümü sabit), Builder Bob (yalnız pazarlama sayfası, onay açık). | Koşullu | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
-| AI-09 | İzlenecek: Flow tam sürümü, Grove, Studio, frappectl, yerel OCR belge kuyruğu, Helpdesk AI, Raven V3 sağlayıcıları, `frappe/mcp` kararlı sürümü. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
+| AI-09 | İzlenecek: Flow tam sürümü, Grove, Studio, frappectl, yerel OCR belge kuyruğu, Helpdesk AI, Raven V3 sağlayıcıları. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-10 | Kaçınılacak: otomatik ana veri üreten OCR ve submit yetkili ajan. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-11 | Öğrenci verisine dokunan yapay zekâ yerel modelle sınırlı; dış LLM yalnız anonim içerik ve kod geliştirme için. GPU'suz sunucuda yalnız 7–8B model, yalnız sınıflandırma ve özetleme. | Çelişki | AE | K-54 |
 | AI-12 | Huf'ta LiteLLM PyPI tedarik zinciri olayı (24 Mart 2026): LiteLLM sürümü sabitlenir (güvenli ≤ 1.82.6). | Kesin | AE | [Agents](/frappesetup/ai-agents/) |

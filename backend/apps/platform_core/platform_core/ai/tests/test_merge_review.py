@@ -73,8 +73,9 @@ class TestFieldPropertyUnderLock(AiTestCase):
 			self.in_other_connection(rival)
 			return original(*args, **kwargs)
 
-		with patch.object(proposals, "_pre_check", pinned_snapshot_then_rival):
-			return self.approve(client, proposal_id, digest).json["message"]
+		# The proposal is R3. The rival runs at the second approval, where the action executes.
+		around = patch.object(proposals, "_pre_check", pinned_snapshot_then_rival)
+		return self.approve_both(client, proposal_id, digest, around_second=around).json["message"]
 
 	def setter_values(self) -> list[str]:
 		frappe.db.rollback()
@@ -134,8 +135,8 @@ class TestFieldPropertyUnderLock(AiTestCase):
 	def test_unchanged_property_is_written(self):
 		manager = self.login(MANAGER)
 
-		first = self.approve(manager, self.propose(manager, "From AI")).json["message"]
-		second = self.approve(manager, self.propose(manager, "Again")).json["message"]
+		first = self.approve_both(manager, self.propose(manager, "From AI")).json["message"]
+		second = self.approve_both(manager, self.propose(manager, "Again")).json["message"]
 
 		self.assertTrue(first["executed"], first)
 		self.assertTrue(second["executed"], second)

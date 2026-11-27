@@ -73,7 +73,10 @@ jobs:
           name: dist
           path: dist/
       - uses: ./.github/actions/playwright-browsers
-      - name: Playwright gate (Chromium, Firefox, WebKit, iPhone 13 × 320–1366), parça ${{ matrix.shard }}/4
+      - name: Marka ayarı ve diyagram kontrolü
+        if: matrix.shard == 1
+        run: npm run test:brand-build
+      - name: Playwright gate (Chromium, WebKit, iPhone 13 × 320–1366), parça ${{ matrix.shard }}/4
         env:
           PW_BLOB: '1'
         run: npx playwright test --shard=${{ matrix.shard }}/4

@@ -310,6 +310,43 @@ paths:
           description: An account update is in progress or a database lock timed out. Retry the request.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.account.request_recovery:
+    post:
+      operationId: requestAccountRecovery
+      summary: Ask for account recovery after losing a strong key.
+      description: Opens a recovery review record when the address belongs to a linked account. Email access alone never recovers an account. The request does not change credentials, send a sign-in link or open a session. A reviewer who is not the account owner approves or rejects the record. The answer is the same for every address. A background job looks up the account after the answer, so the answer time does not show whether an account exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  maxLength: 254
+                  description: Email address of the account to recover.
+      responses:
+        "200":
+          description: The request was received. The answer does not show whether an account exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [received]
+                    properties:
+                      received:
+                        const: true
+        "403":
+          description: The request had extra fields.
+        "429":
+          description: Recovery request limit reached.
   /api/method/press_tr.api.account.request_deletion:
     post:
       operationId: requestAccountDeletion

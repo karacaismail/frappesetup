@@ -79,3 +79,52 @@ class GatewayContractTests(unittest.TestCase):
                 )
         with self.assertRaises(ValidationError):
             self.contract.validate_request(path, "post", {"log": "sample", "cost": "0.5"})
+
+    def test_large_file_job_operations_are_published(self):
+        # D-9: every large file command has an HTTP operation (G-156).
+        for name in ("create_file_job", "file_job_status", "start_file_job", "retry_file_chunk"):
+            path = f"/api/method/platform_core.api.model.{name}"
+            with self.subTest(operation=name):
+                self.assertIn(path, self.contract.spec["paths"])
+                operation = self.contract.spec["paths"][path]["post"]
+                self.assertEqual(operation["security"], [{"session": []}])
+                for status in ("200", "400", "401", "403"):
+                    self.assertIn(status, operation["responses"])
+
+    def test_file_job_status_shows_the_plan_before_the_start(self):
+        path = "/api/method/platform_core.api.model.file_job_status"
+        plan = {
+            "name": "fixture-job",
+            "status": "planned",
+            "failure_code": None,
+            "chunk_count": 1,
+            "estimated_cost": "0.25",
+            "currency": "USD",
+            "chunks": [
+                {
+                    "index": 0,
+                    "first_page": 1,
+                    "last_page": 2,
+                    "byte_count": 900,
+                    "status": "planned",
+                    "failure_code": None,
+                }
+            ],
+        }
+        self.contract.validate_response(path, "post", 200, {"message": plan})
+        unknown = {**plan, "estimated_cost": None, "currency": None}
+        self.contract.validate_response(path, "post", 200, {"message": unknown})
+        with self.assertRaises(ValidationError):
+            self.contract.validate_response(path, "post", 200, {"message": {**plan, "estimated_cost": 0.25}})
+
+    def test_file_job_denials_use_published_codes(self):
+        cases = (
+            ("start_file_job", "409", "job_not_planned"),
+            ("retry_file_chunk", "404", "chunk_not_found"),
+            ("retry_file_chunk", "409", "chunk_not_failed"),
+            ("create_file_job", "400", "unsupported_file"),
+        )
+        for name, status, code in cases:
+            with self.subTest(operation=name, code=code):
+                path = f"/api/method/platform_core.api.model.{name}"
+                self.contract.validate_response(path, "post", status, {"message": {"error": code}})
