@@ -29,6 +29,12 @@ Kopyalar bu klasörden eşitlenir. Kopyada yapılan değişiklik asıl kural say
 2. [SURECLER-VE-SONUCLAR.md](SURECLER-VE-SONUCLAR.md) dosyaların nasıl yazıldığını ve denetlendiğini anlatır.
 3. [ACIK-ISLER.md](ACIK-ISLER.md) bekleyen kararları ve bitmemiş işleri toplar.
 
+## Araştırma belgeleri
+
+Bu belgeler kural değildir. Belgeler karar için öneri sunar.
+
+1. [gilt-kapsami.md](gilt-kapsami.md) GILT kapsamını, MVP altyapısını ve üst yapıyı anlatır.
+
 ## Süreç belgeleri
 
 Bu belgeler işin her adımında kurallara nasıl uyulacağını anlatır. Belgeleri A Takımı yazdı.
