@@ -25,6 +25,10 @@ const TOOLS = [
   'press_propose', 'proposal_get', 'press_execute', 'press_track', 'app_inspect', 'app_check', 'app_propose_change',
   'app_apply',
 ];
+// G-84: Press araçları yalnız Press, uygulama araçları yalnız çalışma alanı yapılandırılınca listelenir.
+const PRESS_TOOLS = ['press_read', 'press_triage_build', 'press_propose', 'press_execute', 'press_track'];
+const APP_TOOLS = ['app_inspect', 'app_check', 'app_propose_change', 'app_apply'];
+const BASE_TOOLS = TOOLS.filter((t) => !PRESS_TOOLS.includes(t) && !APP_TOOLS.includes(t));
 const LICENSES = ['LICENSE', 'LICENSE-CONTENT'];
 
 type Artifact = { path: string; save: string; zip: boolean };
@@ -232,18 +236,36 @@ test.describe('press-ai downloads: artifacts', () => {
         expect(check.code, `${zip} check-contract: ${check.err}`).toBe(0);
 
         const state = mkdtempSync(join(tmpdir(), 'press-ai-state-'));
-        const cfg = join(state, 'config.json');
-        writeFileSync(cfg, JSON.stringify({ approval: { state_dir: join(state, 'state') } }));
-        const input = [
-          { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'dl-test', version: '0' } } },
-          { jsonrpc: '2.0', method: 'notifications/initialized' },
-          { jsonrpc: '2.0', id: 2, method: 'tools/list' },
-        ].map((m) => JSON.stringify(m)).join('\n') + '\n';
-        const serve = python(['packages/press-ai/server.py', 'serve', '--config', cfg], { cwd: dir, input });
-        rmSync(state, { recursive: true, force: true });
-        const replies = serve.out.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
-        const list = replies.find((r) => r.id === 2);
-        expect(list?.result?.tools?.map((t: { name: string }) => t.name).sort(), `${zip} tools/list: ${serve.err}`).toEqual([...TOOLS].sort());
+        try {
+          const workspace = join(state, 'apps');
+          mkdirSync(workspace);
+          const full = {
+            press: {
+              base_url: 'https://press.example.test', principal: 'team', team: 'team-alpha',
+              credentials: { source: 'file', path: join(state, 'credentials.json') },
+            },
+            workspace: { root: workspace },
+          };
+          const input = [
+            { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'dl-test', version: '0' } } },
+            { jsonrpc: '2.0', method: 'notifications/initialized' },
+            { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+          ].map((m) => JSON.stringify(m)).join('\n') + '\n';
+          const cases: [string, object, string[]][] = [
+            ['bare', {}, BASE_TOOLS],
+            ['press+workspace', full, TOOLS],
+          ];
+          for (const [label, extra, expected] of cases) {
+            const cfg = join(state, `config-${label.replace(/\W/g, '-')}.json`);
+            writeFileSync(cfg, JSON.stringify({ approval: { state_dir: join(state, 'state') }, ...extra }));
+            const serve = python(['packages/press-ai/server.py', 'serve', '--config', cfg], { cwd: dir, input });
+            const replies = serve.out.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+            const list = replies.find((r) => r.id === 2);
+            expect(list?.result?.tools?.map((t: { name: string }) => t.name).sort(), `${zip} tools/list (${label}): ${serve.err}`).toEqual([...expected].sort());
+          }
+        } finally {
+          rmSync(state, { recursive: true, force: true });
+        }
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

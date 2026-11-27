@@ -29,6 +29,7 @@ const FULL = [
   'agents/*.md',
   'references/*.md',
   'tests/*.py',
+  'evals/*.json',
   'tests/fixtures/**/*.{py,json,toml,txt,md}',
 ];
 const MCP = [
