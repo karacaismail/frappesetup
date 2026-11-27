@@ -1,0 +1,12 @@
+# Workflow name
+name: "CI # ş"
+url: https://site/sayfa#bölüm
+jobs:
+  a:
+    steps:
+      - name: 'Değer # ğ'
+        run: |
+          # Shell note
+          echo "# ş"
+      - run: >
+          echo plain

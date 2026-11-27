@@ -1,0 +1,3 @@
+/* Heading colour */
+h1::before { content: "/* ş */"; }
+h2::after { content: '/* ğ */'; }
