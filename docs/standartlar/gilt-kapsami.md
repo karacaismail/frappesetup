@@ -501,11 +501,12 @@ Denetim eski satırlara bakmaz. Bu yüzden izin listesi gerekmez. AJA-1409 işi 
 - Ekran metni bu denetime girmez. Ekran metnini IC-10 denetimi yakalar.
 - `docs/standartlar/` klasöründeki Türkçe belgeler dışarıda kalır. Bu belgeler kod değildir.
 
-Denetimi yazan takım önce üç test yazar:
+Denetimi yazan takım önce dört test yazar:
 
 1. Yeni bir Türkçe yorum denetimi düşürür.
 2. Yeni bir İngilizce yorum denetimi geçer.
 3. Dokunulmamış eski bir Türkçe yorum denetimi geçer.
+4. Hedef dal yoksa denetim düşer.
 
 ### Açık soru
 
