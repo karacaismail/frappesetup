@@ -461,9 +461,48 @@ Bu değişiklikler için proje sahibinin kararı gerekir. Karar `KARARLAR.md` do
 4. Yeni bir kural dil ile bölgeyi ayırır.
 5. Yeni bir kural ölçü verisini temel birimle saklatır.
 
+### Kod yorumları İngilizce olur
+
+Proje sahibi "tüm codebase ingilizce olmalı" dedi. Karar 40 yalnız kod adlarını kapsar. Proje sahibi 27 Kasım 2026 Cuma günü bir soruyu da cevapladı. Cevaba göre kod yorumları da İngiliz İngilizcesiyle yazılır. Cevap AJA-1408 işindedir.
+
+- Yeni kod Türkçe yorum eklemez.
+- Var olan Türkçe yorumlar ayrı bir işte çevrilir. Bu iş AJA-1409 işidir.
+
+Öneri şudur: bir denetim yeni Türkçe yorumu reddeder.
+
+Denetim şu yerlerde çalışır:
+
+1. atonota-web deposunda denetim `npm run lint` komutunun içinde çalışır. CI da aynı komutu çalıştırır.
+2. frappesetup deposunda denetim `backend` uygulamaları için CI içinde çalışır.
+3. Committer inceleme listesine bir satır eklenir. Satırda "Yeni Türkçe yorum yok" yazar.
+
+Denetim Git hook'u olarak kurulmaz. Böylece yazar koruması ve hook ayarları değişmez.
+
+Denetim şöyle çalışır:
+
+1. Denetim yalnız yeni eklenen satırlara bakar. Yeni satırları ana dala göre farktan alır.
+2. Denetim yorumu dilin kendi aracıyla bulur. TypeScript için bir ESLint kuralı yorumları okur. Python için `tokenize` modülü yorumları okur. `ast` modülü docstring metinlerini okur. Keycloak şablonlarında `<#-- -->` ve `<!-- -->` yorumları okunur.
+3. Yeni yorumda Türkçeye özgü harf varsa denetim hata verir. Bu harfler ç, ğ, ı, İ, ö, ş ve ü harfleridir.
+4. Bir kelime listesi Türkçe harfi olmayan Türkçe yorumu yakalar. Örneğin "ile" ve "bu" listededir. Bu kontrol yalnız uyarı verir. Yanlış alarm olabilir.
+
+Denetim eski satırlara bakmaz. Bu yüzden izin listesi gerekmez. AJA-1409 işi bitince denetim bütün dosyalara açılabilir.
+
+Şu dosyalar denetimin dışında kalır:
+
+- Çeviri katalogları dışarıda kalır. Örneğin `tr` kataloğu, `tr.po` ve `messages_tr.properties` dosyaları.
+- Türkçe deneme verisi taşıyan test dosyaları dışarıda kalır. Bu dosyalar adıyla listelenir.
+- Ekran metni bu denetime girmez. Ekran metnini IC-10 denetimi yakalar.
+- `docs/standartlar/` klasöründeki Türkçe belgeler dışarıda kalır. Bu belgeler kod değildir.
+
+Denetimi yazan takım önce üç test yazar:
+
+1. Yeni bir Türkçe yorum denetimi düşürür.
+2. Yeni bir İngilizce yorum denetimi geçer.
+3. Dokunulmamış eski bir Türkçe yorum denetimi geçer.
+
 ### Açık soru
 
-Proje sahibi "tüm codebase ingilizce olmalı" dedi. Karar 40 yalnız kod adlarını kapsar. Kod yorumları ve test adları bugün Türkçe olabilir. Bu sözün yorumları da kapsayıp kapsamadığı AJA-1407 işinde netleşmelidir.
+Test adları da bir tür metindir. Örneğin `describe('...')` içindeki ad bir test adıdır. Proje sahibinin kararı test adlarını da kapsıyor olabilir. PM bunu AJA-1409 işinde netleştirebilir. Test adları kapsama girerse denetim onlara da bakar.
 
 ## 13. Kaynaklar
 
