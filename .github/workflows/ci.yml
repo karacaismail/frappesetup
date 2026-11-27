@@ -74,6 +74,9 @@ jobs:
         run: |
           # security-audit bu ref'i karşılaştırma tabanı olarak kullanır.
           git update-ref refs/heads/backend "$BASE_SHA"
+          # ai-readiness öz testleri geçici depo açar. Koşucuda varsayılan dal "master" olur ve
+          # dal adı denetimine takılır. macOS Git (Xcode) varsayılanı "main" olduğundan aynı ayar verilir.
+          git config --global init.defaultBranch main
           python3.14 -m pip install uv==0.13.9
           source backend/dev/security/tool-versions.env
           uv python install 3.12
