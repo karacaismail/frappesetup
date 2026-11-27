@@ -1,6 +1,6 @@
 """Static contract of the reseller records and endpoints (G-169, G-170, AJA-833).
 
-Written before the code (D-2). The tests read files only, so they run without Frappe:
+Written before the code (D-2). The static tests read files only. Runtime pagination tests additionally need Frappe:
 `python3 -I -m unittest discover -s backend/apps/platform_core/platform_core/reseller/tests
 -t backend/apps/platform_core -p 'test_reseller_contract.py'`
 """
@@ -10,7 +10,12 @@ from __future__ import annotations
 import ast
 import json
 import unittest
+from importlib.util import find_spec
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import yaml
 
 APP_DIR = Path(__file__).resolve().parents[2]
 BACKEND_DIR = APP_DIR.parents[2]
@@ -148,6 +153,90 @@ class TestResellerEndpoints(unittest.TestCase):
 		text = CONTRACT_FILE.read_text(encoding="utf-8")
 		for name in ENDPOINTS:
 			self.assertIn(f"/platform_core.api.reseller.{name}:", text)
+
+	def test_customer_page_contract(self):
+		contract = yaml.safe_load(CONTRACT_FILE.read_text())
+		operation = contract["paths"]["/platform_core.api.reseller.list_customers"]["get"]
+		params = {p["name"]: p["schema"] for p in operation["parameters"]}
+		self.assertEqual(params["offset"]["minimum"], 0)
+		self.assertEqual(params["offset"]["default"], 0)
+		self.assertEqual(params["page_size"]["minimum"], 1)
+		self.assertEqual(params["page_size"]["default"], 50)
+		self.assertIn("417", operation["responses"])
+		schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+		page = schema["properties"]["message"]
+		self.assertEqual(page["type"], "object")
+		self.assertEqual(set(page["required"]), {"items", "has_more", "offset", "page_size"})
+		self.assertEqual(page["properties"]["items"]["maxItems"], 100)
+		self.assertEqual(page["properties"]["has_more"]["type"], "boolean")
+		self.assertEqual(page["properties"]["page_size"]["maximum"], 100)
+
+
+@unittest.skipIf(find_spec("frappe") is None, "Runtime tests need Frappe installed.")
+class TestCustomerPages(unittest.TestCase):
+	def setUp(self):
+		from platform_core.reseller import customers
+
+		self.customers = customers
+		self.rows = [
+			SimpleNamespace(
+				customer_tenant=f"customer-{i:03d}",
+				customer_name=None,
+				site_status="Active",
+				reseller_tenant="own-site",
+			)
+			for i in range(205)
+		]
+		self.rows.append(
+			SimpleNamespace(
+				customer_tenant="foreign",
+				customer_name=None,
+				site_status="Active",
+				reseller_tenant="other-site",
+			)
+		)
+		self.queries = []
+
+		def listed(doctype, **kwargs):
+			self.queries.append(kwargs)
+			rows = [r for r in self.rows if r.reseller_tenant == kwargs["filters"]["reseller_tenant"]]
+			offset = kwargs.get("limit_start", 0)
+			limit = kwargs.get("limit_page_length", 0)
+			return rows[offset : offset + limit] if limit else rows[offset:]
+
+		self.patch = patch.object(
+			customers,
+			"frappe",
+			SimpleNamespace(
+				get_roles=lambda: ["Reseller Admin"], local=SimpleNamespace(site="own-site"), get_all=listed
+			),
+		)
+		self.patch.start()
+		self.addCleanup(self.patch.stop)
+
+	def test_default_page_is_bounded_and_has_more(self):
+		page = self.customers.list_customers()
+		self.assertEqual(len(page["items"]), 50)
+		self.assertEqual(page["page_size"], 50)
+		self.assertTrue(page["has_more"])
+		self.assertLessEqual(self.queries[0]["limit_page_length"], 101)
+
+	def test_large_page_is_clamped_and_all_pages_preserve_tenant_scope(self):
+		seen = []
+		for offset, size, more in ((0, 100, True), (100, 100, True), (200, 5, False), (205, 0, False)):
+			page = self.customers.list_customers(offset=offset, page_size=999999)
+			self.assertEqual(page["offset"], offset)
+			self.assertEqual(page["page_size"], 100)
+			self.assertEqual(page["has_more"], more)
+			self.assertEqual(len(page["items"]), size)
+			seen.extend(row["customer_tenant"] for row in page["items"])
+		self.assertEqual(seen, [f"customer-{i:03d}" for i in range(205)])
+		self.assertTrue(all(q["limit_page_length"] == 101 for q in self.queries))
+
+	def test_exact_full_page_has_no_next_page(self):
+		page = self.customers.list_customers(offset=105, page_size=100)
+		self.assertEqual(len(page["items"]), 100)
+		self.assertFalse(page["has_more"])
 
 
 if __name__ == "__main__":

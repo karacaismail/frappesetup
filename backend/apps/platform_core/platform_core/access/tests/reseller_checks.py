@@ -29,7 +29,7 @@ class ResellerChecks:
 		response = self.call(self.login(), "GET", RESELLER_API + "list_customers")
 
 		self.assertEqual(response.status_code, 200, response.data[:300])
-		listed = {row["customer_tenant"] for row in response.json["message"]}
+		listed = {row["customer_tenant"] for row in response.json["message"]["items"]}
 		self.assertEqual(listed, set(OWN_CUSTOMERS))
 		self.assertNotIn(OTHER_CUSTOMER, listed)
 

@@ -37,6 +37,8 @@ class ApprovalEndpointTest(TestCase):
 
 	def test_get_home_summary_foreign_data_denied(self):
 		"""Every part reads through the permission-checked list. Employee rows need employee read."""
+		from frappe.query_builder.builder import MariaDB
+
 		from hrms_tr import home_summary
 
 		with (
@@ -45,7 +47,14 @@ class ApprovalEndpointTest(TestCase):
 		):
 			fake.session.user = "manager@example.test"
 			fake.get_list.return_value = []
+			fake.qb.get_query.return_value = MariaDB.from_(MariaDB.DocType("Leave Application")).select(
+				"name", "employee_name", "department", "from_date", "to_date"
+			)
 			fake.has_permission.return_value = False
+			fake.qb.from_.return_value.select.return_value.limit.return_value.run.return_value = []
+			pairs = fake.qb.from_.return_value.join.return_value.on.return_value
+			pairs.select.return_value.limit.return_value.run.return_value = []
+			pairs.select.return_value.orderby.return_value.limit.return_value.run.return_value = []
 			summary = get_home_summary()
 		self.assertEqual(summary["pending_approvals"], [])
 		self.assertEqual(summary["problems"], [])
@@ -53,6 +62,8 @@ class ApprovalEndpointTest(TestCase):
 		fake.get_all.assert_not_called()
 		fake.db.sql.assert_not_called()
 		fake.has_permission.assert_called_once_with("Employee", "read")
+		for call in fake.qb.get_query.call_args_list:
+			self.assertFalse(call.kwargs["ignore_permissions"])
 		for call in fake.get_list.call_args_list:
 			self.assertEqual(call.args[0], "Leave Application")
 			self.assertNotIn("ignore_permissions", call.kwargs)

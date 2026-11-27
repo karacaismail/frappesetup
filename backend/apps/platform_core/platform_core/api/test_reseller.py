@@ -108,7 +108,9 @@ class TestResellerEndpointSecurity(IntegrationTestCase):
 
 	def login(self):
 		client = get_test_client(use_cookies=True)
-		response = self.send(client, "POST", "/api/method/login", body={"usr": RESELLER, "pwd": FAKE_LOGIN_TEXT})
+		response = self.send(
+			client, "POST", "/api/method/login", body={"usr": RESELLER, "pwd": FAKE_LOGIN_TEXT}
+		)
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		return client
 
@@ -133,7 +135,7 @@ class TestResellerEndpointSecurity(IntegrationTestCase):
 		response = self.send(self.login(), "GET", API + "list_customers")
 
 		self.assertEqual(response.status_code, 200, response.data[:300])
-		listed = [row["customer_tenant"] for row in response.json["message"]]
+		listed = [row["customer_tenant"] for row in response.json["message"]["items"]]
 		self.assertEqual(listed, [OWN_CUSTOMER])
 		self.assertNotIn(OTHER_CUSTOMER.encode(), response.data)
 
@@ -183,3 +185,75 @@ class TestResellerEndpointSecurity(IntegrationTestCase):
 
 		self.assert_denied(response)
 		self.assertEqual(frappe.db.get_value(REQUEST, name, "status"), "Pending")
+
+	def test_list_customers_pages_stay_scoped_to_the_reseller(self):
+		client = self.login()
+		first = self.send(client, "GET", API + "list_customers", query={"page_size": 1, "offset": 0})
+		self.assertEqual(first.status_code, 200, first.data[:300])
+		self.assertEqual(
+			first.json["message"],
+			{
+				"items": [
+					{"customer_tenant": OWN_CUSTOMER, "customer_name": OWN_CUSTOMER, "status": "Active"}
+				],
+				"has_more": False,
+				"offset": 0,
+				"page_size": 1,
+			},
+		)
+		last = self.send(client, "GET", API + "list_customers", query={"page_size": 1, "offset": 1})
+		self.assertEqual(last.status_code, 200, last.data[:300])
+		self.assertEqual(last.json["message"]["items"], [])
+		self.assertFalse(last.json["message"]["has_more"])
+		self.assertNotIn(OTHER_CUSTOMER.encode(), first.data + last.data)
+
+	def test_list_customers_clamps_large_pages_and_reports_the_next_page(self):
+		names = []
+		try:
+			for index in range(201):
+				doc = frappe.get_doc(
+					doctype=LINK,
+					reseller_tenant=self.site,
+					customer_tenant=f"page-{index:03d}.example.test",
+					customer_name="Synthetic page customer",
+					site_status="Active",
+				).insert()
+				names.append(doc.name)
+			client = self.login()
+			first = self.send(client, "GET", API + "list_customers", query={"page_size": 999999})
+			self.assertEqual(first.status_code, 200, first.data[:300])
+			page = first.json["message"]
+			self.assertEqual(page["page_size"], 100)
+			self.assertEqual(len(page["items"]), 100)
+			self.assertTrue(page["has_more"])
+			seen = [item["customer_tenant"] for item in page["items"]]
+			for offset, expected_size, has_more in ((100, 100, True), (200, 2, False)):
+				response = self.send(
+					client, "GET", API + "list_customers", query={"page_size": 100, "offset": offset}
+				)
+				self.assertEqual(response.status_code, 200, response.data[:300])
+				page = response.json["message"]
+				self.assertEqual(len(page["items"]), expected_size)
+				self.assertEqual(page["has_more"], has_more)
+				seen.extend(item["customer_tenant"] for item in page["items"])
+			self.assertEqual(len(set(seen)), 202)
+			self.assertEqual(seen, sorted(seen))
+			self.assertNotIn(OTHER_CUSTOMER, seen)
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.delete(LINK, {"name": ["in", names]})
+			frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+	def test_list_customers_rejects_invalid_pagination(self):
+		client = self.login()
+		for query in (
+			{"page_size": 0},
+			{"page_size": -1},
+			{"offset": -1},
+			{"offset": "x"},
+			{"page_size": "1.5"},
+			{"offset": str(2**64)},
+		):
+			with self.subTest(query=query):
+				response = self.send(client, "GET", API + "list_customers", query=query)
+				self.assertEqual(response.status_code, 417, response.data[:300])
