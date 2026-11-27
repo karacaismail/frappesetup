@@ -43,3 +43,43 @@ for (const name of files) {
     ]) assert.ok(s.includes(needle), `eksik: ${needle}`);
   });
 }
+
+// Yerel ve CI test ayrımı (AJA-2167, kaynak iş AJA-2153): kural ortak bitti tanımının içindedir.
+const FAST_SCRIPT = 'test:e2e:hizli';
+const subsection = (s) => {
+  const start = s.indexOf("\n#### Yerelde hızlı test, tam matris GitHub CI'da\n");
+  assert.notEqual(start, -1, '"Yerelde hızlı test" alt bölümü yok');
+  const next = s.indexOf('\n#### ', start + 1);
+  return s.slice(start, next === -1 ? undefined : next);
+};
+
+for (const name of files) {
+  test(`${name}: local fast tests, full matrix in GitHub CI`, () => {
+    const s = section(read(name));
+    const done = s.indexOf('### Ortak bitti tanımı');
+    const rule = subsection(s);
+    assert.ok(done !== -1 && s.indexOf(rule) > done, 'kural ortak bitti tanımının içinde değil');
+    for (const needle of [
+      'Bu kural 28 Kasım 2026 Cumartesi günü eklendi. Kaynak iş AJA-2153 kaydıdır.',
+      'Yerelde yalnız hızlı testleri koşun. Hızlı testler şunlardır:',
+      '- birim testleri,',
+      '- lint,',
+      '- tip denetimi,',
+      '- tek bir Playwright projesi ve yalnız 320 px genişlik.',
+      'Tam tarayıcı matrisi GitHub CI\'da koşar. PR açılınca CI bu matrisi kendisi koşar.',
+      'Yerelde tam matrisi yalnız gerekçe yazınca koşun. Gerekçeyi testten önce göreve yorum olarak yazın.',
+      'Playwright testi ağır test kilidinden geçer. Aynı anda en çok 2 ajan Playwright koşar. Test bitince açtığınız ortamı kapatın.',
+      `\`npm run ${FAST_SCRIPT}\``,
+    ]) assert.ok(rule.includes(needle), `eksik: ${needle}`);
+  });
+}
+
+test('fast Playwright script: one project, 320 px only, through the heavy-test lock', () => {
+  const { scripts } = JSON.parse(read('package.json'));
+  const cmd = scripts[FAST_SCRIPT];
+  assert.ok(cmd, `package.json içinde ${FAST_SCRIPT} yok`);
+  assert.match(cmd, /^scripts\/agir-test playwright test /, 'komut ağır test kilidinden geçmiyor');
+  assert.equal((cmd.match(/--project[= ]/g) || []).length, 1, 'tek proje seçilmeli');
+  assert.match(cmd, /--project[= ]chromium\b/);
+  assert.match(cmd, /--grep[= ]\S*320/, 'yalnız 320 px testleri seçilmeli');
+});
