@@ -134,6 +134,36 @@ const releaseShape = (label: string, rel: unknown): string[] => {
 };
 
 test.describe('content consistency', () => {
+  const processDocuments = [
+    'task-template.md',
+    'developer-first-comment.md',
+    'review-template.md',
+    'definition-of-done.md',
+    'rule-change-process.md',
+  ];
+  const ruleDocuments = [
+    'frappe-python-standartlari.md',
+    'frappe-python-disi-standartlari.md',
+    'headless-frontend-standartlari.md',
+    'mobile.md',
+  ];
+
+  for (const file of processDocuments) {
+    test(`rule process document ${file} exists and cites defined rules`, () => {
+      const path = `docs/standartlar/${file}`;
+      expect(existsSync(new URL(path, root)), `${path} is missing`).toBe(true);
+      expect(statSync(new URL(path, root)).isFile(), `${path} must be a file`).toBe(true);
+      const text = read(path);
+      expect(text, `${path} needs a concrete example`).toMatch(/^## Somut örnek$/m);
+      const definedCodes = new Set(ruleDocuments.flatMap((source) =>
+        [...read(`docs/standartlar/${source}`).matchAll(/^\*\*([A-Z]{1,2}-\d+)\s/gm)].map((match) => match[1]),
+      ));
+      const citedCodes = [...text.matchAll(/\b[A-Z]{1,2}-\d+\b/g)].map((match) => match[0]);
+      expect(citedCodes.length, `${path} needs an existing rule code`).toBeGreaterThan(0);
+      expect(citedCodes.filter((code) => !definedCodes.has(code)), `${path} cites undefined rules`).toEqual([]);
+    });
+  }
+
   test.beforeEach(({ browserName }) => {
     test.skip(browserName !== 'chromium', 'Dosya düzeyi denetim; tek motorda koşar.');
   });
