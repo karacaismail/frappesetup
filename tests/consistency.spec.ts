@@ -235,6 +235,24 @@ test.describe('content consistency', () => {
     expect(claimed, 'denetim dışı kalemde durum iddiası').toEqual([]);
   });
 
+  test('no MVP task stays unverified after the AJA-2202 audit', () => {
+    // AJA-2202 denetimi 15 MVP kalemini okudu. Her kalem bir durum aldı ve güncelleme listesine girdi.
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    const audited = ['G-36', 'G-51', 'G-54', 'G-72', 'G-91', 'G-92', 'G-99', 'G-100', 'G-118', 'G-140', 'G-153', 'SA-39', 'G-168', 'G-169', 'G-170'];
+    const mvpUnverified = Object.entries(board.items)
+      .filter(([, it]) => it.level === 'mvp' && it.status === 'unverified')
+      .map(([id]) => id);
+    expect(mvpUnverified, 'MVP düzeyinde Doğrulanmadı kalan kalem').toEqual([]);
+    expect(audited.filter((id) => !board.update.reviewed.includes(id)), 'reviewed listesinde olmayan kalem').toEqual([]);
+    // Panel rolleri PR 57 ile yayımlandı. Kanıt kurulum adımının testini de adlandırır.
+    for (const id of ['G-168', 'G-169', 'G-170']) {
+      expect.soft(board.items[id].status, id).toBe('done');
+      expect.soft(board.items[id].evidence?.release, id).toEqual({ pr: 57, commit: 'd5ec6fe5' });
+      expect.soft(board.items[id].evidence?.tests, id).toContain('backend/apps/platform_core/platform_core/setup/tests/test_panel_roles.py');
+    }
+    expect.soft(board.update.note).toContain('AJA-2202');
+  });
+
   test('task board update names a commit that is an ancestor of HEAD', () => {
     // Pano güncel kalır: gereksinimi bitiren ya da ilerleten dal, aynı dalda task-board.json kaydını ve update
     // bloğunu da günceller. update.commit depoda olmalı ve HEAD'in atası olmalı; tarih denetim tarihinden önce olamaz.
