@@ -15,9 +15,10 @@ import Timeline from '../components/Timeline.astro';
 import { sectionIcon } from '../components/icons';
 import { SECTIONS } from '../data/sections';
 import requirementsSource from '../data/requirements.json';
-import taskBoard from '../data/task-board.json';
+import taskBoardSource from '../data/task-board.json';
 import phasesSource from '../data/phases.json';
 const requirements = fillBrandData(requirementsSource);
+const taskBoard = fillBrandData(taskBoardSource);
 const phases = fillBrandData(phasesSource);
 
 export async function getStaticPaths() {

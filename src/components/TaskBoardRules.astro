@@ -1,8 +1,10 @@
 ---
 // Görev panosu kuralları: durum, olgunluk düzeyi ve epic tabloları src/data/task-board.json'dan derleme anında üretilir.
 import requirements from '../data/requirements.json';
-import board from '../data/task-board.json';
-import { REPO_URL } from '../data/site';
+import boardSource from '../data/task-board.json';
+import { fillBrandData, REPO_URL } from '../data/site';
+
+const board = fillBrandData(boardSource);
 
 type Item = { epic: string; status: string; level: string };
 const items = board.items as Record<string, Item>;

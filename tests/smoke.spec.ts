@@ -18,7 +18,7 @@ const board: {
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
   items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; release: Release } }>;
-} = require('../src/data/task-board.json');
+} = fillBrandData(require('../src/data/task-board.json'), brand);
 const phaseList: { id: string; title: string }[] = fillBrandData(require('../src/data/phases.json'), brand);
 
 // Kabul: 320→360→375→390→yatay telefon→tablet→masaüstü; yatay taşma yok; metin ≥ 1rem (SVG dahil);
