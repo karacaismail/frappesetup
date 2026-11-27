@@ -192,6 +192,19 @@ test.describe('content consistency', () => {
     expect(processFiles.filter((f) => !existsSync(new URL(f, dir))), 'depoda olmayan süreç belgesi').toEqual([]);
   });
 
+  test('review template does not present the merge rule as a decision', () => {
+    // Birleştirme yöntemine müşteri karar verecek; karar henüz kayıtlı değil (AJA-1460, AJA-1303).
+    const text = read('docs/standartlar/review-template.md');
+    expect(text, 'kaynak satırı').toContain('Kaynak: orkestratör çalışma düzeni, müşteri kararı bekleniyor.');
+    expect(text.replaceAll('müşteri kararı bekleniyor', ''), 'kaynak olarak müşteri kararı').not.toMatch(/müşteri kararı/i);
+    expect(text, 'kaynak olarak orkestratör kararı').not.toMatch(/orkestratörün[^.\n]*kararı/i);
+    expect(text, 'birleştireni kesin yazan cümle').not.toMatch(/orkestratör[^.\n]*birleştir(ir|sin)\b/i);
+    expect(text, 'birleştireni kesin yazan başlık').not.toMatch(/^#+ .*orkestratör/im);
+    expect(text, 'ajanların birleştirmediği').toContain('Ajanlar `backend` dalına kendileri birleştirme yapmaz.');
+    expect(text, '9. adım').toMatch(/^9\. Karar olumluysa yorumun sonuna “birleştirmeye hazır” yazın\.$/m);
+    expect(text, 'kural uyum listesi tablosu').toContain('| Kural kodu | Kaynak dosya | Sonuç | Kanıt veya gerekçe |');
+  });
+
   test('task board covers every requirement with a valid epic, status and level', () => {
     // Görev panosu verisi (src/data/task-board.json) gereksinim kaydını değiştirmez; yalnız sunum bilgisini taşır.
     expect(existsSync(new URL('src/data/task-board.json', root)), 'task-board.json yok').toBe(true);
