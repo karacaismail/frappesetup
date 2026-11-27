@@ -1,8 +1,8 @@
-// Boş alan denetimi (AJA-1125).
-// Keycloak boş formu "e-posta ya da parola yanlış" diye bildirir. Bu betik formu göndermeden önce
-// boş alanı bulur ve hatayı o alanın altına yazar. Metinler formun data-at-empty-* özniteliklerinden gelir.
-// Hata alanın erişilebilir açıklamasıdır (aria-describedby). İlk boş alan odak alır.
-// Betik çalışmazsa sunucu yine boş e-posta alanını adıyla bildirir (login.ftl).
+// Empty field check (AJA-1125).
+// Keycloak reports an empty form as "wrong e-mail or password". Before submit, this script
+// finds the empty field and writes the error below that field. The texts come from the form's data-at-empty-* attributes.
+// The error is the field's accessible description (aria-describedby). The first empty field gets focus.
+// If the script does not run, the server still reports the empty e-mail field by name (login.ftl).
 (function () {
   var ERROR_CLASS = 'pf-m-error';
 
@@ -32,7 +32,7 @@
     describe(parts.input, id, false);
   }
 
-  // Aynı yapıyı Keycloak'ın field.ftl şablonu da sunucu hatası için kurar.
+  // Keycloak's field.ftl template builds the same structure for a server error.
   function showError(parts, name, text) {
     var id = 'input-error-' + name;
     var helper = document.createElement('div');
@@ -66,9 +66,9 @@
       for (var j = 0; j < names.length; j += 1) {
         var parts = fieldParts(forms[i], names[j]);
         if (!parts || !parts.container) continue;
-        // Bölge baştan durur. Sonradan yazılan hata ekran okuyucuda okunur.
+        // The region exists from the start. An error written later is read out by the screen reader.
         parts.container.setAttribute('aria-live', 'polite');
-        // Sunucunun yazdığı hata da alanın açıklaması olur.
+        // An error written by the server also becomes the field's description.
         if (document.getElementById('input-error-' + names[j])) describe(parts.input, 'input-error-' + names[j], true);
       }
     }
@@ -84,14 +84,14 @@
       var checked = [];
       for (var i = 0; i < names.length; i += 1) {
         var parts = fieldParts(form, names[i]);
-        // Gizli ya da görünmeyen alan denetlenmez. Örneğin yeniden girişte e-posta yalnız yazıdır.
+        // A hidden or invisible field is not checked. For example, on re-login the e-mail is text only.
         if (!parts || !parts.container || parts.input.type === 'hidden' || !parts.input.offsetParent) continue;
         var value = parts.input.type === 'password' ? parts.input.value : parts.input.value.trim();
         checked.push({ parts: parts, name: names[i], empty: value === '' });
       }
       var anyEmpty = checked.some(function (field) { return field.empty; });
       if (!anyEmpty) return;
-      // Form gönderilmez. Formun kendi onsubmit kuralı da çalışmaz, böylece düğme açık kalır.
+      // The form is not submitted. The form's own onsubmit rule does not run either, so the button stays enabled.
       event.preventDefault();
       event.stopImmediatePropagation();
       for (var j = 0; j < checked.length; j += 1) {

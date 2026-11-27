@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { KC, screen, screens } from './helpers';
 
-// Yerleşim testleri bütün görünümlerde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü.
+// Layout tests run in every view: 320, 360, 375, 390, landscape phone, tablet and desktop.
 for (const item of screens) {
   test(`@matrix ${item.name}: taşma, yazı boyutu, yazı tipi ve kontrol ölçüsü`, async ({ page }) => {
     const requests: string[] = [];
@@ -9,14 +9,14 @@ for (const item of screens) {
     await item.open(page);
     await page.evaluate(() => document.fonts.ready);
 
-    // Sayfa yatay taşmaz.
+    // The page does not overflow sideways.
     const overflow = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,
     }));
     expect(overflow.scroll, 'yatay taşma').toBeLessThanOrEqual(overflow.client);
 
-    // Okunabilir her metin en az 14 CSS pikseldir ve Outfit ile çizilir.
+    // Every readable text is at least 14 CSS pixels and is drawn in Outfit.
     const text = await page.evaluate(() => {
       const small: string[] = [];
       const wrongFont: string[] = [];
@@ -51,17 +51,17 @@ for (const item of screens) {
     expect(text.forcedBreak, 'zorlayıcı satır kırma').toEqual([]);
     expect(text.outfitLoaded, 'Outfit yüklendi').toBe(true);
 
-    // Bütün istekler Keycloak'ın kendi adresine gider. Dış yazı tipi ve dış betik yoktur.
+    // Every request goes to Keycloak's own address. There is no external font or script.
     const external = requests.filter((url) => !url.startsWith(KC) && !url.startsWith('data:') && !url.startsWith('blob:'));
     expect(external, 'dış istek').toEqual([]);
     const fonts = requests.filter((url) => /\.(woff2?|ttf|otf|eot)(\?|$)/.test(url));
     expect(fonts.filter((url) => /RedHat|overpass/i.test(url)), 'tema dışı yazı tipi isteği').toEqual([]);
     expect(fonts.some((url) => /outfit-latin-wght-normal\.woff2/.test(url)), 'Outfit isteği').toBe(true);
 
-    // İşletim sisteminin açılır listesi kullanılmaz.
+    // The operating system's drop-down list is not used.
     await expect(page.locator('select')).toHaveCount(0);
 
-    // Tek başına duran kontrolün etkili alanı en az 44 pikseldir. Kaba işaretçide 48 pikseldir.
+    // A standalone control's effective area is at least 44 pixels. With a coarse pointer it is 48 pixels.
     const minimum = await page.evaluate(() => (matchMedia('(any-pointer: coarse)').matches ? 48 : 44));
     const smallTargets = await page.evaluate((min) => {
       const found: string[] = [];
@@ -70,7 +70,7 @@ for (const item of screens) {
       for (const control of document.querySelectorAll<HTMLElement>(selector)) {
         if (!control.checkVisibility()) continue;
         const box = control.getBoundingClientRect();
-        // Bağlantıda yükseklik ölçülür. Kısa bağlantı metni 44 pikselden dar olabilir.
+        // For links the height is measured. A short link text may be narrower than 44 pixels.
         const narrow = control.tagName !== 'A' && box.width < min - 0.5;
         if (box.height < min - 0.5 || narrow) {
           found.push(`${control.tagName.toLowerCase()}#${control.id} ${Math.round(box.width)}x${Math.round(box.height)}`);
@@ -104,7 +104,7 @@ test('@matrix recovery codes stay on one line and within their column', async ({
   expect(wrappedOrOverflowing).toEqual([]);
 });
 
-// Kullanıcı kök yazı boyutunu büyütebilir. Yerleşim taşmamalı ve kontroller görünür kalmalıdır.
+// The user may enlarge the root font size. The layout must not overflow and controls must stay visible.
 for (const percent of [125, 200]) {
   for (const name of ['sign-in', 'totp-setup', 'passkey-sign-in']) {
     test(`${name}: kök yazı %${percent} iken sayfa taşmaz`, async ({ page }) => {

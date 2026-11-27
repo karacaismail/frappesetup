@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { BRAND, createUser, openLogin, screens, submitPassword } from './helpers';
 
-// Giriş ekranı onaylı taslağa uyar (AJA-1125). Taslak: AJA-880, 3. sürüm, "main-giris" bölümü.
+// The login screen follows the approved draft (AJA-1125). Draft: AJA-880, version 3, section "main-giris".
 
 const themeRoot = fileURLToPath(new URL('../../', import.meta.url));
 const loginCss = readFileSync(`${themeRoot}login/resources/css/atonota.css`, 'utf8');
@@ -211,8 +211,8 @@ test('the shared design tokens carry the values of atonota-web commit d21799c', 
   expect(rules.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [], 'fixed colour in a rule').toEqual([]);
 });
 
-// The approved draft says "Giriş yapın". The theme uses this phrase on every screen (orchestrator answer, AJA-1125).
-// Sign-out texts such as "Oturumu kapatın" and "oturum açık kalır" stay as they are.
+// The approved draft uses the "sign in" phrase named in the test title below. The theme uses it on every screen (orchestrator answer, AJA-1125).
+// Sign-out texts such as `doLogout`, `signOut` and `logoutScopeThisText` ("session stays open") stay as they are.
 const SIGN_IN_OLD = /oturum a[çc](?!ık)/i;
 
 test('the Turkish texts of the login theme say "giriş yap", never "oturum aç"', () => {

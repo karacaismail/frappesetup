@@ -85,7 +85,7 @@ test('TOTP: kurulum tamamlanır ve sonraki girişte kod sorulur', async ({ page,
   await page.getByLabel('Doğrulama uygulamasındaki kod').fill('000000');
   await page.getByRole('button', { name: 'Giriş yap', exact: true }).click();
   await expect(page.locator('#input-error-otp')).toHaveText('Kod yanlış. Uygulamadaki yeni kodu yazın.');
-  // Keycloak aynı kodu iki kez kabul etmez. Bu yüzden bir sonraki 30 saniyenin kodu yazılır.
+  // Keycloak does not accept the same code twice. So the code for the next 30 seconds is typed.
   await page.getByLabel('Doğrulama uygulamasındaki kod').fill(totp(base32Decode(key), Date.now() + 30_000));
   await page.getByRole('button', { name: 'Giriş yap', exact: true }).click();
   await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
@@ -105,7 +105,7 @@ test('passkey: anahtar kaydedilir ve anahtarla oturum açılır', async ({ page,
       automaticPresenceSimulation: true,
     },
   });
-  // Keycloak anahtar adını tarayıcının soru penceresiyle sorar. Test varsayılan adı kabul eder.
+  // Keycloak asks for the key name in a browser prompt. The test accepts the default name.
   page.on('dialog', (dialog) => dialog.accept());
   const email = await createUser({ requiredActions: ['webauthn-register-passwordless'] });
   await openLogin(page);
@@ -121,7 +121,7 @@ test('passkey: anahtar kaydedilir ve anahtarla oturum açılır', async ({ page,
   // The account console has loaded when its form is on screen. Only then is the session complete.
   await expect(page.locator('#save-btn')).toBeVisible({ timeout: 30_000 });
   await context.clearCookies();
-  // Sanal anahtar soruyu kendiliğinden yanıtlar. Düğmeyi sınamak için yanıt önce durdurulur.
+  // The virtual key answers the prompt by itself. To test the button, the answer is held back first.
   await cdp.send('WebAuthn.setAutomaticPresenceSimulation', { authenticatorId, enabled: false });
   await openLogin(page);
   await cdp.send('WebAuthn.setAutomaticPresenceSimulation', { authenticatorId, enabled: true });

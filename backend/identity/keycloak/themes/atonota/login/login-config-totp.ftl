@@ -1,7 +1,7 @@
 <#--
-  ATONOTA: Kaynak Keycloak 26.8.2, keycloak.v2/login/login-config-totp.ftl.
-  Tek fark: iki etiketin "for" değeri kendi giriş alanını gösterir ("totp" ve "userLabel").
-  Temel şablonda etiketler var olmayan bir kimliği gösterir. Ekran okuyucu alanın adını okuyamaz.
+  ATONOTA: Source Keycloak 26.8.2, keycloak.v2/login/login-config-totp.ftl.
+  Only difference: the "for" value of two labels points to their own input ("totp" and "userLabel").
+  In the base template the labels point to an id that does not exist. A screen reader cannot read the field's name.
 -->
 <#import "template.ftl" as layout>
 <#import "field.ftl" as field>
