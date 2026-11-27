@@ -70,7 +70,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 23. Bütün kod adları İngilizce ve ASCII olur. Eski adlar da kurallara göre güncellenir (Karar 40).
 24. Kural dosyasının sınırı varsayılan olarak 36.000 bayttır. Özel durumda en çok 39.000 bayttır (Karar 41).
 25. AtonotA Login bağımsız ve ücretli bir üründür. Ürünün geliştirilmesi MVP sonrasıdır (Karar 42).
-26. Varsayılan dil İngiliz İngilizcesidir (`en-GB`). Ölçü birimi kullanıcının ülkesine göre seçilir (Karar 44).
+26. Varsayılan dil İngiliz İngilizcesidir (`en-GB`). Kod yorumları da İngiliz İngilizcesiyle yazılır. Ölçü birimi kullanıcının ülkesine göre seçilir (Karar 44).
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -861,6 +861,8 @@ Sonuç şudur:
 - frappesetup deposunun eski adlarını “Frappe setup” oturumu düzeltir. İş Pane'de `naming-history-fix` adıyla yürür.
 - Kural dosyaları bu karara göre güncellenir. Python dosyasında M-8 değişir. Python dışı dosyada H-10 ve F-4 değişir. Ayrı arayüz dosyasında TS-9 ve IC-1 değişir. Codex ve Gemini değişikliği iki turda inceledi.
 
+Karar 44 bu kuralı kod yorumlarına genişletti.
+
 ### Karar 41. Kural dosyasının sınırı 36.000 ile 39.000 bayt arasında olacak
 
 Python kural dosyası 38.000 baytlık sınırdaydı. İngilizce kuralı dosyaya 39 bayt ekliyordu. Claude sınır artışını sordu. Proje sahibi şöyle cevap verdi:
@@ -941,6 +943,21 @@ Karar şu beş kuralı içerir:
 Bu karar, Karar 43'teki varsayılan dili İngilizce yapmayı erteleme hükmünü kaldırır.
 Karar 43'ün GILT altyapısına ilişkin onayı geçerlidir.
 Bu karar üst yapının kapsamını belirlemez.
+
+#### Kod yorumlarının dili
+
+Proje sahibi bu maddeyi 27 Kasım 2026 Cuma günü ekledi.
+Maddenin kaydı AJA-1407 işindedir.
+
+Karar 40 kod adlarını İngilizce yaptı.
+Bu madde aynı kuralı kod yorumlarına genişletir.
+
+Madde şu dört kuralı içerir:
+
+1. Kod yorumları da İngilizce yazılır. Yazım İngiliz İngilizcesidir (`en-GB`).
+2. Yeni kod Türkçe yorum eklemez.
+3. Var olan Türkçe yorumlar ayrı işlerde İngilizceye çevrilir.
+4. Yeni Türkçe yorumu reddeden bir denetim kurulacak. Bu denetim de ayrı bir iştir.
 
 ## Modellerin kararları
 
