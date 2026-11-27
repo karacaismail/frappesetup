@@ -942,6 +942,27 @@ Bu karar, Karar 43'teki varsayılan dili İngilizce yapmayı erteleme hükmünü
 Karar 43'ün GILT altyapısına ilişkin onayı geçerlidir.
 Bu karar üst yapının kapsamını belirlemez.
 
+### Karar 45. PR'ları ProPR birleştirecek
+
+Müşteri bu kuralı 27 Kasım 2026 Cuma günü koydu. Kural değişmez. Kuralı yalnız müşterinin açık yeni kararı değiştirir. Kararın kaydı AJA-1489 işindedir.
+
+Karar şu beş kuralı içerir:
+
+1. PR'ları ProPR birleştirir.
+2. ProPR'ın her commit'inde yazar ve committer `karacaismail <35493655+karacaismail@users.noreply.github.com>` olur. Kural üç commit türünü kapsar. Bunlar ana dalı PR dalına birleştiren commit, çakışma çözen commit ve ProPR düzeltme commit'idir.
+3. Kimliği iki değişken verir. Değişkenler şunlardır: `PROPR_AGENT_COMMIT_AUTHOR_NAME=karacaismail` ve `PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com`. Değişkenler boş bırakılmaz ve silinmez.
+4. GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı kabul etti.
+5. ProPR Git'i hook'lar kapalı çalıştırır. Yazar koruması bu commit'leri denetlemez. Kimliği değişkenler korur.
+
+Bu karar eski kuralın yerine geçer. Eski kurala göre ProPR yalnız gözlemciydi. Birleştirmeyi kapı betiği yapıyordu.
+
+Sitedeki karşılığı şudur:
+
+- Sitedeki karar kaydı K-64'tür. İş tanımı bu kararı K-62 diye anıyordu. K-62 ve K-63 numaraları sitede zaten kullanılıyordu.
+- Kuralı sitenin “ProPR” sayfası anlatır.
+- Kurulum adımları `Propr_setup/propr_setup.md` belgesindedir.
+- Committer'ın denetimi `review-template.md` dosyasındadır.
+
 ## Modellerin kararları
 
 Proje sahibi bu konuları cevapsız bıraktı ya da modellere bıraktı. Proje sahibi bu kararları değiştirebilir.

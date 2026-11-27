@@ -13,7 +13,8 @@ QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme sürecini 
 5. Her satıra kural kodunu ve sonucu yazın.
 6. Her satıra kanıtı veya eksikliği ekleyin.
 7. İncelenen son commit kimliğini yazın.
-8. Birleştirme kararını gerekçesiyle yazın.
+8. Committer her PR'da commit kimliğini denetler. Ayrıntı “Commit kimliği denetimi” bölümündedir.
+9. Birleştirme kararını gerekçesiyle yazın.
 
 Commit, Git içindeki değişiklik kaydıdır. QA ve Committer aynı son commit'i inceler. Geliştirici yeni commit eklerse etkilenen kurallar yeniden incelenir.
 
@@ -49,6 +50,28 @@ QA şu satırı yazar:
 | G-4 | [frappe-python-standartlari.md](frappe-python-standartlari.md) | uygun değil | Kullanıcının seçtiği kayıtta `ignore_permissions=True` kullanılıyor. |
 
 Committer aynı aykırılığı kendi yorumuna yazar. Committer dalı birleştirmez. Geliştirici izin atlamasını düzeltir. QA düzeltmeyi yeniden dener.
+
+## Commit kimliği denetimi
+
+Committer her PR'da commit kimliğini denetler. Bu kuralı müşteri 27 Kasım 2026 Cuma günü koydu. Kural `KARARLAR.md` dosyasında Karar 45 olarak yazılıdır.
+
+PR'daki her commit'in iki kimlik alanı vardır. Yazar, değişikliği yazan kişidir. Committer, commit'i oluşturan kişidir. İki alan da şu değeri taşımalı:
+
+```text
+karacaismail <35493655+karacaismail@users.noreply.github.com>
+```
+
+Kural ProPR'ın commit'lerini de kapsar. Örneğin ana dalı PR dalına birleştiren commit bu kapsamdadır. Çakışma çözen commit ve ProPR düzeltme commit'i de bu kapsamdadır.
+
+Tek istisna GitHub'ın son birleşme commit'idir. GitHub bu commit'in committer alanına GitHub yazar. Müşteri bu istisnayı kabul etti. Bu commit'in yazar alanı yine `karacaismail` olmalı.
+
+Committer kimliği şu komutla listeler:
+
+```bash
+git log --format='%H %an <%ae> | %cn <%ce>' <hedef-dal>..<pr-dalı>
+```
+
+Bir commit'te başka bir ad varsa dal birleşmez. Örneğin `propr-dev[bot]` adı görünürse dal birleşmez. Committer sonucu inceleme yorumuna yazar. Committer işi gerekçesiyle geliştiriciye geri verir.
 
 ## Otomatik denetimin sınırı
 

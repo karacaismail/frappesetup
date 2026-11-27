@@ -647,6 +647,31 @@ test.describe('content consistency', () => {
     expect(introduction).toContain('Son gün 27 Kasım 2026 Cuma günüdür.');
   });
 
+  test('ProPR merge and commit identity rule is recorded (AJA-1497)', () => {
+    const identityVariables = [
+      'PROPR_AGENT_COMMIT_AUTHOR_NAME=karacaismail',
+      'PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com',
+    ];
+    const setup = read('Propr_setup/propr_setup.md');
+    for (const variable of identityVariables) expect(setup, variable).toContain(variable);
+    expect(setup).not.toContain('ProPR PR birleştirmez');
+
+    const page = docs.find((d) => d.slug === 'ai-propr')?.text ?? '';
+    expect(page).not.toContain('ProPR PR birleştirmez');
+    expect(page).toContain("PR'ları ProPR birleştirir.");
+    expect(page).toContain('K-64');
+
+    const decisions = read('docs/standartlar/KARARLAR.md');
+    const decision = decisions.split(/^### Karar 45\./m)[1]?.split(/^#{1,3} /m)[0] ?? '';
+    for (const reference of [...identityVariables, '27 Kasım 2026 Cuma günü', 'K-64', 'AJA-1489'])
+      expect(decision, reference).toContain(reference);
+    expect(decisions.indexOf('### Karar 45.')).toBeGreaterThan(decisions.indexOf('### Karar 44.'));
+
+    const review = read('docs/standartlar/review-template.md');
+    expect(review).toContain('karacaismail');
+    expect(review).toMatch(/commit kimliğini denetler/);
+  });
+
   test('built pages have no table rows rendered as paragraphs', () => {
     // Tablo içindeki boş satır markdown tablosunu böler; kalan satırlar `<p>| …` olarak yayımlanır.
     const dist = new URL('dist/', root);

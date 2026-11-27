@@ -31,19 +31,48 @@ Bu klasör depoda `Propr_setup` adıyla durur. Klasörde beş dosya vardır:
 
 ## 1. ProPR bizim kurulumumuzda ne yapar
 
-ProPR, `karacaismail/frappesetup` deposunu izler. ProPR depoyu yalnız okur.
+ProPR, `karacaismail/frappesetup` deposunu izler.
 
-ProPR kod yazmaz. ProPR commit atmaz. ProPR PR birleştirmez.
+Müşteri 27 Kasım 2026 Cuma günü yeni bir kural koydu. Kural değişmez. Sitedeki karar kaydı K-64'tür. Kural şudur:
 
-Birleştirmeyi kapı betiği yapar. Betiğin yolu şudur:
+1. PR'ları ProPR birleştirir.
+2. ProPR'ın her commit'inde yazar ve committer `karacaismail <35493655+karacaismail@users.noreply.github.com>` olur.
+3. GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı kabul etti.
+
+Kural ProPR'ın üç commit türünü kapsar:
+
+- ana dalı PR dalına birleştiren commit,
+- çakışma çözen commit,
+- ProPR'ın yazdığı düzeltme commit'i.
+
+### Commit kimliği değişkenleri
+
+Kimliği iki değişken verir. Değişkenler ProPR'ın `.env` dosyasındadır. Dosyanın yolu şudur:
+
+```text
+~/Library/Application Support/ProPR Desktop/local-runtime/.env
+```
+
+İki değişken şu değerleri taşır:
+
+```text
+PROPR_AGENT_COMMIT_AUTHOR_NAME=karacaismail
+PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com
+```
+
+Bu iki değişkeni boş bırakmayın. Bu iki değişkeni silmeyin. Değişken boş kalırsa ProPR yazar alanına `propr-dev[bot]` yazar.
+
+ProPR Git'i hook'lar kapalı çalıştırır. Hook, Git'in her commit'te çalıştırdığı denetimdir. Bu yüzden yazar koruması ProPR commit'lerini denetlemez. Kimliği yalnız bu iki değişken korur.
+
+### Eski kurulumdan kalan bölümler
+
+Bu belge önce 22 Kasım 2026 Pazar günü yazıldı. O gün ProPR yalnız gözlemciydi. Birleştirmeyi kapı betiği yapıyordu. Betiğin yolu şuydu:
 
 ```text
 ~/.config/frappesetup-pr/pr_gate.py
 ```
 
-Betik önce CI sonucuna bakar. CI geçerse `main` dalını hızlı ileri alır. Bu işlemde yeni commit oluşmaz.
-
-GitHub'ın birleştirme düğmesini kullanmıyoruz. Bu düğme committer alanına GitHub yazar. Bu durum yazar kuralımıza aykırıdır.
+Belgedeki GitHub izinleri o günkü kurulumu anlatır. "Yapmayın" bölümündeki birleştirme ve yazma izni maddeleri de o güne aittir. Bu maddeler yeni kurala göre henüz gözden geçirilmedi. Açık işler listesinin 7. maddesi bu işi anlatır.
 
 ## 2. Ön koşullar
 
@@ -650,6 +679,7 @@ LC_ALL=C sed -i '' -E '/(^|;)[0-9a-f]{40}$/d' ~/.zsh_history
 
 5. İndirilenler klasöründeki `.pem` dosyasını çöp kutusuna taşıyabilirsiniz. ProPR bu dosyanın kendi kopyasını sakladı.
 6. ProPR'da ajan tanımlı değildir. Bu durum bilinçli bir seçimdir.
+7. GitHub izinlerini ve "Yapmayın" bölümünü K-64 kuralına göre gözden geçirin. Bu belge değişkenlerin çalıştığını doğrulamaz. ProPR'ın gerçek bir commit'i denetlenmedi.
 
 ## 11. Yapmayın
 
