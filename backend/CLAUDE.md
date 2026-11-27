@@ -56,7 +56,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 
 Her liste kancası dosyada yalnız bir kez atanır. Örneğin `auth_hooks` ya da `ai_write_closed_doctypes` böyledir. Kanca dosyada varsa kendi değerinizi o listeye ekleyin. Yeni bir atama satırı yazmayın. Python'da son atama öncekileri siler ve Git bunu çakışma saymaz. Birleştirme önizlemesi aynı adın iki kez atanmasını yakalar.
 
-`platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı orkestratör birleştirmede çözer.
+`platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı PR birleşirken ProPR çözer.
 
 ## Zorunlu çalışma kuralları
 
@@ -171,7 +171,16 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
   ```
 
 - `--no-verify` kullanmayın. Yazar korumasını ve `core.hooksPath` ayarını değiştirmeyin.
-- Push yapmayın. Pull request açmayın. Dalları orkestratör birleştirir.
+- `backend` dalı GitHub'dadır. `backend` dalına PR ile girilir. PR'ı ProPR birleştirir.
+- Akış şöyledir:
+  1. Dalınızı güncel `origin/backend` ucundan açın.
+  2. İş bitince yalnız kendi dalınızı GitHub'a gönderin.
+  3. `backend` dalına PR açılır. GitHub CI testleri koşar.
+  4. QA ve Committer PR'ı inceler.
+  5. PR'ı ProPR birleştirir. Çakışmayı da ProPR çözer.
+- `backend` dalına yerelde birleştirme yapmayın. `backend` dalına doğrudan push etmeyin.
+- GitHub'ın birleştirme düğmesini kullanmayın.
+- `main` dalına yayın ayrı bir PR ile girer.
 - Commit mesajını yalın Türkçe yazın. Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
 
 ### Alt ajanlar
@@ -207,13 +216,13 @@ runpane report --state <ready|blocked|failed|done> --summary-file <durum dosyas�
 
 - Durum dosyasını `.pane/prompts/durum.md` yoluna yazın. Bu klasör Git'e girmez.
 - Durum dosyasına her denetimin komutunu ve sonucunu yazın. Sonuç `pass`, `fail`, `not_run` ya da `not_applicable` olur.
-- Kontrol noktasında `ready` raporlayın. Orkestratör dalınızı inceler ve birleştirir.
+- Kontrol noktasında `ready` raporlayın. Dalınız PR ile incelenir. PR'ı ProPR birleştirir.
 - Rapordan sonra durmayın. Beklemeden sonraki kontrol noktasına geçin. Proje sahibi işin hiç durmamasını istedi.
 - Bütün kontrol noktaları bitince `done` raporlayın. Orkestratör size yeni iş verir.
 - Bir önkoşul henüz gelmediyse onu beklemeyin. O işe bağlı olmayan bölümü yapın. Örneğin testleri ve sözleşmeyi önce yazın.
 - Proje sahibi kararları ajana bıraktı (D-10). Proje sahibine soru sormayın.
 - Karar gerekiyorsa en güvenli ve en yalın seçeneği seçin. Kararı gerekçesiyle durum dosyasına ve gerekiyorsa `docs/kararlar/` notuna yazın. Sonra işe devam edin.
-- Orkestratör kararı birleştirmede inceler. Gerekirse değiştirir.
+- QA ve Committer kararı PR incelemesinde denetler. Gerekirse değiştirir.
 - Yalnız şu durumda `blocked` raporlayın: iş ilerleyemiyor ve seçim geri alınamaz bir sonuç doğuruyor. Örneğin veri silme ya da dış servise yazma böyledir. Soruyu ve seçenekleri şöyle verin:
 
   ```bash

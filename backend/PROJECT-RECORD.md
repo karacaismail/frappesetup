@@ -241,11 +241,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-31. MVP performans sınırı.** Sunucu süresi okuma uçlarında p95 500 milisaniyeyi, yazma uçlarında p95 1 saniyeyi geçmez. Ölçüm geliştirme sitesinde örnek veriyle yapılır. Örnek veri 200 çalışan ve 2.000 izin kaydıdır. Her uç en az 50 kez çağrılır. Ölçümü elle başlatılan bir komut yapar ve sonucu durum dosyasına yazar. Frappe dışındaki servisler, örneğin identity-sync, kendi geliştirme kurulumunda sahte hedeflerle ölçülür. Bu ölçüm O-31 için geçerlidir, çünkü servis süresi hedef servisten ayrı ölçülür. identity-sync'te bir olay kuyruktaki silme işlerini de sürdürebilir (O-27). Bu ek iş olay başına en çok 3 iştir. Kuyruk okuması, ağ okumaları ve yeniden deneme araları birlikte en çok 5 saniye sürer. Sonucu kayda yazmak bu sürenin dışındadır. Kuyruk boşken olay yanıtı bu işten etkilenmez. 5 saniye p95 sınırı değildir. Bu süre en kötü durumun sınırıdır. Grafana ve gerçek kullanıcı ölçümü P1 işidir (G-149). Bu yüzden teknik borç tablosuna yazıldı.
 - **O-32. Saklama temizliği kopya bırakmaz.** Saklama süresi dolan kayıt kalıcı silinir. Kod `frappe.delete_doc` çağrısına `delete_permanently=True` verir. Böylece “Deleted Document” tablosunda kopya kalmaz. Geri dönüş yolu veritabanı yedeğidir. V-10 kuralının geri yükleme kopyası yalnız yöneticinin iş kaydını elle silmesi için geçerlidir. Bu kural bütün modüllerin saklama temizliğine uygulanır. Örneğin model geçidi ve yapay zekâ katmanının günlük temizliği böyledir.
 - **O-33. Bağımsız dal sırayı beklemez.** O-19 sırası bağımlılık içindir. Bağımsız inceleme `pass` veren ve başka dala bağlı olmayan dal hemen birleşir. Bağımlı dal bağlı olduğu daldan sonra birleşir. Örneğin press-tr ve identity-sync dalları kimlik-realm dalından sonra birleşir, çünkü ikisi de `oidc_verify` kitaplığını kullanır. ilk-dikey-dilim dalı platform-core-yz ve erisim-kurali dallarından sonra birleşir. Her birleşmeden sonra orkestratör kapıları, modül sınırını ve ortak dosya denetimlerini çalıştırır.
-- **O-34. Yasaklı adı taşıyan commit mesajı yayımlanmaz.** Yasaklı ürün adı (D-13) yerel geçmişte sekiz commit mesajında kaldı. Biri `backend` dalındaki `58e8dbc` kaydıdır. Yedisi `ilk-dikey-dilim` dalının ilk kayıtlarıdır. Bu kayıtlar hiçbir uzak depoya gönderilmedi. Geçmişi yeniden yazmak öteki dalların ortak atasını bozar. Bu yüzden şu kurallar uygulanır:
+- **O-34. Yasaklı adı taşıyan commit mesajı yayımlanmaz.** Yasaklı ürün adı (D-13) yerel geçmişte sekiz commit mesajında kaldı. Biri `backend` dalındaki `58e8dbc` kaydıdır. Yedisi `ilk-dikey-dilim` dalının ilk kayıtlarıdır. Bu kayıtlar o gün hiçbir uzak depoya gönderilmemişti. Geçmişi yeniden yazmak öteki dalların ortak atasını bozar. Bu yüzden şu kurallar uygulanır:
   - `ilk-dikey-dilim` dalı `backend` dalına `git merge --squash` ile girer. Birleşme commit'i yeni ve temiz bir mesaj taşır.
   - `backend` dalı `main` dalına tek commit olarak girer. Yasaklı adı taşıyan hiçbir commit uzak depoya gönderilmez. Gönderim için proje sahibinin onayı gerekir.
   - Uygunluk kapısı commit mesajlarındaki yasaklı adı yakalamaya devam eder.
   - integration-e2e işinin geçici önizleme dalları uzak depoya gönderilmez. İş bitince silinir.
+  - 27 Kasım 2026 Cuma günü müşteri `backend` dalının GitHub'a gitmesine karar verdi. `58e8dbc` kaydı bu gönderimle GitHub'a gitti. Geçmiş yeniden yazılmadı. `backend` dalının `main` dalına tek commit olarak girme kuralı sürer.
 - **O-35. Ölçüm komutları yalnız ayrı deneme sitesinde çalışır.** Performans ölçüm komutu var olan veriye ve kuyruğa dokunmaz. Kurallar şunlardır:
   - Komut yalnız adı `perf-` ile başlayan ve `.localhost` ile biten sitede çalışır. Site ayarında `allow_performance_fixture` değeri 1 olmalıdır. Öteki sitede komut veri oluşturmadan durur.
   - Komut başlamadan önce kuyruk boş olmalıdır. Kuyruk boş değilse komut veri oluşturmadan durur. Komut başka işin kuyruğunu çalıştırmaz.
@@ -455,7 +456,11 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 
 - Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
 - Sunucu, DNS, yasal kutu ve ödeme hesabı işleri insanda kalır.
-- Push, pull request ve canlıya yükleme bu turda yapılmaz.
+- `backend` dalı GitHub'dadır. Bu, müşterinin 27 Kasım 2026 Cuma günkü kararıdır.
+- `backend` dalına PR ile girilir. PR'ı ProPR birleştirir.
+- Hiçbir ajan `backend` dalına yerelde birleştirme yapmaz. Hiçbir ajan `backend` dalına doğrudan push etmez.
+- `main` dalına yayın ayrı bir PR ile girer.
+- Canlıya yükleme bu turda yapılmaz.
 
 ## Kişisel veri
 
