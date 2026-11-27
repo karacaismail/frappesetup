@@ -472,18 +472,25 @@ Proje sahibi "tüm codebase ingilizce olmalı" dedi. Karar 40 yalnız kod adlar�
 
 Denetim şu yerlerde çalışır:
 
-1. atonota-web deposunda denetim `npm run lint` komutunun içinde çalışır. CI da aynı komutu çalıştırır.
-2. frappesetup deposunda denetim `backend` uygulamaları için CI içinde çalışır.
+1. atonota-web deposunda denetim ayrı bir `lint:comments` betiğidir. `npm run lint` komutu bu betiği de çalıştırır. CI aynı komutu çalıştırır.
+2. frappesetup deposunda denetim `backend` uygulamaları için yeni bir CI adımıdır. Bugünkü CI bu uygulamaları denetlemiyor. Adımı uygulayan takım ekler.
 3. Committer inceleme listesine bir satır eklenir. Satırda "Yeni Türkçe yorum yok" yazar.
 
 Denetim Git hook'u olarak kurulmaz. Böylece yazar koruması ve hook ayarları değişmez.
 
-Denetim şöyle çalışır:
+ESLint ve öteki araçlar bütün dosyayı okur. Bu araçlar Git farkını bilmez. atonota-web deposunda bugün Türkçe harfli yaklaşık 1059 yorum satırı var. Araç tek başına çalışırsa denetim hemen düşer. Bu yüzden denetimi bir sarmalayıcı betik yürütür.
 
-1. Denetim yalnız yeni eklenen satırlara bakar. Yeni satırları ana dala göre farktan alır.
-2. Denetim yorumu dilin kendi aracıyla bulur. TypeScript için bir ESLint kuralı yorumları okur. Python için `tokenize` modülü yorumları okur. `ast` modülü docstring metinlerini okur. Keycloak şablonlarında `<#-- -->` ve `<!-- -->` yorumları okunur.
-3. Yeni yorumda Türkçeye özgü harf varsa denetim hata verir. Bu harfler ç, ğ, ı, İ, ö, ş ve ü harfleridir.
-4. Bir kelime listesi Türkçe harfi olmayan Türkçe yorumu yakalar. Örneğin "ile" ve "bu" listededir. Bu kontrol yalnız uyarı verir. Yanlış alarm olabilir.
+Sarmalayıcı betik şu adımları izler:
+
+1. Betik hedef dalı bulur. atonota-web için hedef dal `main` dalıdır. frappesetup için hedef dal `backend` dalıdır.
+2. Betik farkı alır. Komut `git diff --unified=0 <hedef dal>...HEAD` komutudur.
+3. Betik farktan her dosyanın yeni satır numaralarını çıkarır.
+4. Betik yorumları dilin kendi aracıyla bulur. TypeScript için ESLint yorumları okur. Python için `tokenize` modülü yorumları okur. `ast` modülü docstring metinlerini okur. Keycloak şablonlarında `<#-- -->` ve `<!-- -->` yorumları okunur.
+5. Betik yalnız yeni satırlara düşen yorumları tutar. Öteki yorumları atar.
+6. Yeni yorumda Türkçeye özgü harf varsa betik hata verir. Küçük harfler ç, ğ, ı, ö, ş ve ü harfleridir. Büyük harfler Ç, Ğ, İ, Ö, Ş ve Ü harfleridir.
+7. Bir kelime listesi Türkçe harfi olmayan Türkçe yorumu yakalar. Örneğin "ile" ve "bu" listededir. Bu kontrol yalnız uyarı verir. Yanlış alarm olabilir.
+
+CI hedef dalı indirmelidir. Bugün iki depoda da `actions/checkout` adımı yalnız son commit'i indirir. Bu durumda fark alınamaz. Bu yüzden adıma `fetch-depth: 0` ayarı eklenir. Bir başka yol da hedef dalı ayrıca çekmektir. Hedef dal yoksa betik hata verir. Betik bu durumda sessizce geçmez.
 
 Denetim eski satırlara bakmaz. Bu yüzden izin listesi gerekmez. AJA-1409 işi bitince denetim bütün dosyalara açılabilir.
 
