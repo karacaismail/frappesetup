@@ -1,8 +1,8 @@
 <#--
-  ATONOTA: Kaynak Keycloak 26.8.2, keycloak.v2/login/select-authenticator.ftl.
-  Fark: her seçenek formun içinde gerçek bir gönder düğmesidir.
-  Temel şablonda seçenek tıklanan bir "div" öğesidir. O öğe Enter ve Space tuşuyla çalışmaz.
-  Her form ayrı kimlik taşır. Temel şablonda bütün formlar aynı kimliği taşır.
+  ATONOTA: Source Keycloak 26.8.2, keycloak.v2/login/select-authenticator.ftl.
+  Difference: each option is a real submit button inside a form.
+  In the base template an option is a clickable "div" element. That element does not work with Enter or Space.
+  Each form has its own id. In the base template all forms share the same id.
 -->
 <#import "template.ftl" as layout>
 <@layout.registrationLayout displayInfo=false; section>

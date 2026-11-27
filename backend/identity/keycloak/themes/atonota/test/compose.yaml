@@ -1,6 +1,6 @@
-# Tema deneme ortamı. Sahibi kimlik-tema işidir.
-# Bu dosya yalnız temayı sınar. Asıl Keycloak kurulumu kimlik-realm işindedir.
-# Portları ve sırları bin/theme-dev.sh betiği .env dosyasına yazar.
+# Theme test environment. Owned by the kimlik-tema work stream.
+# This file only tests the theme. The real Keycloak setup belongs to the kimlik-realm work stream.
+# The bin/theme-dev.sh script writes the ports and secrets to the .env file.
 name: fs-kimlik-tema
 services:
   keycloak:
@@ -8,7 +8,7 @@ services:
     build:
       context: ..
       dockerfile: test/Dockerfile
-    # start-dev tema önbelleğini kapatır. Veritabanı container içindeki H2 dosyasıdır.
+    # start-dev disables the theme cache. The database is an H2 file inside the container.
     command: ["start-dev", "--import-realm"]
     environment:
       KC_HTTP_PORT: ${KC_PORT:?}
@@ -23,7 +23,7 @@ services:
     ports:
       - "127.0.0.1:${KC_PORT:?}:${KC_PORT:?}"
     healthcheck:
-      # Keycloak imajında curl yok. Resmî belge bash'in /dev/tcp yolunu önerir.
+      # The Keycloak image has no curl. The official documentation suggests bash's /dev/tcp path.
       test:
         - CMD-SHELL
         - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.0 200' <&3"

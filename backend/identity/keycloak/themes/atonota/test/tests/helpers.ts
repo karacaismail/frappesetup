@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 
-// Ortam değerleri bin/theme-dev.sh betiğinin ürettiği .env dosyasından gelir.
+// Environment values come from the .env file written by bin/theme-dev.sh.
 const envPath = fileURLToPath(new URL('../.env', import.meta.url));
 const env = Object.fromEntries(
   readFileSync(envPath, 'utf8')
@@ -76,7 +76,7 @@ type UserOptions = {
   realm?: string;
 };
 
-/** Uydurma bir kullanıcı açar. E-posta alanı `ornek.test` ayrılmış deneme alanıdır. */
+/** Creates a made-up user. The email domain `ornek.test` is a reserved test domain. */
 export async function createUser(options: UserOptions = {}): Promise<string> {
   const email = `deneme-${randomUUID().slice(0, 12)}@ornek.test`;
   const credentials: Record<string, unknown>[] = [{ type: 'password', value: PASSWORD, temporary: false }];
@@ -89,7 +89,7 @@ export async function createUser(options: UserOptions = {}): Promise<string> {
     });
   }
   if (options.webauthn) {
-    // Yalnız ekranı göstermek için uydurma bir güvenlik anahtarı kaydı. Bu kayıtla giriş yapılamaz.
+    // A made-up security key record, only for showing the screen. It cannot be used to sign in.
     credentials.push({
       type: 'webauthn',
       userLabel: 'Deneme anahtarı',
@@ -124,7 +124,7 @@ export async function createUser(options: UserOptions = {}): Promise<string> {
   return email;
 }
 
-/** Giriş akışında güvenlik anahtarı adımını açar. Yalnız deneme realm'ini değiştirir. */
+/** Turns on the security key step in the login flow. Changes only the test realm. */
 export async function enableWebAuthnSecondFactor(): Promise<void> {
   const executions = (await (await admin('/authentication/flows/browser/executions')).json()) as {
     id: string;
@@ -141,7 +141,7 @@ export async function enableWebAuthnSecondFactor(): Promise<void> {
   if (!res.ok) throw new Error(`Akış değişmedi: ${res.status}`);
 }
 
-/** RFC 6238 tek kullanımlık kodu. Anahtar düz metindir (Keycloak kaydındaki değer). */
+/** RFC 6238 one-time code. The key is plain text (the value in the Keycloak record). */
 export function totp(secret: string | Buffer = TOTP_SECRET, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
@@ -163,7 +163,7 @@ export function base32Decode(text: string): Buffer {
   return Buffer.from(bytes.map((byte) => Number.parseInt(byte, 2)));
 }
 
-/** Giriş ekranını açar. Hesap konsolu istemcisi PKCE ister, bu yüzden sabit bir sınama değeri verilir. */
+/** Opens the login screen. The account console client requires PKCE, so a fixed challenge value is given. */
 export function loginUrl(locale?: string, realm = REALM, server = KC): string {
   const params = new URLSearchParams({
     client_id: 'account-console',
@@ -201,7 +201,7 @@ export async function submitPassword(page: Page, email: string, password = PASSW
 
 export type Screen = { name: string; open: (page: Page) => Promise<void> };
 
-/** Görev kapsamındaki ekranlar: giriş, kayıt, parola sıfırlama, TOTP ve passkey. */
+/** Screens in the task scope: login, registration, password reset, TOTP and passkey. */
 export const screens: Screen[] = [
   { name: 'sign-in', open: (page) => openLogin(page) },
   {
@@ -295,7 +295,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    // Kullanıcının hem doğrulama uygulaması hem güvenlik anahtarı vardır. "Başka bir yol" seçenek listesini açar.
+    // The user has both an authenticator app and a security key. The "try another way" link (`doTryAnotherWay`) opens the option list.
     name: 'sign-in-method',
     open: async (page) => {
       await enableWebAuthnSecondFactor();
@@ -318,7 +318,7 @@ export const screens: Screen[] = [
   {
     name: 'passkey-error',
     open: async (page) => {
-      // Tarayıcının anahtar penceresi testte açılamaz. Ret yanıtı burada taklit edilir.
+      // The browser key window cannot open in a test. The refusal is simulated here.
       await page.addInitScript(() => {
         const reject = () => Promise.reject(new DOMException('Deneme reddi', 'NotAllowedError'));
         Object.defineProperty(navigator, 'credentials', { value: { create: reject, get: reject } });

@@ -9,15 +9,15 @@
 
 /* tokens:start */
 /*
- * Ortak tasarım tokenları. Giriş ve hesap temaları bu bölümü birebir aynı taşır. Bir test iki bölümü karşılaştırır.
- * Kaynak: atonota-web deposu, src/design/ klasörü, dal pc/aja997-tokenlar, commit d21799c (AJA-997).
- * Keycloak teması o dosyayı içe aktaramaz. Değerler aynı adla, başına "at-" eklenerek buraya taşındı.
- * Örneğin kaynaktaki --color-primary burada --at-color-primary olur.
- * Kaynak değerler hesaplanır. Buradaki sayılar d21799c commit'inde css-variables.ts çıktısıdır.
- * "taslak" yazan değerler kaynakta yoktur. Onlar onaylı taslaktan gelir: AJA-880, 3. sürüm.
+ * Shared design tokens. The login and account themes carry this section byte for byte. A test compares the two sections.
+ * Source: atonota-web repository, src/design/ folder, branch pc/aja997-tokenlar, commit d21799c (AJA-997).
+ * A Keycloak theme cannot import that file. The values were copied here under the same names, prefixed with "at-".
+ * For example, --color-primary in the source becomes --at-color-primary here.
+ * The source values are computed. The numbers here are the css-variables.ts output at commit d21799c.
+ * Values marked "draft" do not exist in the source. They come from the approved draft: AJA-880, version 3.
  */
 
-/* ---------- Yazı tipi: Outfit kendi sunucumuzdan gelir (SIL OFL 1.1, fonts/OFL.txt) ---------- */
+/* ---------- Typeface: Outfit is served from our own server (SIL OFL 1.1, fonts/OFL.txt) ---------- */
 
 @font-face {
   font-family: "Outfit Variable";
@@ -40,8 +40,8 @@
 }
 
 :root {
-  /* Yazı. Kaynak: tokens.ts fontFamily ve typography. Boyutlar kaynakta px'tir.
-     Burada aynı değer rem ile yazılır: kullanıcının tarayıcı yazı boyutu korunur. 1rem = 16px. */
+  /* Type. Source: tokens.ts fontFamily and typography. Sizes are in px in the source.
+     Here the same value is written in rem, so the user's browser font size is kept. 1rem = 16px. */
   --at-font-ui: "Outfit Variable", Outfit, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --at-font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --at-font-min: 0.875rem; /* 14px */
@@ -55,12 +55,12 @@
   --at-font-weight-md: 500;
   --at-font-weight-lg: 600;
 
-  /* Kontrol yüksekliği. Kaynak: tokens.ts sizes.button. */
+  /* Control height. Source: tokens.ts sizes.button. */
   --at-control-h-sm: 36px;
   --at-control-h-md: 42px;
   --at-control-h-lg: 48px;
 
-  /* Boşluk. Kaynak: tokens.ts space. */
+  /* Spacing. Source: tokens.ts space. */
   --at-space-xxs: 4px;
   --at-space-xs: 8px;
   --at-space-sm: 12px;
@@ -69,7 +69,7 @@
   --at-space-xl: 32px;
   --at-space-xxl: 48px;
 
-  /* Yerleşim. Kaynak: tokens.ts layout ve radius. */
+  /* Layout. Source: tokens.ts layout and radius. */
   --at-form-max-width: 420px;
   --at-card-padding: 24px;
   --at-icon-size: 20px;
@@ -77,10 +77,10 @@
   --at-card-radius: 10px;
   --at-border-width: 1px; /* tokens.ts border.width */
 
-  /* Dokunma alanı. Kaynak: tokens.ts hitTarget. Görünen boyuttan ayrıdır. */
+  /* Hit target. Source: tokens.ts hitTarget. It is separate from the visible size. */
   --at-hit-target: 44px;
 
-  /* Odak göstergesi. Kaynak: tokens.ts focusIndicator. Çevreleyen halka değildir, alt kenarda tek çizgidir. */
+  /* Focus indicator. Source: tokens.ts focusIndicator. It is not a surrounding ring but a single line on the bottom edge. */
   --at-focus-indicator-size: 2px;
 
   /* Hareket. Kaynak: motion.ts. */
@@ -89,18 +89,18 @@
   --at-motion-duration-mid: 200ms;
   --at-motion-duration-instant: 0ms;
 
-  /* Birincil renk. Kaynak: tokens.ts primary. #00aacc açık temada yazı rengi olmaz, yalnız düğme zeminidir. */
+  /* Primary colour. Source: tokens.ts primary. In the light theme #00aacc is never a text colour, only a button background. */
   --at-color-primary: #00aacc;
   --at-color-primary-hover: #00b2dd;
   --at-color-primary-active: #00baee;
-  /* Açık temada birincil düğme zemini birincil renktir. Koyu temada kaynak ayrı bir düz zemin verir. */
+  /* In the light theme the primary button background is the primary colour. In the dark theme the source gives a separate solid background. */
   --at-primary-bg: var(--at-color-primary);
   --at-primary-bg-hover: var(--at-color-primary-hover);
   --at-primary-bg-active: var(--at-color-primary-active);
   --at-primary-text: rgba(0, 0, 0, 0.85);
   --at-primary-text-hover: rgba(0, 0, 0, 1);
 
-  /* Zemin, metin ve çizgi: açık tema. Kaynak: tokens.ts palette.light ve link.light. */
+  /* Background, text and lines: light theme. Source: tokens.ts palette.light and link.light. */
   --at-color-bg-layout: #f4f5f7;
   --at-color-bg-panel: #ffffff;
   --at-color-bg-panel-alt: #eef0f3;
@@ -119,14 +119,14 @@
   --at-color-link-hover: #006e89;
   --at-color-link-active: #006e8e;
   --at-focus-indicator-color: #006f86;
-  /* Hata yazısı. Kaynak: tokens.ts danger.light.color (antd colorError, 4.5:1 için koyulaştırılmış). */
+  /* Error text. Source: tokens.ts danger.light.color (antd colorError, darkened for 4.5:1). */
   --at-color-error: #ab3335;
-  /* Durum zeminleri. Kaynakta yok. Değerler taslaktan: --ok-tint, --warn-tint, --danger-tint. */
+  /* Status backgrounds. Not in the source. Values from the draft: --ok-tint, --warn-tint, --danger-tint. */
   --at-color-ok-tint: rgba(21, 128, 61, 0.12);
   --at-color-warn-tint: rgba(180, 83, 9, 0.12);
   --at-color-error-tint: rgba(185, 28, 28, 0.1);
 
-  /* Gölge. Kaynak: tokens.ts shadows.light. */
+  /* Shadow. Source: tokens.ts shadows.light. */
   --at-shadow-card: 0.13px 0.13px 0.19px 0 rgba(11, 18, 32, 0.01), 0.27px 0.27px 0.38px 0 rgba(11, 18, 32, 0.01),
     0.53px 0.53px 0.75px 0 rgba(11, 18, 32, 0.01), 1.06px 1.06px 1.5px 0 rgba(11, 18, 32, 0.01),
     2.12px 2.12px 3px 0 rgba(11, 18, 32, 0.01), 4.24px 4.24px 6px 0 rgba(11, 18, 32, 0.01),
@@ -138,9 +138,9 @@
     0px 16px 36px 0 rgba(11, 18, 32, 0.02);
 }
 
-/* Koyu tema. Keycloak bu sınıfı işletim sistemi koyu temadayken ekler. Kaynak: tokens.ts darkVariables. */
+/* Dark theme. Keycloak adds this class while the operating system is in dark mode. Source: tokens.ts darkVariables. */
 :root.pf-v5-theme-dark {
-  /* Koyu temada birincil düğme düz zemindir. Kaynak: tokens.ts primary.dark. */
+  /* In the dark theme the primary button has a solid background. Source: tokens.ts primary.dark. */
   --at-primary-bg: #142c33;
   --at-primary-bg-hover: #123741;
   --at-primary-bg-active: #123943;
@@ -167,7 +167,7 @@
   --at-focus-indicator-color: #16b1d0;
   /* Kaynak: tokens.ts danger.dark.color. */
   --at-color-error: #e88182;
-  /* Taslaktaki koyu tema değerleri. */
+  /* Dark theme values from the draft. */
   --at-color-ok-tint: rgba(74, 222, 128, 0.12);
   --at-color-warn-tint: rgba(251, 191, 36, 0.12);
   --at-color-error-tint: rgba(248, 113, 113, 0.12);
@@ -184,14 +184,14 @@
     0px 16px 36px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Dokunmatik ekranda dokunma alanı büyür. Kaynak: tokens.ts hitTarget.coarse. Görünen kontrol boyutu değişmez. */
+/* On a touch screen the hit target grows. Source: tokens.ts hitTarget.coarse. The visible control size does not change. */
 @media (any-pointer: coarse) {
   :root {
     --at-hit-target: 48px;
   }
 }
 
-/* Azaltılmış hareket: süreler sıfır olur. Kaynak: motion.ts instantMs. */
+/* Reduced motion: durations become zero. Source: motion.ts instantMs. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --at-motion-duration-fast: 0ms;
