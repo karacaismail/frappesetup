@@ -1,11 +1,11 @@
-"""Press işlemleri: okuma, öneri, onaylı yürütme ve izleme.
+"""Press operations: read, proposal, approved execution and tracking.
 
-Bu modüldeki `READS` ve `MUTATIONS` kod izin listesidir: model yalnız buradaki işlem kimliklerini, burada
-tanımlı şemayla ve burada kurulan isteklerle çağırabilir. Kontrat (contracts/) belgeler ve statü taşır;
-yeni bir çağrıyı yürütülebilir yapan tek şey bu dosyadaki koddur.
+`READS` and `MUTATIONS` in this module are the code allow list: the model can only call the operation IDs here,
+with the schema defined here and the requests built here. The contract (contracts/) documents and carries status;
+the only thing that makes a new call executable is the code in this file.
 
-Kaynak: frappe/press @ebf3e2272dc386e9ceb5e064d6c911d7e2adb7c9 (yol/satırlar kontratta). Kurulu Press'in
-sürümü farklı olabilir; uç nokta yoksa hata `press_not_found` olarak döner, sonuç uydurulmaz.
+Source: frappe/press @ebf3e2272dc386e9ceb5e064d6c911d7e2adb7c9 (paths/lines in the contract). The installed Press
+version may differ; if an endpoint does not exist the error comes back as `press_not_found`, and no result is invented.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .redaction import envelope, truncate
 from .schema import validate
 from .util import canonical_json, iso, parse_iso, sha256_hex
 
-# -- şema parçaları ------------------------------------------------------------------------------
+# -- schema fragments ----------------------------------------------------------------------------
 DOCNAME = {"type": "string", "minLength": 1, "maxLength": 140, "pattern": r"[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"}
 APP = {"type": "string", "minLength": 1, "maxLength": 64, "pattern": r"[a-z][a-z0-9_]{0,63}"}
 SITE = {"type": "string", "minLength": 4, "maxLength": 253,
@@ -50,7 +50,7 @@ def _tail(ctx, text, limit: int) -> str:
     return ctx.redactor.text(value)
 
 
-# -- okuma işlemleri -----------------------------------------------------------------------------
+# -- read operations -----------------------------------------------------------------------------
 class ReadOp:
     def __init__(self, op_id, principals, schema, fn):
         self.id, self.principals, self.schema, self.fn = op_id, principals, schema, fn
@@ -76,7 +76,7 @@ _FALLBACK_NOTE = ("Press silently falls back to the user's default team when the
 
 
 def _resolved_team(client) -> str | None:
-    """Press'in bu istek için çözdüğü takım (press.api.account.current_team); kişisel alanlar alınmaz."""
+    """The team Press resolves for this request (press.api.account.current_team); personal fields are not taken."""
     return _pick(client.call("press.api.account.current_team"), ("name",)).get("name")
 
 
@@ -100,7 +100,7 @@ def _release_group_list(ctx, client, p):
         groups = client.call("press.api.bench.all")
     else:
         filters = {"enabled": 1}
-        if client.config.team:  # System User tüm takımları görür; yapılandırılan takımla daraltılır.
+        if client.config.team:  # System User sees all teams; narrowed to the configured team.
             filters["team"] = client.config.team
         groups = client.get_list("Release Group", filters, ["name", "title", "version", "team", "enabled",
                                                             "creation"], p.get("limit", 20))
@@ -162,7 +162,7 @@ _BUILD_STEP_FIELDS = ["idx", "stage", "step", "stage_slug", "step_slug", "status
 
 
 def _candidate_doc(client, name) -> dict:
-    """Operator: candidate satırları (app/source/release/hash) ve bağlı build'ler; açık alan listesiyle."""
+    """Operator: candidate rows (app/source/release/hash) and linked builds; with an explicit field list."""
     head = client.get_one("Deploy Candidate", name, ["name", "group", "team", "creation"])
     apps = [_pick(a, ("app", "source", "release", "hash")) for a in
             _rows(client.children("Deploy Candidate", "Deploy Candidate App", name, _CANDIDATE_APP_FIELDS))]
@@ -217,9 +217,9 @@ _DEPLOY_INFO_KEYS = ("deploy_in_progress", "has_running_release_pipeline", "benc
 
 
 def _deploy_information(client, group) -> dict:
-    """ReleaseGroup.deploy_information (press.api.bench.deploy_information): deploy_in_progress son build'i,
-    o build'in bench'lerini ve yerinde güncelleme işlerini kapsar. press.api.bench.deploy_status yalnız Release
-    Pipeline'a bakar; Desk/press-ai build'i pipeline açmadığı için meşgul durumu kaçırır."""
+    """ReleaseGroup.deploy_information (press.api.bench.deploy_information): deploy_in_progress covers the last build,
+    that build's benches and in-place update jobs. press.api.bench.deploy_status looks only at the Release
+    Pipeline; it misses the busy state because a Desk/press-ai build does not open a pipeline."""
     info = client.call("press.api.bench.deploy_information", {"name": group})
     return info if isinstance(info, dict) else {}
 
@@ -228,9 +228,9 @@ _BENCH_BUSY = ["Pending", "Installing"]
 
 
 def _group_activity(client, group) -> dict:
-    """Grupta süren deploy/bench işi. deploy_information'a ek olarak bench'ler doğrudan okunur: Press'in
-    last_benches_info'su Bench.candidate'ı build adıyla karşılaştırır (release_group.py) ve bench kurulumunu
-    görmez; bench_creation_underway yalnız Release Pipeline varken hesaplanır."""
+    """Deploy/bench work running in the group. In addition to deploy_information, benches are read directly: Press's
+    last_benches_info compares Bench.candidate with the build name (release_group.py) and does not see bench
+    creation; bench_creation_underway is only computed when there is a Release Pipeline."""
     info = _deploy_information(client, group)
     out = _pick(info, ("deploy_in_progress", "has_running_release_pipeline", "bench_creation_underway", "last_deploy"))
     if client.principal == "operator":
@@ -314,7 +314,7 @@ def _site_jobs_read(ctx, client, p):
 
 @read("site.https_check", BOTH, obj(["site"], site=SITE))
 def _site_https_check(ctx, client, p):
-    # Yalnız bu principal'ın Press'te görebildiği siteye istek atılır (rastgele hosta değil).
+    # Requests go only to a site this principal can see in Press (not to an arbitrary host).
     site = _site(client, p["site"])
     if site.get("name") != p["site"]:
         raise KitError("Press did not confirm this site for the configured principal", code="press_not_found")
@@ -322,7 +322,7 @@ def _site_https_check(ctx, client, p):
 
 
 def https_probe(host: str, timeout: float) -> dict:
-    """TLS doğrulaması açık iki GET: Frappe `ping` ve `/login`. Yönlendirme izlenmez; içerik döndürülmez."""
+    """Two GETs with TLS verification on: Frappe `ping` and `/login`. Redirects are not followed; no content is returned."""
     context = ssl.create_default_context()
     result = {"host": host, "tls_verification": "enabled"}
     try:
@@ -399,7 +399,7 @@ def _agent_job_get(ctx, client, p):
         data = client.call("press.api.site.job", {"job": p["job"]}) or {}
         out = _pick(data, _JOB_KEYS)
     else:
-        # request_data / request_files / data alanları registry parolası veya build token taşıyabilir: okunmaz.
+        # The request_data / request_files / data fields may carry a registry password or build token: they are not read.
         data = client.get_one("Agent Job", p["job"], list(_JOB_KEYS) + ["output", "traceback"])
         out = _pick(data, _JOB_KEYS)
         out["output_tail"] = _tail(ctx, data.get("output"), 1200)
@@ -473,9 +473,9 @@ def _press_settings(ctx, client, p):
             "note": "Only non-secret flags and links are read; credentials in Press Settings are never requested."}
 
 
-# -- ön koşullar ---------------------------------------------------------------------------------
+# -- preconditions -------------------------------------------------------------------------------
 class Checks:
-    """Bir öneri veya yürütme turunda ön koşulları hesaplar; aynı okumayı tekrarlamaz."""
+    """Computes the preconditions in one proposal or execution round; does not repeat the same read."""
 
     def __init__(self, ctx, client, params):
         self.ctx, self.client, self.params = ctx, client, params
@@ -487,7 +487,7 @@ class Checks:
         return self.cache[key]
 
     def group_name(self):
-        """İşlemin grubu: doğrudan parametre ya da candidate/build kaydındaki grup (kiracı kapsamı için)."""
+        """The operation's group: a direct parameter or the group on the candidate/build record (for tenant scope)."""
         if "release_group" in self.params:
             return self.params["release_group"]
         if "deploy_candidate" in self.params:
@@ -570,7 +570,7 @@ def _pre_app_present(checks):
 
 
 def _pre_auto_deploy_off(checks):
-    """Yeni App Release, satırda enable_auto_deploy açıksa build+deploy'u birlikte tetikler
+    """A new App Release triggers build+deploy together when enable_auto_deploy is on in the row
     (press/press/doctype/app_release/app_release.py after_insert → auto_deploy)."""
     if checks.client.principal != "operator":
         return None, {"note": "The team principal cannot read Release Group App.enable_auto_deploy; a new release "
@@ -581,7 +581,7 @@ def _pre_auto_deploy_off(checks):
     if row is None:
         return False, {"note": "app row not found in the group"}
     source = row.get("source")
-    # auto_deploy her grupta bu kaynağı enable_auto_deploy=1 ile kullanan satırlar için çalışır (app_release.py).
+    # auto_deploy runs in every group for the rows that use this source with enable_auto_deploy=1 (app_release.py).
     auto_rows = _rows(checks.client.get_list("Release Group App", {"source": source, "enable_auto_deploy": 1},
                                              ["parent", "app", "source"], 100, "idx asc", parent="Release Group"))
     evidence = {"app": row.get("app"), "source": source,
@@ -594,8 +594,8 @@ def _pre_auto_deploy_off(checks):
     if evidence["groups_with_auto_deploy"]:
         return False, evidence
     if marker:
-        # <işaret>-<grup> etiketsiz adlandırılan grubu, <işaret> takımın auto-deploy gruplarını dağıtır; hangisi
-        # olacağını yeni commit'in mesajı belirler (app_release.py _has_auto_deploy_marker). Önceden doğrulanamaz.
+        # <marker>-<group> deploys an untagged, named group; <marker> deploys the team's auto-deploy groups; which one
+        # happens is decided by the new commit's message (app_release.py _has_auto_deploy_marker). It cannot be verified in advance.
         return None, dict(evidence, note="Press Settings deploy_marker is set: the next commit message decides whether "
                                          "Press builds and deploys a named group or the team's auto-deploy groups. A "
                                          "human checks the commit or clears the marker first.")
@@ -609,7 +609,7 @@ def _pre_title_available(checks):
 
 def _pre_source_matches(checks):
     p = checks.params
-    if "apps" in p:  # release_group.create: her app/source çifti seçilen sürümde sunulmalı
+    if "apps" in p:  # release_group.create: every app/source pair must be offered in the selected version
         options = checks.get("bench_options", lambda: checks.client.call("press.api.bench.options"))
         versions = {v.get("name"): v for v in _rows((options or {}).get("versions"))}
         version = versions.get(p["version"])
@@ -623,7 +623,7 @@ def _pre_source_matches(checks):
                                   "the group with the framework source, then add other apps with release_group.add_app."}
         return True, {"verified_pairs": p["apps"]}
     if checks.client.principal == "operator":
-        # Desk: App Source kaydı doğrudan okunur (uygulama, etkinlik, sürüm satırları).
+        # Desk: the App Source record is read directly (app, enabled state, version rows).
         source = checks.client.get_one("App Source", p["source"], ["name", "app", "enabled", "branch",
                                                                     "repository_url", "public", "team"])
         versions = [v.get("version") for v in _rows(checks.client.children(
@@ -633,8 +633,8 @@ def _pre_source_matches(checks):
                     "source_versions": versions, "group_version": group_version}
         ok = source.get("app") == p["app"] and bool(source.get("enabled")) and group_version in versions
         return ok, evidence
-    # Team: App Source Dashboard'da okunamaz (press.api.client ALLOWED_DOCTYPES). installable_apps/options yalnız
-    # çerçeve kaynaklarını döndürür; uygulama kaynakları all_apps ile (Published Marketplace, grubun sürümü) görülür.
+    # Team: App Source cannot be read in the Dashboard (press.api.client ALLOWED_DOCTYPES). installable_apps/options return
+    # only framework sources; app sources are seen with all_apps (Published Marketplace, the group's version).
     rows = checks.client.call("press.api.bench.all_apps", {"name": p["release_group"]})
     pairs = {(a.get("app") or a.get("name"), s.get("name")) for a in _rows(rows) for s in _rows(a.get("sources"))}
     if (p["app"], p["source"]) in pairs:
@@ -676,13 +676,13 @@ _PLATFORM_FIELD = {"x86_64": "intel_build", "arm64": "arm_build"}
 
 
 def _deploy_artifact(checks) -> dict:
-    """Press'in kuracağı imaj: her grup sunucusu için platform → candidate.intel_build / arm_build
-    (deploy.py _get_build_for_bench). deploy() çağrılan build'i kullanmaz."""
+    """The image Press will install: for each group server, platform → candidate.intel_build / arm_build
+    (deploy.py _get_build_for_bench). deploy() does not use the build it is called with."""
     def compute():
         build = _build_doc(checks)
         candidate = checks.client.get_one("Deploy Candidate", build.get("deploy_candidate"),
                                           ["name", "group", "intel_build", "arm_build"])
-        group = build.get("group") or candidate.get("group")  # create_deploy grubu build'den alır
+        group = build.get("group") or candidate.get("group")  # create_deploy takes the group from the build
         servers = [r.get("server") for r in _rows(checks.client.children(
             "Release Group", "Release Group Server", group, ["server"])) if r.get("server")]
         platforms = {s.get("name"): s.get("platform") for s in _rows(checks.client.get_list(
@@ -700,7 +700,7 @@ def _deploy_artifact(checks) -> dict:
 
 
 def _artifact_digest(artifact) -> str:
-    """Ham (maskelenmemiş) artifact'ın özeti; karşılaştırma maskeleme kaybından etkilenmez."""
+    """Digest of the raw (unmasked) artifact; the comparison is not affected by masking loss."""
     return sha256_hex(canonical_json(artifact))
 
 
@@ -714,7 +714,7 @@ def _pre_artifact_matches(checks):
                 "rule": "Press deploys candidate.intel_build/arm_build for each server platform, not the build passed "
                         "to deploy(); it must be this build, with an image. The auto-update site set is pinned too."}
     proposal_id = checks.cache.get("_proposal_id")
-    if ok and proposal_id:  # yürütme: onaylanan (digest'e bağlı) artifact ile birebir aynı olmalı
+    if ok and proposal_id:  # execution: must be exactly the same as the approved artifact (bound to the digest)
         impact = (checks.ctx.store.load(proposal_id).get("preview") or {}).get("impact") or {}
         evidence["approved_artifact_sha256"] = impact.get("artifact_sha256")
         ok = impact.get("artifact_sha256") == digest
@@ -744,11 +744,11 @@ def _pre_site_no_running_jobs(checks):
 
 
 def backup_age_verdict(creation, now_utc):
-    """Yedek 24 saatten yeni mi? Press zamanı kendi saat diliminde yazar ve bu istemci o dilimi bilmez.
+    """Is the backup newer than 24 hours? Press writes time in its own time zone and this client does not know that zone.
 
-    `creation` UTC sanılarak okunur; gerçek fark = saf fark + ofset, ofset UTC-12..UTC+14 aralığındadır.
-    Saf fark -14 sa ile +10 sa arasındaysa yaş her dilimde 24 saatten azdır (True); +36 saatten büyükse
-    her dilimde 24 saatten fazladır (False); arada kalan durum doğrulanamaz (None).
+    `creation` is read as if it were UTC; real difference = naive difference + offset, where the offset is in UTC-12..UTC+14.
+    If the naive difference is between -14 h and +10 h, the age is under 24 hours in every zone (True); if it is over
+    +36 hours, it is over 24 hours in every zone (False); anything in between cannot be verified (None).
     """
     from .util import parse_frappe_datetime
     moment = parse_frappe_datetime(creation)
@@ -952,8 +952,8 @@ MUTATIONS = {
         obj(["site", "app"], site=SITE, app=APP),
         ["team.resolved_matches_config", "site.owned_by_team", "site.active", "site.no_running_jobs",
          "site.app_available", "site.recent_backup"],
-        # plan bilinçli olarak hep None: plan verilirse Press Marketplace aboneliği açar (site.py install_marketplace_conf);
-        # ücretli plan kararı hesap sahibinindir.
+        # plan is deliberately always None: a given plan opens a Press Marketplace subscription (site.py install_marketplace_conf);
+        # the decision on a paid plan belongs to the account owner.
         lambda p: _method("press.api.site.install_app", {"name": p["site"], "app": p["app"], "plan": None}),
         lambda p: "{}:{}".format(p["site"], p["app"]), "double",
         lambda c: {"changes": "Installs app '{}' on live site {} (install hooks and app migrations run)".format(
@@ -969,7 +969,7 @@ _TRACK_JOB_TYPE = {"site.migrate": "Migrate Site", "site.install_app": "Install 
 
 
 def _release_error_logs(client, p):
-    """Operator: kaynağın 'Create Release Error' kayıtları (create_release hatayı yutar ve loglar). Team okuyamaz: None."""
+    """Operator: the source's 'Create Release Error' records (create_release swallows and logs the error). Team cannot read them: None."""
     if client.principal != "operator":
         return None
     rows = _rows(client.children("Release Group", "Release Group App", p["release_group"], ["app", "source"]))
@@ -994,8 +994,8 @@ _SITE_SCAN_LIMIT = 500
 
 
 def _group_sites(checks) -> list:
-    """Press schedule_updates kümesi: Active/Inactive/Suspended, skip_auto_updates kapalı, fatal_site_update yok
-    (site_update.py sites_with_available_update). Broken siteler otomatik güncellenmez ama listelenir."""
+    """Press schedule_updates set: Active/Inactive/Suspended, skip_auto_updates off, no fatal_site_update
+    (site_update.py sites_with_available_update). Broken sites are not updated automatically but are listed."""
     def compute():
         group = _build_doc(checks).get("group")
         rows = _rows(checks.client.get_list(
@@ -1033,7 +1033,7 @@ def _deploy_impact(checks) -> dict:
                                   "approval. Broken sites are not auto-updated.".format(count))}
 
 
-# -- araç uygulamaları ---------------------------------------------------------------------------
+# -- tool implementations ------------------------------------------------------------------------
 def _contract_excerpt(ctx, op_id) -> dict:
     try:
         op = ctx.contract.operation(op_id)
@@ -1153,7 +1153,7 @@ def press_execute(ctx, args):
     if record["request"] != mutation.request(record["params"]):
         raise ApprovalError("Stored request does not match the operation", code="state_tampered")
     client = ctx.press()
-    # Aynı (işlem, hedef) için tek yürütme: ön koşullar kilit altında yeniden okunur (bkz. ProposalStore).
+    # One execution per (operation, target): preconditions are read again under the lock (see ProposalStore).
     lock = ctx.store.acquire_target_lock(record["operation"], record["target"], record["id"])
     try:
         checks, results = _run_checks(ctx, client, mutation, record["params"], record["id"])
@@ -1165,7 +1165,7 @@ def press_execute(ctx, args):
         ctx.store.consume(record["id"])
         request = record["request"]
         outcome = {"executed_at": iso(ctx.clock()), "snapshot": snapshot, "track": mutation.track, "checks": results}
-        # İstek gönderilmeden önce kalıcı iz: süreç ölse bile sonuç 'unknown' kalır, kör tekrar engellenir.
+        # Durable trace before the request is sent: even if the process dies the outcome stays 'unknown', and a blind retry is blocked.
         ctx.store.record_outcome(record["id"], dict(outcome, state="unknown", phase="dispatching"))
         try:
             if request["transport"] == "method":
@@ -1199,8 +1199,8 @@ _CONTROL_KEYS = ("proposal_id", "operation", "target", "state", "phase", "track"
 
 
 def _wrap_result(result, redactor) -> dict:
-    """Denetim alanları açık kalır; Press'ten türeyen her şey (yanıt, kanıt, snapshot, referans, hata) zarfa girer.
-    `checks` içindeki kanıt zaten zarflıdır."""
+    """Control fields stay open; everything derived from Press (response, evidence, snapshot, reference, error) goes into the envelope.
+    The evidence in `checks` is already enveloped."""
     out = {k: v for k, v in result.items() if k in _CONTROL_KEYS}
     data = {k: v for k, v in result.items() if k not in _CONTROL_KEYS}
     if data:
@@ -1242,7 +1242,7 @@ def press_track(ctx, args):
     if outcome is None:
         return {"proposal_id": proposal_id, "state": "not_executed", "proposal": ctx.store.status(proposal_id)}
     if outcome.get("phase") == "consumed_without_outcome" or not outcome.get("executed_at"):
-        # consume → 'dispatching' kaydı → gönderim sırası: kayıt yoksa istek hiç gönderilmedi. Probe çalışmaz, yazılmaz.
+        # consume → 'dispatching' record → send order: if there is no record, the request was never sent. The probe does not run or write.
         return {"proposal_id": proposal_id, "operation": record["operation"], "target": record["target"],
                 "state": "unknown", "phase": "not_sent",
                 "meaning": "Consumed before dispatch; nothing was sent. A human resolves it with server.py resolve."}
@@ -1357,8 +1357,8 @@ def _track_deploy(ctx, client, record, outcome):
                                       "('Deploy Creation Error')."}
         name = rows[0]["name"]
     deploy = client.get_one("Deploy", name, ["name", "group", "candidate", "creation"])
-    # Beklenen sunucular Deploy Bench satırlarıdır; Deploy Bench.bench @ebf3e22'de New Bench Queue'ya bağlıdır.
-    # Kuyruk işlendikçe her sunucuda Bench (candidate alanı) ve New Bench işi kademeli oluşur.
+    # The expected servers are the Deploy Bench rows; at @ebf3e22 Deploy Bench.bench is linked to the New Bench Queue.
+    # As the queue is processed, a Bench (candidate field) and a New Bench job are created step by step on each server.
     rows = _rows(client.children("Deploy", "Deploy Bench", name, ["server", "bench"]))
     queue_names = [r.get("bench") for r in rows if r.get("bench")]
     queues = {q.get("name"): q for q in _rows(client.get_list(
@@ -1370,7 +1370,7 @@ def _track_deploy(ctx, client, record, outcome):
     servers = []
     for row in rows:
         queue = queues.get(row.get("bench")) or {}
-        # Yalnız bu deploy'un kuyruğunun işaret ettiği bench sayılır; aynı candidate'ın başka bench'i değil.
+        # Only the bench this deploy's queue points to is counted; not another bench of the same candidate.
         bench = benches.get(queue.get("bench")) if queue.get("bench") else None
         job = None
         if bench:
@@ -1461,7 +1461,7 @@ TRACKERS = {
 
 
 def implemented_schemas() -> dict:
-    """Kod izin listesindeki işlemlerin params şeması (kontrattaki `params` ile birebir aynı olmalı)."""
+    """Params schema of the operations in the code allow list (must be exactly the same as `params` in the contract)."""
     schemas = {op_id: op.schema for op_id, op in READS.items()}
     schemas.update({op_id: m.schema for op_id, m in MUTATIONS.items()})
     schemas["build.triage"] = TRIAGE_SCHEMA

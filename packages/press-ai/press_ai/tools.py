@@ -1,4 +1,4 @@
-"""Araç kaydı ve çalışma bağlamı. Araç adları ve şemaları INTERFACE.md'deki tabloyla aynıdır."""
+"""Tool registry and run context. Tool names and schemas match the table in INTERFACE.md."""
 from __future__ import annotations
 
 import json
@@ -76,7 +76,7 @@ def implemented_schemas() -> dict:
     return schemas
 
 
-# -- çekirdek araçlar ----------------------------------------------------------------------------
+# -- core tools ----------------------------------------------------------------------------------
 def kit_status(ctx, args):
     config = ctx.config
     contract = ctx.contract
@@ -144,9 +144,9 @@ def ui_reference_search(ctx, args):
 
 
 def proposal_get(ctx, args):
-    """Durum; `detail: true` ile bağımsız inceleme için params, istek, önizleme ve tam özet de döner. Workspace
-    önerisinde değişiklik satırları onay ekranıyla aynı yoldan (yazılacak içerik → güncel dosyaya karşı diff) üretilir.
-    İçerik Press'ten veya workspace'ten gelir; güvenilmeyen veri zarfındadır."""
+    """Status; with `detail: true` it also returns params, request, preview and the full digest for independent review. For a
+    workspace proposal the change lines are produced the same way as on the approval screen (content to write → diff against the current file).
+    The content comes from Press or the workspace; it is in the untrusted data envelope."""
     status = ctx.store.status(args["proposal_id"])
     if not args.get("detail"):
         return status
@@ -155,7 +155,7 @@ def proposal_get(ctx, args):
               "preview": record["preview"], "approval_level": record["approval_level"],
               "confirm_phrase": record["confirm_phrase"], "authority": record["authority"]}
     if record["kind"] == "workspace":
-        # İnceleyici yazılacak metni birebir görmeli: desen maskelemesi yok, yalnız yapılandırılmış kimlik değerleri.
+        # The reviewer must see the text to be written verbatim: no pattern masking, only the configured credential values.
         detail["changes"] = app_tools.render_changes(app_tools.workspace_for(ctx, record), record)
         return dict(status, detail=envelope_exact(detail, ctx.redactor))
     return dict(status, detail=envelope(detail, ctx.redactor))

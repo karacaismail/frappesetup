@@ -1,10 +1,10 @@
-"""Press kimlik bilgisini yükler; değer hiçbir araç çıktısına, loga veya repr'a girmez.
+"""Loads the Press credential; the value never enters any tool output, log or repr.
 
-Desteklenen kaynaklar:
-- `file`: kullanıcıya ait, 0600, sembolik bağ olmayan JSON dosyası `{"api_key": "...", "api_secret": "..."}`;
-  repo veya workspace içinde olamaz.
-- `keychain`: macOS `security find-generic-password -s <service> -a <account> -w`; saklanan değer `key:secret`.
-- `env`: adı verilen iki ortam değişkeni. MCP istemci yapılandırmasına secret yazmayı teşvik ettiği için en zayıf yoldur.
+Supported sources:
+- `file`: a JSON file `{"api_key": "...", "api_secret": "..."}` owned by the user, mode 0600, not a symbolic link;
+  it cannot be inside the repository or the workspace.
+- `keychain`: macOS `security find-generic-password -s <service> -a <account> -w`; the stored value is `key:secret`.
+- `env`: two named environment variables. The weakest option, because it encourages writing secrets into the MCP client configuration.
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _inside(path: str, root: str) -> bool:
 
 
 def validate_spec(spec: dict) -> dict:
-    """Yapılandırmadaki kaynak tanımını doğrular; secret okumaz."""
+    """Validates the source definition in the configuration; does not read the secret."""
     if not isinstance(spec, dict):
         raise ConfigError("press.credentials must be an object")
     source = spec.get("source")
@@ -78,7 +78,7 @@ def validate_spec(spec: dict) -> dict:
 
 
 def load(spec: dict, forbidden_roots=()) -> Credentials:
-    """Doğrulanmış kaynaktan kimlik bilgisini okur. Hata iletileri değer içermez."""
+    """Reads the credential from the validated source. Error messages contain no values."""
     source = spec["source"]
     if source == "file":
         path = spec["path"]

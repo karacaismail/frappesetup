@@ -1,7 +1,7 @@
-"""Yapılandırma dosyasını yükler ve yetki sınırlarını doğrular.
+"""Loads the configuration file and validates the authority limits.
 
-Yapılandırma insan tarafından yazılır; MCP araçları onu değiştiremez. Bölümler isteğe bağlıdır:
-`press` yoksa Press araçları, `workspace` yoksa uygulama araçları `not_configured` döner.
+The configuration is written by a human; MCP tools cannot change it. Sections are optional:
+without `press` the Press tools, and without `workspace` the app tools, return `not_configured`.
 """
 from __future__ import annotations
 
@@ -22,10 +22,11 @@ _TOP_KEYS = {"press", "workspace", "approval", "references", "contracts_dir"}
 
 
 def _repo_root() -> str:
-    """Paketin içinde bulunduğu depo kökü (packages/press-ai → iki üst dizin); depo değilse paketin kendisi.
+    """Repository root that contains the package (packages/press-ai → two directories up); the package itself if not a repository.
 
-    Secret ve onay durumu bu kökün altına yazılamaz; paket başka yere kopyalandığında geniş bir üst
-    dizin (ör. ev dizini) yanlışlıkla yasaklı sayılmasın diye kök yalnız bir depo işaretiyle kabul edilir."""
+    Secrets and approval state cannot be written under this root. The root is accepted only with a repository marker,
+    so that a broad parent directory (e.g. the home directory) is not wrongly treated as forbidden when the package is
+    copied elsewhere."""
     candidate = os.path.dirname(os.path.dirname(PACKAGE_ROOT))
     if os.path.exists(os.path.join(candidate, ".git")):
         return candidate
@@ -92,7 +93,7 @@ class PressConfig:
             raise ConfigError("press.enabled_mutations must be a list of operation ids")
         self.enabled_mutations = list(dict.fromkeys(enabled))
         if principal == "operator" and self.enabled_mutations and not team:
-            # System User @protected'ı atlar; sahiplik ön koşulları ancak bir takıma göre anlamlıdır.
+            # System User bypasses @protected; ownership preconditions only make sense relative to a team.
             raise ConfigError("press.team is required when the operator principal has enabled mutations")
 
     def summary(self) -> dict:
@@ -136,7 +137,7 @@ class ApprovalConfig:
                 raise ConfigError("approval.state_dir must live outside the repository and workspace")
         self.state_dir = state
         if data.get("approver_uid") is not None:
-            # Ayrı OS hesabıyla onay bu sürümde uygulanmadı ve test edilmedi; yarım bir sınır sunulmaz.
+            # Approval from a separate OS account is not implemented or tested in this version; a half-built boundary is not offered.
             raise ConfigError("approval.approver_uid is not supported: approvals run as the same OS user as the "
                               "server (a speed bump, not a security boundary)")
         self.approval_ttl = self._ttl(data, "approval_ttl_seconds", 900)

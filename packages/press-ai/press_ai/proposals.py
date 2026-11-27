@@ -1,12 +1,12 @@
-"""Öneri, insan onayı, tek kullanım, uçuştaki yürütme kilidi ve sonuç kaydı.
+"""Proposal, human approval, single use, in-flight execution lock and outcome record.
 
-Akış: araç bir öneri yazar (yürütmez) → insan ayrı terminalde `server.py approve <id>` ile kesin özeti
-yazarak onaylar → araç onayı, özeti, süreyi ve tek kullanımı doğrular, aynı (işlem, hedef) için kilidi alır,
-istek göndermeden önce `unknown/dispatching` sonucunu kalıcı yazar ve isteği bir kez gönderir.
+Flow: a tool writes a proposal (does not execute) → a human approves in a separate terminal with `server.py approve <id>`
+by typing the exact digest → the tool verifies the approval, digest, expiry and single use, takes the lock for the same
+(operation, target), durably writes the `unknown/dispatching` outcome before sending the request, and sends it once.
 
-Sınır: onay sunucuyla aynı OS kullanıcısıyla yazılır. MCP üzerinden onay yazan araç yoktur; ama aynı hesapta
-shell erişimi olan bir süreç onay CLI'sini çalıştırabilir veya durum dizinini düzenleyebilir. Bu düzen bir hız
-kesicidir, OS veya kriptografik güvenlik sınırı değildir. Ayrı onay hesabı desteklenmez (yapılandırmada reddedilir).
+Limit: the approval is written by the same OS user as the server. No tool writes an approval over MCP; but a process
+with shell access on the same account can run the approval CLI or edit the state directory. This arrangement is a
+speed bump, not an OS or cryptographic security boundary. A separate approval account is not supported (refused in the configuration).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .errors import ApprovalError, KitError
 from .util import canonical_json, ensure_private_dir, iso, parse_iso, sha256_hex, utc_now, write_private_file
 
 _ID = re.compile(r"p-[0-9a-f]{20}")
-_MAX_RECORD = 1024 * 1024  # 200 KiB içerik tek kez saklanır; JSON kaçışları için pay
+_MAX_RECORD = 1024 * 1024  # 200 KiB of content is stored once; headroom for JSON escapes
 _SIGNED_FIELDS = ("id", "kind", "operation", "created_at", "expires_at", "authority", "target", "params", "request",
                   "preview", "approval_level", "confirm_phrase")
 _OPEN_STATES = ("accepted", "in_progress", "unknown")
@@ -74,7 +74,7 @@ class ProposalStore:
                 raise ApprovalError("State file is not valid JSON: " + os.path.basename(path),
                                     code="state_tampered") from None
 
-    # -- öneri ------------------------------------------------------------------------------------
+    # -- proposal ---------------------------------------------------------------------------------
     def create(self, kind: str, operation: str, authority: dict, target: str, params: dict, request: dict,
                preview: dict, approval_level: str, confirm_phrase: str | None = None) -> dict:
         if approval_level not in ("single", "double"):
@@ -113,11 +113,12 @@ class ProposalStore:
             raise ApprovalError("Proposal content does not match its digest", code="state_tampered")
         return record
 
-    # -- orijinal core uyarısı ---------------------------------------------------------------------
+    # -- original core warning ---------------------------------------------------------------------
     def core_gate(self, request_digest: str, summary: dict) -> dict | None:
-        """Orijinal core değişikliğinin ilk isteği tek kullanımlık bir uyarı kaydı yazar ve onu döndürür; öneri
-        oluşmaz. Aynı istek (aynı özet) uyarı süresi içinde yeniden gelirse kayıt tüketilir ve None döner: öneri CORE
-        onayıyla oluşturulabilir. Bu bir onay değildir; onay yine ayrı terminalde insanla yazılır."""
+        """The first request for an original core change writes a single-use warning record and returns it; no proposal
+        is created. If the same request (same digest) comes again within the warning period, the record is consumed and
+        None is returned: the proposal may be created with CORE approval. This is not an approval; the approval is still
+        written by a human in a separate terminal."""
         if not isinstance(request_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", request_digest):
             raise KitError("invalid request digest")
         path = os.path.join(self._dir("core_warnings"), request_digest + ".json")
@@ -132,10 +133,10 @@ class ProposalStore:
             if info is not None and (stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode)
                                      or info.st_uid != os.getuid()):
                 raise
-            existing = {}  # okunamayan ya da yarım kayıt tekrar sayılmaz: silinir, yeniden uyarı verilir
+            existing = {}  # an unreadable or partial record does not count as a repeat: it is deleted and a new warning is given
         if existing is not None:
             try:
-                os.unlink(path)  # tek kullanım; yarışta ikinci istek yeni bir uyarı alır
+                os.unlink(path)  # single use; in a race the second request gets a new warning
                 live = (isinstance(existing, dict) and existing.get("request_digest") == request_digest
                         and parse_iso(existing["expires_at"]) > now)
             except FileNotFoundError:
@@ -150,7 +151,7 @@ class ProposalStore:
         try:
             write_private_file(path, canonical_json(record), exclusive=True)
         except FileExistsError:
-            return record  # aynı anda gelen eş istek uyarıyı yazdı; bu çağrı da yalnız uyarı döner
+            return record  # a concurrent identical request wrote the warning; this call also only returns a warning
         self.audit({"event": "core_warning_issued", "request_digest": request_digest,
                     "apps": summary.get("apps"), "files": summary.get("files")})
         return record
@@ -186,7 +187,7 @@ class ProposalStore:
         return result
 
     def require_approved(self, proposal_id: str, kind: str) -> dict:
-        """Yürütmeden hemen önce: onaylı, süresi dolmamış, tüketilmemiş ve özeti eşleşen öneriyi döndürür."""
+        """Just before execution: returns the proposal that is approved, not expired, not consumed and has a matching digest."""
         record = self.load(proposal_id)
         if record["kind"] != kind:
             raise ApprovalError("Proposal belongs to a different tool", code="wrong_proposal_kind")
@@ -208,7 +209,7 @@ class ProposalStore:
         return record
 
     def consume(self, proposal_id: str) -> None:
-        """Yürütme öncesi tek kullanım işareti (O_EXCL); ikinci çağrı reddedilir."""
+        """Single-use marker before execution (O_EXCL); a second call is refused."""
         path = self._path("consumed", proposal_id)
         try:
             write_private_file(path, canonical_json({"consumed_at": iso(self.clock()), "pid": os.getpid()}),
@@ -217,11 +218,11 @@ class ProposalStore:
             raise ApprovalError("Proposal was already executed; create a new proposal", code="already_consumed")
         self.audit({"event": "proposal_consumed", "proposal_id": proposal_id})
 
-    # -- uçuştaki yürütme kilidi ------------------------------------------------------------------
+    # -- in-flight execution lock ------------------------------------------------------------------
     def acquire_target_lock(self, operation: str, target: str, proposal_id: str) -> int:
-        """Aynı (işlem, hedef) için tek yürütme: açık tutulan kilit dosyasında `flock(LOCK_EX | LOCK_NB)`.
-        Kilit süreç ölünce işletim sistemi tarafından bırakılır; dosya silinerek kilit bozulmaz ve PID'e dayanılmaz.
-        Dönen tanıtıcı `release_target_lock`'a verilir."""
+        """One execution per (operation, target): `flock(LOCK_EX | LOCK_NB)` on a lock file that is kept open.
+        The operating system releases the lock when the process dies; the lock is not broken by deleting the file and
+        does not rely on a PID. The returned handle is passed to `release_target_lock`."""
         name = sha256_hex((operation + "\x00" + target).encode("utf-8"))[:32] + ".lock"
         path = os.path.join(self._dir("locks"), name)
         fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
@@ -248,7 +249,7 @@ class ProposalStore:
         finally:
             os.close(handle)
 
-    # -- sonuç ------------------------------------------------------------------------------------
+    # -- outcome ------------------------------------------------------------------------------------
     def record_outcome(self, proposal_id: str, outcome: dict) -> dict:
         record = self.load(proposal_id)
         outcome = dict(outcome)
@@ -262,7 +263,7 @@ class ProposalStore:
         return outcome
 
     def outcome(self, proposal_id: str) -> dict | None:
-        """Kayıtlı sonuç; tüketilmiş ama sonucu yazılmamış öneri `unknown` sayılır (süreç yarıda ölmüş olabilir)."""
+        """Recorded outcome; a proposal that was consumed but has no written outcome counts as `unknown` (the process may have died midway)."""
         recorded = self._read(self._path("outcomes", proposal_id))
         if recorded is None and self._read(self._path("consumed", proposal_id)):
             record = self.load(proposal_id)
@@ -272,7 +273,7 @@ class ProposalStore:
         return recorded
 
     def unresolved(self, operation: str, target: str) -> list:
-        """Aynı işlem ve hedef için sonucu bilinmeyen veya sürmekte olan yürütmeler (kör tekrarı engeller)."""
+        """Executions for the same operation and target whose outcome is unknown or still running (blocks blind retries)."""
         found = []
         seen = set()
         for directory in ("outcomes", "consumed"):
@@ -299,7 +300,7 @@ class ProposalStore:
                     items.append({"proposal_id": name[:-5], "state": "invalid", "problem": str(error)})
         return items
 
-    # -- insan tarafı (CLI) -----------------------------------------------------------------------
+    # -- human side (CLI) -----------------------------------------------------------------------
     def write_approval(self, proposal_id: str, record: dict) -> dict:
         now = self.clock()
         if now > parse_iso(record["expires_at"]):
@@ -340,7 +341,7 @@ class ProposalStore:
             with os.fdopen(fd, "ab") as handle:
                 handle.write(canonical_json(event) + b"\n")
         except OSError:
-            # Denetim kaydı yazılamazsa işlem durmaz; sonuç kaydı ayrıca tutulur.
+            # If the audit record cannot be written the operation does not stop; the outcome record is kept separately.
             pass
 
 

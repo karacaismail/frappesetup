@@ -32,8 +32,8 @@ def _print(data) -> None:
 
 
 def safe_display(text) -> str:
-    """Onay ekranına basılan her metin: denetim (C0/C1) ve biçim (bidi, sıfır genişlik) karakterleri kaçışlanır;
-    görünen metin ile yazılacak metin aynı okunur."""
+    """Every text printed on the approval screen: control (C0/C1) and format (bidi, zero-width) characters are escaped;
+    the displayed text reads the same as the text to be written."""
     out = []
     for ch in str(text):
         if ch in "\n\t":
@@ -46,13 +46,13 @@ def safe_display(text) -> str:
 
 
 def _workspace_preview(config, record) -> list:
-    """Yazılacak içerik önerideki istekten okunur; diff güncel dosyaya karşı yeniden üretilir (inceleyiciyle aynı yol)."""
+    """The content to write is read from the request in the proposal; the diff is regenerated against the current file (same path as the reviewer)."""
     from . import app_tools
     return app_tools.render_changes(app_tools.workspace_for(config, record), record)
 
 
 def core_banner(record) -> list:
-    """Orijinal core değişikliği onay ekranında diff'ten önce ayrıca ve açıkça gösterilir."""
+    """An original core change is shown separately and explicitly on the approval screen, before the diff."""
     core = record["preview"].get("core") if record.get("kind") == "workspace" else None
     if not core:
         return []

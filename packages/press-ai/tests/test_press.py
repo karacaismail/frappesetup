@@ -1,7 +1,7 @@
-"""Press tarafı: istemci, okuma projeksiyonu, ön koşullar, onaylı yürütme, izleme ve güvenlik sınırları.
+"""Press side: client, read projection, preconditions, approved execution, tracking and security boundaries.
 
-Senaryolar pressguide@2b83441 kılavuz adımlarından türetilmiştir (adım kimlikleri test adlarında/yorumlarda);
-sahte Press yalnız frappe/press @ebf3e22 dönüş biçimlerini taklit eder. Canlı Press çağrısı yoktur.
+The scenarios are derived from pressguide@2b83441 guide steps (step IDs in test names/comments);
+the fake Press only imitates frappe/press @ebf3e22 return formats. There are no live Press calls.
 """
 import datetime as dt
 import json
@@ -155,8 +155,8 @@ class OperatorReads(PressCase):
 
 
 class OperatorFlow(PressCase):
-    """Kılavuz akışı: candidate (`candidate`) → yalnız build (`schedule`, `live-build-complete`) → Success
-    (`live-build-success`) → ayrı deploy → Bench Active (`live-bench-active`)."""
+    """Guide flow: candidate (`candidate`) → build only (`schedule`, `live-build-complete`) → Success
+    (`live-build-success`) → separate deploy → Bench Active (`live-bench-active`)."""
 
     PRINCIPAL = "operator"
     MUTATIONS = ("deploy_candidate.create", "build.start", "deploy.start", "release_group.add_app",
@@ -184,7 +184,7 @@ class OperatorFlow(PressCase):
         build = executed["untrusted_data"]["references"]["created"]
         self.assertEqual(self.call("press_track", proposal_id=build_p["proposal_id"])["state"], "in_progress")
 
-        # Build bitmeden deploy önerisi reddedilir.
+        # A deploy proposal is refused before the build finishes.
         with self.assertRaises(PreconditionError) as caught:
             self.call("press_propose", operation="deploy.start", params={"build": build})
         failed = [c for c in caught.exception.details["checks"] if c["ok"] is not True]
@@ -240,10 +240,10 @@ class OperatorFlow(PressCase):
     def test_preconditions_are_rechecked_at_execution(self):
         candidate = self.fake.make_candidate("bench-0042")
         proposal = self.propose_and_approve("build.start", deploy_candidate=candidate)
-        self.fake.make_build(candidate, "Running")  # Onaydan sonra başka biri build başlattı.
+        self.fake.make_build(candidate, "Running")  # Someone else started a build after approval.
         with self.assertRaises(PreconditionError):
             self.call("press_execute", proposal_id=proposal["proposal_id"])
-        # Onay tüketilmedi: durum değişince insan yeni öneriye karar verir.
+        # The approval was not consumed: when the state changes, a human decides on a new proposal.
         self.assertEqual(self.ctx.store.status(proposal["proposal_id"])["state"], "approved")
 
     def test_add_app_checks_source_and_absence(self):
@@ -298,7 +298,7 @@ class OperatorFlow(PressCase):
 
 
 class TeamSiteFlow(PressCase):
-    """Site işleri: iş adı dönmez, iş listesi farkıyla izlenir; kurulu uygulama no_op olur."""
+    """Site jobs: no job name is returned, tracked by the difference in the job list; an installed app is a no_op."""
 
     PRINCIPAL = "team"
     MUTATIONS = ("site.backup", "site.migrate", "site.install_app")
@@ -320,7 +320,7 @@ class TeamSiteFlow(PressCase):
         self.assertEqual(caught.exception.code, "wrong_principal")
 
     def test_backup_then_migrate_with_recent_backup(self):
-        # Eski yedek: migrate önerisi engellenir.
+        # Old backup: the migrate proposal is blocked.
         with self.assertRaises(PreconditionError) as caught:
             self.call("press_propose", operation="site.migrate", params={"site": "school.example.test"})
         self.assertIn("site.recent_backup", [c["id"] for c in caught.exception.details["checks"] if c["ok"] is not True])
@@ -347,7 +347,7 @@ class TeamSiteFlow(PressCase):
         proposal = self.call("press_propose", operation="site.install_app",
                              params={"site": "school.example.test", "app": "erpnext"})
         approve(self.ctx, proposal["proposal_id"])
-        self.fake.sites["school.example.test"]["apps"].append("erpnext")  # onaydan sonra başka biri kurdu
+        self.fake.sites["school.example.test"]["apps"].append("erpnext")  # someone else installed it after approval
         with self.assertRaises(PreconditionError):
             self.call("press_execute", proposal_id=proposal["proposal_id"])
 
@@ -359,7 +359,7 @@ class TeamSiteFlow(PressCase):
         approve(self.ctx, proposal["proposal_id"])
         self.fake.jobs.clear()
         original = self.fake.m_press__api__site__install_app
-        self.fake.m_press__api__site__install_app = lambda a: fake_press.ok(None)  # Press iş açmadan döndü
+        self.fake.m_press__api__site__install_app = lambda a: fake_press.ok(None)  # Press returned without opening a job
         try:
             self.assertEqual(self.call("press_execute", proposal_id=proposal["proposal_id"])["state"], "accepted")
         finally:
@@ -391,12 +391,12 @@ def _failed_ids(error):
 
 
 def _untrusted(value):
-    """press_propose önizlemesi, press_track kanıtı ve press_execute yanıtı güvenilmeyen veri zarfındadır."""
+    """The press_propose preview, press_track evidence and press_execute response are in the untrusted data envelope."""
     return value["untrusted_data"]
 
 
 class OperatorSourceAligned(PressCase):
-    """review-final M3, M4, M6, M7, m13: sahte Press frappe/press @ebf3e22 davranışına hizalı."""
+    """review-final M3, M4, M6, M7, m13: the fake Press is aligned with frappe/press @ebf3e22 behaviour."""
 
     PRINCIPAL = "operator"
     MUTATIONS = ("deploy_candidate.create", "build.start", "deploy.start", "app_release.create")
@@ -406,7 +406,7 @@ class OperatorSourceAligned(PressCase):
         return candidate, self.fake.make_build(candidate, "Success", [dict(x) for x in SUCCESS_STEPS])
 
     def test_m3_running_build_without_pipeline_blocks_new_candidate(self):
-        # bench.py deploy_status yalnız Release Pipeline'a bakar; Desk build'i pipeline açmaz.
+        # bench.py deploy_status looks only at the Release Pipeline; a Desk build does not open a pipeline.
         candidate = self.fake.make_candidate("bench-0042")
         self.fake.make_build(candidate, "Running")
         with self.assertRaises(PreconditionError) as caught:
@@ -448,7 +448,7 @@ class OperatorSourceAligned(PressCase):
         self.assertIn("release_group.auto_deploy_off", _failed_ids(caught.exception))
 
     def test_m6_deploy_marker_makes_release_unverifiable(self):
-        # <işaret>-<grup> etiketsiz grubu da dağıtır; commit mesajı önceden bilinmez → None (engel).
+        # <marker>-<group> also deploys an untagged group; the commit message is not known in advance → None (blocked).
         self.fake.settings["deploy_marker"] = "[deploy]"
         with self.assertRaises(PreconditionError) as caught:
             self.call("press_propose", operation="app_release.create",
@@ -476,9 +476,9 @@ class OperatorSourceAligned(PressCase):
         self.assertIn("AUTO-UPDATE", record["confirm_phrase"])
 
     def test_deploy_refused_when_candidate_points_to_another_build(self):
-        # Press imajı candidate.intel_build/arm_build'den alır (deploy.py _get_build_for_bench), çağrılandan değil.
+        # Press takes the image from candidate.intel_build/arm_build (deploy.py _get_build_for_bench), not from the one called.
         candidate, older = self.successful_build()
-        self.fake.make_build(candidate, "Success", [dict(x) for x in SUCCESS_STEPS])  # daha yeni başarılı build
+        self.fake.make_build(candidate, "Success", [dict(x) for x in SUCCESS_STEPS])  # a newer successful build
         with self.assertRaises(PreconditionError) as caught:
             self.call("press_propose", operation="deploy.start", params={"build": older})
         self.assertIn("deploy.artifact_matches_build", _failed_ids(caught.exception))
@@ -498,7 +498,7 @@ class OperatorSourceAligned(PressCase):
         self.assertEqual(self.fake.deploys, {})
 
     def test_r_busy_while_bench_creation_is_queued_or_installing(self):
-        # Press deploy_in_progress bench kurulumunu görmez (last_benches_info build adıyla arar).
+        # Press deploy_in_progress does not see bench creation (last_benches_info searches by build name).
         self.fake.auto_start_benches = False
         _, build = self.successful_build()
         proposal = self.call("press_propose", operation="deploy.start", params={"build": build})
@@ -532,7 +532,7 @@ class OperatorSourceAligned(PressCase):
         record = self.ctx.store.load(proposal["proposal_id"])
         self.assertEqual(record["confirm_phrase"], "DEPLOY {} AUTO-UPDATE 2".format(build))
         approve(self.ctx, proposal["proposal_id"])
-        self.fake.sites["manual.example.test"]["skip_auto_updates"] = 0  # onaydan sonra etki alanı büyüdü
+        self.fake.sites["manual.example.test"]["skip_auto_updates"] = 0  # the scope grew after approval
         with self.assertRaises(PreconditionError) as caught:
             self.call("press_execute", proposal_id=proposal["proposal_id"])
         self.assertIn("deploy.artifact_matches_build", _failed_ids(caught.exception))
@@ -556,7 +556,7 @@ class OperatorSourceAligned(PressCase):
         self.assertEqual(self.call("press_track", proposal_id=proposal["proposal_id"])["state"], "in_progress")
         deploy = list(self.fake.deploys)[-1]
         queue = self.fake.deploys[deploy]["benches"][0]["bench"]
-        self.fake.queues[queue]["build"] = "bld-other"  # Press başka bir imajı sabitledi
+        self.fake.queues[queue]["build"] = "bld-other"  # Press pinned another image
         self.fake.start_bench(deploy, "f1-app.example.test", status="Active", job_status="Success")
         self.assertEqual(self.call("press_track", proposal_id=proposal["proposal_id"])["state"], "failed")
 
@@ -585,7 +585,7 @@ class OperatorSourceAligned(PressCase):
         candidate = self.fake.make_candidate("bench-0042")
         proposal = self.call("press_propose", operation="build.start", params={"deploy_candidate": candidate})
         approve(self.ctx, proposal["proposal_id"])
-        self.ctx.store.consume(proposal["proposal_id"])  # süreç gönderimden önce öldü
+        self.ctx.store.consume(proposal["proposal_id"])  # the process died before sending
         before = len(self.fake.requests)
         tracked = self.call("press_track", proposal_id=proposal["proposal_id"])
         self.assertEqual((tracked["state"], tracked["phase"]), ("unknown", "not_sent"))
@@ -607,7 +607,7 @@ class TeamSourceAligned(PressCase):
     MUTATIONS = ("release_group.add_app", "release_group.create", "site.backup", "site.install_app")
 
     def test_m5_public_marketplace_source_is_verified_for_team(self):
-        # installable_apps/options yalnız çerçeve kaynaklarını döndürür; doğrulama all_apps ile yapılır.
+        # installable_apps/options return only framework sources; validation is done with all_apps.
         proposal = self.call("press_propose", operation="release_group.add_app",
                              params={"release_group": "bench-0042", "app": "erpnext", "source": "SRC-erpnext-1"})
         self.assertEqual(proposal["state"], "pending")
@@ -644,7 +644,7 @@ class TeamSourceAligned(PressCase):
 
     def test_m9_silent_team_fallback_is_detected(self):
         self.fake.member_teams = {"team-beta"}
-        self.fake.default_team = "team-beta"  # yapılandırılan team-alpha'ya üyelik yok
+        self.fake.default_team = "team-beta"  # no membership of the configured team-alpha
         context = _untrusted(self.call("press_read", operation="team.context", params={})["result"])
         self.assertEqual(context["resolved_team"], "team-beta")
         self.assertFalse(context["team_matches_config"])
@@ -662,7 +662,7 @@ class TeamSourceAligned(PressCase):
         approve(self.ctx, proposal["proposal_id"])
         executed = self.call("press_execute", proposal_id=proposal["proposal_id"])
         self.assertEqual(executed["state"], "accepted")
-        # Yürütme sırasında üyelik kalktı: Press grubu varsayılan takımda yarattı ve okumada da ona düşer.
+        # Membership was removed during execution: Press created the group in the default team and reads fall back to it too.
         self.fake.groups[_untrusted(executed)["references"]["release_group"]]["team"] = "team-beta"
         self.fake.member_teams, self.fake.default_team = {"team-beta"}, "team-beta"
         self.assertEqual(self.call("press_track", proposal_id=proposal["proposal_id"])["state"], "failed")
@@ -671,7 +671,7 @@ class TeamSourceAligned(PressCase):
         proposal = self.call("press_propose", operation="site.backup", params={"site": "school.example.test"})
         approve(self.ctx, proposal["proposal_id"])
         self.call("press_execute", proposal_id=proposal["proposal_id"])
-        self.fake.add_job("Backup Site", "Success", site="school.example.test")  # zamanlanmış ikinci yedek
+        self.fake.add_job("Backup Site", "Success", site="school.example.test")  # a second, scheduled backup
         tracked = self.call("press_track", proposal_id=proposal["proposal_id"])
         self.assertEqual(tracked["state"], "unknown")
         self.assertEqual(len(_untrusted(tracked)["evidence"]["candidates"]), 2)
@@ -694,9 +694,9 @@ class BackupAge(unittest.TestCase):
 
     def test_window_holds_in_every_timezone(self):
         verdict = press_ops.backup_age_verdict
-        self.assertTrue(verdict("2026-10-08 14:30:00", self.NOW))   # UTC+3 Press, 30 dk önce
+        self.assertTrue(verdict("2026-10-08 14:30:00", self.NOW))   # UTC+3 Press, 30 min ago
         self.assertTrue(verdict("2026-10-08 03:00:00", self.NOW))   # 9 sa saf fark
-        self.assertIsNone(verdict("2026-10-07 20:00:00", self.NOW))  # 16 sa: dilime göre değişir
+        self.assertIsNone(verdict("2026-10-07 20:00:00", self.NOW))  # 16 h: depends on the time zone
         self.assertFalse(verdict("2026-10-06 20:00:00", self.NOW))  # 40 sa
         self.assertIsNone(verdict("not a date", self.NOW))
 

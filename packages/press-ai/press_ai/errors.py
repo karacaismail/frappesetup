@@ -1,9 +1,9 @@
-"""Araç hataları: her hata makinece okunur bir `code` ve gizli değer içermeyen ayrıntı taşır."""
+"""Tool errors: each error carries a machine-readable `code` and detail without secret values."""
 from __future__ import annotations
 
 
 class KitError(Exception):
-    """Araç çağrısının isteyerek reddedildiği veya tamamlanamadığı durum."""
+    """A tool call was deliberately refused or could not be completed."""
 
     code = "error"
 
@@ -38,7 +38,7 @@ class PreconditionError(KitError):
 
 
 class PressError(KitError):
-    """Press yanıtı hata döndürdü; `kind` permission/validation/not_found/server/protocol olabilir."""
+    """Press returned an error; `kind` may be permission/validation/not_found/server/protocol."""
 
     code = "press_error"
 
@@ -51,7 +51,7 @@ class PressError(KitError):
 
 
 class PressTimeout(KitError):
-    """İstek süresinde yanıt alınamadı: uzak işlemin sonucu bilinmez (unknown)."""
+    """No response within the request time: the outcome of the remote operation is unknown."""
 
     code = "timeout_unknown_outcome"
 

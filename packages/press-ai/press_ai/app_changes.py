@@ -1,9 +1,9 @@
-"""Frappe uygulama değişiklik planları: dosya içerikleri, özetler ve diff üretir; hiçbir şey yazmaz.
+"""Frappe app change plans: produces file contents, summaries and diffs; writes nothing.
 
-Şablonlar frappe/frappe boilerplate'ından türetilmiştir (version-15 b0b5b99, version-16 6b450a1:
-frappe/utils/boilerplate.py, frappe/core/doctype/doctype/boilerplate/*._py). hooks.py yalnız ilgili
-anahtar yoksa sona yeni atama eklenerek değiştirilir; anahtar zaten varsa dosya yeniden yazılmaz,
-insanın birleştireceği parça döndürülür (yorum ve biçim kaybı olmasın diye).
+Templates are derived from the frappe/frappe boilerplate (version-15 b0b5b99, version-16 6b450a1:
+frappe/utils/boilerplate.py, frappe/core/doctype/doctype/boilerplate/*._py). hooks.py is changed only by
+appending a new assignment when the key is absent; when the key already exists the file is not rewritten
+and a fragment for a human to merge is returned (so that comments and formatting are not lost).
 """
 from __future__ import annotations
 
@@ -55,9 +55,9 @@ def _obj(required, **props):
     return {"type": "object", "additionalProperties": False, "required": list(required), "properties": props}
 
 
-# Üretilen Python/TOML dosyalarına giren serbest metin: denetim karakteri, tırnak ve ters bölü yok.
+# Free text that goes into generated Python/TOML files: no control characters, quotes or backslashes.
 _PLAIN = r"[^\x00-\x1f\x7f\"\\]{1,300}"
-# write_file: yalnız kaynak/metin dosyaları ve boyut sınırı (MAX_PLAN_BYTES içinde kalır).
+# write_file: source/text files only, with a size limit (stays within MAX_PLAN_BYTES).
 WRITE_FILE_SUFFIXES = (".py", ".js", ".ts", ".vue", ".json", ".html", ".css", ".scss", ".md", ".txt", ".csv", ".po",
                        ".pot")
 WRITE_FILE_MAX = 200 * 1024
@@ -109,7 +109,7 @@ KIND_SCHEMAS = {
                        purpose={"type": "string", "minLength": 3, "maxLength": 200, "pattern": _PLAIN},
                        expected_sha256={"type": ["string", "null"], "pattern": r"[0-9a-f]{64}"}),
 }
-# Kontrat kimliği → değişiklik türü (contracts/frappe-app-operations.json `params` bu şemalardır).
+# Contract ID → change type (the `params` in contracts/frappe-app-operations.json are these schemas).
 OPERATION_KINDS = {"app.scaffold": "new_app", "doctype.create": "new_doctype", "child_table.create": "add_child_table",
                    "patch.create": "add_patch", "fixtures.filter": "add_fixture_filter",
                    "hooks.doc_event": "add_doc_event", "hooks.extend_class": "extend_doctype_class",
@@ -121,7 +121,7 @@ def _now() -> str:
 
 
 def as_frappe_json(data) -> str:
-    """Frappe dışa aktarımıyla aynı biçim: indent=1, sıralı anahtar."""
+    """Same format as the Frappe export: indent=1, sorted keys."""
     return json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False, separators=(",", ": ")) + "\n"
 
 
@@ -130,8 +130,8 @@ _DENIED_NAME = re.compile(
     r"(?i)(site_config\.json|common_site_config\.json|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|credentials?([._-].*)?\.json|"
     r"secrets?([._-].*)?|.*\.(pem|key|p12|pfx|crt|sqlite3?|db|sql|sql\.gz|pyc|so|dylib|exe|sh))")
 def check_readable_path(path: str) -> list:
-    """Okuma için de gizli (.git, .env), çalışma zamanı dizini ve secret/config/ikili dosya yolu kapalıdır.
-    Resmi uygulama kodu okunabilir (genişletme için hedef kodun görülmesi gerekir)."""
+    """Hidden paths (.git, .env), the runtime directory and secret/config/binary file paths are closed for reading too.
+    Official app code can be read (the target code must be visible in order to extend it)."""
     parts = split_relative(path)
     for part in parts:
         if part.startswith(".") or part.casefold() in _DENIED_DIRS:
@@ -142,7 +142,7 @@ def check_readable_path(path: str) -> list:
 
 
 def official_owner(ws, path: str) -> str | None:
-    """Yol resmi bir uygulamanın deposu/paketi içindeyse o dizini döndürür (hooks.py ile tanınır)."""
+    """If the path is inside an official app's repository/package, returns that directory (recognised by hooks.py)."""
     parts = split_relative(path)
     root_name = ws.root.rstrip("/").rsplit("/", 1)[-1]
     if is_official(root_name) and (ws.exists("hooks.py") or ws.exists(root_name + "/hooks.py")):
@@ -156,8 +156,8 @@ def official_owner(ws, path: str) -> str | None:
 
 
 def check_canonical_case(ws, path: str) -> None:
-    """Var olan her yol bileşeni diskteki adla birebir yazılmalı. Harf duyarsız dosya sisteminde `Erpnext/ERPNEXT`
-    ya da `DocType/...` gerçek dizine çözülür; adlara dayanan korumalar böylece atlatılamaz."""
+    """Every existing path component must be written exactly as its name on disk. On a case-insensitive file system
+    `Erpnext/ERPNEXT` or `DocType/...` resolves to a real directory; this stops name-based guards from being bypassed."""
     parts = split_relative(path)
     for index, name in enumerate(parts):
         entries = ws.entries(parts[:index])
@@ -167,7 +167,7 @@ def check_canonical_case(ws, path: str) -> None:
             continue
         if any(entry.casefold() == name.casefold() for entry in entries):
             raise WorkspaceError("Path case differs from the name on disk: " + path, code="case_mismatch")
-        return  # bu bileşen yok: yeni dosya/dizin
+        return  # this component does not exist: new file/directory
 
 
 def core_app_name(ws, owner: str) -> str:
@@ -175,9 +175,10 @@ def core_app_name(ws, owner: str) -> str:
 
 
 def check_mutation_path(ws, path: str) -> str | None:
-    """Her app mutasyonunda mutlak sınır: workspace içi, diskteki adla birebir, gizli/secret/state/çalışma zamanı yolu
-    değil. Dönüş: yol orijinal core (resmi uygulama) içindeyse o uygulamanın adı, değilse None. Core yolu burada
-    reddedilmez; çağıran onu varsayılan-ret akışına sokar (önce uyarı, aynı isteğin açık tekrarı, CORE onayı)."""
+    """Absolute limit for every app mutation: inside the workspace, exactly as named on disk, and not a hidden/secret/state/
+    runtime path. Returns the app name when the path is inside original core (an official app), otherwise None. A core
+    path is not refused here; the caller puts it through the default-refuse flow (warning first, explicit repeat of the
+    same request, CORE approval)."""
     check_canonical_case(ws, path)
     parts = split_relative(path)
     for index, part in enumerate(parts):
@@ -207,7 +208,7 @@ class Plan:
             self.core_files.append({"path": path, "app": app})
 
     def create(self, path, content):
-        app = check_mutation_path(self.ws, path)  # Öneri aşamasında da workspace dışı ve yasak yol reddedilir.
+        app = check_mutation_path(self.ws, path)  # Paths outside the workspace and forbidden paths are refused at the proposal stage too.
         if self.ws.exists(path):
             raise WorkspaceError("Refusing to overwrite existing file " + path, code="conflict")
         if any(f["path"] == path for f in self.files):
@@ -231,7 +232,7 @@ class Plan:
         self._core(path, app)
 
     def core(self) -> dict | None:
-        """Orijinal core dosyalarına dokunan değişikliğin özeti; özel uygulama dosyaları hiçbir zaman core değildir."""
+        """Summary of a change that touches original core files; custom app files are never core."""
         if not self.core_files:
             return None
         return {"apps": sorted({f["app"] for f in self.core_files}), "files": [f["path"] for f in self.core_files]}
@@ -252,7 +253,7 @@ class Plan:
 
 
 def _hooks_append(plan, package, key, value_source, snippet_note):
-    """hooks.py'ye `key = ...` ekler; anahtar varsa birleştirme parçasını insana bırakır."""
+    """Adds `key = ...` to hooks.py; if the key exists, leaves the merge fragment to a human."""
     path = package + "/hooks.py"
     text = plan.ws.read_text(path)
     hooks = parse_hooks(text)
@@ -265,7 +266,7 @@ def _hooks_append(plan, package, key, value_source, snippet_note):
 
 
 def _py_literal(value) -> str:
-    """hooks.py'ye yazılacak Python sabiti (dict/list/str); geri okunabilirliği parse_hooks ile sınanır."""
+    """Python constant (dict/list/str) to write to hooks.py; parse_hooks checks that it reads back."""
     text = pprint.pformat(value, indent=1, width=100, sort_dicts=False)
     if ast.literal_eval(text) != value:
         raise KitError("Could not render a hooks literal", code="internal")
@@ -314,7 +315,7 @@ def _doctype_json(module, doctype, fields, istable, naming_rule, permissions) ->
 
 
 def _publisher(ws, package) -> str:
-    """Yorum satırına girecek yayıncı adı: satır sonu ve denetim karakterleri temizlenir."""
+    """Publisher name for a comment line: line breaks and control characters are removed."""
     values = parse_hooks(ws.read_text(package + "/hooks.py"))["values"]
     publisher = values.get("app_publisher")
     if not isinstance(publisher, str) or not publisher.strip():
@@ -323,7 +324,7 @@ def _publisher(ws, package) -> str:
 
 
 def _lit(text: str) -> str:
-    """Python ve TOML için güvenli çift tırnaklı dize (JSON dize sözdizimi her ikisinde de geçerlidir)."""
+    """Safe double-quoted string for Python and TOML (JSON string syntax is valid in both)."""
     return json.dumps(text, ensure_ascii=False)
 
 
@@ -361,7 +362,7 @@ def _check_fields(fields, doctypes_in_app, child_ok=True):
             raise ValidationError("Child tables cannot contain Table fields")
 
 
-# -- üreticiler ----------------------------------------------------------------------------------
+# -- generators ----------------------------------------------------------------------------------
 def _new_app(plan, ws, app_path, c):
     name = c["app_name"]
     if is_official(name) or keyword.iskeyword(name):
@@ -505,7 +506,7 @@ def _add_doc_event(plan, ws, info, c, target):
     if handler.split(".")[0] != info["name"]:
         raise ValidationError("Handler must live in this app ({}.*)".format(info["name"]))
     if handler.count(".") < 2:
-        # `app.func` paketin yanına app.py üretirdi; işleyici bir modülde olmalı: app.modul.func.
+        # `app.func` would generate app.py beside the package; the handler must be in a module: app.module.func.
         raise ValidationError("Handler needs at least app.module.function (e.g. {}.events.sales_invoice.validate)".format(
             info["name"]))
     module, func = handler.rsplit(".", 1)
@@ -577,7 +578,7 @@ def _add_test(plan, ws, info, c, target):
     plan.followups.append("bench --site <site> run-tests --app {} --doctype \"{}\"".format(info["name"], c["doctype"]))
 
 
-_BLOCKING_RULES = {"SEC002"}  # güvenlik; özel koddaki EXT001 normal uyarıdır (özel geliştirme yetkili)
+_BLOCKING_RULES = {"SEC002"}  # security; EXT001 in custom code is an ordinary warning (custom development is authorised)
 _DOCTYPE_JSON = re.compile(r"(?:^|/)doctype/([^/]+)/\1\.json$", re.I)
 _PERMISSION_FIXTURE = re.compile(r"(?i)(?:^|/)fixtures/[^/]*(docperm|role)[^/]*\.json$")
 
@@ -588,8 +589,8 @@ def _roles(perms) -> list:
 
 
 def _note_permission_change(plan, ws, rel, content, current_sha):
-    """Özel geliştirme yetkilidir: DocType izinleri ve izin/rol fixture'ları engellenmez. Onaylayan insan görsün diye
-    önizlemeye not düşülür; Guest ve All rolleri kaydı herkese açar."""
+    """Custom development is authorised: DocType permissions and permission/role fixtures are not blocked. A note is added
+    to the preview so that the approving human sees it; the Guest and All roles open the record to everyone."""
     if _PERMISSION_FIXTURE.search(rel):
         plan.notes.append("Permission or role fixture {} is imported on migrate/install; review its rows before "
                           "approving.".format(rel))
@@ -600,7 +601,7 @@ def _note_permission_change(plan, ws, rel, content, current_sha):
         new = json.loads(content)
         old = json.loads(ws.read_text(rel)) if current_sha is not None else {}
     except ValueError:
-        return  # JSON hatası ayrıca raporlanır
+        return  # a JSON error is reported separately
     new_perms = new.get("permissions") if isinstance(new, dict) else None
     old_perms = old.get("permissions") if isinstance(old, dict) else None
     if (new_perms or []) == (old_perms or []):
@@ -616,10 +617,10 @@ def _note_permission_change(plan, ws, rel, content, current_sha):
 
 
 def _write_file(plan, ws, info, c, target, app_path):
-    """Geliştiricinin yazdığı tek kaynak dosyası: metin olarak alınır, ast/json ile yalnız sözdizimi denetlenir;
-    kod çalıştırılmaz ve import edilmez. Gizli/secret/state yolu ve ikili dosya yazılmaz; orijinal core dosyası core
-    akışına girer (varsayılan ret, uyarı, açık tekrar, CORE onayı). Özel koddaki resmi modül yaması (EXT001) normal
-    yetkili akışta kalır; önizlemede risk uyarısı olur."""
+    """A single source file written by the developer: taken as text, and only its syntax is checked with ast/json;
+    the code is not run or imported. Hidden/secret/state paths and binary files are not written; an original core
+    file goes into the core flow (default refusal, warning, explicit repeat, CORE approval). An official module patch
+    in custom code (EXT001) stays in the normal authorised flow; the preview carries a risk warning."""
     rel = app_path.rstrip("/") + "/" + c["path"]
     split_relative(c["path"])
     if not rel.endswith(WRITE_FILE_SUFFIXES):
@@ -630,7 +631,7 @@ def _write_file(plan, ws, info, c, target, app_path):
     check_mutation_path(ws, rel)
     current = ws.sha256(rel)
     if current is not None and "expected_sha256" not in c:
-        # Eski bir okumaya dayanan tam içerik araya giren düzenlemeyi sessizce geri almasın.
+        # Full content based on an old read must not silently undo an edit made in between.
         raise WorkspaceError("File exists: pass expected_sha256 from app_inspect files (content and hash come from "
                              "the same read): " + rel, code="conflict")
     expected = c.get("expected_sha256")
@@ -640,7 +641,7 @@ def _write_file(plan, ws, info, c, target, app_path):
         raise WorkspaceError("File changed since it was read (expected_sha256 differs): " + rel, code="conflict")
     _note_permission_change(plan, ws, rel, content, current)
     if "[REDACTED]" in content and (current is None or "[REDACTED]" not in ws.read_text(rel)):
-        # Maskelenmiş bir okumanın geri yazılması dosyayı bozar; içerik app_inspect files ile birebir okunur.
+        # Writing back a masked read corrupts the file; the content is read verbatim with app_inspect files.
         raise ValidationError("Content contains [REDACTED], which the current file does not: read the file again "
                               "with app_inspect files and send the exact text")
     findings = []
@@ -709,13 +710,13 @@ def build_plan(ws, app_path: str, change: dict) -> dict:
     else:
         info = locate_app(ws, app_path)
         check_canonical_case(ws, info["package"] + "/hooks.py")
-        # Resmi uygulamadaki her dosya Plan'da core olarak işaretlenir; öneri yalnız uyarı ve açık tekrardan sonra oluşur.
+        # Every file in an official app is marked as core in the Plan; the proposal is created only after a warning and an explicit repeat.
         if kind == "write_file":
             _write_file(plan, ws, info, change, None, app_path)
         else:
             GENERATORS[kind](plan, ws, info, change, change.get("target_frappe"))
         if is_official(info["name"]):
-            # Resmi uygulama başka bir dizin adıyla klonlanmış olabilir (ör. erpnext-15/): depo kökündeki dosyalar da core.
+            # An official app may be cloned under another directory name (e.g. erpnext-15/): files at the repository root are core too.
             prefix = (info["repo"] or info["package"]) + "/"
             for item in plan.files:
                 if item["path"].startswith(prefix):

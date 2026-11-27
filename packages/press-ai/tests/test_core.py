@@ -1,4 +1,4 @@
-"""Çekirdek: şema, yapılandırma, kimlik bilgisi, maskeleme ve onay deposu."""
+"""Core: schema, configuration, credentials, masking and the approval store."""
 import json
 import os
 import stat
@@ -79,7 +79,7 @@ class ConfigTests(unittest.TestCase):
     def test_operator_with_mutations_needs_team(self):
         with self.assertRaises(ConfigError):
             Config(self.base(principal="operator", team=None, enabled_mutations=["build.start"]))
-        Config(self.base(principal="operator", team=None))  # yalnız okuma: takım isteğe bağlı
+        Config(self.base(principal="operator", team=None))  # read only: the team is optional
 
     def test_example_config_loads(self):
         path = os.path.join(support.PACKAGE, "config", "press-ai.example.json")
@@ -141,7 +141,7 @@ class CredentialTests(unittest.TestCase):
             del os.environ["PRESS_AI_TEST_KEY"], os.environ["PRESS_AI_TEST_SECRET"]
 
 
-# Sahte değer çalışma anında birleştirilir: depoda gerçek anahtar biçiminde dize durmaz.
+# The fake value is joined at run time: no string in the shape of a real key sits in the repository.
 FAKE_AWS_KEY_ID = "AKIA" + "ABCDEFGHIJKLMNOP"
 
 
@@ -263,7 +263,7 @@ class ProposalStoreTests(unittest.TestCase):
             self.store.require_approved(record["id"], "press")
 
     def test_consumed_without_outcome_counts_as_unknown(self):
-        # Süreç tüketimden sonra, sonuç yazılmadan öldüyse kör tekrar yine engellenir.
+        # If the process died after consumption but before the outcome was written, a blind retry is still blocked.
         record = self.proposal()
         self.store.write_approval(record["id"], record)
         self.store.consume(record["id"])
@@ -279,7 +279,7 @@ class ProposalStoreTests(unittest.TestCase):
         other = self.store.acquire_target_lock("site.backup", "other.example.test", "p-" + "3" * 20)
         self.store.release_target_lock(other)
         self.store.release_target_lock(lock)
-        # Kilit dosyası yerinde kalır ama tutan yoktur: dosya silinmeden yeniden alınır (PID'e dayanılmaz).
+        # The lock file stays in place but nobody holds it: it is taken again without deleting the file (no reliance on a PID).
         again = self.store.acquire_target_lock("site.backup", "s.example.test", "p-" + "4" * 20)
         self.store.release_target_lock(again)
         locks = os.listdir(os.path.join(self.home.path("state"), "locks"))

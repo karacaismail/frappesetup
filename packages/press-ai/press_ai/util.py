@@ -1,4 +1,4 @@
-"""Ortak yardımcılar: kanonik JSON, özet, zaman ve sınırlı dosya işlemleri."""
+"""Shared helpers: canonical JSON, digest, time and bounded file operations."""
 from __future__ import annotations
 
 import datetime as _dt
@@ -9,7 +9,7 @@ import stat
 
 
 def canonical_json(value) -> bytes:
-    """Özet için kararlı serileştirme: sıralı anahtar, boşluksuz ayraç, UTF-8."""
+    """Stable serialisation for the digest: sorted keys, separators without spaces, UTF-8."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
@@ -30,10 +30,10 @@ def parse_iso(text: str) -> _dt.datetime:
 
 
 def parse_frappe_datetime(text) -> _dt.datetime | None:
-    """Frappe `YYYY-MM-DD HH:MM:SS[.ffffff]` değerini UTC kabul ederek okur; tanınmazsa None.
+    """Reads a Frappe `YYYY-MM-DD HH:MM:SS[.ffffff]` value as UTC; None if it is not recognised.
 
-    Press sunucu saat dilimi yapılandırmaya bağlıdır; karşılaştırmalarda bu nedenle yalnız aynı
-    kaynaktan gelen zamanlar birbiriyle kıyaslanır (bkz. press_ops)."""
+    The Press server time zone depends on its configuration; for this reason comparisons only compare
+    times that come from the same source (see press_ops)."""
     if not isinstance(text, str) or not text:
         return None
     for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
@@ -45,7 +45,7 @@ def parse_frappe_datetime(text) -> _dt.datetime | None:
 
 
 def ensure_private_dir(path: str) -> str:
-    """Dizini 0700 oluşturur; sembolik bağ veya başka kullanıcıya ait dizini reddeder."""
+    """Creates a directory with mode 0700; refuses a symbolic link or a directory owned by another user."""
     os.makedirs(path, mode=0o700, exist_ok=True)
     info = os.lstat(path)
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
@@ -58,7 +58,7 @@ def ensure_private_dir(path: str) -> str:
 
 
 def write_private_file(path: str, data: bytes, exclusive: bool = True) -> None:
-    """0600 dosya yazar; `exclusive` iken var olan dosyanın üzerine yazmaz (O_EXCL)."""
+    """Writes a 0600 file; when `exclusive` is set it does not overwrite an existing file (O_EXCL)."""
     flags = os.O_WRONLY | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
     flags |= os.O_EXCL if exclusive else os.O_TRUNC
     fd = os.open(path, flags, 0o600)
@@ -69,7 +69,7 @@ def write_private_file(path: str, data: bytes, exclusive: bool = True) -> None:
 
 
 def read_limited(path: str, limit: int) -> bytes:
-    """Sembolik bağı izlemeden en fazla `limit` bayt okur; büyük dosyada hata verir."""
+    """Reads at most `limit` bytes without following symbolic links; raises an error for a large file."""
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(fd, "rb") as handle:
         data = handle.read(limit + 1)

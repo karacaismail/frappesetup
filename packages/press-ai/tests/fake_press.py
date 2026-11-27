@@ -1,7 +1,7 @@
-"""Testler için yerel sahte Press (127.0.0.1, stdlib HTTP). Gerçek Press'in yalnız runtime'ın kullandığı
-uç noktalarını, frappe/press @ebf3e22 dönüş biçimlerine göre taklit eder. Veriler uydurmadır; kişisel
-veri veya gerçek kurulum kimliği içermez. Gizli alanlar (user_private_key, build_token, request_data)
-bilerek tutulur: runtime'ın bunları hiç istemediği ve hiçbir çıktıya taşımadığı testlerde doğrulanır.
+"""Local fake Press for tests (127.0.0.1, stdlib HTTP). It imitates only the real Press endpoints the runtime uses,
+following the frappe/press @ebf3e22 return formats. The data is made up; it contains no personal
+data or real installation identifiers. Secret fields (user_private_key, build_token, request_data)
+are kept on purpose: tests verify that the runtime never requests them and never carries them into any output.
 """
 import copy
 import json
@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 KEY, SECRET = "k1a2b3c4d5e6f70", "s9z8y7x6w5v4u31"
-# Sahte gizli değerler çalışma anında birleştirilir: depoda tarayıcıların tanıdığı tam kalıp bulunmaz.
+# Fake secret values are joined at run time: the repository holds no complete pattern that scanners recognise.
 FAKE_PRIVATE_KEY = "-----BEGIN OPENSSH " + "PRIVATE KEY-----\nAAAA\n-----END OPENSSH " + "PRIVATE KEY-----"
 FAKE_GITHUB_TOKEN = "ghp_" + "SECRETSECRET123"
 SECRET_FIELDS = {"user_private_key", "build_token", "request_data", "request_files", "data",
@@ -31,11 +31,11 @@ class FakePress:
     def __init__(self, principal="team", team="team-alpha", user="operator@example.test"):
         self.principal = principal
         self.team = team
-        self.member_teams = {team}  # kullanıcının üyesi olduğu takımlar
-        self.default_team = team    # üyelik dışı başlıkta Press'in sessizce düştüğü takım (utils.get_current_team)
-        self.current = team         # bu istek için çözülen takım
+        self.member_teams = {team}  # teams the user is a member of
+        self.default_team = team    # team Press silently falls back to for a non-member header (utils.get_current_team)
+        self.current = team         # team resolved for this request
         self.user = user
-        self.auto_start_benches = True  # False: Deploy yalnız New Bench Queue açar, bench'ler sonra (start_bench)
+        self.auto_start_benches = True  # False: Deploy only opens a New Bench Queue, benches come later (start_bench)
         self.requests = []  # (method, args, headers)
         self.fail = {}      # method -> (status, exc_type, message)
         self.delay = {}     # method -> seconds
@@ -68,10 +68,10 @@ class FakePress:
                                "team": "team-alpha", "versions": ["Version 16"]},
         }
         self.group_servers = {"bench-0042": ["f1-app.example.test"]}
-        self.group_tags = {}       # grup → Resource Tag adları (ör. "auto-deploy")
+        self.group_tags = {}       # group → Resource Tag names (e.g. "auto-deploy")
         self.marketplace = {"erpnext", "education", "payments"}  # Published Marketplace App'ler
-        self.pipelines = []        # etkin Release Pipeline (yeni deploy akışı); kılavuz akışı açmaz
-        self.subscriptions = []    # (site, app, plan): ücretli Marketplace aboneliği izi
+        self.pipelines = []        # active Release Pipeline (new deploy flow); the guide flow does not open one
+        self.subscriptions = []    # (site, app, plan): trace of a paid Marketplace subscription
         self.queues = {}           # New Bench Queue
         self.candidates = {}
         self.builds = {}
@@ -129,7 +129,7 @@ class FakePress:
         return name
 
     def start_bench(self, deploy, server, status="Installing", job_status="Running"):
-        """New Bench Queue işlenir: o sunucu için Bench ve New Bench işi oluşur (kademeli)."""
+        """The New Bench Queue is processed: a Bench and a New Bench job are created for that server (step by step)."""
         dep = self.deploys[deploy]
         row = next(r for r in dep["benches"] if r["server"] == server)
         bench = "{}-{}-{}".format(dep["group"], deploy, server.split(".")[0])
@@ -153,7 +153,7 @@ class FakePress:
                              "build_steps": steps or []}
         return name
 
-    # -- uç noktalar --------------------------------------------------------------------------------
+    # -- endpoints --------------------------------------------------------------------------------
     def handle(self, method, args, headers):
         with self.lock:
             self.requests.append((method, copy.deepcopy(args), dict(headers)))
@@ -168,8 +168,8 @@ class FakePress:
             return frappe_error(404, "DoesNotExistError", "No such method " + method)
         with self.lock:
             header = headers.get("X-Press-Team")
-            # Press: kullanıcı başlıktaki takımın üyesi değilse hata vermeden varsayılan takıma geçer
-            # (press/utils/__init__.py get_current_team). System User başlığı olduğu gibi kullanır.
+            # Press: if the user is not a member of the team in the header, it switches to the default team without an error
+            # (press/utils/__init__.py get_current_team). System User uses the header as it is.
             if self.principal == "team":
                 self.current = header if header in self.member_teams else self.default_team
             else:
@@ -232,7 +232,7 @@ class FakePress:
         group, err = self._group_or_403(a.get("name"))
         if err:
             return err
-        # bench.py installable_apps → options()["versions"]: yalnız çerçeve (frappe=1) kaynakları
+        # bench.py installable_apps → options()["versions"]: framework (frappe=1) sources only
         installed = {r["app"] for r in self.group_apps[group["name"]]}
         apps = {}
         for source in self.sources.values():
@@ -241,7 +241,7 @@ class FakePress:
         return ok([{"name": n, "sources": s} for n, s in apps.items()])
 
     def m_press__api__bench__all_apps(self, a):
-        # bench.py all_apps: Published Marketplace App'ler (grupta olmayan) + grubun sürümündeki public kaynaklar
+        # bench.py all_apps: Published Marketplace Apps (not in the group) + public sources in the group's version
         group, err = self._group_or_403(a.get("name"))
         if err:
             return err
@@ -285,7 +285,7 @@ class FakePress:
         info = copy.deepcopy(self.deploy_information.get(a["name"], {"apps": []}))
         builds = [b for b in self.builds.values() if b["group"] == a["name"]]
         last = builds[-1] if builds else None  # last_dc_info: en yeni Deploy Candidate Build
-        # release_group.py last_benches_info: Bench.candidate == <son build adı> (build adıyla karşılaştırır; eşleşmez)
+        # release_group.py last_benches_info: Bench.candidate == <last build name> (compares with the build name; does not match)
         benches = [b for b in self.benches.values() if last and b.get("candidate") == last["name"]]
         running_pipeline = a["name"] in self.pipelines
         info.update(
@@ -297,7 +297,7 @@ class FakePress:
         return ok(info)
 
     def m_press__api__bench__deploy_status(self, a):
-        # bench.py deploy_status: yalnız etkin Release Pipeline'a bakar; pipeline yoksa boşta döner.
+        # bench.py deploy_status: looks only at the active Release Pipeline; without a pipeline it returns idle.
         if a["name"] not in self.pipelines:
             return ok({"is_validating": False, "is_deploy_in_progress": False, "candidate": None})
         return ok({"is_validating": True, "is_deploy_in_progress": True, "candidate": None})
@@ -338,7 +338,7 @@ class FakePress:
 
     # Desk ----------------------------------------------------------------------------------------
     def m_frappe__client__get(self, a):
-        # Bilerek gizli alanlarla döner; runtime bu ucu operator okumaları için çağırmamalı.
+        # Returns with the secret fields on purpose; the runtime must not call this endpoint for operator reads.
         doc = {"Deploy Candidate": self.candidates, "Agent Job": self.jobs}.get(a["doctype"], {}).get(a["name"])
         return ok(copy.deepcopy(doc)) if doc else frappe_error(404, "DoesNotExistError", "not found")
 
@@ -346,7 +346,7 @@ class FakePress:
         if doctype == "Release Group":
             return list(self.groups.values())
         if doctype == "Deploy Candidate":
-            # update_deploy_candidate_with_build: Success olan son build platformuna göre intel_build/arm_build olur
+            # update_deploy_candidate_with_build: the last Success build becomes intel_build/arm_build by platform
             rows = []
             for c in self.candidates.values():
                 done = [b for b in self.builds.values() if b["deploy_candidate"] == c["name"] and b["status"] == "Success"]
@@ -534,7 +534,7 @@ class FakePress:
         if err:
             return err
         if a["app"] in site["apps"]:
-            return ok(None)  # Site.install_app iş açmadan döner
+            return ok(None)  # Site.install_app returns without opening a job
         if a.get("plan"):
             self.subscriptions.append((a["name"], a["app"], a["plan"]))
         self.add_job("Install App on Site", "Pending", site=a["name"])

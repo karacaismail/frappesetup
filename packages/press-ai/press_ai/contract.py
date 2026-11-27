@@ -1,8 +1,8 @@
-"""Operasyon kontratını yükler, doğrular, arar ve kapsamı ölçer.
+"""Loads, validates and searches the operation contract, and measures its coverage.
 
-Kontrat `contracts/` altındaki JSON dosyalarıdır (biçim: INTERFACE.md). Kontrat neyin bilindiğini ve
-hangi statüde olduğunu söyler; neyin yürütülebileceğine runtime'daki kod izin listesi karar verir.
-`validate()` ikisinin tutarlılığını da denetler.
+The contract is the JSON files under `contracts/` (format: INTERFACE.md). The contract states what is known and
+its status; the code allow list in the runtime decides what can be executed.
+`validate()` also checks that the two are consistent.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ OPERATION_KEYS = (
     "mcp", "skill", "agent", "verification", "notes",
 )
 _ID = re.compile(r"[a-z][a-z_]*\.[a-z][a-z_]*")
-# Adım kapsamı en zayıf işlemin statüsüdür; not_applicable nötrdür.
+# Step coverage is the status of the weakest operation; not_applicable is neutral.
 _STRENGTH = {"implemented": 5, "read_only": 4, "planned": 3, "unsupported": 2, "unknown": 1}
 
 
@@ -65,7 +65,7 @@ class Contract:
         self.extension_points = None
         self._load()
 
-    # -- yükleme ----------------------------------------------------------------------------------
+    # -- loading -----------------------------------------------------------------------------------
     def _load(self) -> None:
         paths = [os.path.join(self.directory, "press", name + ".json") for name in PRESS_FILES]
         paths.append(os.path.join(self.directory, "frappe-app-operations.json"))
@@ -113,7 +113,7 @@ class Contract:
         else:
             self.load_errors.append("sources.json: missing")
 
-    # -- erişim -----------------------------------------------------------------------------------
+    # -- access ------------------------------------------------------------------------------------
     def operation(self, op_id: str) -> dict:
         op = self.operations.get(op_id)
         if op is None:
@@ -204,11 +204,11 @@ class Contract:
             "live_press_verification": "not_run",
         }
 
-    # -- doğrulama --------------------------------------------------------------------------------
+    # -- validation -------------------------------------------------------------------------------
     def validate(self, runtime_implemented=None, guide_step_ids=None, sitemap_ids=None,
                  runtime_preconditions=None) -> list:
-        """Hata listesini döndürür. `runtime_implemented`: {op_id: params_schema} (kod izin listesi);
-        `runtime_preconditions`: {op_id: [makine ön koşulu]} (runtime'ın gerçekten çalıştırdığı denetimler)."""
+        """Returns the list of errors. `runtime_implemented`: {op_id: params_schema} (code allow list);
+        `runtime_preconditions`: {op_id: [machine precondition]} (checks the runtime actually runs)."""
         errors = list(self.load_errors)
         for rel, family in self.files.items():
             if family not in FAMILIES:

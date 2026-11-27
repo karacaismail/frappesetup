@@ -1,9 +1,9 @@
-"""Araç girdileri için küçük JSON Schema doğrulayıcısı.
+"""Small JSON Schema validator for tool inputs.
 
-Desteklenen anahtarlar bu paketin şemalarında kullanılanlarla sınırlıdır: type, properties, required,
-additionalProperties (yalnız false), items, enum, const, minLength, maxLength, pattern, minItems,
-maxItems, minimum, maximum. Tanınmayan anahtar bir programlama hatasıdır ve reddedilir; böylece
-yanlışlıkla gevşek bir şema sessizce kabul edilmez.
+The supported keys are limited to those used in this package's schemas: type, properties, required,
+additionalProperties (false only), items, enum, const, minLength, maxLength, pattern, minItems,
+maxItems, minimum, maximum. An unrecognised key is a programming error and is refused; this way a
+loose schema is not silently accepted by mistake.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def _is_type(value, name: str) -> bool:
 
 
 def check_schema(schema: dict, where: str = "$") -> None:
-    """Şemanın yalnız desteklenen anahtarları kullandığını ve nesnelerin kapalı olduğunu doğrular."""
+    """Checks that the schema uses only supported keys and that objects are closed."""
     if not isinstance(schema, dict):
         raise ValueError(where + ": schema must be an object")
     unknown = set(schema) - _KNOWN
@@ -48,8 +48,8 @@ def check_schema(schema: dict, where: str = "$") -> None:
     types = schema.get("type")
     names = types if isinstance(types, list) else [types] if types else []
     if "object" in names:
-        # Serbest nesne yalnız `properties` tanımlamayan, içi ayrıca işleme özgü şemayla doğrulanan
-        # zarf alanlarında kullanılır (ör. press_read.params); tanımlı alanlı nesneler kapalıdır.
+        # A free-form object is used only in envelope fields that define no `properties` and whose content is validated
+        # separately by an operation-specific schema (e.g. press_read.params); objects with defined fields are closed.
         open_envelope = "properties" not in schema and schema.get("additionalProperties") is True
         if schema.get("additionalProperties") is not False and not open_envelope:
             raise ValueError(where + ": object schemas must set additionalProperties to false")
@@ -63,7 +63,7 @@ def check_schema(schema: dict, where: str = "$") -> None:
 
 
 def validate(value, schema: dict, where: str = "params") -> None:
-    """Değeri şemaya göre doğrular; ilk uyumsuzlukta ValidationError yükseltir."""
+    """Validates the value against the schema; raises ValidationError at the first mismatch."""
     types = schema.get("type")
     if types is not None:
         names = types if isinstance(types, list) else [types]

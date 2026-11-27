@@ -1,4 +1,4 @@
-"""Build teşhisi: kılavuz olaylarından türetilmiş sınıflar (pressguide@2b83441 adım kimlikleri)."""
+"""Build diagnosis: classes derived from guide incidents (pressguide@2b83441 step IDs)."""
 import unittest
 
 import support  # noqa: F401

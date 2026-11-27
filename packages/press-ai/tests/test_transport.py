@@ -1,4 +1,4 @@
-"""Gerçek süreç üzerinden stdio MCP: initialize → initialized → tools/list → tools/call; CLI insan sınırları."""
+"""Stdio MCP through a real process: initialize → initialized → tools/list → tools/call; human limits of the CLI."""
 import json
 import os
 import subprocess
@@ -132,7 +132,7 @@ class CliHumanBoundaryTests(unittest.TestCase):
         self.home.cleanup()
 
     def run_cli(self, *args):
-        # Onay ifadesi boru üzerinden verilse bile (TTY yok) komut reddetmeli.
+        # The command must refuse even if the approval phrase is given through a pipe (no TTY).
         return subprocess.run([sys.executable, "-I", SERVER, *args, "--config", self.config_path],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
                               input=b"APPROVE 000000000000\n")

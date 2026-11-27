@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""press-ai giriş noktası. Önerilen çağrı: `python3 -I packages/press-ai/server.py serve --config <yol>`.
+"""press-ai entry point. Recommended call: `python3 -I packages/press-ai/server.py serve --config <path>`.
 
-`-I` ortam değişkenlerini ve kullanıcı site-packages'ını yok sayar; paket dizini burada açıkça eklenir.
+`-I` ignores environment variables and the user site-packages; the package directory is added explicitly here.
 """
 import os
 import sys

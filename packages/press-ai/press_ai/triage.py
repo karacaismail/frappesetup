@@ -1,8 +1,8 @@
-"""Deploy Candidate Build teşhisi: ilk Failure adımı + kılavuzdaki gerçek olaylardan türetilen sınıflar.
+"""Deploy Candidate Build diagnosis: first Failure step + classes derived from real incidents in the guide.
 
-Kurallar pressguide@2b83441 adımlarına dayanır (adım kimlikleri `guide_steps` alanında). Bir kalıp
-eşleşmesi kesin neden değildir: sınıf `pattern` güveniyle döner ve sonraki adım kanıtı doğrulamaktır.
-Eşleşme yoksa `unclassified` döner; teşhis uydurulmaz.
+The rules are based on pressguide@2b83441 steps (step IDs in the `guide_steps` field). A pattern
+match is not a definite cause: the class comes back with `pattern` confidence and the next step is to verify the evidence.
+With no match it returns `unclassified`; no diagnosis is invented.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ _ALWAYS = [
     "Sonuç ve neden görülmeden yeni build açma; aynı candidate için tek build ile doğrula.",
 ]
 
-# (sınıf, eşleşme işlevi, açıklama, sonraki adımlar, sahip, kılavuz adımları)
+# (class, match function, description, next steps, owner, guide steps)
 _RULES = [
     ("required_app_not_found",
      lambda step, out: re.search(r"required app.{0,80}not (found|installed)|app .{0,60} not found|"
@@ -94,7 +94,7 @@ def _label(step: dict) -> str:
 
 
 def classify(build: dict, redactor=None) -> dict:
-    """`build`: {status, build_steps[]} (Deploy Candidate Build ya da candidate okumasından)."""
+    """`build`: {status, build_steps[]} (from a Deploy Candidate Build or a candidate read)."""
     status = build.get("status")
     steps = _ordered(build.get("build_steps") or [])
     summary = {"build": build.get("name"), "status": status, "steps_total": len(steps),

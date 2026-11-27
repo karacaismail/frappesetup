@@ -1,8 +1,8 @@
-"""Press/Frappe HTTP istemcisi (urllib). Yalnız yapılandırılmış hosta, yönlendirme izlemeden konuşur.
+"""Press/Frappe HTTP client (urllib). Talks only to the configured host, without following redirects.
 
-- team principal: Press Dashboard API (`/api/method/press.api...`) + `X-Press-Team` başlığı.
+- team principal: Press Dashboard API (`/api/method/press.api...`) + `X-Press-Team` header.
 - operator principal: Frappe Desk API (`frappe.client.get`, `frappe.client.get_list`, `run_doc_method`).
-Kimlik bilgisi yalnız `Authorization` başlığına girer; hata iletileri maskelenir ve kısaltılır.
+The credential goes only into the `Authorization` header; error messages are masked and truncated.
 """
 from __future__ import annotations
 
@@ -22,12 +22,12 @@ _STATUS_KIND = {401: "authentication", 403: "permission", 404: "not_found", 409:
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401 - urllib arayüzü
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401 - urllib interface
         raise urllib.error.HTTPError(req.full_url, code, "Redirect refused: " + str(code), headers, fp)
 
 
 def _server_message(payload: dict) -> str:
-    """Frappe hata gövdesinden kullanıcıya dönük iletiyi çıkarır; traceback (`exc`) alınmaz."""
+    """Extracts the user-facing message from a Frappe error body; the traceback (`exc`) is not taken."""
     raw = payload.get("_server_messages")
     messages = []
     if isinstance(raw, str):
@@ -57,7 +57,7 @@ class PressClient:
         if press_config.base_url.startswith("https://"):
             handlers.append(urllib.request.HTTPSHandler(context=ssl.create_default_context()))
         self._opener = urllib.request.build_opener(*handlers)
-        self.calls = []  # Son çağrılan yöntem adları (argüman/secret içermez); testler ve denetim için.
+        self.calls = []  # Names of the last methods called (no arguments/secrets); for tests and auditing.
 
     @property
     def principal(self) -> str:
@@ -111,13 +111,13 @@ class PressClient:
             raise PressError("Press returned a non-JSON response", kind="protocol", http_status=status)
         return payload.get("message")
 
-    # -- uç noktalar -----------------------------------------------------------------------------
+    # -- endpoints -----------------------------------------------------------------------------
     def _note(self, label: str) -> None:
         self.calls.append(label)
         del self.calls[:-200]
 
     def call(self, method: str, args: dict | None = None, http_method: str = "POST"):
-        """`/api/method/<method>`; GET isteklerinde argümanlar sorgu dizgisine konur."""
+        """`/api/method/<method>`; for GET requests the arguments go into the query string."""
         self._note(method)
         if http_method == "GET":
             from urllib.parse import urlencode
@@ -127,7 +127,7 @@ class PressClient:
         return self._request("/api/method/" + method, args or {}, "POST")
 
     def run_doc_method(self, doctype: str, name: str, method: str, args: dict | None = None):
-        """Frappe Desk `run_doc_method` (yalnız @frappe.whitelist doc metotları; doc izniyle)."""
+        """Frappe Desk `run_doc_method` (only @frappe.whitelist doc methods; with doc permission)."""
         self._note("run_doc_method:{}.{}".format(doctype, method))
         body = {"dt": doctype, "dn": name, "method": method}
         if args:
@@ -135,16 +135,16 @@ class PressClient:
         return self._request("/api/method/run_doc_method", body, "POST")
 
     def dashboard_get(self, doctype: str, name: str) -> dict:
-        """Team: `press.api.client.get` yalnız DocType'ın `dashboard_fields` alanlarını döndürür."""
+        """Team: `press.api.client.get` returns only the DocType's `dashboard_fields`."""
         return self.call("press.api.client.get", {"doctype": doctype, "name": name})
 
     def get_list(self, doctype: str, filters: dict, fields: list, limit: int = 20, order_by: str = "creation desc",
                  parent: str | None = None):
-        """Operator: Desk liste okuması, yalnız açık alan listesiyle.
+        """Operator: Desk list read, only with an explicit field list.
 
-        Tam belge okuması (`frappe.client.get`) bilinçli olarak kullanılmaz: Deploy Candidate `user_private_key`
-        ve `build_token`, Agent Job `request_data`, Press Settings bazı token alanlarını düz metin döndürür.
-        Alt tablolar `parent` ile okunur."""
+        A full document read (`frappe.client.get`) is deliberately not used: Deploy Candidate `user_private_key`
+        and `build_token`, Agent Job `request_data` and some Press Settings token fields come back in plain text.
+        Child tables are read by `parent`."""
         args = {"doctype": doctype, "filters": filters, "fields": fields, "limit_page_length": limit,
                 "order_by": order_by}
         if parent:

@@ -1,8 +1,8 @@
-"""Yapılandırılmış workspace içinde güvenli dosya erişimi.
+"""Safe file access inside the configured workspace.
 
-Her yol göreli olmalı, `..`/mutlak yol/NUL/ters bölü içeremez ve `.git` bileşeni taşıyamaz. Dizinler
-`O_NOFOLLOW | O_DIRECTORY` ile tek tek, üst dizinin tanıtıcısına göre (`dir_fd`) açılır; böylece sembolik
-bağ ile workspace dışına çıkma, kontrol ile kullanım arasındaki dizin değişimi dahil, engellenir.
+Every path must be relative, cannot contain `..`/an absolute path/NUL/a backslash and cannot carry a `.git` component.
+Directories are opened one by one with `O_NOFOLLOW | O_DIRECTORY`, relative to the parent directory's handle (`dir_fd`);
+this blocks escaping the workspace through a symbolic link, including a directory change between check and use.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def split_relative(path) -> list:
     if not parts:
         raise WorkspaceError("Path points at the workspace root", code="invalid_path")
     for part in parts:
-        # Büyük/küçük harfe duyarsız dosya sistemlerinde (APFS varsayılanı) .GIT de .git'tir.
+        # On case-insensitive file systems (the APFS default) .GIT is also .git.
         if part == ".." or part.casefold() == ".git":
             raise WorkspaceError("Path escapes the workspace or touches .git", code="invalid_path")
     return parts
@@ -37,9 +37,9 @@ class Workspace:
         self.root = os.path.realpath(root)
         self.allow_writes = allow_writes
 
-    # -- güvenli gezinme --------------------------------------------------------------------------
+    # -- safe traversal --------------------------------------------------------------------------
     def _open_dir(self, parts, create: bool = False) -> int:
-        """`parts` dizin bileşenlerini sembolik bağ izlemeden açar; tanıtıcıyı döndürür (çağıran kapatır)."""
+        """Opens the `parts` directory components without following symbolic links; returns the handle (the caller closes it)."""
         fd = os.open(self.root, _DIR_FLAGS)
         try:
             for part in parts:
@@ -70,7 +70,7 @@ class Workspace:
             os.close(fd)
 
     def entries(self, parts) -> list | None:
-        """Bir dizinin girdileri (diskteki adlarıyla); dizin yoksa None."""
+        """A directory's entries (with their names on disk); None if the directory does not exist."""
         try:
             fd = self._open_dir(list(parts))
         except WorkspaceError as error:
@@ -83,7 +83,7 @@ class Workspace:
             os.close(fd)
 
     def exists(self, path: str) -> bool:
-        """Geçersiz yol ve sembolik bağ hata olarak yükselir; yalnız 'bulunamadı' False döner."""
+        """An invalid path and a symbolic link raise an error; only 'not found' returns False."""
         parts = split_relative(path)
         try:
             return self._lstat(parts) is not None
@@ -131,7 +131,7 @@ class Workspace:
             raise
 
     def walk(self, path: str, max_files: int = 5000) -> list:
-        """Sembolik bağları atlayarak düzenli dosyaların göreli yollarını listeler."""
+        """Lists the relative paths of regular files, skipping symbolic links."""
         base = split_relative(path)
         results = []
         stack = [base]
@@ -157,9 +157,9 @@ class Workspace:
 
     # -- yazma ------------------------------------------------------------------------------------
     def apply(self, files: list) -> list:
-        """Hepsi ya da hiçbiri: taban özetleri doğrulanır, tüm içerik geçici dosyalara yazılıp fsync edilir,
-        değiştirilecek dosyaların sabit bağlantılı yedeği alınır; sonra sırayla devreye alınır. Herhangi bir
-        adımda hata olursa devreye alınanlar ters sırayla geri alınır. Bu sırada açılan yeni boş dizinler kalabilir."""
+        """All or nothing: base digests are verified, all content is written to temporary files and fsynced, and a hard-linked
+        backup of the files to be changed is taken; then they are put in place in order. If any step fails, the ones
+        already in place are rolled back in reverse order. New empty directories created meanwhile may remain."""
         if not self.allow_writes:
             raise WorkspaceError("workspace.allow_writes is false; a human must enable writes in the config",
                                  code="writes_disabled")
@@ -172,7 +172,7 @@ class Workspace:
         staged = []
         committed = []
         try:
-            for item in files:  # 1. aşama: geçici dosya + yedek
+            for item in files:  # stage 1: temporary file + backup
                 parts = split_relative(item["path"])
                 entry = {"item": item, "name": parts[-1], "fd": self._open_dir(parts[:-1], create=True),
                          "temp": ".press-ai-" + uuid.uuid4().hex[:10] + ".tmp", "backup": None}
@@ -188,7 +188,7 @@ class Workspace:
                     entry["backup"] = ".press-ai-" + uuid.uuid4().hex[:10] + ".bak"
                     os.link(entry["name"], entry["backup"], src_dir_fd=entry["fd"], dst_dir_fd=entry["fd"],
                             follow_symlinks=False)
-            for entry in staged:  # 2. aşama: devreye alma
+            for entry in staged:  # stage 2: put in place
                 if entry["item"]["action"] == "create":
                     try:
                         os.link(entry["temp"], entry["name"], src_dir_fd=entry["fd"], dst_dir_fd=entry["fd"],
@@ -211,7 +211,7 @@ class Workspace:
                 except OSError as rollback_error:
                     not_restored.append({"path": entry["item"]["path"], "action": entry["item"]["action"],
                                          "error": type(rollback_error).__name__})
-                    entry["backup"] = None  # yedek, elle kurtarma için yerinde kalsın
+                    entry["backup"] = None  # the backup stays in place for manual recovery
             if not_restored:
                 raise WorkspaceError("Apply failed and some files could not be rolled back", code="failed_partial",
                                      details={"not_restored": not_restored, "cause": type(error).__name__}) from error

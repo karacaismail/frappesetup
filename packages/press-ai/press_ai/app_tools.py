@@ -1,4 +1,4 @@
-"""Uygulama geliştirme araçları: inceleme, kural denetimi, değişiklik önerisi ve onaylı uygulama."""
+"""App development tools: review, rule check, change proposal and approved application."""
 from __future__ import annotations
 
 import copy
@@ -18,7 +18,7 @@ CORE_WARNING = ("Original core code is refused by default. A bench update or a P
 
 
 def core_phrase(core: dict, unchecked: list) -> str:
-    """İkinci onay ifadesi: değişen orijinal core uygulama(lar)ını açıkça adlandırır."""
+    """Second approval phrase: explicitly names the changed original core app(s)."""
     return " ".join(["CORE"] + (["UNCHECKED"] if unchecked else []) + [",".join(core["apps"])])
 
 
@@ -26,8 +26,8 @@ def app_inspect(ctx, args):
     ws = ctx.workspace()
     result = app_static.inspect(ws, args["app_path"])
     if args.get("files"):
-        # İçerik ve sha256 aynı okumadan gelir: write_file'ın expected_sha256 değeri buradan alınır.
-        # Desen maskelemesi yapılmaz: ajan bu içerikle tam dosya önerir; maskelenmiş metin geri yazılırsa dosya bozulur.
+        # Content and sha256 come from the same read: write_file's expected_sha256 value is taken from here.
+        # No pattern masking: the agent proposes the full file from this content; writing back masked text corrupts the file.
         files = []
         for rel in args["files"]:
             full = args["app_path"].rstrip("/") + "/" + rel
@@ -51,8 +51,9 @@ def app_check(ctx, args):
 
 
 def render_changes(ws, record) -> list:
-    """Onay ekranı ve inceleyici için: yazılacak içerik önerideki istekten okunur, diff güncel dosyaya karşı yeniden
-    üretilir ve her dosyanın sha256'sı içerikle doğrulanır. `ws` None ise yeni içerik tümüyle gösterilir."""
+    """For the approval screen and the reviewer: the content to write is read from the request in the proposal, the diff is
+    regenerated against the current file and each file's sha256 is verified against the content. If `ws` is None the
+    new content is shown in full."""
     lines = []
     for item in record["request"]["files"]:
         if sha256_hex(item["content"].encode("utf-8")) != item["sha256"]:
@@ -74,7 +75,7 @@ def render_changes(ws, record) -> list:
 
 
 def workspace_for(ctx_or_config, record):
-    """Önerinin workspace'i bu yapılandırmadakiyle aynıysa onu döndürür, değilse None."""
+    """Returns the proposal's workspace if it is the same as in this configuration, otherwise None."""
     from .workspace import Workspace
     config = getattr(ctx_or_config, "config", ctx_or_config)
     if config.workspace and config.workspace.root == (record.get("authority") or {}).get("workspace_root"):
@@ -88,7 +89,7 @@ def app_propose_change(ctx, args):
     operation = _KIND_TO_OPERATION[plan["kind"]]
     request = {"files": [{key: f[key] for key in ("path", "action", "base_sha256", "content", "sha256")}
                          for f in plan["files"]]}
-    # İçerik kayıtta yalnız request.files içinde tutulur; diff onayda ve incelemede içerikten yeniden üretilir.
+    # Content is kept in the record only in request.files; the diff is regenerated from the content at approval and review.
     stored_params = copy.deepcopy({"app_path": args["app_path"], "change": args["change"]})
     if plan["kind"] == "write_file":
         stored_params["change"]["content"] = None
@@ -96,9 +97,9 @@ def app_propose_change(ctx, args):
     files = [{key: f[key] for key in ("path", "action", "base_sha256", "sha256")} for f in plan["files"]]
     core = plan["core"]
     if core:
-        # Orijinal core varsayılan olarak reddedilir: ilk istek yalnız uyarı döner. Aynı istek (aynı argümanlar ve aynı
-        # dosya tabanları) uyarı süresi içinde açıkça tekrarlanırsa öneri oluşur; onu insan CORE ifadesiyle onaylar.
-        # Üretilen içerik özete girmez: tipli türler zaman damgası yazar; içerik öneri özetinde zaten bağlıdır.
+        # Original core is refused by default: the first request only returns a warning. If the same request (same arguments and
+        # same file bases) is explicitly repeated within the warning period, a proposal is created; a human approves it with CORE.
+        # Generated content does not go into the summary: typed kinds write a timestamp; the content is already bound in the proposal summary.
         bases = [{key: f[key] for key in ("path", "action", "base_sha256")} for f in plan["files"]]
         request_digest = sha256_hex(canonical_json({"workspace_root": ws.root, "operation": operation,
                                                     "app_path": args["app_path"], "change": args["change"],
@@ -114,7 +115,7 @@ def app_propose_change(ctx, args):
                             "approval in a separate terminal."}
     stored_preview = {"manual_merge": plan["manual_merge"], "human_commands": plan["human_commands"],
                       "notes": plan["notes"], "files": files}
-    # Çift onay: core değişikliği (CORE ...) ya da ayrıştırılamayan Python (UNCHECKED ...); ifade nedeni adlandırır.
+    # Dual approval: a core change (CORE ...) or unparsable Python (UNCHECKED ...); the phrase names the reason.
     if core:
         level, phrase = "double", core_phrase(core, plan["unchecked"])
         stored_preview["core"] = dict(core, warning=CORE_WARNING)
@@ -148,7 +149,7 @@ def app_apply(ctx, args):
     core = record["preview"].get("core") or {}
     core_approved = bool(core) and record["approval_level"] == "double" and \
         (record.get("confirm_phrase") or "").startswith("CORE ")
-    for item in files:  # Önce doğrula: onay yalnız taban hâlâ aynıysa tüketilir.
+    for item in files:  # Validate first: the approval is consumed only if the base is still the same.
         app = app_changes.check_mutation_path(ws, item["path"])
         if app and not (core_approved and item["path"] in core.get("files", [])):
             raise ApprovalError("{} is original core code ({}) but this proposal was not approved as a core change; "

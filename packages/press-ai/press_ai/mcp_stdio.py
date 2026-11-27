@@ -1,9 +1,9 @@
-"""MCP stdio taşıması: satır başına bir JSON-RPC 2.0 iletisi (stdin → stdout), log stderr'e.
+"""MCP stdio transport: one JSON-RPC 2.0 message per line (stdin → stdout), logs to stderr.
 
-Kaynak: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports (stdio) ve
-https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle (sürüm müzakeresi).
-Toplu (batch) istekler 2025-06-18'de kaldırıldığı için reddedilir. Desteklenmeyen daha yeni bir
-sürüm istenirse desteklenen en yeni sürüm önerilir; istemci kabul etmezse bağlantıyı kapatır.
+Source: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports (stdio) and
+https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle (version negotiation).
+Batch requests are refused because they were removed in 2025-06-18. If a newer, unsupported
+version is requested, the newest supported version is offered; if the client does not accept it, it closes the connection.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class Server:
     def __init__(self, toolbox, stdin=None, stdout=None, stderr=None):
         self.toolbox = toolbox
         self.stdin = stdin or sys.stdin.buffer
-        # Çıktı yerel ayardan bağımsız UTF-8 bayttır (`-I` ile PYTHONIOENCODING yok sayılır).
+        # Output is UTF-8 bytes regardless of locale (`-I` ignores PYTHONIOENCODING).
         self.stdout = stdout or sys.stdout.buffer
         self.stderr = stderr or sys.stderr
         self.initialized = False
@@ -130,7 +130,7 @@ class Server:
         except KitError as error:
             return {"content": [{"type": "text", "text": json.dumps(error.as_dict(), ensure_ascii=False)}],
                     "isError": True}
-        except Exception as error:  # noqa: BLE001 - araç hatası istemciye genel iletiyle döner, süreç yaşar
+        except Exception as error:  # noqa: BLE001 - a tool error returns to the client with a generic message; the process stays alive
             self.stderr.write("press-ai: unexpected {} in {}\n".format(type(error).__name__, name))
             self.stderr.flush()
             payload = {"error": "internal", "message": "Unexpected server error ({})".format(type(error).__name__)}

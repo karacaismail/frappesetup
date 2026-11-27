@@ -1,13 +1,13 @@
-"""Frappe uygulamasının statik incelemesi: yapı (`app_inspect`) ve kurallar (`app_check`).
+"""Static review of a Frappe app: structure (`app_inspect`) and rules (`app_check`).
 
-Kod hiçbir zaman içe aktarılmaz veya çalıştırılmaz; Python dosyaları `ast` ile, JSON dosyaları `json`
-ile okunur. Sürüme bağlı kurallar hedef Frappe sürümü (v15/v16) verilmezse `unknown` döner.
-Doğrulanmış sürüm gerçekleri (frappe/frappe version-15 b0b5b99, version-16 6b450a1):
-- `override_doctype_class`: iki sürümde var; birden çok uygulamada son tanım kazanır; v16 özgün sınıfın
-  alt sınıfı olmayı zorunlu kılar (frappe/model/base_document.py v15:89-96, v16:110-123).
-- `extend_doctype_class`: yalnız v16 (mixin; base_document.py v16:180-207).
-- patches.txt `[pre_model_sync]` / `[post_model_sync]` bölümleri (frappe/modules/patch_handler.py).
-- Test tabanı: v15 `frappe.tests.utils.FrappeTestCase`, v16 `frappe.tests.IntegrationTestCase`.
+Code is never imported or run; Python files are read with `ast` and JSON files with `json`.
+Version-dependent rules return `unknown` when the target Frappe version (v15/v16) is not given.
+Verified version facts (frappe/frappe version-15 b0b5b99, version-16 6b450a1):
+- `override_doctype_class`: present in both versions; across several apps the last definition wins; v16 requires
+  it to be a subclass of the original class (frappe/model/base_document.py v15:89-96, v16:110-123).
+- `extend_doctype_class`: v16 only (mixin; base_document.py v16:180-207).
+- patches.txt `[pre_model_sync]` / `[post_model_sync]` sections (frappe/modules/patch_handler.py).
+- Test base: v15 `frappe.tests.utils.FrappeTestCase`, v16 `frappe.tests.IntegrationTestCase`.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ OFFICIAL_MODULES = ("frappe", "erpnext", "hrms", "payments", "education", "lms",
 
 
 def min_python(spec) -> tuple | None:
-    """`requires-python` değerinden en düşük sürüm (ör. ">=3.10,<3.15" → (3, 10)); okunamazsa None."""
+    """Lowest version from a `requires-python` value (e.g. ">=3.10,<3.15" → (3, 10)); None if it cannot be read."""
     if not isinstance(spec, str):
         return None
     match = re.search(r">=\s*(\d+)\.(\d+)", spec) or re.search(r"~=\s*(\d+)\.(\d+)", spec)
@@ -41,17 +41,18 @@ OFFICIAL_CASEFOLDED = frozenset(name.casefold() for name in OFFICIAL_MODULES)
 
 
 def is_official(name) -> bool:
-    """Harf duyarsız dosya sisteminde (APFS varsayılanı) `Erpnext` de `erpnext`tir."""
+    """On a case-insensitive file system (the APFS default) `Erpnext` is also `erpnext`."""
     return isinstance(name, str) and name.casefold() in OFFICIAL_CASEFOLDED
 
 
 def parse_python(source: str, filename: str, target_min):
-    """Kodu çalıştırmadan ayrıştırır. Dönüş: (ağaç | None, durum). Durum `ok`, `invalid` ya da `unknown`.
+    """Parses without running the code. Returns: (tree | None, status). Status is `ok`, `invalid` or `unknown`.
 
-    Sunucu Python'u uygulamanın en düşük sürümüne yetişiyorsa ayrıştırma o sürümün dilbilgisiyle yapılır
-    (`feature_version`): ör. `>=3.10` bildiren uygulamada 3.12'ye özgü `type X = ...` geçersizdir. Sunucu daha eskiyse
-    (ör. 3.9 sunucu, 3.10+ hedef) sözdizimi hatası kesin değildir; sonuç `unknown` olur ve çağıran metin taramasına ve
-    çift onaya düşer. Hedef bilinmiyorsa sunucunun dilbilgisiyle ayrıştırılır, hata yine `unknown` sayılır."""
+    When the server's Python reaches the app's lowest version, parsing uses that version's grammar
+    (`feature_version`): e.g. 3.12-only `type X = ...` is invalid in an app that declares `>=3.10`. When the server is
+    older (e.g. a 3.9 server, a 3.10+ target) a syntax error is not conclusive; the result is `unknown` and the caller
+    falls back to the text scan and dual approval. When the target is unknown, the server's grammar is used and an
+    error still counts as `unknown`."""
     authoritative = target_min is not None and sys.version_info[:2] >= tuple(target_min)
     try:
         if authoritative:
@@ -73,9 +74,9 @@ _TEXT_IGNORE_PERMISSIONS = re.compile(r"ignore_permissions\s*=\s*True")
 
 
 def text_rule_scan(source: str) -> list:
-    """Ayrıştırılamayan dosya için en iyi çaba metin taraması: modül düzeyinde resmi modüle atama ya da setattr
-    (EXT001), biçimlenmiş SQL (SEC002) ve misafir uç noktası olan dosyada `ignore_permissions=True` (SEC003; işlev
-    sınırı görülemediği için temkinli). İçe aktarma takma adlarını görmez; bu yüzden çift onay eşlik eder."""
+    """Best-effort text scan for a file that cannot be parsed: module-level assignment or setattr to an official module
+    (EXT001), formatted SQL (SEC002) and `ignore_permissions=True` in a file with a guest endpoint (SEC003; cautious
+    because function boundaries are not visible). It does not see import aliases; dual approval therefore goes with it."""
     found = []
     line = lambda match: source.count("\n", 0, match.start()) + 1  # noqa: E731
     for rule, severity, pattern in (("EXT001", "warning", _TEXT_EXT001), ("SEC002", "error", _TEXT_SEC002)):
@@ -105,9 +106,9 @@ def classname(doctype: str) -> str:
     return doctype.replace(" ", "").replace("-", "")
 
 
-# -- yapı ----------------------------------------------------------------------------------------
+# -- structure -----------------------------------------------------------------------------------
 def locate_app(ws, app_path: str) -> dict:
-    """`app_path` uygulama deposu kökü (pyproject.toml/setup.py ve iç paket) ya da iç paketin kendisi olabilir."""
+    """`app_path` may be the app repository root (pyproject.toml/setup.py and inner package) or the inner package itself."""
     if ws.exists(app_path + "/hooks.py"):
         package = app_path
         repo = app_path.rsplit("/", 1)[0] if "/" in app_path else None
@@ -128,7 +129,7 @@ def locate_app(ws, app_path: str) -> dict:
 
 
 def parse_hooks(source: str) -> dict:
-    """hooks.py'deki üst düzey sabit atamaları döndürür; sabit olmayan değerler işaretlenir."""
+    """Returns the top-level constant assignments in hooks.py; non-constant values are flagged."""
     tree = ast.parse(source)
     hooks = {}
     lines = {}
@@ -214,7 +215,7 @@ def inspect(ws, app_path: str) -> dict:
 
 
 def _pyproject_summary(text: str) -> dict:
-    """Python 3.9'da tomllib yok: yalnız gereken anahtarlar düz metinden okunur."""
+    """Python 3.9 has no tomllib: only the needed keys are read from plain text."""
     out = {}
     match = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
     if match:
@@ -267,7 +268,7 @@ class _Finder(ast.NodeVisitor):
     def visit_Assign(self, node):
         for target in node.targets:
             if isinstance(target, ast.Attribute) and self._root(target) in self.official and not self.function_stack:
-                # Özel koddaki resmi modül yaması engellenmez: risk uyarısıdır (yazım akışıyla aynı ciddiyet).
+                # An official module patch in custom code is not blocked: it is a risk warning (same severity as the write flow).
                 self.add("EXT001", "warning", node, "Module-level assignment to an official app attribute "
                                                   "(monkey patch). Use hooks (doc_events, extend/override class).")
             if (isinstance(target, ast.Attribute) and target.attr == "ignore_permissions"
@@ -318,7 +319,7 @@ def _imports(tree) -> set:
 
 def _module_file(ws, package_parent: str, dotted: str) -> str | None:
     rel = package_parent + "/" + dotted.replace(".", "/") if package_parent else dotted.replace(".", "/")
-    # Python'daki gibi paket (dizin/__init__.py) aynı adlı modül dosyasından önce gelir.
+    # As in Python, a package (directory/__init__.py) comes before a module file of the same name.
     for candidate in (rel + "/__init__.py", rel + ".py"):
         if ws.exists(candidate):
             return candidate
@@ -337,7 +338,7 @@ def _defines(ws, path: str, name: str):
 
 
 def _resolve(ws, info, dotted: str):
-    """`app.module.attr` yolunu bu uygulamada çözer; başka uygulamaya aitse None ('external')."""
+    """Resolves an `app.module.attr` path in this app; None ('external') if it belongs to another app."""
     if not isinstance(dotted, str) or "." not in dotted:
         return "invalid", None
     if dotted.split(".")[0] != info["name"]:
@@ -363,7 +364,7 @@ def check(ws, app_path: str, target: str | None, extension_points: dict | None =
     def add(rule, severity, message, file=hooks_file, line=None):
         findings.append({"rule": rule, "severity": severity, "file": file, "line": line, "message": message})
 
-    # Python kaynakları (sözdizimi hedef Python'a göre yorumlanır; bkz. parse_python)
+    # Python sources (syntax is interpreted for the target Python; see parse_python)
     target_python = app_min_python(ws, info)
     for rel in ws.walk(package, max_files=20000):
         if not rel.endswith(".py"):
@@ -397,7 +398,7 @@ def check(ws, app_path: str, target: str | None, extension_points: dict | None =
                     if state in ("missing_module", "missing_attr", "invalid"):
                         add("HOOK001", "error", "doc_events {}.{} handler {} not found in this app ({})".format(
                             doctype, event, handler, state), line=lines.get("doc_events"))
-    # hooks: sınıf geçersiz kılma / genişletme
+    # hooks: class override / extension
     for key in ("override_doctype_class", "extend_doctype_class"):
         mapping = values.get(key)
         if not isinstance(mapping, dict):
@@ -426,7 +427,7 @@ def check(ws, app_path: str, target: str | None, extension_points: dict | None =
     if "override_whitelisted_methods" in values:
         add("EXT004", "warning", "override_whitelisted_methods replaces a core/official endpoint; re-test it on "
                                  "every upgrade.", line=lines.get("override_whitelisted_methods"))
-    # sürüme bağlı kurallar
+    # version-dependent rules
     version_rules = []
     if "extend_doctype_class" in values:
         version_rules.append(_versioned("VER001", "extend_doctype_class", target, {"v15": False, "v16": True},

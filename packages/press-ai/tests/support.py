@@ -1,7 +1,7 @@
-"""Test yardımcıları: geçici yapılandırma, kimlik dosyası, sahte Press, sabit saat ve insan onayı benzetimi.
+"""Test helpers: temporary configuration, credential file, fake Press, fixed clock and simulated human approval.
 
-İnsan onayı testlerde `ProposalStore.write_approval` ile benzetilir: `server.py approve` aynı çağrıyı
-TTY'de özet ve onay ifadesi doğrulandıktan sonra yapar. TTY zorunluluğu ayrı bir CLI testinde sınanır.
+Human approval is simulated in tests with `ProposalStore.write_approval`: `server.py approve` makes the same call
+on a TTY after the digest and approval phrase are verified. The TTY requirement is tested in a separate CLI test.
 """
 import datetime as dt
 import json
@@ -35,7 +35,7 @@ class Clock:
 
 
 class TempHome:
-    """Repo dışında geçici dizin: state, kimlik dosyası ve workspace burada."""
+    """Temporary directory outside the repository: state, credential file and workspace live here."""
 
     def __init__(self):
         self.root = os.path.realpath(tempfile.mkdtemp(prefix="press-ai-test-"))
@@ -85,13 +85,13 @@ def make_config(home, url=None, principal="team", team="team-alpha", mutations=(
 
 
 def approve(ctx, proposal_id):
-    """İnsan onayının benzetimi (CLI'nin TTY doğrulamasından sonraki adım)."""
+    """Simulates human approval (the step after the CLI's TTY verification)."""
     record = ctx.store.load(proposal_id)
     return ctx.store.write_approval(proposal_id, record)
 
 
 class PressCase(unittest.TestCase):
-    """Sahte Press + yapılandırılmış Toolbox. Alt sınıflar PRINCIPAL ve MUTATIONS belirler."""
+    """Fake Press + configured Toolbox. Subclasses set PRINCIPAL and MUTATIONS."""
 
     PRINCIPAL = "team"
     TEAM = "team-alpha"
@@ -120,7 +120,7 @@ class PressCase(unittest.TestCase):
         return [r[0] for r in self.fake.requests]
 
     def state_text(self):
-        """State dizinindeki tüm dosyaların birleşik metni (secret sızıntısı testleri için)."""
+        """Combined text of all files in the state directory (for secret leak tests)."""
         chunks = []
         for base, _, files in os.walk(self.home.path("state")):
             for name in files:
