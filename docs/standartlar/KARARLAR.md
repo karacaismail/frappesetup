@@ -1,6 +1,6 @@
 # Proje sahibinin kararları
 
-Bu dosya dört günün kararlarını toplar. İlk gün 20 Kasım 2026 Cuma günüdür. Son gün 23 Kasım 2026 Pazartesi günüdür.
+Bu dosya sekiz günün kararlarını toplar. İlk gün 20 Kasım 2026 Cuma günüdür. Son gün 27 Kasım 2026 Cuma günüdür.
 
 Çalışma Frappe için kod standartlarıyla başladı. Sonra mobil uygulamaya ve KVKK uyumuna genişledi.
 
@@ -902,6 +902,24 @@ Sitedeki karşılığı şudur:
 - Ürün sayfası sitenin “AtonotA Login” bölümüdür.
 - Sitedeki karar kaydı K-61'dir.
 - Ürünün fazı P7'dir. Gereksinimler G-157 ile başlar.
+
+### Karar 43. GILT kuralları onaylandı
+
+Proje sahibi GILT kuralını 27 Kasım 2026 Cuma günü onayladı.
+GILT, arayüzün birden çok dili desteklemesi için gereken hazırlıkları kapsar.
+Proje sahibi şöyle dedi: "Evet, onaylıyorum".
+Onay kaydı AJA-1350 işindedir.
+
+Kuralları ekleyen Git kaydı (commit) `d8822566` kimliğini taşır.
+Onay şu kapsamı içerir:
+
+- Sunucu tarafındaki `frappe-python-standartlari.md` dosyasının M-9 kuralı onaylandı.
+- Arayüz tarafındaki `headless-frontend-standartlari.md` dosyasının GILT bölümü onaylandı. Bölüm, IC-9 ile IC-16 arasındaki kuralları kapsar. AD-11 ve AX-9 kuralları da onaylandı.
+- G-73 gereksinimindeki GILT altyapısı onaylandı.
+
+Bu onay, G-73 gereksinimindeki kapsamı korur.
+İlk kullanılabilir sürümde yalnız dil altyapısı kurulur.
+Metin çevirisi ve varsayılan dili İngilizce yapma işi sonraya kalır.
 
 ## Modellerin kararları
 

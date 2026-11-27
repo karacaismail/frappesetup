@@ -570,6 +570,22 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('GILT approval is recorded in decision 43 (AJA-1358)', () => {
+    const decisions = read('docs/standartlar/KARARLAR.md');
+    expect(decisions).toMatch(/^### Karar 43\./m);
+    const decision = decisions.split(/^### Karar 43\./m)[1]?.split(/^#{1,3} /m)[0];
+    for (const reference of [
+      'd8822566', 'G-73', '27 Kasım 2026 Cuma günü', '"Evet, onaylıyorum"',
+      'frappe-python-standartlari.md', 'M-9', 'headless-frontend-standartlari.md',
+      'IC-9', 'IC-16', 'AD-11', 'AX-9',
+    ]) expect(decision, reference).toContain(reference);
+    expect(decisions.indexOf('### Karar 43.')).toBeGreaterThan(decisions.indexOf('### Karar 42.'));
+    const introduction = decisions.split(/^## /m)[0];
+    expect(introduction).toContain('sekiz günün');
+    expect(introduction).toContain('İlk gün 20 Kasım 2026 Cuma günüdür.');
+    expect(introduction).toContain('Son gün 27 Kasım 2026 Cuma günüdür.');
+  });
+
   test('built pages have no table rows rendered as paragraphs', () => {
     // Tablo içindeki boş satır markdown tablosunu böler; kalan satırlar `<p>| …` olarak yayımlanır.
     const dist = new URL('dist/', root);
