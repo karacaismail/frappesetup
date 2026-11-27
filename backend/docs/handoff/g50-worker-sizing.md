@@ -111,3 +111,7 @@ python3 -I worker_sizing.py --system-settings sites.json
 
 Sonucu görev kaydına yazın. Tam ayar dosyasını ve gizli değerleri paylaşmayın.
 Canlı ortamda bu adımlar henüz denenmedi.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

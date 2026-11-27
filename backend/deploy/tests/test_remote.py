@@ -22,6 +22,9 @@ DEPLOY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(DEPLOY))
 
 import release  # noqa: E402
+
+DOMAIN = release.load_brand()["BRAND_DOMAIN"]
+SITE = f"demo.app.alpha.{DOMAIN}"
 import test_settings  # noqa: E402
 
 FAKE_DOCKER = r"""#!/usr/bin/env bash
@@ -80,20 +83,24 @@ class RemoteScripts(unittest.TestCase):
         # The DevOps owner wrote every secret file of every environment (blocker E-4).
         for env in release.ORDER:
             test_settings.fill_server(self.etc, env, press=True)
+            keycloak = self.etc / env / "keycloak.env"
+            keycloak.write_text(re.sub(r"(?m)^IDENTITY_BRAND_NAME=.*\n?", "", keycloak.read_text()))
 
     def incoming(self, env, manifest, bundle=None, drop=()):
         folder = self.folder / f"incoming-{env}-{manifest['release_id']}"
         # Jenkins sends the files again on every attempt.
         shutil.rmtree(folder, ignore_errors=True)
         folder.mkdir()
+        release.pack_deploy(DEPLOY, folder, manifest["commit"])
+        packed = folder / "deploy"
         (folder / "release.json").write_text(json.dumps(manifest))
-        shutil.copy(DEPLOY / "environments" / f"{env}.env", folder)
+        shutil.copy(packed / "environments" / f"{env}.env", folder)
         for name in ("stack.yaml", "edge.yaml", "Caddyfile", "site.caddy.template"):
-            shutil.copy(DEPLOY / "compose" / name, folder)
-        for script in (DEPLOY / "remote").iterdir():
+            shutil.copy(packed / "compose" / name, folder)
+        for script in (packed / "remote").iterdir():
             if script.is_file():
                 shutil.copy(script, folder)
-        for listing in (DEPLOY / "settings").glob("*.production.env.example"):
+        for listing in (packed / "settings").glob("*.production.env.example"):
             shutil.copy(listing, folder)
         if bundle:
             name, data = bundle
@@ -190,7 +197,7 @@ class RemoteScripts(unittest.TestCase):
         result = self.apply("alpha", self.backend(1), ATONOTA_FIRST_INSTALL="1")
         self.assertEqual(result.returncode, 0, result.stderr)
         pull = self.index(" pull --quiet")
-        migrate = self.index("bench --site demo.app.alpha.atonota.net migrate")
+        migrate = self.index(f"bench --site {SITE} migrate")
         start = self.index("--remove-orphans")
         reload = self.index("caddy reload")
         self.assertLess(pull, migrate)
@@ -200,8 +207,8 @@ class RemoteScripts(unittest.TestCase):
         self.assertEqual(self.link("alpha", "backend-current"), f"releases/backend-{commit(1)[:12]}-b1")
         self.assertFalse((self.root / "alpha" / "backend-pending").is_symlink())
         site = (self.root / "edge" / "sites" / "alpha.caddy").read_text()
-        self.assertIn("api.login.alpha.atonota.net {", site)
-        self.assertIn("demo.app.alpha.atonota.net {", site)
+        self.assertIn(f"api.login.alpha.{DOMAIN} {{", site)
+        self.assertIn(f"{SITE} {{", site)
         self.assertIn("reverse_proxy alpha-keycloak:8080", site)
         self.assertNotIn("__", site)
 
@@ -434,7 +441,7 @@ class RemoteScripts(unittest.TestCase):
         calls = self.calls()
         self.assertFalse(any(" stop " in line or "backup" in line or " pull" in line for line in calls), calls)
         self.assertFalse(any("set-maintenance-mode on" in line for line in calls), calls)
-        migrate = self.index("bench --site demo.app.alpha.atonota.net migrate")
+        migrate = self.index(f"bench --site {SITE} migrate")
         self.assertIn(self.release_id(2), calls[migrate])
         start = self.index("--wait-timeout 600 --remove-orphans")
         self.assertLess(migrate, start)
@@ -524,6 +531,24 @@ class RemoteScripts(unittest.TestCase):
         rolled = self.run_remote("prod", "rollback", "backend", "--failed", self.release_id(2))
         self.assertEqual(rolled.returncode, 0, rolled.stderr)
         self.assertEqual(self.calls(), [], "prod keeps running; no restart (finding K6)")
+
+    def test_offsite_backup_loads_settings_before_writing_the_site_brand(self):
+        test_settings.write_env(self.etc / "prod/offsite.env", test_settings.filled("offsite"))
+        rclone = self.folder / "bin/rclone"
+        rclone.write_text('#!/usr/bin/env bash\nset -eu\n'
+                          '[[ -n "$RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY" ]]\n'
+                          'printf "%s\\n" "$1" >>"$FAKE_RCLONE_LOG"\n')
+        rclone.chmod(0o755)
+        self.first_install("prod")
+        offsite_log = self.folder / "rclone.log"
+        result = self.apply("prod", self.backend(2, "prod"), FAKE_RCLONE_LOG=str(offsite_log))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(offsite_log.read_text().splitlines(), ["copy", "check"])
+        backup = self.index("backup --with-files")
+        brand = self.index("set-config -- identity_brand_name")
+        migrate = self.index(" migrate", start=brand)
+        self.assertLess(backup, brand)
+        self.assertLess(brand, migrate)
 
     def test_status_reports_the_current_backend_release(self):
         self.first_install()
@@ -683,9 +708,9 @@ class RemoteScripts(unittest.TestCase):
         self.first_install()
         keys = [key for key in test_settings.required("tenant-site") if key != "keycloak_client_secret"]
         result = self.apply("alpha", self.backend(2),
-                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": {"set": keys, "differs": []}}))
+                            FAKE_SITE_KEYS=json.dumps({SITE: {"set": keys, "differs": []}}))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("demo.app.alpha.atonota.net, site_config.json: keycloak_client_secret (missing)",
+        self.assertIn(f"{SITE}, site_config.json: keycloak_client_secret (missing)",
                       result.stderr)
         self.assertLess(self.index(" pull --quiet"), self.index("site-settings-probe"))
         self.assertFalse(any("set-maintenance-mode" in line or " stop " in line for line in self.calls()))
@@ -700,7 +725,7 @@ class RemoteScripts(unittest.TestCase):
         self.first_install()
         report = {"set": sorted(test_settings.required("tenant-site")), "differs": ["developer_mode"]}
         result = self.apply("alpha", self.backend(2),
-                            FAKE_SITE_KEYS=json.dumps({"demo.app.alpha.atonota.net": report}))
+                            FAKE_SITE_KEYS=json.dumps({SITE: report}))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("developer_mode (must be 0)", result.stderr)
         probe = self.calls()[self.index("site-settings-probe")]
@@ -722,7 +747,7 @@ class RemoteScripts(unittest.TestCase):
         names = {path.name for path in (folder / "settings").iterdir()}
         self.assertIn("keycloak.production.env.example", names)
         probe = json.loads((folder / "site-settings.json").read_text())
-        self.assertIn("demo.app.alpha.atonota.net", probe)
+        self.assertIn(SITE, probe)
 
 
 if __name__ == "__main__":

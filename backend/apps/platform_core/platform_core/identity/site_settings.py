@@ -16,6 +16,7 @@ REQUIRED = (
 )
 DEFAULT_REALM = "platform"
 DEFAULT_SERVICE_AZP = ("identity-sync",)
+TECHNICAL_NAME = "atonota_login"
 
 
 def realm() -> str:
@@ -33,6 +34,14 @@ def issuer() -> str:
 			KeycloakSettingsMissing,
 		)
 	return helpers.issuer_url(public_url, realm())
+
+
+def brand_name() -> str:
+	"""Visible product name. The deploy step writes it from backend/brand.env (AJA-1061).
+
+	Without the setting the technical name is shown, never an invented brand.
+	"""
+	return (frappe.conf.get("identity_brand_name") or "").strip() or TECHNICAL_NAME
 
 
 def keycloak_only() -> bool:

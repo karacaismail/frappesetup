@@ -197,6 +197,118 @@ paths:
                 $ref: "#/components/schemas/FrappeError"
               example:
                 exc_type: TimestampMismatchError
+  /method/hrms_tr.api.reject_leave:
+    post:
+      operationId: rejectLeaveApplication
+      summary: Reject and submit an open leave application.
+      description: |
+        Follows the same rules as approval. The caller needs an approver role and the read, write
+        and submit permissions of the application. Nobody rejects their own application.
+        The endpoint locks the application and compares the version before it changes anything.
+        HRMS submits a rejected application with the status Rejected.
+        Send the modified value from the application response in the version field.
+      parameters:
+        - in: header
+          name: X-Frappe-CSRF-Token
+          description: Frappe requires this header for a write request if the session has a CSRF token.
+          schema:
+            type: string
+          example: synthetic-csrf-token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveLeaveRequest"
+            example: {name: HR-LAP-TEST-01, version: "2026-11-22 09:00:00.000001"}
+      responses:
+        "200":
+          description: Name of the rejected record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveLeaveResponse"
+              example: {message: {name: HR-LAP-TEST-01}}
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+        "404":
+          $ref: "#/components/responses/LeaveNotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "417":
+          description: |
+            The application version changed, input validation failed, the application is not an open draft,
+            or HRMS validation failed. A version conflict returns TimestampMismatchError.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
+              example:
+                exc_type: TimestampMismatchError
+  /method/hrms_tr.api.get_home_summary:
+    get:
+      operationId: getHomeSummary
+      x-request-example: "GET /api/method/hrms_tr.api.get_home_summary"
+      summary: Read the four parts of the home page for the signed-in user.
+      description: |
+        Every part counts and lists only the records the signed-in user can read.
+        Lists hold at most 50 items. The counts count every matching record.
+        An overlap is two open or approved applications of one team that share at least one day.
+        The team is the department of the leave application.
+        An application without a department is never an overlap.
+        Only applications that end today or later count.
+        Two applications of the same employee also count.
+      responses:
+        "200":
+          description: Home page summary. An empty part is an empty list or a zero count.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    description: Summary of the signed-in user.
+                    $ref: "#/components/schemas/HomeSummary"
+              example:
+                message:
+                  pending_approvals:
+                    - name: HR-LAP-TEST-01
+                      version: "2026-11-22 09:00:00.000001"
+                      employee_name: Synthetic Employee 3
+                      leave_type: Synthetic Annual Leave
+                      from_date: "2026-12-08"
+                      to_date: "2026-12-12"
+                      total_leave_days: 5
+                      leave_balance: 11
+                  problems:
+                    - kind: missing_joining_date
+                      employee: HR-EMP-TEST-08
+                      employee_name: Synthetic Employee 8
+                    - kind: overlap
+                      department: Synthetic Team A - HRT
+                      leaves:
+                        - {name: HR-LAP-TEST-38, employee_name: Synthetic Employee 4, from_date: "2026-12-14", to_date: "2026-12-15"}
+                        - {name: HR-LAP-TEST-39, employee_name: Synthetic Employee 6, from_date: "2026-12-15", to_date: "2026-12-16"}
+                  recent_changes:
+                    - name: HR-LAP-TEST-40
+                      employee_name: Synthetic Employee 2
+                      actor: Synthetic Employee 2
+                      action: created
+                      at: "2026-11-26 09:40:00.000001"
+                  counts:
+                    pending_approvals: 1
+                    on_leave_today: 3
+                    opened_this_month: 14
+                    problems: 2
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
   /method/hrms_tr.api.cancel_leave:
     post:
       operationId: cancelLeaveApplication
@@ -279,6 +391,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/FrappeError"
               example: {exc_type: ValidationError}
+  /method/hrms_tr.api.get_leave_request_context:
+    get:
+      operationId: getLeaveRequestContext
+      summary: Read the signed-in employee's defaults for a new leave application.
+      description: |
+        Returns only the active Employee linked to the authenticated session user.
+        Employee and user selectors are unsupported and ignored by Frappe, including for administrators.
+        Missing employee, display name, leave type, allocation, or balance data is null.
+        Each available value has its source DocType in sources. Missing values have null sources.
+        HRMS calculates the balance for today's site date, through that date only.
+        Existing legacy balance routes remain blocked. This route does not create or change records.
+        POST and other non-GET methods are rejected with Frappe's 403 PermissionError.
+      parameters:
+        - in: query
+          name: leave_type
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 140}
+          description: |
+            Exact Leave Type record name. An explicit name is resolved from Leave Type.
+            If omitted, use the signed-in employee's submitted Leave Allocation records valid today.
+            Select the type only when those allocations contain exactly one distinct leave type.
+            The source is Leave Allocation. No allocation or multiple types yields null type and balance.
+            No translated-name matching or alternate leave type is inferred.
+          example: Annual Leave
+      responses:
+        "200":
+          description: Available defaults and their sources. A missing allocation is null, not zero.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveRequestContextResponse"
+              example:
+                message:
+                  employee: HR-EMP-TEST-01
+                  employee_name: Örnek Kişi 1
+                  leave_type: Annual Leave
+                  leave_balance: 8.5
+                  sources:
+                    employee: Employee
+                    employee_name: Employee
+                    leave_type: Leave Allocation
+                    leave_balance: Leave Ledger Entry
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+        "417":
+          description: Invalid leave_type input. Empty strings, objects, and names over 140 characters are rejected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
+              example: {exc_type: FrappeTypeError}
   /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
     get:
       operationId: denyLegacyLeaveQueryGet
@@ -449,6 +614,51 @@ components:
             errors:
               - type: DoesNotExistError
   schemas:
+    LeaveRequestContextResponse:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          description: Available defaults for the signed-in employee.
+          type: object
+          additionalProperties: false
+          required: [employee, employee_name, leave_type, leave_balance, sources]
+          properties:
+            employee:
+              type: [string, "null"]
+              description: Active Employee record name linked to the session user, or null.
+            employee_name:
+              type: [string, "null"]
+              description: Display name from that Employee record, or null.
+            leave_type:
+              type: [string, "null"]
+              description: Explicit Leave Type or the single type allocated today. Null when employee or type is missing, or omitted type has no unique allocation.
+            leave_balance:
+              type: [number, "null"]
+              description: Remaining days from HRMS for today's site date, or null without balance data.
+            sources:
+              description: Source DocType for each available value. Null means the value is missing.
+              type: object
+              additionalProperties: false
+              required: [employee, employee_name, leave_type, leave_balance]
+              properties:
+                employee:
+                  type: [string, "null"]
+                  enum: [Employee, null]
+                  description: Employee record, or null when employee is missing.
+                employee_name:
+                  type: [string, "null"]
+                  enum: [Employee, null]
+                  description: Employee record, or null when its display name is missing.
+                leave_type:
+                  type: [string, "null"]
+                  enum: [Leave Type, Leave Allocation, null]
+                  description: Leave Type for an explicit name, Leave Allocation for the single allocated type, or null when no type was resolved.
+                leave_balance:
+                  type: [string, "null"]
+                  enum: [Leave Ledger Entry, null]
+                  description: Leave ledger records evaluated by HRMS, or null without balance data.
     LeaveName:
       type: object
       additionalProperties: false
@@ -535,6 +745,105 @@ components:
       examples:
         - message:
             name: HR-LAP-TEST-01
+    HomeSummary:
+      type: object
+      additionalProperties: false
+      required: [pending_approvals, problems, recent_changes, counts]
+      properties:
+        pending_approvals:
+          type: array
+          maxItems: 50
+          description: Open draft applications whose approver is the signed-in user. Ordered by the first leave day.
+          items:
+            $ref: "#/components/schemas/PendingApproval"
+        problems:
+          type: array
+          maxItems: 50
+          description: Records that need a fix. Overlaps come first, then employee records.
+          items:
+            $ref: "#/components/schemas/HomeProblem"
+        recent_changes:
+          type: array
+          maxItems: 5
+          description: The five readable leave applications that changed last. The newest comes first.
+          items:
+            $ref: "#/components/schemas/RecentChange"
+        counts:
+          description: Summary numbers.
+          $ref: "#/components/schemas/HomeCounts"
+    PendingApproval:
+      type: object
+      additionalProperties: false
+      required: [name, version, employee_name, leave_type, from_date, to_date, total_leave_days, leave_balance]
+      properties:
+        name: {type: string, description: Leave application record name.}
+        version: {type: string, description: The modified value. Send it unchanged to approve_leave or reject_leave.}
+        employee_name: {type: [string, "null"], description: Employee display name.}
+        leave_type: {type: [string, "null"], description: Leave category linked to the request.}
+        from_date: {type: [string, "null"], format: date, description: First requested leave day.}
+        to_date: {type: [string, "null"], format: date, description: Last requested leave day.}
+        total_leave_days: {type: [number, "null"], description: Leave days calculated by HRMS.}
+        leave_balance:
+          type: [number, "null"]
+          description: Leave balance before this application. Null when the user cannot read the field.
+    HomeProblem:
+      description: A record that needs a fix.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          description: |
+            Two open or approved applications of one team share at least one day. The team is the
+            department of the application. Only applications that end today or later count.
+          required: [kind, department, leaves]
+          properties:
+            kind: {const: overlap, description: Kind of the problem.}
+            department: {type: string, description: Department that both applications belong to.}
+            leaves:
+              type: array
+              minItems: 2
+              maxItems: 2
+              description: The two applications that share days. The earlier one comes first.
+              items:
+                type: object
+                additionalProperties: false
+                required: [name, employee_name, from_date, to_date]
+                properties:
+                  name: {type: string, description: Leave application record name.}
+                  employee_name: {type: [string, "null"], description: Employee display name.}
+                  from_date: {type: string, format: date, description: First leave day.}
+                  to_date: {type: string, format: date, description: Last leave day.}
+        - type: object
+          additionalProperties: false
+          description: An employee record has no joining date. Only users who can read employee records see this kind.
+          required: [kind, employee, employee_name]
+          properties:
+            kind: {const: missing_joining_date, description: Kind of the problem.}
+            employee: {type: string, description: Employee record name.}
+            employee_name: {type: [string, "null"], description: Employee display name.}
+    RecentChange:
+      type: object
+      additionalProperties: false
+      required: [name, employee_name, actor, action, at]
+      properties:
+        name: {type: string, description: Leave application record name.}
+        employee_name: {type: [string, "null"], description: Employee display name of the application.}
+        actor: {type: string, description: Full name of the user who made the last change.}
+        action:
+          type: string
+          enum: [created, updated, approved, rejected, cancelled]
+          description: What the last change did. The client shows its own text for each value.
+        at:
+          type: string
+          description: Time of the last change in the site time zone without a UTC offset.
+    HomeCounts:
+      type: object
+      additionalProperties: false
+      required: [pending_approvals, on_leave_today, opened_this_month, problems]
+      properties:
+        pending_approvals: {type: integer, minimum: 0, description: Open drafts that wait for the signed-in user.}
+        on_leave_today: {type: integer, minimum: 0, description: People with an approved application that covers today.}
+        opened_this_month: {type: integer, minimum: 0, description: Applications created in the current calendar month.}
+        problems: {type: integer, minimum: 0, description: All problem records, also those cut from the list.}
     FrappeError:
       type: object
       properties:

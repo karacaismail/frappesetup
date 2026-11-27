@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { parseBrand } from '../../src/lib/brand.mjs';
 import { account, localUrl, required } from './local';
+
+const { PRODUCT_NAME } = parseBrand(readFileSync(new URL('../brand.env', import.meta.url), 'utf8'));
+const escapedProductName = PRODUCT_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const loginLinkName = new RegExp(`^(Sign in with ${escapedProductName}|${escapedProductName} ile oturum aç)$`, 'i');
 
 async function login(page: Page, entry: 'button' | 'api') {
   const site = localUrl('tenant1.localhost', 1);
@@ -16,7 +22,7 @@ async function login(page: Page, entry: 'button' | 'api') {
 
   if (entry === 'button') {
     await page.goto(`${site}/panel`);
-    await page.getByRole('link', { name: /^(Sign in with AtonotA Login|AtonotA Login ile oturum aç)$/i }).click();
+    await page.getByRole('link', { name: loginLinkName }).click();
   } else {
     const response = await page.request.post(`${site}/api/method/platform_core.api.auth.get_login_url`, {
       data: { redirect_to: '/panel' }, maxRedirects: 0,

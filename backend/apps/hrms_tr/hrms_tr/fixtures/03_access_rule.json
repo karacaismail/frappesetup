@@ -75,5 +75,31 @@
     "allow_submit": 1,
     "allow_cancel": 1,
     "description": "Preserve operations access to leave applications on this site."
+  },
+  {
+    "doctype": "PLT Access Rule",
+    "name": "HRMS TR Tenant Admin Leave Application",
+    "title": "HRMS TR Tenant Admin Leave Application",
+    "document_type": "Leave Application",
+    "role": "Tenant Admin",
+    "scope": "all",
+    "is_active": 1,
+    "allow_read": 1,
+    "allow_create": 1,
+    "allow_write": 1,
+    "allow_submit": 1,
+    "description": "The tenant admin reads, opens, approves and rejects every leave application of this site (AJA-947)."
+  },
+  {
+    "doctype": "PLT Access Rule",
+    "name": "HRMS TR Tenant Admin Assistant Leave Application",
+    "title": "HRMS TR Tenant Admin Assistant Leave Application",
+    "document_type": "Leave Application",
+    "role": "Tenant Admin Assistant",
+    "scope": "all",
+    "is_active": 1,
+    "allow_read": 1,
+    "allow_create": 1,
+    "description": "The tenant admin assistant reads and opens every leave application of this site (AJA-947)."
   }
 ]

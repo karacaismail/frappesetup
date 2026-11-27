@@ -37,6 +37,8 @@ CUSTOM_TYPE = "TA Ozel Tur"
 RULE_TYPE = "ToDo"
 PROTECTED = ("System Manager", "Administrator")
 RESELLER_ROLES = ("Reseller Admin", "Reseller Assistant")
+# press_tr opens this role on the Press site (AJA-421). Only Administrator gives it.
+RECOVERY_REVIEWER = "Recovery Reviewer"
 
 
 def _user(email: str, roles: list[str]) -> None:
@@ -221,6 +223,17 @@ class TestTenantAdmin(IntegrationTestCase):
 					frappe.db.get_value("Custom DocPerm", row, ptype), 1, (doctype, level, ptype)
 				)
 		self.assertEqual(frappe.db.get_value("User", HOLDER, "user_type"), "Website User")
+
+	def test_higher_level_rows_read_only_when_the_grant_says_so(self):
+		"""Frappe turns read on in every new row. A row without “read” in its grant keeps it off (AJA-1024)."""
+		tenant_admin.ensure_permissions()
+		tenant_admin.ensure_permissions()
+		for (doctype, level), ptypes in tenant_admin.LEVEL_GRANTS.items():
+			row = {"parent": doctype, "role": tenant_admin.ROLE, "permlevel": level, "if_owner": 0}
+			with self.subTest(doctype=doctype, level=level):
+				self.assertEqual(frappe.db.get_value("Custom DocPerm", row, "read"), int("read" in ptypes))
+		credential = {"parent": "PLT AI API", "role": tenant_admin.ROLE, "permlevel": 1, "if_owner": 0}
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", credential, ["read", "write"]), (0, 1))
 
 	# --- read endpoints ---
 
@@ -621,6 +634,32 @@ class TestTenantAdmin(IntegrationTestCase):
 			frappe.set_user("Administrator")
 			self.assertNotIn(role, frappe.get_roles(PLAIN))
 			self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
+
+	def test_holder_cannot_give_the_recovery_reviewer_role(self):
+		"""AJA-421: the holder gives the recovery reviewer role neither to itself nor to another user.
+
+		The role is opened here without desk access, so only the closed role list stops the holder.
+		"""
+		if not frappe.db.exists("Role", RECOVERY_REVIEWER):
+			frappe.get_doc(doctype="Role", role_name=RECOVERY_REVIEWER, desk_access=0).insert()
+		self.assertIn(RECOVERY_REVIEWER, tenant_admin.CLOSED_ROLES)
+		self.assertFalse(tenant_admin.grantable_role(RECOVERY_REVIEWER))
+		for email in (HOLDER, PLAIN):
+			frappe.set_user(HOLDER)
+			doc = frappe.get_doc("User", email)
+			doc.append("roles", {"role": RECOVERY_REVIEWER})
+			with self.subTest(user=email), self.assertRaises(frappe.PermissionError):
+				doc.save(ignore_permissions=True)
+			frappe.set_user("Administrator")
+			self.assertNotIn(RECOVERY_REVIEWER, frappe.get_roles(email))
+		frappe.set_user(HOLDER)
+		profile = frappe.get_doc(
+			doctype="Role Profile", role_profile=PROFILE, roles=[{"role": RECOVERY_REVIEWER}]
+		)
+		with self.assertRaises(frappe.PermissionError):
+			profile.insert(ignore_permissions=True)
+		frappe.set_user("Administrator")
+		self.assertFalse(frappe.db.exists("Role Profile", PROFILE))
 
 	def test_holder_cannot_change_or_delete_its_own_role(self):
 		client = self.login()

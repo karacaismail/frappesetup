@@ -43,6 +43,9 @@ class PreviewFixturesTest(unittest.TestCase):
         frappe.init.side_effect = StopIteration
         settings = {
             "PANE_PORT": "43820",
+            "PRODUCT_NAME": runpy.run_path(
+                str(source.parents[2] / "deploy/brand.py")
+            )["load_brand"]()["PRODUCT_NAME"],
             "E2E_LIFECYCLE_IDENTITIES": "{}",
             "E2E_FULL_BROWSER_FIXTURES": "0",
             "E2E_KEYCLOAK_CLIENT_SECRET": "synthetic-client",

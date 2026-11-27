@@ -7,15 +7,20 @@ docs/dagitim/ortamlar.md. The tests apply one rule to every record, never a fixe
 import json
 import re
 import secrets
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from atonota_login import platforms
 from atonota_login.platforms import RegistryError
+from tests.brand_values import BRAND_DOMAIN, LOGIN_HOST
 
 PRODUCT = Path(__file__).resolve().parents[1]
 BACKEND = PRODUCT.parents[1]
+sys.path.insert(0, str(BACKEND / "deploy"))
+from release import load_environments  # noqa: E402
+
 REALM_FILE = BACKEND / "identity" / "keycloak" / "realm" / "platform-realm.json"
 ENVIRONMENTS = BACKEND / "deploy" / "environments"
 DEV_ENV_EXAMPLE = BACKEND / "identity" / "keycloak" / ".env.example"
@@ -258,16 +263,17 @@ class DesiredStateTest(unittest.TestCase):
 class RedirectTest(unittest.TestCase):
     def test_redirect_uses_the_login_host_and_the_broker_path(self):
         self.assertEqual(
-            platforms.broker_redirect_uri("https://api.login.atonota.net", "google"),
-            "https://api.login.atonota.net/realms/platform/broker/google/endpoint",
+            platforms.broker_redirect_uri(f"https://{LOGIN_HOST}", "google"),
+            f"https://{LOGIN_HOST}/realms/platform/broker/google/endpoint",
         )
 
     def test_every_environment_uses_the_login_name_rule(self):
         # docs/dagitim/ortamlar.md: the login host is api.login.<environment base>.
         files = sorted(ENVIRONMENTS.glob("*.env"))
         self.assertEqual({f.stem for f in files}, {"alpha", "beta", "rc", "prod"})
+        environments = load_environments(ENVIRONMENTS)
         for path in files:
-            values = platforms.read_env_file(path)
+            values = environments[path.stem]
             with self.subTest(environment=path.stem):
                 self.assertEqual(values["ATONOTA_ID_HOST"], "api.login." + values["ATONOTA_BASE_HOST"])
                 table = platforms.environment_redirects(values)
@@ -279,15 +285,15 @@ class RedirectTest(unittest.TestCase):
 
     def test_a_host_that_breaks_the_rule_is_refused(self):
         for values in (
-            {"ATONOTA_BASE_HOST": "alpha.atonota.net", "ATONOTA_ID_HOST": "id.alpha.atonota.net"},
-            {"ATONOTA_BASE_HOST": "alpha.atonota.net", "ATONOTA_ID_HOST": "api.login.atonota.net"},
-            {"ATONOTA_BASE_HOST": "alpha.atonota.net", "ATONOTA_ID_HOST": "api.login.alpha.atonota.net/x"},
+            {"ATONOTA_BASE_HOST": f"alpha.{BRAND_DOMAIN}", "ATONOTA_ID_HOST": f"id.alpha.{BRAND_DOMAIN}"},
+            {"ATONOTA_BASE_HOST": f"alpha.{BRAND_DOMAIN}", "ATONOTA_ID_HOST": LOGIN_HOST},
+            {"ATONOTA_BASE_HOST": f"alpha.{BRAND_DOMAIN}", "ATONOTA_ID_HOST": f"api.login.alpha.{BRAND_DOMAIN}/x"},
         ):
             with self.subTest(values=values), self.assertRaises(RegistryError):
                 platforms.environment_redirects(values)
 
     def test_redirect_refuses_unsafe_addresses(self):
-        for url in ("http://api.login.atonota.net", "https://user@login.example.test", "https://h.test/path", "ftp://x"):
+        for url in (f"http://{LOGIN_HOST}", "https://user@login.example.test", "https://h.test/path", "ftp://x"):
             with self.subTest(url=url), self.assertRaises(RegistryError):
                 platforms.broker_redirect_uri(url, "google")
 

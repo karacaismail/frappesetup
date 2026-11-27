@@ -92,6 +92,13 @@ Proje sahibi `cron` kurulumunu istemedi. Bu yüzden şunları kurmayın:
 
 Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle başlatılan komut olarak yazın.
 
+Proje sahibi 26 Kasım 2026 Perşembe günü iki istisna onayladı (D-16):
+
+- Frappe zamanlayıcısı sunucularda açıktır.
+- Düzenli yedek sunucularda açıktır.
+
+Bu iki işi DevOps sorumlusu sunucuda kurar. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Yukarıdaki liste uygulama kodu için geçerli kalır.
+
 ### Ad dili
 
 Bütün kod adları İngilizce ve yalnız ASCII olur (D-12, proje sahibinin Karar 40'ı). Ayrıntı `docs/standartlar/` içindeki M-8, H-10, F-4, TS-9 ve IC-1 kurallarıdır.

@@ -6,9 +6,11 @@ import Rails from '../components/Rails.astro';
 import Timeline from '../components/Timeline.astro';
 import { sectionIcon } from '../components/icons';
 import { GROUP_ORDER, RAILS, SECTIONS } from '../data/sections';
-import requirements from '../data/requirements.json';
-import phases from '../data/phases.json';
-import { AS_OF, DECISION_COUNT, RAIL_COUNT } from '../data/site';
+import requirementsSource from '../data/requirements.json';
+import phasesSource from '../data/phases.json';
+import { AS_OF, DECISION_COUNT, RAIL_COUNT, fillBrand, fillBrandData } from '../data/site';
+const requirements = fillBrandData(requirementsSource);
+const phases = fillBrandData(phasesSource);
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
@@ -160,9 +162,9 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
                   <span class="section-text">
                     <span class="section-nav">
                       <span class="section-order">{String(d.data.order).padStart(2, '0')}</span>
-                      {d.data.nav}
+                      {fillBrand(d.data.nav)}
                     </span>
-                    <span class="section-title">{SECTIONS[d.id]?.summary ?? d.data.title}</span>
+                    <span class="section-title">{SECTIONS[d.id]?.summary ?? fillBrand(d.data.title)}</span>
                   </span>
                 </a>
               </li>

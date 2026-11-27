@@ -13,7 +13,7 @@ RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git app
     && uv pip check --python env/bin/python \
     && printf '\nhrms\n' >> sites/apps.txt
 COPY --chown=1000:0 libs/oidc_verify /tmp/oidc_verify
-# AtonotA Login decision code (G-161). Frappe imports the package; the code is not copied into the app.
+# atonota_login decision code (G-161). Frappe imports the package; the code is not copied into the app.
 COPY --chown=1000:0 identity/atonota_login /tmp/atonota_login
 COPY --chown=1000:0 apps/platform_core /home/frappe/frappe-bench/apps/platform_core
 COPY --chown=1000:0 apps/hrms_tr /home/frappe/frappe-bench/apps/hrms_tr

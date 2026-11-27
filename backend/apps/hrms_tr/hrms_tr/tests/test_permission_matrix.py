@@ -21,6 +21,9 @@ import unittest
 from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
+# The two tenant panel roles and their profiles come from platform_core (AJA-947, AJA-1024).
+PLATFORM_SETUP = Path(__file__).resolve().parents[3] / "platform_core" / "platform_core" / "setup"
+PANEL_PROFILES = ("Tenant Admin", "Tenant Admin Assistant")
 DOCTYPE = "Leave Application"
 BALANCE_FIELD = "leave_balance"
 STATUS_FIELD = "status"
@@ -33,6 +36,8 @@ PROFILES = {
 	"peer_manager": "HRT Manager",
 	"peer_employee": "HRT Employee",
 	"admin": "HRT Admin",
+	"tenant_admin": "Tenant Admin",
+	"tenant_assistant": "Tenant Admin Assistant",
 	"outsider": None,
 }
 # The person each employee reports to. People missing here have no employee record.
@@ -53,6 +58,8 @@ VISIBLE = {
 	"peer_manager": {"peer_manager", "peer_employee"},
 	"peer_employee": {"peer_employee"},
 	"admin": set(RECORD_OWNERS),
+	"tenant_admin": set(RECORD_OWNERS),
+	"tenant_assistant": set(RECORD_OWNERS),
 	"outsider": set(),
 }
 
@@ -72,11 +79,25 @@ ACTIONS = {
 	"HRT Admin": {
 		"other": {"read": True, "write": True, "submit": True, "cancel": True},
 	},
+	# The tenant admin approves and rejects, the assistant only reads and opens.
+	"Tenant Admin": {
+		"other": {"read": True, "write": True, "submit": True, "cancel": False},
+	},
+	"Tenant Admin Assistant": {
+		"other": {"read": True, "write": False, "submit": False, "cancel": False},
+	},
 	None: {
 		"other": {"read": False, "write": False, "submit": False, "cancel": False},
 	},
 }
-CREATE = {"HRT Employee": True, "HRT Manager": True, "HRT Admin": True, None: False}
+CREATE = {
+	"HRT Employee": True,
+	"HRT Manager": True,
+	"HRT Admin": True,
+	"Tenant Admin": True,
+	"Tenant Admin Assistant": True,
+	None: False,
+}
 
 # Field levels each profile reads and writes on a leave application.
 # Level 1 holds `status`: everyone reads it, only approvers write it, so only they approve.
@@ -85,13 +106,22 @@ LEVELS = {
 	"HRT Employee": {"read": {0, 1}, "write": {0}},
 	"HRT Manager": {"read": {0, 1, 2}, "write": {0, 1}},
 	"HRT Admin": {"read": {0, 1, 2}, "write": {0, 1}},
+	"Tenant Admin": {"read": {0, 1, 2}, "write": {0, 1}},
+	"Tenant Admin Assistant": {"read": {0, 1}, "write": set()},
 }
 
 # Frappe copies the standard rows of HRMS into "Custom DocPerm" when the first custom row is
 # added. This standard row is the one the HRMS TR roles share: every user reads level 1.
 INHERITED_ROWS = ({"role": "All", "permlevel": 1, "read": 1, "write": 0},)
 
-RULE_SCOPE = {"HRT Employee": "own", "HRT Manager": "team", "HRT Admin": "all"}
+RULE_SCOPE = {
+	"HRT Employee": "own",
+	"HRT Manager": "team",
+	"HRT Admin": "all",
+	"Tenant Admin": "all",
+	"Tenant Admin Assistant": "all",
+}
+MATRIX_ROLES = frozenset(RULE_SCOPE)
 RULE_FLAGS = ("read", "create", "write", "submit", "cancel")
 
 
@@ -105,6 +135,11 @@ def profiles():
 
 
 def profile_roles(profile):
+	if profile in PANEL_PROFILES:
+		rows = json.loads((PLATFORM_SETUP / "role_profile.json").read_text(encoding="utf-8"))
+		for row in rows:
+			if row["role_profile"] == profile:
+				return {role["role"] for role in row["roles"]}
 	for row in profiles():
 		if row["name"] == profile:
 			return {role["role"] for role in row["roles"]}
@@ -132,6 +167,9 @@ class MatrixFixtureTest(unittest.TestCase):
 
 	def test_every_profile_has_a_role_and_a_profile_fixture(self):
 		roles = {row["name"] for row in fixture("01_role.json")}
+		roles |= {
+			row["role_name"] for row in json.loads((PLATFORM_SETUP / "role.json").read_text(encoding="utf-8"))
+		}
 		for profile in RULE_SCOPE:
 			with self.subTest(profile=profile):
 				self.assertIn(profile, roles)
@@ -153,12 +191,18 @@ class MatrixFixtureTest(unittest.TestCase):
 		rules = {
 			row["role"]: row for row in fixture("03_access_rule.json") if row["document_type"] == DOCTYPE
 		}
-		widest = {"HRT Employee": "own", "HRT Manager": "report", "HRT Admin": "other"}
+		widest = {
+			"HRT Employee": "own",
+			"HRT Manager": "report",
+			"HRT Admin": "other",
+			"Tenant Admin": "other",
+			"Tenant Admin Assistant": "other",
+		}
 		for role, cell in widest.items():
 			actions = ACTIONS[role][cell]
 			for flag in ("read", "write", "submit", "cancel"):
 				with self.subTest(role=role, flag=flag):
-					self.assertEqual(bool(rules[role][f"allow_{flag}"]), actions[flag])
+					self.assertEqual(bool(rules[role].get(f"allow_{flag}")), actions[flag])
 
 	def test_custom_permissions_give_the_level_table(self):
 		rows = [row for row in fixture("05_custom_docperm.json") if row["parent"] == DOCTYPE]
@@ -301,7 +345,7 @@ class PermissionMatrixIntegrationTest(IntegrationTestCase):
 				self.assertEqual([(r.read, r.write) for r in stored], [(row["read"], row["write"])])
 
 	def test_people_hold_only_hrms_tr_roles(self):
-		hrms_tr_roles = {"HRT Employee", "HRT Manager", "HRT Admin", "All", "Guest"}
+		hrms_tr_roles = {*MATRIX_ROLES, "All", "Guest"}
 		for person in PROFILES:
 			with self.subTest(person=person):
 				roles = set(frappe.get_roles(self.users[person]))
@@ -315,7 +359,7 @@ class PermissionMatrixIntegrationTest(IntegrationTestCase):
 				self.assertEqual(user.user_type, "Website User")
 				roles = {row.role for row in user.roles}
 				expected = profile_roles(profile) if profile else set()
-				self.assertEqual(roles & {"HRT Employee", "HRT Manager", "HRT Admin"}, expected)
+				self.assertEqual(roles & MATRIX_ROLES, expected)
 
 	def test_list_shows_the_records_in_the_table(self):
 		for person, expected in VISIBLE.items():
@@ -353,7 +397,7 @@ class PermissionMatrixIntegrationTest(IntegrationTestCase):
 	def test_sensitive_fields_follow_the_level_table(self):
 		from frappe.client import get as client_get
 
-		for person in ("employee", "manager", "admin"):
+		for person in ("employee", "manager", "admin", "tenant_admin", "tenant_assistant"):
 			levels = LEVELS[PROFILES[person]]
 			with self.subTest(person=person):
 				self.sign_in(person)
@@ -362,6 +406,26 @@ class PermissionMatrixIntegrationTest(IntegrationTestCase):
 				self.assertEqual(STATUS_FIELD in data, 1 in levels["read"])
 				doc = frappe.get_doc(DOCTYPE, self.leaves["employee"])
 				self.assertEqual(set(doc.get_permlevel_access("write")), levels["write"])
+
+	def test_personal_employee_fields_follow_the_profile(self):
+		"""HRT Admin reads the personal fields. The two panel roles read only level 0 (AJA-1024)."""
+		from frappe.client import get as client_get
+
+		values = {"iban": "TR330006100519786457841024", "passport_number": "U10241024"}
+		frappe.db.savepoint("before_personal_values")
+		try:
+			frappe.db.set_value("Employee", self.employees["employee"], values, update_modified=False)
+			for person, sees in (("admin", True), ("tenant_admin", False), ("tenant_assistant", False)):
+				with self.subTest(person=person):
+					self.sign_in(person)
+					data = client_get("Employee", self.employees["employee"])
+					# A hidden field keeps its key with an empty value.
+					self.assertTrue(data.get("employee_name"))
+					for field in ("date_of_birth", *values):
+						self.assertEqual(bool(data.get(field)), sees, field)
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.rollback(save_point="before_personal_values")
 
 	def test_reporting_change_moves_the_record_to_the_new_manager(self):
 		frappe.db.savepoint("before_reports_to_change")

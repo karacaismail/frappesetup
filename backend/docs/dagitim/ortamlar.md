@@ -1,5 +1,9 @@
 # Canlı ortamlar ve dağıtım hattı
 
+Ürün adı `PRODUCT_NAME` ayarından gelir. Alan adı `BRAND_DOMAIN` ayarından gelir.
+İki değer [ortak marka dosyasında](../../brand.env) tutulur.
+Bu belgedeki `<PRODUCT_NAME>` ve `<BRAND_DOMAIN>` alanlarını bu değerlerle doldurun.
+
 Bu belge ürünün Hetzner sunucularına nasıl çıkacağını anlatır. Belge 23 Kasım 2026 Pazartesi günü yazıldı.
 
 Kod `backend/deploy/` klasöründedir. Bu belge o kodun tasarımıdır.
@@ -15,8 +19,8 @@ Proje sahibi şu kararları 23 Kasım 2026 Pazartesi günü verdi:
 3. GitHub Actions yalnız pull request test kapısı olarak kalır.
 4. Ana dal güncellenince alpha ortamı kendiliğinden güncellenir.
 5. Sonraki ortamlara geçiş Jenkins'te elle basılan düğmeyle olur. Sıra alpha, beta, rc ve prod şeklindedir.
-6. alpha, beta ve rc birer alt alan adıdır. Prod ana alan adındadır: `atonota.net`.
-7. AtonotA Login giriş adresi prod'da `api.login.atonota.net` olur. AtonotA Login, Keycloak üzerinde çalışan giriş ürünüdür. Bu adres proje kaydındaki O-51 kararıdır.
+6. alpha, beta ve rc birer alt alan adıdır. Prod ana alan adındadır: `<BRAND_DOMAIN>`.
+7. Giriş adresi prod'da `api.login.<BRAND_DOMAIN>` olur. Giriş ürünü Keycloak üzerinde çalışır. Ürünün görünen adı `PRODUCT_NAME` ayarından gelir. Bu adres proje kaydındaki O-51 kararıdır.
 
 ## Sözlük
 
@@ -37,7 +41,7 @@ Bu belgede şu kelimeler geçer:
 | alpha | Ana daldaki son kodu denemek | Geliştirme ekibi | Ana dal güncellenince kendiliğinden |
 | beta | Ürün ekibinin iç denemesi | Ürün sahibi ve test ekibi | Jenkins'te "Move to beta" düğmesiyle |
 | rc | Prod'un aynısında son kabul denemesi | Test ekibi ve DevOps sorumlusu | Jenkins'te "Move to rc" düğmesiyle |
-| prod | Gerçek müşteri | Müşteriler | Jenkins'te "Move to prod" düğmesiyle |
+| prod | Müşteriye açılacak canlı ortam. Bugün yalnız deneme verisi girer | Ürün sahibi ve test ekibi | Jenkins'te "Move to prod" düğmesiyle |
 
 Her ortamın kuralları `backend/deploy/environments/` klasöründedir. Bu dosyalarda sır yoktur.
 
@@ -49,20 +53,26 @@ rc ve prod ortamları daha sıkıdır:
 
 alpha ortamında hata olursa hat yedeği kendiliğinden geri yükler. alpha verisi deneme verisidir.
 
+Proje sahibi 26 Kasım 2026 Perşembe günü şu kararları verdi:
+
+- Gerçek müşteri verisi için karar yoktur. Bu yüzden prod ortamına yalnız deneme verisi girer.
+- IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).
+- Frappe zamanlayıcısı ve düzenli yedek sunucularda açılır. Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz.
+
 ## Alan adı haritası
 
 Kararım şudur: her ortamın bir temel adı vardır. Öteki adlar bu temel adın önüne eklenir.
 
 | Ad | alpha | beta | rc | prod |
 | --- | --- | --- | --- | --- |
-| Temel ad | `alpha.atonota.net` | `beta.atonota.net` | `rc.atonota.net` | `atonota.net` |
-| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.beta.atonota.net` | `api.login.rc.atonota.net` | `api.login.atonota.net` |
-| Press | `press.alpha.atonota.net` | `press.beta.atonota.net` | `press.rc.atonota.net` | `press.atonota.net` |
-| Kiracı bölgesi | `*.app.alpha.atonota.net` | `*.app.beta.atonota.net` | `*.app.rc.atonota.net` | `*.app.atonota.net` |
-| İlk kiracı | `demo.app.alpha.atonota.net` | `demo.app.beta.atonota.net` | `demo.app.rc.atonota.net` | `demo.app.atonota.net` |
+| Temel ad | `alpha.<BRAND_DOMAIN>` | `beta.<BRAND_DOMAIN>` | `rc.<BRAND_DOMAIN>` | `<BRAND_DOMAIN>` |
+| Giriş ürünü (Keycloak) | `api.login.alpha.<BRAND_DOMAIN>` | `api.login.beta.<BRAND_DOMAIN>` | `api.login.rc.<BRAND_DOMAIN>` | `api.login.<BRAND_DOMAIN>` |
+| Press | `press.alpha.<BRAND_DOMAIN>` | `press.beta.<BRAND_DOMAIN>` | `press.rc.<BRAND_DOMAIN>` | `press.<BRAND_DOMAIN>` |
+| Kiracı bölgesi | `*.app.alpha.<BRAND_DOMAIN>` | `*.app.beta.<BRAND_DOMAIN>` | `*.app.rc.<BRAND_DOMAIN>` | `*.app.<BRAND_DOMAIN>` |
+| İlk kiracı | `demo.app.alpha.<BRAND_DOMAIN>` | `demo.app.beta.<BRAND_DOMAIN>` | `demo.app.rc.<BRAND_DOMAIN>` | `demo.app.<BRAND_DOMAIN>` |
 | Panel | `https://<kiracı>/panel` | aynı | aynı | aynı |
 
-Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bildirimini alır.
+Jenkins için ayrıca `ci.<BRAND_DOMAIN>` adı açılır. Bu ad yalnız GitHub bildirimini alır.
 
 ### Gerekçe
 
@@ -71,9 +81,9 @@ Jenkins için ayrıca `ci.atonota.net` adı açılır. Bu ad yalnız GitHub bild
 3. Kiracı adları karar sitesindeki K-2 biçimini korur. K-2'de kiracılar `<kiracı>.app.<marka>` biçimindedir.
 4. Panel her kiracının kendi adresinde `/panel` yolundadır. Ayrı bir `panel.` adı açılmaz. Nedeni şudur: panel Frappe çerezini ve CSRF belirtecini aynı kökten okur (SZ-7). CSRF belirteci, sahte istekleri engelleyen tek kullanımlık koddur.
 5. `press.` adı DNS'te geneldir. Kenar vekil bu adı yalnız Tailscale ağına tam açar. Müşteri yalnız hesap silme akışının yollarına ve hesap kurtarma isteğine ulaşır. Öteki her istek 404 alır. Yol listesi O-55 kararındadır. Bu kural G-6, G-13 ve G-119 ile uyumludur.
-6. Prod temel adı `atonota.net` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
+6. Prod temel adı `<BRAND_DOMAIN>` markanın tanıtım sayfasıdır. Tanıtım sayfası henüz yok. Bu yüzden temel ad şimdilik ilk kiracının paneline yönlendirir.
 
-Bir kural daha geçerlidir. Hiçbir servis `Domain=atonota.net` çerezi yazmaz. Yazarsa prod çerezi alpha'ya da gider. Frappe ve Keycloak çerezleri yalnız kendi adlarında geçerlidir.
+Bir kural daha geçerlidir. Hiçbir servis `Domain=<BRAND_DOMAIN>` çerezi yazmaz. Yazarsa prod çerezi alpha'ya da gider. Frappe ve Keycloak çerezleri yalnız kendi adlarında geçerlidir.
 
 ## Hetzner yerleşimi
 
@@ -87,6 +97,142 @@ Kararım dört sunucudur:
 | `atonota-prod` | prod | Prod hiçbir ortamla sunucu paylaşmaz |
 
 Sunucu tipini DevOps sorumlusu seçer. rc ve prod aynı tip olur. Sunucu tipini ölçümle seçin. Proje kaydında üretim işçi sayısı henüz ölçülmedi.
+
+### İşçi ve kuyruk önerisi
+
+**G-50 önerisi doğrulanmadı.** Bildirilen sunucuda 128 GB bellek ve AMD EPYC işlemci vardır.
+Çekirdek sayısı bilinmiyor. Sunucuda yük ölçümü yapılmadı.
+Bu öneri yalnız bildirilen 128 GB sunucu içindir.
+Başka sunucuların belleği ve çekirdek sayısı ayrıca doğrulanmalıdır.
+
+Kararın kaynağı AJA-1055 görevidir. Karar 26 Kasım 2026 Perşembe günü verildi.
+Sunucularda zamanlayıcı ve düzenli yedek açık kabul edilir.
+Bu görev sunucudaki çalışma durumunu doğrulamaz.
+prod ortamına yalnız deneme verisi girer. Öneri gerçek müşteri yükünü kapsamaz.
+
+İşçi, isteği veya arka plandaki işi çalıştıran süreçtir.
+Kuyruk, çalıştırılmayı bekleyen işleri tutar.
+Gunicorn, web isteklerini işçilere dağıtan programdır.
+
+Bellek hesabı şu varsayımları kullanır:
+
+1. Diğer servisler ve güvenlik payı için 64 GB ayrılır.
+   Veritabanı, Redis, Keycloak ve işletim sistemi bu payı kullanır.
+   Diğer süreçler ve varsa derleme işleri de bu paya dahildir.
+2. Kalan 64 GB, en çok dört ortama bölünür.
+   Ortam başına hesap `(128 - 64) / 4 = 16 GB` olur.
+   Bu bölme, dört ortamın aynı sunucuda bulunduğu varsayımına karşı pay bırakır.
+   Bölme, yukarıdaki sunucu yerleşimini değiştirmez.
+   Daha az ortam varsa kalan pay kendiliğinden başka ortama aktarılmaz.
+3. `tenant-scheduler` için 1 GB ayrılır. Bu pay doğrulanmadı.
+   Bu servis, zamanı gelen Frappe işlerini kuyruğa gönderir.
+4. Yedek işi için 3 GB ayrılır. Bu pay doğrulanmadı.
+   Her ortamda eşzamanlı tek yedek işi varsayılır.
+   Dört ortam aynı anda yedek alabilir.
+   Yedeğin sıkıştırma ve aktarım işlemleri de bu paya dahildir.
+5. İşçilere kalan bellek `16 - 1 - 3 = 12 GB` olur.
+   Zamanlayıcı ve yedek payı, diğer servislerin 64 GB payından ayrıdır.
+   Aynı pay iki kez sayılmaz.
+6. Her web işçisi için 1 GB varsayılır.
+   Her kuyruk süreci için 2 GB varsayılır.
+   Kuyruk varsayımı üst süreci ve çalışan işi birlikte kapsar.
+   Bu değerler ölçüm sonucu değildir.
+
+| Ortam başına ayrılan pay | Bellek hesabı | Bellekten çıkan üst sınır |
+| --- | --- | --- |
+| Kiracı web işçileri için 6 GB | `6 / 1 = 6` | 6 işçi |
+| Press web işçileri için 2 GB | `2 / 1 = 2` | 2 işçi |
+| İki kuyruk servisi için toplam 4 GB | `4 / 2 = 2` | Toplam 2 süreç |
+
+`C_t`, kiracı web işçilerine ayrılan çekirdek payıdır.
+`C_p`, Press web işçilerine ayrılan çekirdek payıdır.
+`C_q`, iki kuyruk servisine ayrılan toplam çekirdek payıdır.
+`C_env`, diğer servislerden sonra ortama ayrılan çekirdek payıdır.
+`C_s`, zamanlayıcının çekirdek payıdır. `C_b`, yedek işinin çekirdek payıdır.
+Bu iki işlemci payı da doğrulanmadı. Sayıları ölçüm belirler.
+`C_s > 0` ve `C_b > 0` olmalıdır.
+Bu paylar, bütün sunucunun çekirdek sayısı değildir.
+DevOps sorumlusu diğer servislerden kalan çekirdekleri ortamlar arasında böler.
+Ortamların `C_env` toplamı, kalan çekirdek sayısını aşamaz.
+Aşağıdaki koşul, zamanlayıcı ve yedek payını işçilere kalan paydan düşer:
+
+`C_t + C_p + C_q <= C_env - C_s - C_b`
+
+DevOps sorumlusu aynı çekirdek payını iki kez ayırmaz.
+Sorumlu, yedek çalışırken bu koşulu ayrıca doğrular.
+
+| Ayar veya süreç grubu | Önerilen hesap |
+| --- | --- |
+| `ATONOTA_GUNICORN_WORKERS` | `min(2 * C_t + 1, 6)` |
+| `ATONOTA_PRESS_GUNICORN_WORKERS` | `min(2 * C_p + 1, 2)` |
+| `tenant-worker` ve `press-worker` toplamı | `min(C_q, 2)` |
+
+`min`, çekirdek ve bellek sınırlarından küçük olanı seçer.
+Kesirli sonuç aşağı yuvarlanır.
+Web formülü, [Gunicorn başlangıç önerisine](https://gunicorn.org/design/#how-many-workers) dayanır.
+Bu formül, yük ölçümünün yerini tutmaz.
+Mevcut web süreçleri `gthread` ve `--threads=4` kullanır.
+`gthread`, bir işçinin birden fazla yürütme kolu kullanmasını sağlar.
+Bellek varsayımı dört kolu birlikte kapsar.
+
+Mevcut geçici değerler kiracı için `4`, Press için `2` olarak korunur.
+Çekirdek sayısı bilinmediğinden bu değerler formül sonucu değildir.
+Her kuyruk servisi için geçici öneri bir süreçtir.
+Press açıksa toplam iki kuyruk süreci için `C_q` en az 2 olmalıdır.
+Her süreç `bench worker --queue short,default,long` komutunu kullanır.
+Üç kuyruk adı, üç ayrı süreç anlamına gelmez.
+Uzun işler kısa işlerin beklemesini artırabilir. DevOps sorumlusu bekleme sürelerini ayrı ölçer.
+Press kapalıysa Press süreçleri çalışmaz. Ayrılan pay kiracıya otomatik aktarılmaz.
+
+Press açıkken geçici değerlerin hesabı aşağıdadır. Zamanlayıcı ve yedek aynı anda çalışıyor kabul edilir.
+
+| Hesap | Toplam |
+| --- | --- |
+| Bir ortamın geçici değerleri | `(4 + 2) * 1 + 2 * 2 + 1 + 3 = 14 GB` |
+| Dört ortam ve diğer servisler | `64 + 4 * 14 = 120 GB` |
+| Sunucuda kalan bellek | `128 - 120 = 8 GB` |
+| Bir ortamın işçi bellek sınırları | `(6 + 2) * 1 + 2 * 2 + 1 + 3 = 16 GB` |
+| Dört ortam bellek sınırındayken sunucu | `64 + 4 * 16 = 128 GB` |
+
+İşçilere ayrılan pay toplam `4 * 12 = 48 GB` olur.
+Zamanlayıcı ve yedek payları toplam `4 * (1 + 3) = 16 GB` olur.
+Bu hesap, işlemci gücünün veya gerçek bellek tüketiminin yeterli olduğunu kanıtlamaz.
+Compose bu öneriyle bellek veya çekirdek kotası uygulamaz.
+
+`stack.yaml` dosyasındaki mevcut varsayılanlar çalışır.
+`environments/*.env` dosyalarındaki öneri satırları yorumdur.
+Mevcut ayar okuyucusu bu iki anahtarı ortam dosyalarında kabul etmez.
+Yorum işaretini kaldırmak dağıtım denetimini düşürür.
+Ortamdan etkin değer seçmek için okuyucuya ayrı destek gerekir.
+
+DevOps sorumlusu, sayı değişmeden önce şu adımları tamamlar:
+
+1. Sunucunun kullanılabilir çekirdek sayısını doğrular.
+2. Bellek ve çekirdek paylarını servisler arasında belirler.
+3. Hazırlık ortamında zamanlayıcı ve yedek çalışırken kaynak tüketimini ölçer.
+4. Web yanıt süresini ve kuyruk beklemesini ölçer.
+5. Ölçümle varsayımları düzeltir ve küçük sınırı yeniden hesaplar.
+6. Sonucu E-8 kaydına yazar.
+
+Bir pay yetersizse sorumlu yerleşimi yeniden değerlendirir.
+Başka bellek boyutunda veya dört ortam aşıldığında hesap yeniden yapılır.
+Bir ortamda eşzamanlı yedek sayısı artarsa hesap yeniden yapılır.
+Sunucu kararı, bu Mac'te veya Jenkinsfile içinde zamanlanmış iş kurmaz.
+Bu değişiklik yalnız öneriyi düzeltir. Depoya cron veya zamanlanmış iş eklemez.
+Mevcut `tenant-scheduler` servisi `COMPOSE_PROFILES=scheduler` ile seçilir.
+Bu görev mevcut servis seçimini değiştirmez.
+G-50'nin tamamının uygulandığını göstermez.
+E-8 engeli, yük ölçümü tamamlanana kadar açık kalır.
+
+Yerel denetim depo kökünde şu komutla çalışır:
+
+```sh
+python3 -I -m unittest discover -s backend/deploy/tests -p test_settings.py -k WorkerSizingProposal -v
+```
+
+Test, doğrulanmadı notunu, hesapları ve geçici komutları denetler.
+Zamanlayıcı, yedek ve prod deneme verisi sınırı da denetlenir.
+Test, canlı kapasiteyi doğrulamaz.
 
 ### Bir sunucunun içi
 
@@ -114,7 +260,7 @@ Dosyalar şunlardır:
 1. Hetzner güvenlik duvarı yalnız 80 ve 443 portlarını internete açar.
 2. SSH portu internete kapalıdır. Jenkins sunuculara Tailscale ağı üzerinden bağlanır. Tailscale, sunucuları özel bir ağda birleştiren araçtır.
 3. Jenkins arayüzü yalnız Tailscale ağında açılır.
-4. `ci.atonota.net` adresi yalnız `/github-webhook/` yolunu Jenkins'e iletir. GitHub bildirimi gizli bir paylaşılan anahtarla imzalanır.
+4. `ci.<BRAND_DOMAIN>` adresi yalnız `/github-webhook/` yolunu Jenkins'e iletir. GitHub bildirimi gizli bir paylaşılan anahtarla imzalanır.
 5. Keycloak yönetim konsolu herkese açık adreste kapalıdır. Ön vekil `/admin` ve `master` realm yollarına 404 yanıtı verir.
 
 ## Bir kez derle, aynı paketi taşı
@@ -356,7 +502,9 @@ Bu kural tutarsa geri dönüşte veritabanını geri yüklemek gerekmez.
 - Yedek klasöründe bir `SHA256SUMS` dosyası vardır. Geri yükleme önce bu özetleri denetler.
 - Sunucu dışı kopya Hetzner Object Storage'a gider. Kopyayı `rclone` aracı yapar.
 - rc ve prod'da sunucu dışı kopya zorunludur.
-- Yedeği yalnız bir kişi ya da bir dağıtım başlatır. Zamanlanmış yedek yoktur.
+- Yedeği bir dağıtım ya da bir kişi başlatır.
+- Proje sahibi 26 Kasım 2026 Perşembe günü sunucularda düzenli yedeği onayladı. Düzenli yedeği DevOps sorumlusu sunucuda kurar. Bugün depoda düzenli yedek kurulumu yoktur.
+- Geliştirme Mac'inde zamanlanmış iş kurulmaz.
 
 Elle yedek almak için DevOps sorumlusu sunucuda şu komutu çalıştırır:
 
@@ -593,12 +741,12 @@ Proje kaydı karar sitesinden önce gelir. Şu çelişkileri buldum:
 | --- | --- | --- | --- |
 | Ç-1 | P0: Press Frappe v15 ve Python 3.11 üzerinde | Backend Frappe 16 ve Python 3.14 kullanır (D-15) | P0 metni Frappe 16 ve Python 3.14 olarak düzeltilir |
 | Ç-2 | P0 ve Rail 1: Route 53 bölgesi, NS devri ve joker sertifika | DNS GoDaddy'dedir. MVP'de Route 53 yoktur | MVP'de GoDaddy kaydı ve ad başına sertifika kullanılır. Route 53 kararı Press sunucu kurma akışı çalışınca yeniden açılır |
-| Ç-3 | Adlar `<marka>.com.tr`. `panel.` Press'in adıdır | Marka adı `atonota.net`. Panel kiracının `/panel` yoludur | Rail 1 tablosu bu belgedeki harita ile değiştirilir |
+| Ç-3 | Adlar `<marka>.com.tr`. `panel.` Press'in adıdır | Marka adı `<BRAND_DOMAIN>`. Panel kiracının `/panel` yoludur | Rail 1 tablosu bu belgedeki harita ile değiştirilir |
 | Ç-4 | P0: "Press staging ve prod" | Dört ortam vardır: alpha, beta, rc ve prod | "staging" yerine beta ve rc yazılır |
 | Ç-5 | Yol haritası X-02 üç ortam sayar: Colima geliştirme, staging ve prod | Colima yalnız geliştirme içindir. Canlıda dört ortam vardır | X-02 dört ortamla yazılır |
 | Ç-6 | Dağıtım hattı P1 içinde kurulur | Jenkins hattı canlıya çıkıştan önce gerekir | Dağıtım hattı P0'a alınır |
 | Ç-7 | O-1: "Alan adının kayıt yeri doğrulanmadı" | Proje sahibi DNS'in GoDaddy'de olduğunu söyledi | O-1 notu "GoDaddy" olarak güncellenir |
-| Ç-8 | P0: offsite yedek ve izleme uyarıları | Zamanlanmış iş yasağı vardır | Yedek yalnız dağıtımda ve elle alınır. Düzenli yedek için proje sahibinin kararı gerekir (E-7) |
+| Ç-8 | P0: offsite yedek ve izleme uyarıları | Zamanlanmış iş yasağı yalnız geliştirme Mac'i içindir | Proje sahibi 26 Kasım 2026 Perşembe günü sunucularda düzenli yedeği onayladı (E-7) |
 | Ç-9 | `ci.yml` PR kapısı | Kapı yalnız siteyi ve `press-ai` paketini sınıyordu | Bu iş dağıtım testlerini kapıya ekledi. Backend testleri yine yalnız Jenkins'te koşar |
 
 Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir işle yapar.
@@ -613,14 +761,14 @@ Bu belge karar sitesini değiştirmedi. Düzeltmeleri orkestratör ayrı bir iş
 | E-4 | Çözüldü. Listeler `backend/deploy/settings/` klasöründedir. Dağıtım eksik ayarda durur ("Üretim ayarları" bölümü). Gerçek değerleri sunucuya yazmak kaldı | DevOps sorumlusu sırları sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok (O-29) | `docs/handoff/ci-security.md` işleri Jenkins kapılarına eklenir | DevOps sorumlusu |
 | E-6 | identity-sync testleri CI'da koşmuyor | Testler Jenkins kapılarına eklenir | DevOps sorumlusu |
-| E-7 | Zamanlanmış iş yasağı var. Bu yüzden Frappe zamanlayıcısı kapalıdır. Düzenli yedek de yoktur | Proje sahibi karar verir. Zamanlayıcı `COMPOSE_PROFILES=scheduler` ile açılır | Proje sahibi |
+| E-7 | Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır. Geliştirme Mac'inde zamanlanmış iş kurulmaz. Sunucuda kurulum henüz yapılmadı. Çalışma durumu doğrulanmadı | DevOps sorumlusu zamanlayıcıyı sunucuda `COMPOSE_PROFILES=scheduler` ile açar. Düzenli yedeği de sunucuda kurar. Sorumlu, ayrı sunucu işinde sonucu doğrular. Bu görev yalnız kaynak payını hesaplar | DevOps sorumlusu |
 | E-8 | Üretim işçi sayısı ölçülmedi | DevOps sorumlusu rc'de yük ölçer. `ATONOTA_GUNICORN_WORKERS` değerini ölçümle seçer | DevOps sorumlusu |
 | E-9 | Gerçek servislerle uçtan uca test yok | Uçtan uca test beta'da gerçek Keycloak ve kiracıyla koşar | integration-e2e işi |
 | E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | Devir notundaki adımlar uygulanır | DevOps sorumlusu |
 | E-11 | GoDaddy'nin `*.app.alpha` gibi çok katlı joker kaydı kabul ettiği doğrulanmadı | Kayıt girilirken denenir. Kabul edilmezse her kiracı için ayrı A kaydı girilir | Alan adı sorumlusu |
 | E-12 | E-posta aktarma sunucusu seçilmedi (G-47) | SMTP sağlayıcısı seçilir. Sırlar `keycloak.env` dosyasına yazılır | DevOps sorumlusu |
 | E-13 | Arayüz ve arka uç ayrı taşınır. Bir ortamda uyumsuz ikili oluşabilir | Bir ortamda önce arka uç taşınır. Arayüz arka ucun sözleşmesini aşmaz | Orkestratör |
-| E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | prod'a gerçek veri girmeden önce hukuk onayı alınır | Hukuk ve ürün sahibi |
+| E-14 | Gerçek müşteri verisi için karar yoktur. KVKK aktarım bildirimi ve VERBİS kaydı da bitmedi | prod ortamına yalnız deneme verisi girer (26 Kasım 2026). Gerçek veri için önce proje sahibi karar verir. Sonra hukuk onayı alınır | Hukuk ve ürün sahibi |
 | E-15 | Üretim imajları Mac'te arm64 ile denendi. Hetzner sunucuları amd64 olabilir | `build-release` bütün imajları `linux/amd64` için derler. arm64 derleme ajanı QEMU öykünmesiyle derler. Sunucular amd64 olur. arm64 sunucu seçilirse önce Go bağımlılıkları sabitlenir. Ayrıntı [Press imajı belgesindedir](press-imaji.md) | DevOps sorumlusu |
 | E-16 | identity-sync üretimde yalnız iç ağda HTTP ile açılır. Üç bağlantı bu servise ulaşmalıdır. Bunlar Keycloak olayları, telefonun oturum kapatma isteği ve Press'in silme isteğidir. Press'in silme isteği 23 Kasım 2026 Pazartesi günü çözüldü. `press-web` ile identity-sync ayrı bir ağı paylaşır. Ağın adı `press-identity` olur. Bu ağda yalnız bu iki servis vardır. Ağın internete çıkışı yoktur (`internal: true`). `identity_sync_url` değeri `http://identity-sync:6115` olur. Gerekçe şudur. identity-sync internete açılsaydı silme ve oturum kapatma uçları da açılırdı. identity-sync `press-internal` ağına girseydi Press'in Redis'ine ulaşırdı. O Redis parolasızdır. Ayrı ağ yalnız gereken bağlantıyı açar. Ters yön de kapalı bir ağdır. identity-sync, Press'e `identity-press` ağından ulaşır (O-55). Bunu `test_press_image.py` denetler. Diğer iki bağlantı için geçerli değer henüz yok. Bunlar `KC_SPI_EVENTS_LISTENER__WEBHOOK__URL` ve `mobile_identity_sync_url` değerleridir. İkisi HTTPS ister | Keycloak olayları ve telefon isteği için iç ağda TLS tasarlanır. Başka bir yol da vardır. Ön vekilde yalnız iç ağa açık bir ad açılır. identity-sync hiçbir yolda internete açılmaz | identity-sync işi ve DevOps sorumlusu |
 

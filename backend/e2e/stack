@@ -8,6 +8,7 @@ import ipaddress
 import json
 import os
 import re
+import runpy
 import secrets
 import shutil
 import stat
@@ -17,6 +18,7 @@ import urllib.parse
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
+load_brand = runpy.run_path(str(BACKEND / "deploy/brand.py"))["load_brand"]
 # Tests may move BACKEND. The trusted credential root stays this checkout.
 REPOSITORY = Path(__file__).resolve().parents[2]
 CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
@@ -174,6 +176,7 @@ def setup():
             "IDENTITY_SYNC_EVENTS_URL": "http://identity-sync.localhost:6115/v1/events",
             "KC_PORT": str(port),
             "KC_PUBLIC_URL": f"http://identity.localhost:{port}",
+            "IDENTITY_BRAND_NAME": load_brand()["PRODUCT_NAME"],
             "MAILPIT_UI_PORT": str(port + 6),
             "ATONOTA_SITE_TENANT1_URL": f"http://tenant1.localhost:{port + 1}",
             "ATONOTA_PRESS_URL": f"http://press.localhost:{port + 3}",
@@ -537,7 +540,7 @@ def tenant_login_settings(environment):
         "keycloak_internal_url": environment["KC_PUBLIC_URL"],
         "keycloak_client_id": "site-tenant1",
         "keycloak_client_secret": environment["ATONOTA_SITE_TENANT1_SECRET"],
-        "identity_brand_name": "AtonotA Login",
+        "identity_brand_name": environment["IDENTITY_BRAND_NAME"],
         "platform_panel_url": origin + "/panel",
     }
     if environment.get("FS_STACK_VITE") == "1":
@@ -1069,10 +1072,13 @@ OPERATOR_ROLE = "System Manager"
 def load_review_accounts(path=REVIEW_ACCOUNTS):
     """Read the local review accounts. Only synthetic example.test names and a local admin name pass."""
     data = json.loads(path.read_text())
-    password = data.get("password")
     accounts = data.get("accounts")
-    if not isinstance(password, str) or not password or not isinstance(accounts, list) or not accounts:
-        raise ValueError("review-accounts.json needs a password and a list of accounts.")
+    if "password" in data:
+        # AJA-1074: the repository is public. The password lives in the Git-ignored env file only.
+        raise ValueError("review-accounts.json must not hold a password. Put it in E2E_REVIEW_PASSWORD"
+                         " in backend/e2e/.env.")
+    if not isinstance(accounts, list) or not accounts:
+        raise ValueError("review-accounts.json needs a list of accounts.")
     for account in accounts:
         realm, username = account.get("realm"), account.get("username")
         if realm == "platform" and isinstance(username, str) and REVIEW_EMAIL.fullmatch(username):
@@ -1106,6 +1112,15 @@ def check_reseller_links(links):
         customers.add(customer)
 
 
+def review_password(environment):
+    """The shared review password from E2E_REVIEW_PASSWORD (backend/e2e/.env, ignored by Git)."""
+    password = environment.get("E2E_REVIEW_PASSWORD", "")
+    if len(password) < REVIEW_RELAXED_LENGTH:
+        raise ValueError(f"Set E2E_REVIEW_PASSWORD in backend/e2e/.env to at least {REVIEW_RELAXED_LENGTH}"
+                         " characters, then run review-accounts again. No account was changed.")
+    return password
+
+
 def require_local_stack(environment):
     """Stop unless every address of the stack is a plain-HTTP localhost address."""
     for key in REVIEW_LOCAL_SETTINGS:
@@ -1123,11 +1138,14 @@ def require_local_stack(environment):
 def review_accounts(compose, environment):
     """Create or update the local review accounts (backend/e2e/review-accounts.json).
 
+    The shared password comes from E2E_REVIEW_PASSWORD in the Git-ignored env file.
+
     Keycloak gets the users and the shared review password, the tenant gets the roles and the
     identity links, and Press gets the identity link. The password travels on stdin only.
     """
     require_local_stack(environment)
     require_realm_sync_settings(environment)
+    password = review_password(environment)
     data = load_review_accounts()
     accounts = data["accounts"]
     issuer = environment["KC_PUBLIC_URL"] + "/realms/platform"
@@ -1141,7 +1159,7 @@ def review_accounts(compose, environment):
                     "keycloak_url": environment["KC_PUBLIC_URL"],
                     "admin_username": environment["KC_BOOTSTRAP_ADMIN_USERNAME"],
                     "admin_password": environment["KC_BOOTSTRAP_ADMIN_PASSWORD"],
-                    "password": data["password"],
+                    "password": password,
                     "relaxed_length": REVIEW_RELAXED_LENGTH,
                     # The rule of the realm file, not of the running Keycloak, so a killed
                     # earlier run cannot leave the relaxed rule in place for good.

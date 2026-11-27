@@ -130,6 +130,8 @@ PROTECTED_ROLES = frozenset(
 PROTECTED_PERMISSION_ROLES = frozenset({"Administrator", "Guest", "All", "Desk User"})
 
 FORBIDDEN_ARGUMENT_NAMES = frozenset({"confirm", "confirmed", "approve", "approved", "force"})
+# Values the server sets itself. An app tool cannot take them as model input (AJA-1001).
+SERVER_SET_ARGUMENT_NAMES = frozenset({"risk_level"})
 
 
 def is_framework_doctype(meta) -> bool:

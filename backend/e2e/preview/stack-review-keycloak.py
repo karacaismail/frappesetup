@@ -5,8 +5,8 @@ admin_password, password, relaxed_length, restore_policy, organization and the a
 backend/e2e/review-accounts.json.
 Output on stdout: the Keycloak subject of every platform realm account. It prints no password.
 
-The platform realm asks for 12 characters, the production rule. The shared review password is
-shorter, so the script lowers the length rule of the running local Keycloak while it sets the
+The platform realm asks for 12 characters, the production rule. The shared review password
+(E2E_REVIEW_PASSWORD) may be shorter, so the script lowers the length rule of the running local Keycloak while it sets the
 passwords, and afterwards writes restore_policy, also after an error. restore_policy is the rule
 of platform-realm.json, never the rule read from the running Keycloak: a run killed before the
 restore leaves the relaxed rule behind, and the next run must not take that rule for the realm's. The password history

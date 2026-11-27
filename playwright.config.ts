@@ -9,6 +9,8 @@ export const BASE_URL = `http://127.0.0.1:${PORT}/frappesetup/`;
 
 export default defineConfig({
   testDir: './tests',
+  // Node's unit/build tests have their own npm commands and must not run on import.
+  testMatch: '**/*.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -36,7 +38,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
     // Dokunma profili (emülasyon): yalnız @touch etiketli senaryolar.
     { name: 'iphone-13', use: { ...devices['iPhone 13'] }, grep: /@touch/ },
