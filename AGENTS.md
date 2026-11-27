@@ -96,3 +96,66 @@ Kabuk bütçesi ilk görünümde inen tüm JavaScript dosyalarını kapsar. Giri
 - Depo public ve açık kaynaktır: kod MIT (`LICENSE`), içerik CC BY 4.0 (`LICENSE-CONTENT`); bu seçimin onay kaydı açık karardır (K-32). Secret, gerçek `.env`, kişisel veri eklenmez.
 - Dağıtım: `main`'e push → `.github/workflows/deploy.yml` önce `npm ci`, derleme ve Playwright koşar; testler geçmeden Pages artifact'ı yüklenmez. `ci.yml` pull request'lerde aynı kapıyı çalıştırır. Playwright HTML raporu her koşuda artifact olarak yüklenir.
 - CI yapısı (23 Kasım 2026): derleme bir kez yapılır (`dist` artifact'ı) → Playwright 4 parçalı matris (`e2e (n/4)`, `--shard`, `fail-fast: false`, parça başına blob raporu, `PW_BLOB=1`) → toplayıcı iş `needs.*.result` değerlerinin hepsi `success` değilse başarısız olur ve blob raporlarını tek `playwright-report` artifact'ına birleştirir. ProPR'ın beklediği denetim adı `build-and-test` toplayıcıdır; ad değişmez, toplayıcı `if: always()` ile koşar (atlanan zorunlu denetim yeşil sayılmasın diye). `deploy.yml` toplayıcısı (`build`, ad "Build and test") Pages artifact'ını test edilen aynı `dist`'ten yükler. Tarayıcı ve apt kurulumu `.github/actions/playwright-browsers` bileşik action'ıdır: `~/.cache/ms-playwright` Playwright sürümüyle, `.deb` paketleri Playwright sürümü + koşucu imajı sürümüyle (`ImageOS`-`ImageVersion`, anahtarın sonunda) önbelleğe alınır; önbellek varsa `apt-get update` çalışmaz. Tam anahtar yoksa aynı işletim sisteminin en yeni eski imaj paketleri denenir (`restore-keys`). Önbellekteki dosyalar önce `/var/cache/apt/archives` klasörüne kopyalanır: `apt-get install --no-download` bu klasör dışındaki dosyaları kurmaz (24 Kasım 2026 bulgusu, AJA-364; o güne kadar önbellek hiç kullanılmamıştı). Önbellekten kurulum olmazsa ağdan kurulur. Ağ denemesinin süre sınırı 240 sn, deneme sayısı 3'tür; her başarısız denemeden sonra `/etc/apt/apt-mirrors.txt` içindeki ilk ayna sona alınır (yavaş ama yanıt veren aynaya apt kendiliğinden hata vermez). Ölçüm: eski tek iş akışında `playwright install --with-deps` 42–1453 sn (apt ayna hızı), testler 2 işçiyle 553–902 sn sürüyordu. Parça sayısı değişirse `--shard` toplamı `npx playwright test --list` toplamıyla karşılaştırılır. Action'lar tam commit SHA'sına sabitlidir (yorumda sürüm); güncellemede etiket→SHA eşleşmesi `gh api repos/<owner>/<repo>/commits/<etiket>` ile doğrulanır. Gerçek macOS/iOS Safari doğrulaması emülasyondan ayrı raporlanır.
+
+### Ortak bitti tanımı: test ortamını kapatma ve paralel test sınırı
+
+Kural A Takımı, B Takımı ve SAFe ekibi için ortaktır. Kural 27 Kasım 2026 Cuma günü yazıldı. Kaynak işler AJA-1799, AJA-1807 ve AJA-1804 kayıtlarıdır.
+
+Bu kuralın bir nedeni var. 27 Kasım 2026 Cuma günü Mac aşırı yüklendi. Yük ortalaması 450 oldu. Makinede 18 işlemci var. 70 eski test kapsayıcısı açık kalmıştı. 40'tan fazla test tarayıcısı aynı anda açıktı.
+
+#### Kural 1: İş bitince kendi ortamınızı kapatın
+
+Ajan bir işi "bitti" saymadan önce şu adımları yapar:
+
+1. Açtığınız `astro dev` sunucusunu kapatın. Komut `astro dev stop` olur.
+2. Açtığınız `astro preview` sürecini kapatın. Yalnız kendi başlattığınız süreci kapatın.
+3. Açtığınız `fs-dev-ortam-*` kapsayıcılarını kapatın. Adın sonundaki port sizin portunuz olmalıdır.
+4. Açtığınız `fs-e2e-*` kapsayıcılarını kapatın. Yalnız kendi işinizin ortamını kapatın.
+5. Kapsayıcının kapandığını `docker ps` ile denetleyin.
+6. İş kaydına kısa bir not yazın. Örnek: "Ortamlarım kapalı: fs-dev-ortam-43820."
+
+Veri birimlerini silmeyin. Kapatma ile silme ayrı işlerdir.
+
+#### Kural 2: Ortamı bilerek açık bırakırsanız nedenini yazın
+
+Bazen ortam bir sonraki iş için açık kalmalıdır. Bu durumda iki bilgiyi kendi iş kaydınıza yazın:
+
+- Ortamın tam adını yazın. Örnek: `fs-e2e-7150-8ceae9a08e8e3b85fd78`.
+- Açık kalma nedenini ve ortamı kimin kapatacağını yazın.
+
+Neden yazılmazsa iş "bitti" sayılmaz.
+
+#### Kural 3: Aynı anda en çok 2 ajan ağır test koşar
+
+Ağır test komutları ortak bir kilitle koşar. Kilidin 2 yeri vardır. Üçüncü ajan bir yer boşalana kadar bekler.
+
+Ağır testler şunlardır:
+
+- `npm run test:e2e` komutu ve her Playwright koşusu,
+- `backend/e2e` altındaki uçtan uca test yığını.
+
+Backend yığınının açılışı, testi ve kapanışı aynı kilidin içindedir. İki test türü aynı kilidi paylaşır. `metafrappe` deposu da ağır test koşarsa aynı kilidi kullanır.
+
+Kilit yöntemi şöyledir:
+
+1. Sarmalayıcı betik `scripts/agir-test` dosyasıdır. Betik kilidi alır ve sonra testi çalıştırır.
+2. Kilit klasörü `~$(id -un)/.cache/frappesetup-test-kilidi` olur. Betik klasörü kullanıcı adından bulur. Betik `HOME` değişkenine bakmaz. Bazı ajanlar ayrı `HOME` ile koşar.
+3. Klasörde iki dosya vardır: `yer-1` ve `yer-2`. Klasörün adı ve yer sayısı değişmez.
+4. Betik önce `yer-1` dosyasını dener. Bu yer doluysa `yer-2` dosyasını dener.
+5. Kilit macOS'taki `/usr/bin/lockf` aracıyla alınır. Komut `lockf -k -s -t 0` olur. Bu Mac'te `flock` aracı yoktur.
+6. İki yer de doluysa betik 10 ile 20 saniye bekler. Sonra yeniden dener. Beklerken ekrana "Test sırası bekleniyor" yazar.
+7. Kilidi alan betik `AGIR_TEST_YER` değişkenini koyar. Bu değişken varsa iç içe çağrı yeni kilit almaz.
+8. Test bitince kilidi işletim sistemi bırakır. Süreç çökse bile kilit kalmaz.
+9. GitHub CI işlerinde kilit atlanır. Betik bunu `GITHUB_ACTIONS=true` değerinden anlar. `CI` değişkeni kilidi atlatmaz.
+
+Doğrudan `npx playwright test` komutu yerelde hata verir. Yerelde her zaman `npm run test:e2e` komutunu kullanın.
+
+Yerel Playwright işçi sayısı 4 olur. CI'daki işçi sayısı değişmez.
+
+Kilidi atlatmayın. Kilit dosyasını elle silmeyin.
+
+#### Sınırlar
+
+- Başka ajanın ortamını kapatmayın. Yalnız kendi açtığınız ortamı kapatın.
+- Temizlik için cron, rutin veya zamanlanmış iş kurmayın. Temizlik her işin son adımıdır.
+- Canlı sunucuya dokunmayın.

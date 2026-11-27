@@ -86,6 +86,9 @@ jobs:
       - name: Marka ayarı ve diyagram kontrolü
         if: matrix.shard == 1
         run: npm run test:brand-build
+      - name: Ajan kuralı kontrolü (AGENTS.md ve CLAUDE.md)
+        if: matrix.shard == 1
+        run: npm run test:rules
       - name: Playwright gate (Chromium, WebKit, iPhone 13 × 320–1366), parça ${{ matrix.shard }}/4
         env:
           PW_BLOB: '1'
