@@ -27,6 +27,9 @@ jobs:
       # Jenkins dağıtım hattının sürüm ve sunucu betiği testleri (backend/deploy). Yalnız stdlib ve GNU araçları.
       - name: deploy gate (release manifest + remote scripts)
         run: python3 -I -m unittest discover -s backend/deploy/tests -v
+      # Turkish code comment counter: fails when a folder has more Turkish comments than the baseline.
+      - name: Turkish comment gate (count must not exceed the baseline)
+        run: python3 -I -m unittest discover -s tests -p test_turkish_comments.py -v
 
   build:
     runs-on: ubuntu-24.04
