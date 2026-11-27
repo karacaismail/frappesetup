@@ -134,6 +134,19 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   5. Ortak işlerde yazışma kanalı proje Telegram grubudur. Grubun adresi ve kişi adları depoya yazılmaz.
   - `backend/dev/tests/test_release_residue.py` depoyu tarar. Test Telegram grup bağlantısını, genel IP adresini ve `.env` dosyasındaki gerçek parolayı yakalar.
 
+- **D-17. PR'ları ProPR birleştirir. ProPR'ın commit kimliği `karacaismail` olur.** Proje sahibi bu kuralı 27 Kasım 2026 Cuma günü koydu. Kural değişmez. Karar dosyasındaki kodu K-62'dir.
+  1. PR'ları ProPR birleştirir.
+  2. ProPR'ın her commit'inde yazar ve committer `karacaismail <35493655+karacaismail@users.noreply.github.com>` olur. Kural üç commit türünü kapsar:
+     - ana dalı PR dalına birleştiren commit,
+     - çakışma çözen commit,
+     - ProPR'ın yazdığı düzeltme commit'i.
+  3. Kimliği iki değişken verir. Değişkenler boş bırakılmaz ve silinmez:
+     - `PROPR_AGENT_COMMIT_AUTHOR_NAME=karacaismail`
+     - `PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com`
+  4. GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Proje sahibi bu tek istisnayı kabul etti.
+  5. ProPR Git'i hook'lar kapalı çalıştırır. Yazar koruması bu commit'leri denetlemez. Kimliği yukarıdaki iki değişken korur.
+  - Committer her PR'da commit kimliğini denetler. Adım `docs/standartlar/review-template.md` dosyasındadır.
+
 ## Orkestratörün seçtiği varsayılanlar
 
 Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçti. Proje sahibi bunları değiştirebilir.

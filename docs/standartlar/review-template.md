@@ -14,6 +14,12 @@ QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme sürecini 
 6. Her satıra kanıtı veya eksikliği ekleyin.
 7. İncelenen son commit kimliğini yazın.
 8. Birleştirme kararını gerekçesiyle yazın.
+9. Committer her PR'da commit kimliğini denetler. Bu adım ProPR kuralının gereğidir. Kural `backend/PROJECT-RECORD.md` dosyasındadır.
+   - Her commit'in yazarı `karacaismail` olmalı.
+   - Her commit'in committer'ı da `karacaismail` olmalı.
+   - Tek istisna GitHub'ın son birleşme commit'idir. Bu commit'in committer alanında GitHub yazar.
+   - Kimliği şu komutla görün: `git log --format='%h %an %cn' <ana dal>..<PR dalı>`.
+   - Başka bir kimlik varsa dal birleşmez. Committer işi gerekçesiyle geri verir.
 
 Commit, Git içindeki değişiklik kaydıdır. QA ve Committer aynı son commit'i inceler. Geliştirici yeni commit eklerse etkilenen kurallar yeniden incelenir.
 
