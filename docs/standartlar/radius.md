@@ -7,7 +7,7 @@
 > - Çevreleyen odak halkası müşterinin kalıcı kuralıyla yasaktır. Odak göstergesi o kurala uyar.
 > - `--r-ring` değeri yalnız Segmented ve Radio.Group sarmalayıcısında kullanılır.
 > - Satır numaraları kaynak dosyanın satırlarıdır. Bu dosyada aynı satırlar 85. ve 157. satırdır.
-> - Karar kaydı `KARARLAR.md` dosyasındaki Karar 43'tür.
+> - Karar kaydı `KARARLAR.md` dosyasındaki Karar 44'tür.
 
 ---
 
