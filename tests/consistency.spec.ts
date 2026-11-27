@@ -259,18 +259,19 @@ test.describe('content consistency', () => {
     }
   });
 
-  test('brand merge review distinguishes product evidence from incomplete delivery', () => {
+  test('brand merge review preserves released product evidence and incomplete delivery', () => {
     const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
     const product = board.items['G-157'];
     expect.soft(product.status).toBe('done');
-    expect.soft(product.evidence?.commit).toBe('30494610');
-    expect.soft(product.evidence?.tests).toEqual(expect.arrayContaining([
-      'backend/identity/atonota_login/tests/test_product_boundary.py',
-      'backend/apps/platform_core/platform_core/identity/tests/test_brand_texts.py',
-      'backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts',
-      'backend/deploy/tests/test_brand_hardcode.py',
-    ]));
-    expect.soft(board.update.note).toContain('30494610');
+    expect.soft(product.evidence).toEqual({
+      commit: '18a9fff8',
+      release: { pr: 23, commit: '22e70ad7' },
+      tests: [
+        'backend/identity/atonota_login/tests/test_product_boundary.py',
+        'backend/identity/keycloak/themes/atonota/test/tests/brand.spec.ts',
+      ],
+    });
+    expect.soft(board.update.note).toContain('Marka ayarı 30494610 birleşmesiyle geldi.');
     expect.soft(board.update.note).toContain('backend/brand.env');
     expect.soft(board.update.note).toContain('backend/brand-exclusions.txt');
     // A shared brand setting does not finish mail delivery, theme acceptance or live DNS.
