@@ -1,8 +1,8 @@
-// press-ai indirme dosyalarını üretir: beyaz listeli, deterministik ZIP'ler ve tekil skill/agent dosyaları.
-// Çıktı public/downloads/press-ai/ altına yazılır (gitignore'da); Astro onu derlemede dist'e kopyalar.
-// ZIP yerleşimi depo yollarını izler: kökte LICENSE, LICENSE-CONTENT ve packages/press-ai/... Böylece belgelerdeki
-// `python3 -I packages/press-ai/server.py ...` ve `--plugin-dir packages/press-ai` komutları açılan dizinde çalışır.
-// Bağımlılık yok: deflate ve CRC-32 Node'un zlib modülünden (Node >= 22.2).
+// Generates the press-ai download files: allow-listed, deterministic ZIPs and single skill/agent files.
+// Output goes to public/downloads/press-ai/ (git-ignored); Astro copies it to dist during the build.
+// The ZIP layout follows repository paths: LICENSE, LICENSE-CONTENT and packages/press-ai/... at the root. So the
+// `python3 -I packages/press-ai/server.py ...` and `--plugin-dir packages/press-ai` commands in the docs work in the unpacked folder.
+// No dependencies: deflate and CRC-32 come from Node's zlib module (Node >= 22.2).
 import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -13,7 +13,7 @@ const PACKAGE_DIR = 'packages/press-ai';
 const LICENSES = ['LICENSE', 'LICENSE-CONTENT'];
 export const OUT_DIR = 'public/downloads/press-ai';
 
-// Beyaz liste (pakete göre göreli). Listede olmayan hiçbir dosya yayımlanmaz; yeni dosya türü bilinçli eklenir.
+// Allow list (relative to the package). No file outside the list is published; a new file type is added deliberately.
 const FULL = [
   'README.md',
   'INTERFACE.md',
@@ -42,7 +42,7 @@ const MCP = [
   'config/*.example.json',
 ];
 const SKILL = (name) => [`skills/${name}/SKILL.md`, `skills/${name}/references/*.md`, 'references/*.md'];
-// Hiçbir koşulda paketlenmeyen yollar (beyaz liste yanlış genişlese bile).
+// Paths that are never packed under any condition (even if the allow list is widened by mistake).
 const NEVER = /(^|\/)(\.git|\.github|\.env[^/]*|__pycache__|node_modules|\.pytest_cache|\.DS_Store)(\/|$)|\.(pyc|pyo|key|pem)$/;
 
 function globToRegExp(glob) {
@@ -63,7 +63,7 @@ function globToRegExp(glob) {
   return new RegExp(`^${re}$`);
 }
 
-// Sembolik bağ izlenmez: beyaz listeye uyan adla depo dışı bayt yayımlanamasın; bağ görülürse derleme durur.
+// Symbolic links are not followed: no bytes from outside the repository may be published under an allow-listed name; the build stops if a link is found.
 function regular(full, label) {
   const info = lstatSync(full);
   if (info.isSymbolicLink()) throw new Error(`press-ai indirmeleri: sembolik bağ izlenmez: ${label}`);
@@ -92,7 +92,7 @@ const select = (files, globs) => {
 const DOS_DATE = 0x0021;
 const MODE = (0o100644 << 16) >>> 0;
 
-/** Sıralı girdilerden deterministik ZIP (yalnız dosyalar; dizinleri açıcı oluşturur). */
+/** Deterministic ZIP from sorted entries (files only; the unpacker creates the folders). */
 export function zip(entries) {
   const locals = [];
   const central = [];
@@ -143,7 +143,7 @@ export function zip(entries) {
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
-/** Tüm indirme dosyalarını `root/OUT_DIR` altına yeniden üretir ve manifesti döndürür. */
+/** Regenerates all download files under `root/OUT_DIR` and returns the manifest. */
 export function generatePressAiDownloads(root) {
   const pkgDir = join(root, PACKAGE_DIR);
   const out = join(root, OUT_DIR);
@@ -186,18 +186,18 @@ export function generatePressAiDownloads(root) {
     .sort((a, b) => (a.path < b.path ? -1 : 1))
     .map((f) => `${f.sha256}  ${f.path}`)
     .join('\n');
-  // Uzantılı ad: astro preview (trailingSlash: always) uzantısız yolu 404'ler; kaydedilen ad bağlantıda SHA256SUMS.
+  // Name with extension: astro preview (trailingSlash: always) returns 404 for a path without one; the saved name in the link is SHA256SUMS.
   writeFileSync(join(out, 'SHA256SUMS.txt'), `${sums}\n`);
   writeFileSync(join(out, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }
 
-/** Bileşenler için: derlemede üretilmiş manifest (proje kökü = Astro'nun çalışma dizini). */
+/** For components: the manifest generated during the build (project root = Astro's working directory). */
 export function readPressAiManifest(root = process.cwd()) {
   return JSON.parse(readFileSync(join(root, OUT_DIR, 'manifest.json'), 'utf8'));
 }
 
-/** Astro entegrasyonu: dev, build ve preview başlarken indirme dosyalarını yeniden üretir. */
+/** Astro integration: regenerates the download files when dev, build and preview start. */
 export function pressAiDownloads() {
   return {
     name: 'press-ai-downloads',

@@ -6,10 +6,10 @@ import { test, expect } from '@playwright/test';
 const siteSource = readFileSync(new URL('../src/data/site.ts', import.meta.url), 'utf8');
 const AS_OF = /export const AS_OF = '([^']+)'/.exec(siteSource)?.[1] ?? '';
 
-// AS_OF ana sayfada ve kabukta görünen "güncellik" tarihidir. Değer elle yazılır.
-// Bu test, içerik sayfaları değiştiği hâlde tarihin eski kalmasını yakalar.
-// CI sığ klon yapar (actions/checkout varsayılanı). Sığ klonda son commit tüm dosyaları değiştirmiş görünür;
-// bu yüzden git karşılaştırması yalnız tam geçmişte koşar. Biçim denetimi her yerde koşar.
+// AS_OF is the "up to date" date shown on the home page and in the shell. The value is written by hand.
+// This test catches a date that stays old although content pages have changed.
+// CI makes a shallow clone (the actions/checkout default). In a shallow clone the last commit seems to change every file;
+// so the git comparison runs only with full history. The format check runs everywhere.
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const root = fileURLToPath(new URL('../', import.meta.url));
 const git = (...args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();

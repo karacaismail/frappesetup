@@ -1,6 +1,6 @@
-// Yatay taşma avcısı: verilen sayfalarda viewport dışına taşan (sabit konumlu olmayan,
-// kaydırılabilir bir atası bulunmayan) öğeleri listeler.
-// Kullanım: node scripts/find-overflow.mjs <baseURL> <genişlik> <yol...>
+// Horizontal overflow hunter: lists the elements on the given pages that overflow the viewport (not fixed-position,
+// with no scrollable ancestor).
+// Usage: node scripts/find-overflow.mjs <baseURL> <width> <path...>
 import { chromium } from '@playwright/test';
 
 const [base = 'http://127.0.0.1:4329/frappesetup/', widthArg = '320', ...paths] = process.argv.slice(2);

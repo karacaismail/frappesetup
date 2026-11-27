@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
-// Karar kataloğu denetimi: kullanıcının araştırma notlarından gelen kararlar (kimlik, arayüz, AI ekosistemi, kalite)
-// tek katalogda, kaynak etiketli ve çelişkileri açık kararlara bağlı olmalı. Kaynaktan fazla kelime üretilmez.
-// Tarayıcı gerektirmez; tek projede koşar.
+// Decision catalogue check: the decisions from the user's research notes (identity, interface, AI ecosystem, quality)
+// must be in one catalogue, labelled with their source and with conflicts linked to explicit decisions. No more words than the source are produced.
+// Needs no browser; runs in a single project.
 const root = new URL('../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 const body = (t: string) => t.replace(/^---[\s\S]*?---\n/, '');
@@ -98,7 +98,7 @@ test.describe('karar kataloğu', () => {
     const budget = sources.sources.reduce((n, s) => n + s.words, 0);
     const added = NEW_PAGES.reduce((n, slug) => n + words(doc(slug)), 0);
     expect(added, `yeni sayfalar ${added} kelime; kaynak toplamı ${budget}`).toBeLessThanOrEqual(budget);
-    // Katalog özettir: kaynak toplamının beşte birini geçmez.
+    // The catalogue is a summary: it does not exceed one fifth of the source total.
     for (const slug of NEW_PAGES) expect(words(doc(slug)), slug).toBeLessThanOrEqual(budget / 5);
   });
 

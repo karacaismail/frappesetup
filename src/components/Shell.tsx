@@ -41,16 +41,16 @@ interface ShellProps {
   children?: ReactNode;
 }
 
-// Yerleşim sabitleri (px): AppShell bunları CSS değişkenlerine çevirir; global.css --fs-header-h ile eşleşir.
-// Kabuk JS bütçesi (AGENTS.md): yalnız kabuğun gerçekten gerektirdiği Mantine bileşenleri kullanılır; gezinme bağlantısı
-// ve simge düğmeleri sade öğelerdir ve aynı tokenlarla global.css'te çizilir (Tooltip/ScrollArea/NavLink/ActionIcon yok).
+// Layout constants (px): AppShell turns them into CSS variables; matches --fs-header-h in global.css.
+// Shell JS budget (AGENTS.md): only the Mantine components the shell really needs are used; navigation links
+// and icon buttons are plain elements drawn in global.css with the same tokens (no Tooltip/ScrollArea/NavLink/ActionIcon).
 const HEADER_HEIGHT = 60;
 const NAVBAR_WIDTH = 280;
 const ASIDE_WIDTH = 248;
 
 function ColorSchemeToggle() {
   const { setColorScheme } = useMantineColorScheme();
-  // 'auto' tercih (kayıt yok) işletim sistemi şemasına çözülür; ilk değer efektte okunur, SSR çıktısıyla aynı başlar.
+  // An 'auto' preference (nothing saved) resolves to the operating system scheme; the first value is read in the effect and starts the same as the SSR output.
   const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -71,8 +71,8 @@ function ColorSchemeToggle() {
   );
 }
 
-// Sayfadaki h2'leri izler; okuma çizgisini (başlık altı) geçen son bölümü "Bu sayfada" listesinde vurgular.
-// Kaydırma tabanlı ve deterministiktir (IntersectionObserver'ın tarayıcılar arası ilk-geri çağrı farkları yok).
+// Watches the h2 elements on the page; highlights in the "Bu sayfada" list the last section that has passed the reading line (below the header).
+// Scroll-based and deterministic (no cross-browser differences in the first IntersectionObserver callback).
 function useScrollSpy(slugs: string[]) {
   const [active, setActive] = useState<string | null>(null);
   useEffect(() => {
@@ -112,7 +112,7 @@ function useScrollSpy(slugs: string[]) {
   return active;
 }
 
-// Kenar çubuğu sarmalayıcı grubu: gerçek <button> (klavyeyle odaklanır/açılır) + aria-expanded; Mantine bileşeni yok.
+// Sidebar collapsible group: a real <button> (focusable and opened with the keyboard) + aria-expanded; no Mantine component.
 function CollapsibleGroup({
   id,
   label,
@@ -158,8 +158,8 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const navRef = useRef<HTMLDivElement>(null);
-  // Etkin bölüm bağlantısı gezinme listesinin görünür alanında değilse yalnız liste kaydırılır (odak ve sayfa
-  // kaydırması değişmez); mobil çekmece açılınca da aynı denetim yapılır.
+  // If the active section link is not in the visible area of the navigation list, only the list is scrolled (focus and page
+  // scroll do not change); the same check runs when the mobile drawer opens.
   useEffect(() => {
     const nav = navRef.current;
     const active = nav?.querySelector<HTMLElement>('.nav-link[data-active]');

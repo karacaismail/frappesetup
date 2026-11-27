@@ -21,8 +21,8 @@ const board: {
 } = require('../src/data/task-board.json');
 const phaseList: { id: string; title: string }[] = fillBrandData(require('../src/data/phases.json'), brand);
 
-// Kabul: 320→360→375→390→yatay telefon→tablet→masaüstü; yatay taşma yok; metin ≥ 1rem (SVG dahil);
-// tek odak göstergesi yalnız klavye odağında; menü, tema, gezgin, diyagramlar ve erişilebilirlik.
+// Acceptance: 320→360→375→390→landscape phone→tablet→desktop; no horizontal overflow; text ≥ 1rem (SVG included);
+// a single focus indicator only on keyboard focus; menu, theme, explorer, diagrams and accessibility.
 const VIEWPORTS = [
   { name: '320', width: 320, height: 640 },
   { name: '360', width: 360, height: 740 },
@@ -33,14 +33,14 @@ const VIEWPORTS = [
   { name: 'desktop', width: 1366, height: 900 },
 ];
 
-// Sayfa listesi içerik dizininden türer: yeni bölüm eklendiğinde testler kendiliğinden kapsar.
+// The page list derives from the content folder: when a new section is added, the tests cover it automatically.
 const DOC_SLUGS = readdirSync(new URL('../src/content/docs/', import.meta.url))
   .filter((f) => f.endsWith('.md'))
   .map((f) => f.replace(/\.md$/, ''))
   .sort();
 const ALL_PAGES = ['', ...DOC_SLUGS.map((slug) => `${slug}/`)];
 const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/', 'atonota-login-tanitim/'];
-// AI grubundaki sayfa sayısı bölüm üst verisinden türer: yeni AI sayfası eklendiğinde test kendiliğinden uyar.
+// The page count of the AI group derives from the section metadata: when a new AI page is added, the test adapts automatically.
 const AI_NAV_COUNT = (
   readFileSync(new URL('../src/data/sections.ts', import.meta.url), 'utf8').match(/group: 'AI'/g) ?? []
 ).length;
@@ -57,7 +57,7 @@ async function noHorizontalOverflow(page: Page) {
   expect(r.bodyScroll).toBeLessThanOrEqual(r.clientWidth);
 }
 
-// Görünür metnin etkin yazı boyutu: HTML'de hesaplanmış font-size; SVG içinde font-size × çizim ölçeği.
+// Effective font size of visible text: computed font-size in HTML; font-size × drawing scale inside SVG.
 async function minEffectiveFontPx(page: Page) {
   return page.evaluate(() => {
     let min = Infinity;
@@ -90,9 +90,9 @@ async function minEffectiveFontPx(page: Page) {
   });
 }
 
-// Tüm Astro adaları hidrasyonunu bitirene kadar bekler (ssr özniteliği hidrasyonda kalkar).
+// Waits until all Astro islands have finished hydrating (the ssr attribute is removed on hydration).
 async function waitForHydration(page: Page) {
-  // Astro görünürlüğü display: contents sarmalayıcısında değil, adanın içindeki öğede izler.
+  // Astro tracks visibility on the element inside the island, not on the display: contents wrapper.
   await page.evaluate(() => {
     document.querySelector('astro-island[ssr][client="visible"] > .req-explorer')
       ?.scrollIntoView({ block: 'start', behavior: 'instant' });
@@ -102,7 +102,7 @@ async function waitForHydration(page: Page) {
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
 }
 
-// Mermaid blokları varsa çizimin bitmesini bekler (ölçümler yerleşmiş SVG üzerinde yapılır).
+// If there are Mermaid blocks, waits for drawing to finish (measurements are made on the laid-out SVG).
 async function waitForMermaid(page: Page) {
   await page.waitForFunction(
     () =>
@@ -113,8 +113,8 @@ async function waitForMermaid(page: Page) {
   );
 }
 
-// Alt sınır 1rem = tarayıcı varsayılanı (16 px) × testin kök ölçeği (%100, %125, %200). Kök boyut da denetlenir:
-// site `html` yazısını küçülterek (ör. %87,5) kuralı dolaylı biçimde aşamaz.
+// Lower limit 1rem = browser default (16 px) × the test's root scale (100%, 125%, 200%). The root size is checked too:
+// the site cannot get round the rule indirectly by shrinking the `html` font (e.g. 87.5%).
 const BROWSER_DEFAULT_PX = 16;
 async function expectMinFont(page: Page, rootPct = 100) {
   const expectedRoot = (BROWSER_DEFAULT_PX * rootPct) / 100;
@@ -128,10 +128,10 @@ async function expectMinFont(page: Page, rootPct = 100) {
   );
 }
 
-// Satır kırılımı (kalıcı kural, AGENTS.md): metin sözcük aralarından ve tarayıcının doğal fırsatlarından (tire, eğik
-// çizgi, noktalama) sarılır. Zorlayıcı kural (overflow-wrap: anywhere, word-break: break-all/break-word, line-break: anywhere) yoktur; bunlar
-// içsel genişliği küçültüp tablo sütununda ve esnek öğede sığan sözcüğü böler. overflow-wrap: break-word yalnız satırın
-// tamamından uzun dizgide devreye giren güvenlik ağıdır.
+// Line breaking (permanent rule, AGENTS.md): text wraps between words and at the browser's natural opportunities (hyphen, slash,
+// punctuation). There is no forcing rule (overflow-wrap: anywhere, word-break: break-all/break-word, line-break: anywhere); these
+// shrink the intrinsic width and split a word that fits in a table column or flex item. overflow-wrap: break-word is only the
+// safety net that applies to a string longer than the whole line.
 async function forcedBreakRules(page: Page) {
   return page.evaluate(() => {
     const out = new Set<string>();
@@ -146,12 +146,12 @@ async function forcedBreakRules(page: Page) {
   });
 }
 
-// Gerçek sözcük ortası bölünme: iki satıra yayılan belirtecin kırılma noktası iki tanımlayıcı karakteri (harf, rakam,
-// alt çizgi) arasındaysa ve (a) belirteç satır içi koddaysa (kod bölünmez, kendi kutusunda kayar), (b) başlık, kimlik ya
-// da başlık/model adıysa (`names`: %100 yazıda; büyük yazıda satırdan uzun ad satır sonunda kırılabilir) ya da (c)
-// bölünmemiş doğal genişliği satır genişliğinden en az 1 px darsa (sığan sözcük) ihlaldir. Satırdan uzun dizginin satır
-// sonunda kırılması güvenlik ağıdır. Doğal genişlik aynı ebeveynde görünmez, sarılmayan bir kopyayla ölçülür: bölünmüş
-// parçaların toplamı alt piksel ve kerning farkı taşır, yarım piksellik sınır durumunu sığıyor gösterebilir.
+// A real mid-word split: when the break point of a token spread over two lines is between two identifier characters (letter, digit,
+// underscore) and (a) the token is in inline code (code is not split, it scrolls in its own box), (b) it is a heading, an ID
+// or a title/model name (`names`: at 100% font; at a large font a name longer than the line may break at the line end) or (c)
+// its unsplit natural width is at least 1 px narrower than the line width (a word that fits), it is a violation. Breaking a string longer
+// than the line at the line end is the safety net. The natural width is measured with an invisible, non-wrapping copy in the same parent: the sum of the
+// split parts carries sub-pixel and kerning differences and can show a half-pixel edge case as fitting.
 const NAME_TEXT = 'h1, h2, h3, h4, th, td:first-child, .req-id, .req-title, .brand-name, .nav-link-label, .toc-link';
 async function midWordSplits(page: Page, { names = true }: { names?: boolean } = {}) {
   return page.evaluate(
@@ -173,7 +173,7 @@ async function midWordSplits(page: Page, { names = true }: { names?: boolean } =
         probe.remove();
         return width;
       };
-      // Tanımlayıcı karakterleri (harf, rakam, alt çizgi) arasında doğal satır fırsatı yoktur.
+      // There is no natural line opportunity between identifier characters (letter, digit, underscore).
       const wordChar = /[\p{L}\p{N}_]/u;
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       const nodes: Text[] = [];
@@ -228,12 +228,12 @@ async function midWordSplits(page: Page, { names = true }: { names?: boolean } =
   );
 }
 
-// Belgede görünür outline taşıyan öğeler (tek odak göstergesi kuralı için).
+// Elements in the document that carry a visible outline (for the single focus indicator rule).
 async function outlinedElements(page: Page) {
   return page.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLElement>('body *'))
       .filter((el) => {
-        if (el.getClientRects().length === 0) return false; // çizilmeyen (display:none) öğeler
+        if (el.getClientRects().length === 0) return false; // elements that are not drawn (display:none)
         const cs = getComputedStyle(el);
         return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && cs.visibility !== 'hidden';
       })
@@ -348,7 +348,7 @@ test('requirement fragment preserves the reading position on rotation', async ({
 test('requirement fragment does not pull the reader back after a late hydration', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  // Gezgin JS'i okur sayfanın başına döndükten sonra iner (yavaş cihaz). Gezgin okuru satıra geri çekmemeli.
+  // The explorer JS arrives after the reader has gone back to the top of the page (slow device). The explorer must not pull the reader back to the row.
   let release!: () => void;
   const held = new Promise<void>((resolve) => { release = resolve; });
   await page.route(/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
@@ -356,7 +356,7 @@ test('requirement fragment does not pull the reader back after a late hydration'
     await route.continue();
   });
   await page.goto('gereksinimler/#req-G-151', { waitUntil: 'domcontentloaded' });
-  // Tarayıcı önce bağlantının satırına kaydırır. Sonra okur sayfanın başına döner.
+  // The browser first scrolls to the link's row. Then the reader goes back to the top of the page.
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   release();
@@ -376,7 +376,7 @@ for (const [width, height, cpu] of [[1366, 900, 1], [800, 1000, 1], [1024, 1366,
   test(`requirements initial CLS stays within budget at ${width}x${height}${label}`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Layout Instability API Chromium üzerinde ölçülür.');
     await page.setViewportSize({ width, height });
-    // Yavaş işlemcide tarayıcı uzun HTML'nin ortasında çizer. Yerinden taşınan blok o çizimde gezginin üstünde görünmemeli.
+    // On a slow processor the browser paints in the middle of the long HTML. A block moved from its place must not appear above the explorer in that paint.
     if (cpu > 1) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: cpu });
     page.on('console', (msg) => { if (msg.text().startsWith('CLS shift')) console.log(width, msg.text()); });
     await page.addInitScript(() => {
@@ -432,7 +432,7 @@ test.describe('viewport matrix', () => {
           await expect(page.locator('h1')).toBeVisible();
           if (path === 'gereksinimler/') await waitForHydration(page);
           await waitForMermaid(page);
-          // Ayrıştırılamayan diyagram (ör. mesajda ';') hata çıktısıyla yayımlanmaz.
+          // A diagram that cannot be parsed (e.g. ';' in a message) is not published with error output.
           await expect(page.locator('figure.mermaid-figure[data-state="error"]'), 'Mermaid ayrıştırma hatası').toHaveCount(0);
           await noHorizontalOverflow(page);
           await expectMinFont(page);
@@ -445,7 +445,7 @@ test.describe('viewport matrix', () => {
 });
 
 test.describe('text scaling', () => {
-  // Kullanıcının kök yazı boyutu (tarayıcı ayarı) büyüdüğünde: taşma yok, tüm metin yeni 1rem'in altına inmez.
+  // When the user's root font size (browser setting) grows: no overflow, no text goes below the new 1rem.
   const SCALES = [
     { root: 125, viewport: { width: 320, height: 640 } },
     { root: 200, viewport: { width: 390, height: 844 } },
@@ -466,9 +466,9 @@ test.describe('text scaling', () => {
         await waitForMermaid(page);
         await noHorizontalOverflow(page);
         await expectMinFont(page, root);
-        // Büyük yazıda satırdan uzun sözcük ya da ad satır sonunda kırılabilir (güvenlik ağı); satırına sığan sözcük bölünmez.
+        // At a large font a word or name longer than the line may break at the line end (safety net); a word that fits its line is not split.
         expect(await midWordSplits(page, { names: false }), 'sözcük ortasından bölünme').toEqual([]);
-        // Sabit başlık çubuğu scrollWidth'e yansımaz: eylem düğmesi görünür alanda kalmalı (işlev kaybı yok).
+        // The fixed header bar does not show up in scrollWidth: the action button must stay in the visible area (no loss of function).
         const toggle = await page.getByTestId('color-scheme-toggle').boundingBox();
         expect(toggle, 'tema düğmesi çizilmeli').not.toBeNull();
         expect(toggle!.x + toggle!.width, 'tema düğmesi görünür alanda').toBeLessThanOrEqual(viewport.width);
@@ -582,7 +582,7 @@ test.describe('shell', () => {
         expect(b!.x, `${sel} görünür alanda`).toBeGreaterThanOrEqual(0);
         expect(b!.x + b!.width, `${sel} görünür alanda`).toBeLessThanOrEqual(320);
       }
-      // Menü simgesi kendi etkili alanında ortalanır.
+      // The menu icon is centred in its own effective area.
       const offset = await page.locator('.burger').evaluate((el) => {
         const r = el.getBoundingClientRect();
         const g = el.querySelector('.mantine-Burger-burger')!.getBoundingClientRect();
@@ -630,7 +630,7 @@ test.describe('shell', () => {
     await page.goto('raylar/');
     await waitForHydration(page);
     const nav = page.getByRole('navigation', { name: 'Bölümler', exact: true });
-    // Kapalı AI grubunun bağlantıları da DOM'dadır (hidden); varsayılan rol sorgusu bunları saymaz.
+    // The links of the closed AI group are in the DOM too (hidden); the default role query does not count them.
     await expect(nav.getByRole('link', { includeHidden: true })).toHaveCount(ALL_PAGES.length);
     const current = nav.getByRole('link', { name: 'Raylar', exact: true });
     await expect(current).toHaveAttribute('data-active', 'true');
@@ -661,7 +661,7 @@ test.describe('shell', () => {
     await waitForHydration(page);
     const html = page.locator('html');
     await expect(html).toHaveAttribute('data-mantine-color-scheme', 'dark');
-    // 'auto' tercihte düğme gerçek şemaya göre adlanır; tek tıklama açık temaya geçirir.
+    // With the 'auto' preference the button is named after the real scheme; one click switches to the light theme.
     const toggle = page.getByTestId('color-scheme-toggle');
     await expect(toggle).toHaveAccessibleName('Açık temaya geç');
     await toggle.click();
@@ -678,17 +678,17 @@ test.describe('shell', () => {
         /* yok say */
       }
     });
-    // Adalar engellenir: yalnız <head> içindeki satır içi betik çalışır.
+    // Islands are blocked: only the inline script in <head> runs.
     await page.route('**/_astro/*.js', (route) => route.abort());
     await page.goto('kararlar/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('html')).toHaveAttribute('data-mantine-color-scheme', 'dark');
   });
 });
 
-// Çerçeve üreten hesaplanmış stiller (outline, box-shadow, kenarlık), belge sırasıyla. Ölçüm ve karşılaştırma sayfada
-// yapılır: her Tab adımında Node'a yalnız sonuç (değişen çerçeveler, çizili göstergeler) döner, büyük DOM listesi taşınmaz.
-// outline-style 'none' ise genişlik/renk görünmez olduğundan 'none' sayılır (WebKit odak kaybında bu değerleri farklı
-// raporlar); saydam outline (ör. Mantine Burger çizgisinin yüksek kontrast modu için taşıdığı) gösterge sayılmaz.
+// Computed styles that produce a frame (outline, box-shadow, border), in document order. Measuring and comparing happen in the
+// page: at each Tab step only the result (changed frames, drawn indicators) returns to Node; the large DOM list is not carried over.
+// If outline-style is 'none', width/colour are invisible, so it counts as 'none' (WebKit reports these values differently on
+// focus loss); a transparent outline (e.g. the one the Mantine Burger line carries for high contrast mode) does not count as an indicator.
 type FrameProbe = {
   __fsCollect: () => { tag: string; outline: string; frame: string; focused: boolean; proxy: boolean; opaque: boolean }[];
   __fsBase: ReturnType<FrameProbe['__fsCollect']>;
@@ -698,7 +698,7 @@ async function installFrameProbe(page: Page) {
     const w = window as unknown as FrameProbe;
     w.__fsCollect = () => {
       const active = document.activeElement as HTMLElement | null;
-      // Görsel vekil: odaklanan kontrol görünmezse (Switch'in opacity 0 input'u) göstergeyi aynı kapsayıcıdaki kardeş çizer.
+      // Visual proxy: if the focused control is invisible (the opacity 0 input of Switch), a sibling in the same container draws the indicator.
       const activeHidden = active ? getComputedStyle(active).opacity === '0' : false;
       return Array.from(document.querySelectorAll<HTMLElement>('body *')).map((el) => {
         const cs = getComputedStyle(el);
@@ -725,7 +725,7 @@ async function installFrameProbe(page: Page) {
     w.__fsBase = w.__fsCollect();
   });
 }
-// Karşılaştırma tabanını yeniler (ör. açılan bölümden sonra).
+// Refreshes the comparison base (e.g. after a section opens).
 async function frameBaseline(page: Page) {
   await page.evaluate(() => {
     const w = window as unknown as FrameProbe;
@@ -835,8 +835,8 @@ test.describe('AI nav group', () => {
 
 /* ------------------------------------------------------------------ */
 test.describe('focus', () => {
-  // Klavye odağı yalnız odaklanan öğenin outline'ını değiştirir: box-shadow/kenarlık ikinci çerçeve
-  // üretmez, başka hiçbir öğe (kapsayıcı, satır, bölüm) değişmez. Gezgindeki metin kutusuna kadar Tab.
+  // Keyboard focus changes only the outline of the focused element: box-shadow/border produce no second frame,
+  // and no other element (container, row, section) changes. Tab up to the text box in the explorer.
   test('keyboard focus adds only one outline; border and box-shadow never form a second frame', async ({
     page,
     browserName,
@@ -848,8 +848,8 @@ test.describe('focus', () => {
     await page.mouse.move(1, 1);
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     const seen = new Set<string>();
-    // Bir Tab adımı: kenarlık/gölge hiçbir öğede değişmez; görünür gösterge tam bir tanedir ve odaklanan öğede ya da
-    // görünmez kontrolün görsel vekilindedir (Switch girdisi opaklık 0, gösterge izde).
+    // One Tab step: border/shadow change on no element; there is exactly one visible indicator and it is on the focused element or
+    // on the visual proxy of an invisible control (Switch input opacity 0, indicator on the track).
     const step = async () => {
       await page.keyboard.press(tab);
       const r = await frameStep(page);
@@ -857,27 +857,27 @@ test.describe('focus', () => {
       expect(r.focused, 'odaklanan öğe yok').toBeTruthy();
       seen.add(r.focused!);
       expect(r.secondFrames, `odakta ikinci çerçeve (kenarlık/gölge): ${r.focused}`).toEqual([]);
-      // Belgenin tamamında çizili gösterge tam bir tanedir: önceki öğede takılı kalan outline da yakalanır.
+      // There is exactly one drawn indicator in the whole document: an outline stuck on a previous element is caught too.
       for (const d of r.drawn) expect(d.focused || d.proxy, `odak dışı öğede gösterge: ${d.tag}`).toBe(true);
       expect(r.drawn.length, `tek görünür odak göstergesi: ${r.focused}`).toBe(1);
       return { indicator: r.drawn[0], tag: r.focused! };
     };
     const isActive = (selector: string) => page.locator(selector).evaluate((el) => el === document.activeElement);
 
-    // 1) Öncelik düğmeleri ve metin kutusundan süzgeç bölümünün özetine kadar.
+    // 1) From the priority buttons and the text box up to the summary of the filter section.
     await installFrameProbe(page);
     for (let i = 0; i < 60 && !(await isActive('.req-more > summary')); i++) await step();
     expect(await isActive('.req-more > summary')).toBe(true);
     expect([...seen].some((t) => t.startsWith('INPUT')), `metin kutusuna ulaşılmadı: ${[...seen].join(', ')}`).toBe(true);
 
-    // 2) Özet Enter ile açılır; içindeki süzgeç düğmeleri ve ayrıntı anahtarı aynı kurala tabidir.
+    // 2) The summary opens with Enter; the filter buttons and the details switch inside follow the same rule.
     await page.keyboard.press('Enter');
     await expect(page.locator('.req-more')).toHaveAttribute('open', '');
     await frameBaseline(page);
     const switchInput = '.req-explorer input[role="switch"]';
     let switchIndicator: { proxy: boolean } | undefined;
     let facetButtons = 0;
-    // Açılan bölümde faz, düzey, durum, epic, ray ve kaynak düğmeleri, ardından görünüm düğmeleri gelir.
+    // In the opened section come the phase, level, status, epic, rail and source buttons, then the view buttons.
     for (let i = 0; i < 90; i++) {
       const { indicator, tag } = await step();
       if (tag.startsWith('BUTTON')) facetButtons++;
@@ -896,7 +896,7 @@ test.describe('focus', () => {
     await page.goto('kararlar/');
     await waitForHydration(page);
 
-    // Fare: odaklanabilir bir kontrole (tema düğmesi) ve içeriğe tıkla → hiçbir yerde outline yok.
+    // Mouse: click a focusable control (the theme button) and the content → no outline anywhere.
     const toggle = page.getByTestId('color-scheme-toggle');
     const radiusBefore = await toggle.evaluate((el) => getComputedStyle(el).borderRadius);
     await toggle.click();
@@ -906,8 +906,8 @@ test.describe('focus', () => {
     await page.locator('h1').click();
     expect(await outlinedElements(page)).toEqual([]);
 
-    // Klavye: Tab → belgede tam olarak bir outline, odaklanan öğede; yarıçap değişmez.
-    // WebKit varsayılanı bağlantıları Tab sırasına almaz; Safari'deki Option+Tab karşılığı kullanılır.
+    // Keyboard: Tab → exactly one outline in the document, on the focused element; the radius does not change.
+    // The WebKit default does not put links in the Tab order; the equivalent of Option+Tab in Safari is used.
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     await page.keyboard.press(tab);
     let outlined = await outlinedElements(page);
@@ -922,7 +922,7 @@ test.describe('focus', () => {
     outlined = await outlinedElements(page);
     expect(outlined).toHaveLength(1);
 
-    // Tema düğmesi klavyeyle odaklandığında köşe yarıçapı korunur (odak kuralı şekli değiştirmez).
+    // When the theme button is focused with the keyboard the corner radius is kept (the focus rule does not change the shape).
     await toggle.focus();
     await page.keyboard.press(browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab');
     await page.keyboard.press(tab);
@@ -938,8 +938,8 @@ test.describe('focus', () => {
 });
 
 /* ------------------------------------------------------------------ */
-// Etkili dokunma alanı (AGENTS.md, --fs-hit): tek başına duran kontrol ince işaretçide ≥ 44, kaba işaretçi varsa ≥ 48
-// CSS px. Metin içi bağlantılar politikanın açık istisnasıdır ve ölçülmez. Görünmeyen (kapalı panel) öğeler atlanır.
+// Effective touch area (AGENTS.md, --fs-hit): a standalone control is ≥ 44 with a fine pointer, ≥ 48 when a coarse pointer is present
+// (CSS px). Inline text links are an explicit exception of the policy and are not measured. Invisible (closed panel) elements are skipped.
 const STANDALONE_CONTROLS = [
   '.skip-link',
   '.icon-btn',
@@ -1032,7 +1032,7 @@ test.describe('requirements explorer', () => {
     await waitForHydration(page);
     const count = page.getByTestId('req-count');
     await expect(count).toContainText(`${requirements.length} / ${requirements.length}`);
-    // Erken girdi yokken hidrasyon varsayılanı değiştirmez: ayrıntılar açık kalır.
+    // With no early input, hydration does not change the default: the details stay open.
     await expect(page.getByRole('switch', { name: 'Ayrıntıları göster' })).toBeChecked();
     await expect(page.locator('.req-detail').first()).toBeVisible();
     await page.getByRole('button', { name: new RegExp(`^SHOULD · ${shouldCount}$`) }).click();
@@ -1063,13 +1063,13 @@ test.describe('requirements explorer', () => {
     await page.keyboard.press('Enter');
     await expect(p1Button).toHaveAttribute('aria-pressed', 'false');
     await expect(count).toContainText(`${requirements.length} / ${requirements.length}`);
-    // Açılır liste yok: combobox/listbox rolü ve floating-ui portalı sayfada bulunmaz.
+    // No dropdown: the combobox/listbox role and the floating-ui portal are not on the page.
     await expect(page.getByRole('combobox')).toHaveCount(0);
     await expect(page.getByRole('listbox')).toHaveCount(0);
   });
 
   test('titles and details keep every character in table and cards', async ({ page }) => {
-    // Metin işlenmez: gezgin yalnız `kod` parçalarını <code> yapar; satır fırsatı eklenmez (<wbr>, U+200B, U+00AD yok).
+    // Text is not processed: the explorer only turns `code` parts into <code>; no line opportunities are added (no <wbr>, U+200B, U+00AD).
     const strip = (t: string) => t.replace(/`/g, '');
     const titles = requirements.map((r) => r.title).sort();
     const details = requirements.map((r) => strip(r.detail)).sort();
@@ -1096,8 +1096,8 @@ test.describe('requirements explorer', () => {
   });
 
   test('requirements table keeps six columns and scrolls only inside its own container', async ({ page }) => {
-    // 1280 ve 1366 px'te altı sütun kapsayıcıya sığar (uzun kod ayrıntı hücresinde kendi kutusunda kayar, sütunu
-    // genişletmez); daha dar kapsayıcıda tablo kendi kapsayıcısında kayar, sayfa yatay taşmaz.
+    // At 1280 and 1366 px the six columns fit the container (long code scrolls in its own box in the detail cell and does not widen
+    // the column); in a narrower container the table scrolls in its own container and the page does not overflow horizontally.
     for (const width of [1024, 1280, 1366]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('gereksinimler/');
@@ -1205,9 +1205,9 @@ test.describe('requirements explorer', () => {
     await expect(results).toHaveCSS('box-shadow', 'none');
   });
 
-  // Regresyon (rapor Y-10): ada JS'i gecikirken bir kez yazılan metin kaybolmamalı ve filtre uygulanmalı.
-  // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez. Sayaç kesin metinle
-  // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
+  // Regression (report Y-10): text typed once while the island JS is delayed must not be lost, and the filter must apply.
+  // The JS request is held; typing happens once before hydration, and the test does not repeat the typing. The counter matches the exact text
+  // (not a substring): the unfiltered "N / N" text is not accepted in any data state.
   const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} görev$`);
   for (const vp of [
     { name: 'desktop', width: 1366, height: 900, tag: '' },
@@ -1231,7 +1231,7 @@ test.describe('requirements explorer', () => {
       await expect(page.locator('.req-detail').first()).toBeVisible();
       await search.fill('Keycloak');
       await detail.uncheck();
-      // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
+      // At input time the island is still server HTML (React is not attached).
       await expect(island).toHaveAttribute('ssr', '');
       release();
       await expect(page.getByTestId('req-count')).toHaveText(exactCount(keycloakCount));
@@ -1257,9 +1257,9 @@ test.describe('requirements explorer', () => {
       await page.evaluate(() => {
         document.documentElement.style.fontSize = '200%';
       });
-      // Kök yazı değişince betik kutuları ResizeObserver + rAF ile yeniden ölçer. Ölçüm bitmeden odak verilirse
-      // %100 düzenindeki ilk kutu odaklanır, ölçümden sonra `.first()` başka (daha önceki) bir kutuyu gösterir.
-      // Önce ölçümün %200 düzenine yetiştiğini bekle, sonra hedef kutuyu sıra numarasıyla sabitle.
+      // When the root font changes, the script measures the boxes again with ResizeObserver + rAF. If focus is given before measuring ends,
+      // the first box of the 100% layout gets focus; after measuring, `.first()` points to another (earlier) box.
+      // First wait until measuring has caught up with the 200% layout, then pin the target box by its index.
       await expect.poll(() => mismatched(page)).toBe(0);
       const index = await page.evaluate(() =>
         Array.from(document.querySelectorAll('.req-detail code')).findIndex((c) => c.getAttribute('tabindex') === '0'),
@@ -1314,7 +1314,7 @@ test.describe('requirements explorer', () => {
     await waitForHydration(page);
     const search = page.getByRole('textbox', { name: 'Ara' });
     const count = page.getByTestId('req-count');
-    // Tek yazım: hidrasyon sırasında yazılan metni bileşen kendisi korur (yukarıdaki regresyon testi).
+    // Single typing: the component itself keeps the text typed during hydration (the regression test above).
     await search.fill('Keycloak');
     await expect(count).toHaveText(exactCount(keycloakCount));
     await page.setViewportSize({ width: 844, height: 390 });
@@ -1330,9 +1330,9 @@ test.describe('requirements explorer', () => {
 });
 
 /* ------------------------------------------------------------------ */
-// Görev panosu: gereksinimler görev olarak gösterilir (durum, olgunluk düzeyi, epic). Bitti görevin başlığı üstü
-// çizilidir; görünür "Bitti" etiketi ve ekran okuyucunun okuduğu metin de vardır. Gruplu görünüm faz, sonra epic sırasıyla
-// "bitti / toplam" sayısını verir. Veri src/data/task-board.json dosyasındadır.
+// Task board: requirements are shown as tasks (status, maturity level, epic). The title of a finished task is struck
+// through; there is also a visible "Bitti" label and text read by screen readers. The grouped view gives the "done / total" count
+// in phase, then epic order. The data is in src/data/task-board.json.
 const statusLabel = (id: string) => board.statuses.find((s) => s.id === id)!.label;
 const doneIds = requirements.filter((r) => board.items[r.id].status === 'done').map((r) => r.id);
 const countWhere = (f: (r: (typeof requirements)[number]) => boolean) => requirements.filter(f).length;
@@ -1360,21 +1360,21 @@ test.describe('task board', () => {
       expect(d.line, 'bitti başlığı üstü çizili').toContain('line-through');
       expect(o.line, 'açık başlık çizili değil').not.toContain('line-through');
       expect(d.color, 'çizili başlık rengi açık başlıkla aynı (karşıtlık korunur)').toBe(o.color);
-      // Görünür etiket ve erişilebilir ad: yalnız çizgi gösterge değildir.
+      // Visible label and accessible name: the line alone is not the indicator.
       await expect(done.locator('.task-status')).toHaveText(statusLabel('done'));
       await expect(done.locator('.task-status')).toBeVisible();
       await expect(done).toContainText(/Kanıt:/);
-      // Kanıt commit'i işi yapan commit değil, denetim commit'idir; metin bunu ve commit'in dalını açıkça söyler.
+      // The evidence commit is the check commit, not the commit that did the work; the text says this and the commit's branch clearly.
       const ev = board.items[doneIds[0]].evidence!;
       await expect(done).toContainText(`Denetim commit'i ${ev.commit} backend dalındadır.`);
-      // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+      // The reader finds the commit through the main release: a PR link or the "not released yet" text (review 1, suggestion 1).
       if (ev.release) {
         const link = done.getByRole('link', { name: `PR #${ev.release.pr} ile yayımlandı` });
         await expect(link).toHaveAttribute('href', `https://github.com/karacaismail/frappesetup/pull/${ev.release.pr}`);
       } else {
         await expect(done).toContainText('Henüz yayımlanmadı.');
       }
-      // Pano başlığı ile markdown kuralları başlığı aynı adı taşımaz (ekran okuyucu başlık listesi).
+      // The board heading and the markdown rules heading do not share a name (screen reader heading list).
       const h2 = (await page.locator('main h2').allTextContents()).map((t) => t.trim());
       expect(h2.filter((t, i) => h2.indexOf(t) !== i), 'tekrarlanan h2').toEqual([]);
       await expect(page.locator(`${vp.title}.is-done`)).toHaveCount(doneIds.length);
@@ -1383,7 +1383,7 @@ test.describe('task board', () => {
   }
 
   test('the board says when and at which commit the statuses were updated', async ({ page }) => {
-    // Okur durumun hangi güne ve hangi commit'e göre yazıldığını panonun kurallar bölümünde görür.
+    // The reader sees in the rules section of the board which day and which commit the status was written against.
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');
     const stamp = page.getByTestId('task-board-updated');
@@ -1396,10 +1396,10 @@ test.describe('task board', () => {
     await expect(stamp).toBeVisible();
     const audit = page.locator('.task-rules > p').nth(1);
     await expect(audit).toContainText(`Denetim backend dalındaki ${board.audit.commit} commit'inde yapıldı.`);
-    // İki commit aynı biçimde görünür (inceleme 1, K-3).
+    // The two commits look the same (review 1, K-3).
     await expect(stamp.locator('code')).toHaveText(board.update.commit);
     await expect(audit.locator('code')).toHaveText(board.audit.commit);
-    // Okur commit'i main yayınından bulur: PR bağlantısı ya da "henüz yayımlanmadı" (inceleme 1, Ö-1).
+    // The reader finds the commit through the main release: a PR link or the "not released yet" text (review 1, suggestion 1).
     for (const [where, rel] of [[stamp, board.update.release], [audit, board.audit.release]] as const) {
       if (rel) {
         await expect(where.getByRole('link', { name: `PR #${rel.pr} ile yayımlandı` })).toHaveAttribute(
@@ -1410,7 +1410,7 @@ test.describe('task board', () => {
         await expect(where).toContainText('Bu commit henüz yayımlanmadı.');
       }
     }
-    // Cümleler arasında boşluk kalır: derleme metni bitişik yazarsa "güncellendi.Güncelleme" tek sözcük olur.
+    // A space stays between sentences: if the build joins the text, two sentences become one word, like "updated.Update".
     const lead = (rel: Release) => (rel ? `PR #${rel.pr} ile yayımlandı.` : 'henüz yayımlanmadı.');
     await expect(stamp).toContainText(`${lead(board.update.release)} ${board.update.note}`);
     await expect(audit).toContainText(`${lead(board.audit.release)} ${board.audit.note}`);
@@ -1437,7 +1437,7 @@ test.describe('task board', () => {
     for (const l of board.levels) await press('Olgunluk düzeyi', l.label, countWhere((r) => board.items[r.id].level === l.id));
     const epic = board.epics[0];
     await press('Epic', epic.title, countWhere((r) => board.items[r.id].epic === epic.id));
-    // Süzgeçler birleşir: MVP + Bitti.
+    // Filters combine: MVP + Bitti.
     const mvpDone = countWhere((r) => board.items[r.id].level === 'mvp' && board.items[r.id].status === 'done');
     await page.getByRole('group', { name: 'Olgunluk düzeyi' }).getByRole('button', { name: /^MVP · / }).click();
     await page.getByRole('group', { name: 'Durum' }).getByRole('button', { name: new RegExp(`^${statusLabel('done')} · `) }).click();
@@ -1479,8 +1479,8 @@ test.describe('task board', () => {
         );
       }
       await expect(page.locator('.task-phase .req-card')).toHaveCount(requirements.length);
-      // Süzgeç gruplu görünümde de çalışır; boş grup gösterilmez.
-      // Bitti görevin başlığı tek görevi bulur.
+      // The filter works in the grouped view too; empty groups are not shown.
+      // The title of a finished task finds a single task.
       await page.getByRole('textbox', { name: 'Ara' }).fill(requirements.find((r) => r.id === doneIds[0])!.title);
       await expect(page.locator('.task-phase')).toHaveCount(1);
       await expect(page.locator('.task-phase .req-card-title.is-done')).toHaveCount(1);
@@ -1521,16 +1521,16 @@ test.describe('task board', () => {
 });
 
 /* ------------------------------------------------------------------ */
-// Uzun satır içi kod bölünmez; satırdan uzunsa kendi kutusunda kayar (global.css). Yalnız gerçekten taşan kutu Tab
-// sırasındadır (sayfa betiği; WebKit taşan kutuyu kendiliğinden odaklamaz), ok tuşuyla kayar, sığınca sıradan çıkar.
+// Long inline code is not split; if it is longer than the line, it scrolls in its own box (global.css). Only a box that really overflows is in the Tab
+// order (page script; WebKit does not focus an overflowing box by itself), it scrolls with the arrow keys and leaves the order when it fits.
 const INLINE_CODE = '.prose :not(pre, a) > code, .req-detail > code';
 async function codeBoxes(page: Page) {
   return page.evaluate((sel) =>
     Array.from(document.querySelectorAll<HTMLElement>(sel))
       .filter((c) => c.getClientRects().length > 0)
       .map((c) => {
-        // Yalnız kaydırma kutusu taşabilir: satır içi (display: inline) kod kutu değildir (Firefox satır içi öğede de
-        // scrollWidth raporlar); taşma, kaydırılabilecek en az bir piksel demektir.
+        // Only a scroll box can overflow: inline (display: inline) code is not a box (Firefox reports scrollWidth on an inline
+        // element too); overflow means at least one pixel that can be scrolled.
         const cs = getComputedStyle(c);
         const box = cs.display !== 'inline' && ['auto', 'scroll'].includes(cs.overflowX);
         return { overflows: box && c.scrollWidth > c.clientWidth, tabbable: c.getAttribute('tabindex') === '0' };
@@ -1538,7 +1538,7 @@ async function codeBoxes(page: Page) {
   INLINE_CODE);
 }
 const mismatched = async (page: Page) => (await codeBoxes(page)).filter((c) => c.overflows !== c.tabbable).length;
-// Satır içi kod ve kaydırma kutusu, satır kutusunun içerik sağ kenarını aşmaz (yarım piksel tolerans).
+// Inline code and the scroll box do not exceed the right content edge of the line box (half-pixel tolerance).
 async function codeOutsideLine(page: Page) {
   return page.evaluate((sel) => {
     const out: string[] = [];
@@ -1639,7 +1639,7 @@ test.describe('long inline code', () => {
     await expect.poll(() => mismatched(page), 'yalnız taşan kod Tab sırasında').toBe(0);
     await noHorizontalOverflow(page);
 
-    // Klavye: Tab sırasında hedeften önceki öğeden tek Tab ile ilk taşan koda gelinir; ok tuşu kutuyu kaydırır.
+    // Keyboard: in the Tab order, one Tab from the element before the target reaches the first overflowing code; an arrow key scrolls the box.
     const hasPrev = await page.evaluate((sel) => {
       const target = Array.from(document.querySelectorAll<HTMLElement>(sel)).find((c) => c.getAttribute('tabindex') === '0')!;
       target.setAttribute('data-test-code', '');
@@ -1655,8 +1655,8 @@ test.describe('long inline code', () => {
     const code = page.locator('[data-test-code]');
     await expect(code).toBeFocused();
     expect(await code.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
-    // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz ve kaydırmayı canlandırır: her basıştan sonra
-    // sonuç 1 sn'ye kadar beklenir, en çok üç basış.
+    // WebKit does not use the first arrow key after a focus change for scrolling and animates the scroll: after each press
+    // the result is awaited for up to 1 s, at most three presses.
     const scrolled = async () => {
       for (let t = 0; t < 10; t++) {
         if ((await code.evaluate((el) => el.scrollLeft)) > 0) return true;
@@ -1672,10 +1672,10 @@ test.describe('long inline code', () => {
     expect(moved, 'ok tuşu kod kutusunu kaydırır').toBe(true);
     expect(await page.evaluate(() => window.scrollX), 'sayfa yatay kaymaz').toBe(0);
 
-    // Satır içi kod ve kaydırma kutusu satır kutusunun içerik kenarını aşmaz.
+    // Inline code and the scroll box do not exceed the content edge of the line box.
     expect(await codeOutsideLine(page), 'kod satır kutusunu aşmaz').toEqual([]);
 
-    // Geniş ekranda aynı kod sığar: odaktayken odak kaybolmaz; odak ayrılınca Tab sırasından çıkar.
+    // On a wide screen the same code fits: while focused it does not lose focus; when focus leaves, it leaves the Tab order.
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.waitForTimeout(300);
     await expect(code, '1366 px: odaktaki kod kutusu odakta kalır').toBeFocused();
@@ -1739,7 +1739,7 @@ test.describe('diagrams', () => {
       for (const svg of Array.from(document.querySelectorAll<SVGSVGElement>('.diagram svg'))) {
         const vbW = svg.viewBox.baseVal.width;
         const vbH = svg.viewBox.baseVal.height;
-        // Hale kopyaları (.halo) dolgu metninin altındaki çizimdir, ayrı etiket sayılmaz.
+        // Halo copies (.halo) are the drawing beneath the fill text and do not count as separate labels.
         const texts = Array.from(svg.querySelectorAll('text:not(.halo)'));
         const boxes = texts.map((t) => ({ t, b: t.getBBox() }));
         for (const { t, b } of boxes) {
@@ -1800,8 +1800,8 @@ test.describe('content', () => {
       expect(m.overflowX).toBe('auto');
       expect(m.scrollWidth).toBeGreaterThan(m.clientWidth);
       expect(m.tabIndex).toBe(0);
-      // İlk sütun ad sayılır: sözcük yalnız doğal fırsatta (boşluk, tire, eğik çizgi) sarılır, iki harf/rakam arasında
-      // hiçbir genişlikte bölünmez (midWordSplits `names`).
+      // The first column counts as a name: a word wraps only at a natural opportunity (space, hyphen, slash) and is never split between
+      // two letters/digits at any width (midWordSplits `names`).
       expect(await midWordSplits(page), `/${path}: sözcük ortasından bölünme`).toEqual([]);
       await wrap.click({ position: { x: 10, y: 10 } });
       expect(await wrap.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
@@ -1810,8 +1810,8 @@ test.describe('content', () => {
 });
 
 /* ------------------------------------------------------------------ */
-// G-165 tanıtım sayfası: değer önerisi gereksinime bağlıdır, fiyat yazmaz, ölçüm satıcısına istek gitmez,
-// durum tabloları görev panosuyla aynıdır.
+// G-165 introduction page: the value proposition is tied to requirements, no price is written, no request goes to a measurement vendor,
+// and the status tables are the same as the task board.
 test.describe(`${brand.PRODUCT_NAME} landing page`, () => {
   const PATH = 'atonota-login-tanitim/';
   const reqIds = new Set(requirements.map((r) => r.id));
@@ -1876,8 +1876,8 @@ test.describe(`${brand.PRODUCT_NAME} landing page`, () => {
 
 /* ------------------------------------------------------------------ */
 test.describe('accessibility (axe)', () => {
-  // Kapı: WCAG 2.0/2.1/2.2 A ve AA kuralları + axe best-practice; HER etki düzeyi (minor dahil) başarısızlıktır.
-  // Bu, otomatik kuralların kapsadığı kadarını kanıtlar; tam WCAG AA uyumu iddiası değildir (elle denetim ayrı).
+  // Gate: WCAG 2.0/2.1/2.2 A and AA rules + axe best-practice; EVERY impact level (minor included) is a failure.
+  // This proves only what the automatic rules cover; it is not a claim of full WCAG AA conformance (manual review is separate).
   for (const scheme of ['light', 'dark'] as const) {
     for (const path of ALL_PAGES) {
       test(`axe ${scheme} /${path}`, async ({ page }) => {
@@ -1902,14 +1902,14 @@ test.describe('accessibility (axe)', () => {
 });
 
 /* ------------------------------------------------------------------ */
-// Ağ bütçesi (AGENTS.md tablosu): her rota gerçekten indirdiği varlıklarla ölçülür; gzip boyutu `gzip -c` ile
-// aynı yöntemle (zlib, varsayılan düzey) hesaplanır. Koşullu yükleme de burada kanıtlanır.
+// Network budget (AGENTS.md table): every route is measured by the assets it really downloads; the gzip size is calculated the same way
+// as `gzip -c` (zlib, default level). Conditional loading is proven here too.
 test.describe('network budget', () => {
   type Asset = { url: string; kind: string; gz: number };
   async function load(page: Page, path: string): Promise<Asset[]> {
     const assets: Asset[] = [];
     const pending: Promise<void>[] = [];
-    // Dinleyici yalnız bu yükleme süresince açıktır: sonraki sayfaların istekleri bu listeye karışmaz.
+    // The listener is open only during this load: requests of later pages do not mix into this list.
     const onResponse = (res: import('@playwright/test').Response) => {
       const url = res.url();
       if (!url.includes('/frappesetup/') || res.status() !== 200) return;
@@ -1926,13 +1926,13 @@ test.describe('network budget', () => {
                   : res.request().resourceType() === 'document'
                     ? 'html'
                     : 'other';
-            // Yazı tipleri zaten sıkıştırılmıştır: aktarılan bayt olarak sayılır.
+            // Fonts are already compressed: they count as transferred bytes.
             assets.push({ url, kind, gz: kind === 'font' ? body.length : gzipSync(body).length });
           })
           .catch(() => undefined),
       );
     };
-    // Yarıda kalan istek ölçümü eksik bırakır: aynı origin'de başarısız istek testi düşürür.
+    // An interrupted request leaves the measurement incomplete: a failed same-origin request fails the test.
     const failed: string[] = [];
     const onFailed = (req: import('@playwright/test').Request) => {
       if (req.url().includes('/frappesetup/')) failed.push(`${req.url()} ${req.failure()?.errorText ?? ''}`);
@@ -1964,8 +1964,8 @@ test.describe('network budget', () => {
 
     const home = await load(page, '');
     expect(kb(home, 'html'), 'ana sayfa HTML').toBeLessThanOrEqual(25);
-    // Kabuk bütçesinin kapsamı kabuğun ilk görünümde gerektirdiği TOPLAM JS'tir (giriş parçaları + paylaşılan
-    // Mantine/tema ve React parçaları). Giriş parçaları ayrıca raporlanır, bütçe onlarla daraltılmaz.
+    // The scope of the shell budget is the TOTAL JS the shell needs for the first view (entry chunks + shared
+    // Mantine/theme and React chunks). Entry chunks are reported separately; the budget is not narrowed to them.
     const shellEntry = (a: Asset) => /\/(client|Shell)\.[^/]+\.js$/.test(a.url);
     const shellTotal = kb(home, 'js');
     test.info().annotations.push({
@@ -1979,7 +1979,7 @@ test.describe('network budget', () => {
     expect(home.filter(isExplorer), 'gezgin adası yalnız Gereksinimler sayfasında').toEqual([]);
     expect(home.filter(isMermaid), 'mermaid yalnız diyagramlı sayfada').toEqual([]);
 
-    // Koşullu yükleme ad bağımsız denetlenir: kabuk dışındaki her JS parçası "ek" sayılır.
+    // Conditional loading is checked independently of names: every JS chunk outside the shell counts as "extra".
     const shellUrls = new Set(home.filter((a) => a.kind === 'js').map((a) => a.url));
     const extraJs = (assets: Asset[]) => assets.filter((a) => a.kind === 'js' && !shellUrls.has(a.url)).map((a) => a.url);
 
@@ -1993,8 +1993,8 @@ test.describe('network budget', () => {
     test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (bütçe 180)` });
     console.log(`[bütçe] Gereksinimler HTML ${reqsHtml.toFixed(1)} KB`);
     expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(180);
-    // Ada bütçesi: Gereksinimler sayfasının kabuğa EK olarak indirdiği tüm JS (adanın kendi parçası + yalnız onun
-    // çektiği paylaşılmayan parçalar).
+    // Island budget: all JS that the Requirements page downloads IN ADDITION to the shell (the island's own chunk + the unshared
+    // chunks only it pulls in).
     const islandExtra = kb(reqs, 'js', (a) => !shellUrls.has(a.url));
     expect(kb(reqs, 'js', isExplorer), 'gezgin adası yüklendi').toBeGreaterThan(0);
     test.info().annotations.push({ type: 'ölçüm', description: `gezgin adası ek JS ${islandExtra.toFixed(1)} KB gzip` });
