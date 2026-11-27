@@ -314,8 +314,8 @@ test.describe('content consistency', () => {
   });
 
   test('task board update note names a test file from its own merge', () => {
-    // Güncelleme notu kanıtını adıyla gösterir: notta en az bir test dosyası yolu geçer (AJA-464).
-    // Notta geçen her dosya yolu depoda vardır. Commit yerelde varsa test dosyası o birleşmede değişmiştir.
+    // The update note names its evidence: it mentions at least one test file path (AJA-464).
+    // Every file path in the note exists in the repository. If the commit is local, the test file changed in that merge.
     const u: TaskBoard['update'] = JSON.parse(read('src/data/task-board.json')).update;
     const paths = [...u.note.matchAll(/(?:[\w.-]+\/)+[\w.-]+\.(?:py|ts|tsx|mjs|js|json|ftl|yaml)\b/g)].map((m) => m[0]);
     expect(paths.filter((p) => !existsSync(new URL(p, root))), 'notta adı geçen ama depoda olmayan dosya').toEqual([]);
