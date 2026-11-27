@@ -116,6 +116,7 @@ class DeployScript(unittest.TestCase):
         # rc and prod got the compose files of the newest main, not of the release (review 2, Ö8).
         source = self.folder / "deploy-at-release-commit"
         shutil.copytree(DEPLOY, source, ignore=shutil.ignore_patterns("__pycache__", "tests"))
+        shutil.copy(DEPLOY.parent / "brand.env", source.parent / "brand.env")
         (source / "compose" / "stack.yaml").write_text("# stack.yaml of the release commit\n")
         packed = self.pack(manifest(), source)
         self.assertEqual(packed.returncode, 0, packed.stderr)
@@ -227,8 +228,8 @@ class Jenkinsfiles(unittest.TestCase):
         text = jenkinsfile("backend.Jenkinsfile")
         stages = re.findall(r"stage\('([^']+)'\)", text)
         self.assertLess(stages.index("Checkout"), stages.index("Security tools"))
-        self.assertEqual(stages.index("Security tools") + 1, stages.index("Gates"))
-        block = text.split("stage('Security tools')", 1)[1].split("stage('Gates')", 1)[0]
+        self.assertEqual(stages.index("Security tools") + 1, stages.index("Gate: deploy tests"))
+        block = text.split("stage('Security tools')", 1)[1].split("stage('Gate: ", 1)[0]
         self.assertIn("sh 'backend/dev/security/osv-setup --if-stale'", block)
         self.assertLess(text.index("osv-setup --if-stale"), text.index("backend/dev/bin/security-audit"))
         # The setup comment (comments are stripped above) names what the agent needs.

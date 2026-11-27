@@ -29,7 +29,7 @@ order: 9
 
 ## Superadmin paneli (operatör modu)
 
-Panel, tenant SPA ile aynı kabuktur ve yalnız özel ağdaki `operator.atonota.net` origin'inde sunulur (MVP sonrası hedef, backend ad haritasında yok; G-119); Keycloak 'platform' realm'indeki `platform-operator` grubunun `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Elle başlatılan mutabakat farkları**.
+Panel, tenant SPA ile aynı kabuktur ve yalnız özel ağdaki `operator.{{BRAND_DOMAIN}}` origin'inde sunulur (MVP sonrası hedef, backend ad haritasında yok; G-119); Keycloak 'platform' realm'indeki `platform-operator` grubunun `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Elle başlatılan mutabakat farkları**.
 
 Press erişimi iki katmanlıdır ve gerekçesi koddur: `press.api.client` `get/set_value/delete/run_doc_method` Support Access'i tanır (client.py L246-260, L336-375), fakat başka takımın Team/Invoice/BT tekil yazması yalnız `frappe.local.system_user()` ile açılır (client.py L442-447, takım sahipliği ownership.py L80-105; v0.155.3). Bu yüzden **site düzeyi destek eylemleri** Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden, **ticari yazmalar** ise System User servis hesabı + `press_tr.api.ops` üzerinden yapılır. Operatör BFF'i (`ops-bff`; `operator.` origin'inde, operatör moduyla aynı origin'de, G-119) operatör başına Press API key/secret ve `X-Press-Team` başlığı kullanır; paylaşımlı anahtar yoktur. `press.api.client.get_list` + `skip_team_filter_for_system_user_and_support_agent` bayrağı Press Support Agent'a Support Access'siz çapraz-kiracı liste okuması verdiği için (client.py L164-170) bu rol KVKK envanterinde ayrıcalıklı sayılır ve her çağrı loglanır. Gerçek zamanlılık: panel verisi TanStack Query ile yenilenir; destek oturumu presence'ı Hocuspocus odasından gelir; ops sitesi `frappe.realtime` kanalı ticket güncellemeleri için kullanılır (doğrulanacak).
 
@@ -166,12 +166,12 @@ Colima yalnız geliştirme içindir. Colima, geliştiricinin yerel bilgisayarın
 
 | Ad | alpha | prod |
 | --- | --- | --- |
-| AtonotA Login (Keycloak) | `api.login.alpha.atonota.net` | `api.login.atonota.net` |
-| Press | `press.alpha.atonota.net` | `press.atonota.net` |
-| Kiracı | `<kiracı>.app.alpha.atonota.net` | `<kiracı>.app.atonota.net` |
+| {{PRODUCT_NAME}} (Keycloak) | `api.login.alpha.{{BRAND_DOMAIN}}` | `api.login.{{BRAND_DOMAIN}}` |
+| Press | `press.alpha.{{BRAND_DOMAIN}}` | `press.{{BRAND_DOMAIN}}` |
+| Kiracı | `<kiracı>.app.alpha.{{BRAND_DOMAIN}}` | `<kiracı>.app.{{BRAND_DOMAIN}}` |
 | Panel | `https://<kiracı>/panel` | `https://<kiracı>/panel` |
 
-beta ve rc ortamları aynı kalıbı izler. Örneğin beta'da Press `press.beta.atonota.net` adresindedir. Panel her kiracının kendi adresinde `/panel` yolundadır.
+beta ve rc ortamları aynı kalıbı izler. Örneğin beta'da Press `press.beta.{{BRAND_DOMAIN}}` adresindedir. Panel her kiracının kendi adresinde `/panel` yolundadır.
 
 ### Jenkins hattı
 
@@ -180,7 +180,11 @@ beta ve rc ortamları aynı kalıbı izler. Örneğin beta'da Press `press.beta.
 - Ana daldan gelen iş yalnız alpha ve beta anahtarlarını görür. rc ve prod anahtarları ayrı bir Jenkins klasöründedir. Bu yüzden ana daldaki değişiklik prod'a kendiliğinden gitmez.
 - Jenkins her dağıtımdan sonra sağlık denetimi koşar. Denetim geçmezse sonraki ortama taşıma yapılmaz.
 - alpha ortamında hata olursa hat yedeği kendiliğinden geri yükler. rc ve prod ortamında bu kararı DevOps sorumlusu verir.
-- Yedek her dağıtımdan önce alınır. Düzenli yedek yoktur, çünkü zamanlanmış iş kurulmaz (E-7).
+- Yedek her dağıtımdan önce alınır.
+- Proje sahibi 26 Kasım 2026 Perşembe günü karar verdi. Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır (E-7). Kurulumu DevOps sorumlusu yapar.
+- Bu onay yalnız sunucular içindir. Geliştirme Mac'inde zamanlanmış iş kurulmaz.
+- Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer.
+- IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır.
 
 ### Canlıya çıkışın önündeki engeller
 
@@ -193,10 +197,10 @@ Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dos
 | E-3 | `/panel` sayfası arka uçta hazır. Arayüz paketi bu adrese göre henüz ayarlanmadı | atonota-web işi |
 | E-4 | Çözüldü. Ayar listeleri yazıldı. Gerçek değerleri DevOps sorumlusu sunucuya yazar | DevOps sorumlusu |
 | E-5 | CI'da güvenlik kapısı yok | DevOps sorumlusu |
-| E-7 | Zamanlanmış iş yasağı yüzünden düzenli yedek yok | Proje sahibi |
+| E-7 | Karar verildi: zamanlayıcı ve düzenli yedek sunucularda açıktır. Sunucuda kurulum henüz yapılmadı | DevOps sorumlusu |
 | E-9 | Gerçek servislerle uçtan uca test yok | integration-e2e işi |
 | E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | DevOps sorumlusu |
 | E-11 | GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı | Alan adı sorumlusu |
-| E-14 | Gerçek müşteri verisi için KVKK aktarım bildirimi ve VERBİS kaydı bitmedi | Hukuk ve ürün sahibi |
+| E-14 | Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer. KVKK aktarım bildirimi ve VERBİS kaydı da bitmedi | Hukuk ve ürün sahibi |
 
 Prod'a çıkmadan önce üç yaşam döngüsü testi de geçmelidir. Bu testler TLS aracısı olan hazırlık ortamında koşar (backend proje kaydı O-50).

@@ -101,13 +101,13 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 
 ## 6. Press altyapı envanteri — Hetzner (G-2..G-6, G-36, G-37)
 
-Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha, beta ve rc ortamlarında ortam adı araya girer. Örneğin rc'de Press `press.rc.atonota.net` adresindedir. Tam harita [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır. Ad haritasında olmayan adlar "MVP sonrası hedef" diye ayrıldı.
+Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha, beta ve rc ortamlarında ortam adı araya girer. Örneğin rc'de Press `press.rc.{{BRAND_DOMAIN}}` adresindedir. Tam harita [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır. Ad haritasında olmayan adlar "MVP sonrası hedef" diye ayrıldı.
 
-İki panel birbirine karışmasın: `panel.` adı Press'in müşteri panelidir, kiracının paneli ise kiracı adresinin `/panel` yoludur (örneğin `demo.app.atonota.net/panel`).
+İki panel birbirine karışmasın: `panel.` adı Press'in müşteri panelidir, kiracının paneli ise kiracı adresinin `/panel` yoludur (örneğin `demo.app.{{BRAND_DOMAIN}}/panel`).
 
 | Bileşen | Press doctype / ayar | Sahip |
 | --- | --- | --- |
-| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); MVP'de Press `press.atonota.net` adresindedir. Press müşteri paneli için `panel.atonota.net` adı MVP sonrası hedeftir, backend ad haritasında yoktur. Backend MVP'de bu adı açmaz (`ortamlar.md` madde 4). `allow_cors` yok (G-119) | DevOps sorumlusu |
+| Press host (Frappe 16, Python 3.14, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); MVP'de Press `press.{{BRAND_DOMAIN}}` adresindedir. Press müşteri paneli için `panel.{{BRAND_DOMAIN}}` adı MVP sonrası hedeftir, backend ad haritasında yoktur. Backend MVP'de bu adı açmaz (`ortamlar.md` madde 4). `allow_cors` yok (G-119) | DevOps sorumlusu |
 | n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | DevOps sorumlusu |
 | f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | DevOps sorumlusu |
 | m1 veritabanı | Database Server (binlog, audit log, replika, G-55) | DevOps sorumlusu |
@@ -116,9 +116,9 @@ Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha
 | Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test. MVP'de düzenli yedek yoktur, çünkü zamanlanmış iş yasaktır. Yedek yalnız dağıtımda ve elle alınır. Düzenli yedek için proje sahibinin kararı gerekir (E-7). RPO ve aylık test bu karardan sonra geçerli olur | DevOps sorumlusu |
 | Cluster | 'hetzner-fsn1' cloud\_provider='Generic' fiziksel sunucular için kullanılır. Hetzner Cloud VM’ler için değer 'Hetzner' olur. | DevOps sorumlusu |
 | DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53`. MVP'de Route 53 yoktur: DNS GoDaddy'de kalır, sertifika her ad için ayrı alınır. Route 53 kararı Press sunucu kurma akışı çalışınca yeniden açılır (7. bölüm) | DevOps sorumlusu (Route 53/IAM, sonuç doğrulama) |
-| Kiracı adları ve NS delegasyonu | MVP: kiracılar `<kiracı>.app.atonota.net` adresindedir, ilk kiracı `demo.app.atonota.net` olur. Kayıtlar GoDaddy'dedir, NS devri yoktur. GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı (E-11). MVP sonrası hedef: `app.atonota.net` NS kayıtları GoDaddy'den Route 53'e devredilir, sabit host'lar GoDaddy'de kalır (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
-| Operasyon sitesi (Rail 6) | Kendi takımında 'ops' Release Group ve `ops.atonota.net` (MVP sonrası hedef, backend ad haritasında yok) bulunur. Finans çekirdeği P2’de, CRM ve Helpdesk P6’da açılır (SA-17). | DevOps sorumlusu dağıtımı yapar. Alan adı sorumlusu DNS kaydını uygular. |
-| Operatör modu ve `ops-bff` (Rail 6) | `operator.atonota.net` (MVP sonrası hedef, backend ad haritasında yok): aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında. Yalnız Tailscale veya özel ağdan erişilir, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS). DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
+| Kiracı adları ve NS delegasyonu | MVP: kiracılar `<kiracı>.app.{{BRAND_DOMAIN}}` adresindedir, ilk kiracı `demo.app.{{BRAND_DOMAIN}}` olur. Kayıtlar GoDaddy'dedir, NS devri yoktur. GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı (E-11). MVP sonrası hedef: `app.{{BRAND_DOMAIN}}` NS kayıtları GoDaddy'den Route 53'e devredilir, sabit host'lar GoDaddy'de kalır (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
+| Operasyon sitesi (Rail 6) | Kendi takımında 'ops' Release Group ve `ops.{{BRAND_DOMAIN}}` (MVP sonrası hedef, backend ad haritasında yok) bulunur. Finans çekirdeği P2’de, CRM ve Helpdesk P6’da açılır (SA-17). | DevOps sorumlusu dağıtımı yapar. Alan adı sorumlusu DNS kaydını uygular. |
+| Operatör modu ve `ops-bff` (Rail 6) | `operator.{{BRAND_DOMAIN}}` (MVP sonrası hedef, backend ad haritasında yok): aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında. Yalnız Tailscale veya özel ağdan erişilir, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS). DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
 | Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | DevOps sorumlusu |
 | Sürüm takibi | v0.155.x+ rc ortamındaki Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | DevOps sorumlusu |
 | Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible, birinci taraf ürün analitiği adayı). Rıza ve ekran kurallarını G-134 belirler. | DevOps sorumlusu |
@@ -143,4 +143,4 @@ Bu bölüm backend'in 23 Kasım 2026 Pazartesi günkü durumunu anlatır. Kaynak
 1. Press'in sunucu kurma akışı Frappe 16'da çalışmıyor (E-1). MVP'de Press sunucu kurmaz. DevOps sorumlusu ilk kiracı sitesini elle açar.
 2. Yedek, geri yükleme ve taşıma betikleri Press sitesini henüz kapsamıyor (E-2). Bu yüzden Press, rc ve prod ortamlarında kapalı kalır.
 
-Adlar `atonota.net` alanındadır. Örneğin prod'da Press `press.atonota.net` adresindedir. Kiracılar `<kiracı>.app.atonota.net` adresindedir. Ortamların tam ad haritası [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır.
+Adlar `{{BRAND_DOMAIN}}` alanındadır. Örneğin prod'da Press `press.{{BRAND_DOMAIN}}` adresindedir. Kiracılar `<kiracı>.app.{{BRAND_DOMAIN}}` adresindedir. Ortamların tam ad haritası [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır.

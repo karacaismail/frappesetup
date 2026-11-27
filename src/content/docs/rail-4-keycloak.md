@@ -27,20 +27,20 @@ Press ve kiracı, kullanıcıyı belirteçteki `(iss, sub)` bağıyla eşler. E-
 
 Tek Keycloak SSO oturumu her siteye etkileşimsiz OIDC dönüşüyle ayrı bir site oturumu açtırır; ortak parent-domain `sid` yoktur. Bu tablo tasarım sözleşmesidir; uygulanmadı ve test edilmedi.
 
-Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha, beta ve rc ortamlarında ortam adı araya girer. Örneğin beta'da giriş adresi `api.login.beta.atonota.net` olur. Tam harita [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır. Ad haritasında olmayan adlar "MVP sonrası hedef" diye ayrıldı.
+Tablodaki adlar backend ad haritasına uyar. Adlar prod adıyla yazıldı. alpha, beta ve rc ortamlarında ortam adı araya girer. Örneğin beta'da giriş adresi `api.login.beta.{{BRAND_DOMAIN}}` olur. Tam harita [Rail 6](/frappesetup/rail-6-operasyon/#canlı-ortamlar-ve-dağıtım-hattı) sayfasındadır. Ad haritasında olmayan adlar "MVP sonrası hedef" diye ayrıldı.
 
-İki panel birbirine karışmasın: `panel.` adı Press'in müşteri panelidir, kiracının paneli ise kiracı adresinin `/panel` yoludur (örneğin `demo.app.atonota.net/panel`).
+İki panel birbirine karışmasın: `panel.` adı Press'in müşteri panelidir, kiracının paneli ise kiracı adresinin `/panel` yoludur (örneğin `demo.app.{{BRAND_DOMAIN}}/panel`).
 
 | Host | Sunan | Oturum | CSRF kaynağı | CORS | Realtime / WS kimliği |
 | --- | --- | --- | --- | --- | --- |
-| `panel.atonota.net` (MVP sonrası hedef. Backend MVP'de bu adı açmaz, `ortamlar.md` madde 4) | Press müşteri paneli (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
-| `operator.atonota.net` (MVP sonrası hedef) | Aynı SPA'nın operatör modu ve operatör BFF'i (`ops-bff`), ters vekil arkasında aynı origin; yalnız Tailscale/özel ağ (`press.` ile aynı sınır, Press Desk'ten ayrı origin); satıcı betiği yok (G-134) | BFF'in host'a bağlı HttpOnly sunucu oturumu; Keycloak belirteçleri yalnız bu oturumda (G-148); dönüş ve back-channel logout adresi bu origin'de (G-58) | BFF oturumuna bağlı CSRF belirteci | Yok (aynı origin); tarayıcı `ops.` host'una istek atmaz (K-16) | Operatör bileti: `ops-bff` kiracı sitesinden alır; Hocuspocus yalnız bu origin'den kabul eder |
-| `press.atonota.net` | Press Desk (operatör; yalnız Tailscale) | Ayrı `sid` | Desk | Yok | Desk |
-| `<kiracı>.app.atonota.net` (ilk kiracı `demo.app.atonota.net`) | Kiracı sitesi (platform\_core www, SPA). Kiracının paneli bu adresin `/panel` yoludur | Host'a bağlı `sid` | `www/<panel>.py` | Yok | Kiracı socket.io, aynı origin |
+| `panel.{{BRAND_DOMAIN}}` (MVP sonrası hedef. Backend MVP'de bu adı açmaz, `ortamlar.md` madde 4) | Press müşteri paneli (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
+| `operator.{{BRAND_DOMAIN}}` (MVP sonrası hedef) | Aynı SPA'nın operatör modu ve operatör BFF'i (`ops-bff`), ters vekil arkasında aynı origin; yalnız Tailscale/özel ağ (`press.` ile aynı sınır, Press Desk'ten ayrı origin); satıcı betiği yok (G-134) | BFF'in host'a bağlı HttpOnly sunucu oturumu; Keycloak belirteçleri yalnız bu oturumda (G-148); dönüş ve back-channel logout adresi bu origin'de (G-58) | BFF oturumuna bağlı CSRF belirteci | Yok (aynı origin); tarayıcı `ops.` host'una istek atmaz (K-16) | Operatör bileti: `ops-bff` kiracı sitesinden alır; Hocuspocus yalnız bu origin'den kabul eder |
+| `press.{{BRAND_DOMAIN}}` | Press Desk (operatör; yalnız Tailscale) | Ayrı `sid` | Desk | Yok | Desk |
+| `<kiracı>.app.{{BRAND_DOMAIN}}` (ilk kiracı `demo.app.{{BRAND_DOMAIN}}`) | Kiracı sitesi (platform\_core www, SPA). Kiracının paneli bu adresin `/panel` yoludur | Host'a bağlı `sid` | `www/<panel>.py` | Yok | Kiracı socket.io, aynı origin |
 | Doğrulanmış özel alan adı | Aynı kiracı sitesi; kiracının kayıtlı origin'i (G-119) | O host'a bağlı `sid` | Aynı | Yok | Aynı origin; redirect URI tam adres (G-124) |
-| `ops.atonota.net` (MVP sonrası hedef) | Operasyon sitesi (personel Desk); operatör modu buraya yalnız `ops-bff` üzerinden erişir | Host'a bağlı `sid` | Desk / www | Yok | — |
+| `ops.{{BRAND_DOMAIN}}` (MVP sonrası hedef) | Operasyon sitesi (personel Desk); operatör modu buraya yalnız `ops-bff` üzerinden erişir | Host'a bağlı `sid` | Desk / www | Yok | — |
 | `agent.` ve Hocuspocus (MVP sonrası hedef) | Agent servisi, Hocuspocus | Çerez yok; aracı belirteci / tek kullanımlık bilet (G-148) | Gerekmez | Aracı belirteci ve müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden (kiracı host'u ve doğrulanmış özel alan adları, G-119), operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok); kimlik bilgisiz | Bilet + aktif Support Session |
-| `api.login.atonota.net` (AtonotA Login, K-61) | Keycloak | Yalnız Keycloak SSO oturumu | Keycloak | Yok | — |
+| `api.login.{{BRAND_DOMAIN}}` ({{PRODUCT_NAME}}, K-61) | Keycloak | Yalnız Keycloak SSO oturumu | Keycloak | Yok | — |
 
 ## 2. Akışlar
 
@@ -165,7 +165,7 @@ Realm rolleri yalnızca servis hesapları ve `platform-operator` grubu için tan
 
 ## 6. Press SSO (G-12)
 
-Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://api.login.atonota.net/realms/platform`, `/protocol/openid-connect/{auth,token,userinfo}`, `auth_url_data {response_type: code, scope: openid}`, `sign_ups='Allow'`, `user_id_property='sub'`. press\_tr `before_request`: `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` → 403; `/login`, `/signup`, `/dashboard/login` → panel. MFA Keycloak'ta, Press User 2FA zorunluluğu kapalı (G-78). Agent delegasyonu Press OAuth Client ile (G-28).
+Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://api.login.{{BRAND_DOMAIN}}/realms/platform`, `/protocol/openid-connect/{auth,token,userinfo}`, `auth_url_data {response_type: code, scope: openid}`, `sign_ups='Allow'`, `user_id_property='sub'`. press\_tr `before_request`: `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` → 403; `/login`, `/signup`, `/dashboard/login` → panel. MFA Keycloak'ta, Press User 2FA zorunluluğu kapalı (G-78). Agent delegasyonu Press OAuth Client ile (G-28).
 
 ## 7. Realm politikaları (G-43, G-78, G-80)
 
@@ -176,7 +176,8 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 | İş | Sahip |
 | --- | --- |
 | 2 Keycloak düğümü (26.x, Docker Engine), Infinispan küme, PostgreSQL streaming replika (sürüm Keycloak uyumluluk matrisinden, doğrulanacak), nginx TLS, admin konsolu yalnızca Tailscale/özel ağ | DevOps sorumlusu |
-| `api.login.atonota.net` için A ve AAAA kaydı. alpha, beta ve rc için ad `api.login.<ortam>.atonota.net` olur (K-61). Değerleri DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı `atonota.net` bölgesine yazar. | DevOps sorumlusu / alan adı sorumlusu |
+| `api.login.{{BRAND_DOMAIN}}` için A ve AAAA kaydı. alpha, beta ve rc için ad `api.login.<ortam>.{{BRAND_DOMAIN}}` olur (K-61). Değerleri DevOps sorumlusu hazırlar. Alan adı sorumlusu kaydı `{{BRAND_DOMAIN}}` bölgesine yazar. IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (K-63). | DevOps sorumlusu / alan adı sorumlusu |
+| Google, Apple ve LinkedIn geliştirici hesapları (K-63). Hesaplar açılınca DevOps sorumlusu istemcileri bu hesaplarda açar. | Hesap sorumlusu |
 | Günlük şifreli PostgreSQL yedeği (fsn1 → nbg1), haftalık realm export, RPO ≤ 1 saat (WAL), çeyreklik geri yükleme tatbikatı (G-114) | DevOps sorumlusu |
 | Login/admin event'leri Log Server'a (KVKK/5651 saklama, G-117), metrikler Monitor Server'a (X-05) | DevOps sorumlusu |
 | identity-sync konteyneri, sırlar age/sops (G-112) | DevOps sorumlusu |

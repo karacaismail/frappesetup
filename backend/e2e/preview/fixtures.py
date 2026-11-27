@@ -6,6 +6,7 @@ import ipaddress
 import json
 import os
 import re
+import runpy
 import secrets
 import shutil
 import subprocess
@@ -25,7 +26,7 @@ SYNC_ROLES = (
     "manage-users",
     "view-organizations",
     "manage-organizations",
-    # AJA-459: the AtonotA Login platform list. manage-identity-providers is not given.
+    # AJA-459: the atonota_login platform list. manage-identity-providers is not given.
     "view-identity-providers",
 )
 BENCH = "/home/frappe/frappe-bench"
@@ -241,6 +242,8 @@ def seed_keycloak(port, password, *, browser_fixtures=None):
 
 def seed_site(project, service, bench, environment):
     source = Path(__file__).with_name("site-seed.py")
+    load_brand = runpy.run_path(str(source.parents[2] / "deploy/brand.py"))["load_brand"]
+    environment = {**environment, "PRODUCT_NAME": load_brand()["PRODUCT_NAME"]}
     command = [docker_executable(), "--context", docker_context(), "exec", "-i", "--workdir", bench]
     for name in environment:
         command.extend(("--env", name))

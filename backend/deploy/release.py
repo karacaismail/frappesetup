@@ -15,6 +15,10 @@ import sys
 from pathlib import Path
 
 DEPLOY = Path(__file__).resolve().parent
+# The command runs with -I. Import only this checkout's helper, never the working directory.
+sys.path.insert(0, str(DEPLOY))
+from brand import BRAND_FILE, LABEL, load_brand  # noqa: E402
+
 ORDER = ("alpha", "beta", "rc", "prod")
 REQUIRED = {
     "backend": ("tenant", "keycloak", "identity-sync", "press"),
@@ -28,12 +32,8 @@ ENV_KEYS = {
     "ATONOTA_PREVIOUS_ENV",
     "ATONOTA_SSH_HOST",
     "ATONOTA_SSH_USER",
-    "ATONOTA_BASE_HOST",
-    "ATONOTA_ID_HOST",
-    "ATONOTA_PRESS_HOST",
+    "ATONOTA_HOST_LABEL",
     "ATONOTA_PRESS_ENABLED",
-    "ATONOTA_TENANT_ZONE",
-    "ATONOTA_TENANT_SITES",
     "ATONOTA_REQUIRE_ALL_COMPONENTS",
     "ATONOTA_REQUIRE_OFFSITE_BACKUP",
     "ATONOTA_AUTO_RESTORE_ON_FAILURE",
@@ -57,13 +57,14 @@ def parse_env_file(path):
         if not line.strip() or line.startswith("#"):
             continue
         key, separator, value = line.partition("=")
-        if not separator or key not in ENV_KEYS:
+        if not separator or key not in ENV_KEYS or key in settings:
             raise ReleaseError(f"{path}:{number}: unknown setting {key!r}")
         settings[key] = value
     return settings
 
 
-def load_environments(folder=DEPLOY / "environments"):
+def load_environments(folder=DEPLOY / "environments", brand_file=BRAND_FILE):
+    brand = load_brand(brand_file)
     environments = {}
     for name in ORDER:
         settings = parse_env_file(Path(folder) / f"{name}.env")
@@ -74,8 +75,31 @@ def load_environments(folder=DEPLOY / "environments"):
             raise ReleaseError(f"{name}.env: ATONOTA_PRESS_ENABLED must be 0 or 1")
         if settings["ATONOTA_PRESS_ENABLED"] == "1" and name not in PRESS_ENVIRONMENTS:
             raise ReleaseError(f"{name}.env: ATONOTA_PRESS_ENABLED=1 is refused; Press is not backed up there yet (E-2)")
+        label = settings["ATONOTA_HOST_LABEL"]
+        if label != ("" if name == "prod" else name) or (label and not LABEL.fullmatch(label)):
+            raise ReleaseError(f"{name}.env: ATONOTA_HOST_LABEL must match the environment")
+        base = f"{label}." if label else ""
+        base += brand["BRAND_DOMAIN"]
+        settings.update({
+            "ATONOTA_BASE_HOST": base,
+            "ATONOTA_ID_HOST": f"api.login.{base}",
+            "ATONOTA_PRESS_HOST": f"press.{base}",
+            "ATONOTA_TENANT_ZONE": f"app.{base}",
+            "ATONOTA_TENANT_SITES": f"demo.app.{base}",
+            "PRODUCT_NAME": brand["PRODUCT_NAME"],
+        })
         environments[name] = settings
     return environments
+
+
+def environment_text(settings, quoted=True):
+    """Render Compose literals, or raw lines for readers that never execute the values."""
+    lines = []
+    for key, value in settings.items():
+        if quoted and key == "PRODUCT_NAME":
+            value = json.dumps(value.replace("$", "$$"), ensure_ascii=False)
+        lines.append(f"{key}={value}")
+    return "\n".join(lines) + "\n"
 
 
 def release_id(kind, commit, build):
@@ -218,6 +242,7 @@ def pack_deploy(source, release_folder, commit):
     if not COMMIT.fullmatch(commit):
         raise ReleaseError(f"bad commit: {commit}")
     source = Path(source)
+    environments = load_environments(source / "environments", source.parent / "brand.env")
     out = Path(release_folder) / "deploy"
     if out.exists():
         raise ReleaseError(f"{out} already exists")
@@ -227,8 +252,25 @@ def pack_deploy(source, release_folder, commit):
             if path.is_file():
                 name = path.relative_to(source).as_posix()
                 (out / name).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path, out / name)
-                files[name] = sha256_of(path)
+                target = out / name
+                if name.startswith("environments/"):
+                    target.write_text(environment_text(environments[path.stem]), encoding="utf-8")
+                else:
+                    shutil.copy2(path, target)
+                if name == "settings/keycloak.production.env.example":
+                    # The source is a symlink owned by the identity team. Only the packaged
+                    # contract changes: Compose supplies this key from the release's host.env.
+                    text = target.read_text(encoding="utf-8")
+                    text = re.sub(r"(?m)^IDENTITY_BRAND_NAME=.*\n?", "", text)
+                    target.write_text(text, encoding="utf-8")
+                files[name] = sha256_of(target)
+    product = environments["prod"]["PRODUCT_NAME"]
+    tenant_list = out / "settings/tenant-site.production.env.example"
+    if tenant_list.is_file():
+        text = tenant_list.read_text(encoding="utf-8")
+        text = re.sub(r"(?m)^identity_brand_name=.*$", lambda _: f"# [sabit]\nidentity_brand_name={product}", text)
+        tenant_list.write_text(text, encoding="utf-8")
+        files["settings/tenant-site.production.env.example"] = sha256_of(tenant_list)
     missing = [name for name in NEEDED if name not in files]
     if missing:
         raise ReleaseError(f"deploy files missing in {source}: {', '.join(missing)}")
@@ -308,6 +350,8 @@ def main(argv=None):
     field.add_argument("name")
     env_check = commands.add_parser("env-check", help="validate every environment file")
     env_check.add_argument("env", choices=ORDER)
+    env_show = commands.add_parser("env-show", help="print resolved non-secret settings as data")
+    env_show.add_argument("env", choices=ORDER)
     images = commands.add_parser("images", help="print name=image lines")
     images.add_argument("manifest")
     pack = commands.add_parser("pack-deploy", help="copy the deploy files into a release folder")
@@ -344,6 +388,8 @@ def main(argv=None):
             print(read_json(arguments.manifest)[arguments.name])
         elif arguments.command == "env-check":
             load_environments()
+        elif arguments.command == "env-show":
+            print(environment_text(load_environments()[arguments.env], quoted=False), end="")
         elif arguments.command == "pack-deploy":
             pack_deploy(arguments.source, arguments.release_folder, arguments.commit)
         elif arguments.command == "check-deploy":
@@ -352,7 +398,7 @@ def main(argv=None):
             for name, component in sorted(read_json(arguments.manifest)["components"].items()):
                 if "image" in component:
                     print(f"{name}={component['image']}")
-    except (ReleaseError, KeyError, OSError) as error:
+    except (ValueError, KeyError, OSError) as error:
         print(f"release: {error}", file=sys.stderr)
         return 1
     return 0

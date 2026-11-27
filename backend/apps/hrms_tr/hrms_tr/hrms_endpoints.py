@@ -62,9 +62,16 @@ class PreparedReportAccess:
 
 
 class PreparedReportFileAccess:
-	"""Apply the report restriction to direct private file downloads."""
+	"""Apply the report restriction and the employee privacy rule to direct private file downloads.
+
+	Frappe's download asks its own file rule, not the record hooks. So both checks run here.
+	"""
 
 	def is_downloadable(self):
+		from hrms_tr.employee_privacy import attachment_allowed
+
+		if not attachment_allowed(self):
+			return False
 		if self.attached_to_doctype == "Prepared Report" and self.attached_to_name:
 			name = frappe.db.get_value("Prepared Report", self.attached_to_name, "report_name")
 			if not name or is_blocked_report(name):

@@ -94,7 +94,7 @@ class TestAiToolsHook(AiTestCase):
 			]
 			unchanged = frappe.db.get_value(DOCTYPE, name, "title")
 			shown = self.human(client, "GET", "get_proposal", query={"proposal_id": proposal["proposal_id"]})
-			outcome = self.approve(client, proposal["proposal_id"]).json["message"]
+			outcome = self.approve_both(client, proposal["proposal_id"]).json["message"]
 
 		self.assertEqual(proposal["status"], "approval_required")
 		self.assertEqual(unchanged, "Eski")

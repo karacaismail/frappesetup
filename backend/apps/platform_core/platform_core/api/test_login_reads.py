@@ -1,4 +1,4 @@
-"""AtonotA Login reads through Frappe's HTTP dispatch (AJA-459).
+"""`atonota_login` reads through Frappe's HTTP dispatch (AJA-459).
 
 Expected values come from the security review (AJA-458) and from the panel contract
 (`atonota-web`, `src/auth/README.md`, sections G-159 and G-160) (D-1):

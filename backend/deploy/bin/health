@@ -18,6 +18,34 @@ check_release_id "$id"
 running="$(remote "$(server_bin "$env" "$kind")/status" "$env" "$kind")"
 [[ "$running" == "$id" ]] || fail "$env runs $running, expected $id"
 
+# Use the checked archive's hosts. Resume has only a manifest, so read that backend
+# release's immutable host file from the server. Connection settings stay local.
+scratch="$(mktemp -d)"
+trap 'rm -rf -- "$scratch"' EXIT
+if [[ -d "$folder/deploy" ]]; then
+    release_py check-deploy "$folder" || fail "invalid release archive"
+    cp "$folder/deploy/environments/$env.env" "$scratch/host.env"
+elif [[ "$kind" == backend ]]; then
+    host_path="/srv/atonota/$env/releases/$id/host.env"
+    copy_from_remote "$host_path" "$scratch/host.env"
+else
+    fail "web health requires the release archive"
+fi
+settings="$(python3 -I "$DEPLOY_DIR/remote/settings.py" host-env "$scratch/host.env")" ||
+    fail "cannot read release hosts"
+unset ATONOTA_BASE_HOST ATONOTA_ID_HOST ATONOTA_PRESS_HOST ATONOTA_TENANT_ZONE ATONOTA_TENANT_SITES ATONOTA_PRESS_ENABLED
+host_environment=""
+while IFS='=' read -r key value; do
+    case "$key" in
+    ATONOTA_ENV) host_environment="$value" ;;
+    ATONOTA_BASE_HOST | ATONOTA_ID_HOST | ATONOTA_PRESS_HOST | ATONOTA_TENANT_ZONE | ATONOTA_TENANT_SITES | ATONOTA_PRESS_ENABLED)
+        export "$key=$value" ;;
+    esac
+done <<<"$settings"
+[[ "$host_environment" == "$env" ]] || fail "release hosts belong to another environment"
+: "${ATONOTA_BASE_HOST:?}" "${ATONOTA_ID_HOST:?}" "${ATONOTA_PRESS_HOST:?}" \
+    "${ATONOTA_TENANT_ZONE:?}" "${ATONOTA_TENANT_SITES:?}" "${ATONOTA_PRESS_ENABLED:?}"
+
 probe() {
     local url="$1" expect="$2"
     local body
@@ -61,8 +89,7 @@ else
     done
 fi
 
-record="$(mktemp)"
-trap 'rm -f -- "$record"' EXIT
+record="$scratch/health.json"
 release_py record "$manifest" --env "$env" --out "$record"
 copy_to_remote "/srv/atonota/$env/health/$kind.json" "$record"
 printf 'health record of %s stored in %s\n' "$id" "$env"

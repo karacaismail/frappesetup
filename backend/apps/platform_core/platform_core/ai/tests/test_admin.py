@@ -141,7 +141,7 @@ class TestAdminTools(AiTestCase):
 			{"doctype": DOCTYPE, "fieldname": "title", "property": "reqd", "value": True},
 		)
 		before = frappe.get_meta(DOCTYPE).get_field("title").reqd
-		outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
+		outcome = self.approve_both(manager, proposal["proposal_id"]).json["message"]
 		frappe.clear_cache(doctype=DOCTYPE)
 		forbidden = self.call_tool(
 			manager,
@@ -164,7 +164,7 @@ class TestAdminTools(AiTestCase):
 
 		proposal = self.propose(manager, "plt_set_role_permission", arguments)
 		before = self.call_tool(client, "plt_delete_document", target)
-		outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
+		outcome = self.approve_both(manager, proposal["proposal_id"]).json["message"]
 		after = self.call_tool(client, "plt_delete_document", target)
 		still_reads = self.call_tool(client, "plt_get_document", target)
 
@@ -213,11 +213,11 @@ class TestAdminTools(AiTestCase):
 
 		give = self.propose(manager, "plt_assign_role", {"user": USER_B, "role": EXTRA_ROLE})
 		before = EXTRA_ROLE in frappe.get_roles(USER_B)
-		self.assertTrue(self.approve(manager, give["proposal_id"]).json["message"]["executed"])
+		self.assertTrue(self.approve_both(manager, give["proposal_id"]).json["message"]["executed"])
 		frappe.clear_cache(user=USER_B)
 		given = EXTRA_ROLE in frappe.get_roles(USER_B)
 		take = self.propose(manager, "plt_remove_role", {"user": USER_B, "role": EXTRA_ROLE})
-		self.assertTrue(self.approve(manager, take["proposal_id"]).json["message"]["executed"])
+		self.assertTrue(self.approve_both(manager, take["proposal_id"]).json["message"]["executed"])
 		frappe.clear_cache(user=USER_B)
 
 		self.assertFalse(before)
@@ -269,7 +269,7 @@ class TestAdminTools(AiTestCase):
 		too_short = self.call_tool(manager, "plt_purge_action_log", {"older_than_days": 30})
 		proposal = self.propose(manager, "plt_purge_action_log", {})
 		untouched = frappe.db.exists("PLT AI Action Log", old)
-		outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
+		outcome = self.approve_both(manager, proposal["proposal_id"]).json["message"]
 
 		self.assert_denied(too_short, "invalid_arguments")
 		self.assertGreaterEqual(proposal["preview"]["details"]["logs"], 1)

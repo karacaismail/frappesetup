@@ -1,8 +1,11 @@
 ---
 // Faz tablosu — hedef, çıkış ve sahip src/data/phases.json'dan; gereksinim kimlikleri requirements.json'daki
 // faz alanından derleme anında türetilir (elle kopya yok, faz–gereksinim çelişkisi oluşamaz).
-import phases from '../data/phases.json';
-import requirements from '../data/requirements.json';
+import { fillBrandData } from '../data/site';
+import phasesSource from '../data/phases.json';
+const requirements = fillBrandData(requirementsSource);
+const phases = fillBrandData(phasesSource);
+import requirementsSource from '../data/requirements.json';
 
 // Ardışık kimlikleri aralığa sıkıştırır: G-7, G-8, G-9 → G-7..G-9.
 function compress(ids: string[]): string {

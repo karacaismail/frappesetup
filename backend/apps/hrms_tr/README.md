@@ -36,3 +36,44 @@ Hata çıkarsa ekrandaki ilk hata metnini okuyun.
 Komut yalnız izin kayıtlarını siler. Çalışan kaydı kalır.
 “Leave Allocation”, “Leave Ledger Entry”, “Attendance”, “Salary Slip” ve “Shift Assignment” kayıtları kalır.
 Kullanıcı hesapları, denetim kayıtları ve yedekler bu işlemin kapsamı dışındadır.
+
+
+## Yeni izin talebi bilgisi
+
+Ekran, `GET /api/method/hrms_tr.api.get_leave_request_context` yolunu çağırır.
+Yol yalnız oturum sahibinin etkin personel kaydını okur.
+Yöneticiler de bu yoldan başka kişiyi seçemez.
+Yol, genel personel okuma yetkisi vermez.
+
+İsteğe bağlı `leave_type` alanı, izin türünün tam kayıt adını alır.
+Alan verilmezse yol personelin bugün geçerli, onaylanmış izin tahsislerine bakar.
+İzin tahsisi, personele ayrılan izin hakkını gösterir.
+Bu kayıtlarda tek izin türü varsa yol bu türü seçer.
+Bu durumda `sources.leave_type` değeri `Leave Allocation` olur.
+Tahsis yoksa veya birden çok tür varsa tür ve bakiye `null` olur.
+`null`, değerin bulunmadığını gösterir.
+İstekte izin türü verilirse mevcut davranış korunur.
+Bu durumda `sources.leave_type` değeri `Leave Type` olur.
+Yol, çevrilmiş addan veya benzer kayıttan izin türü tahmin etmez.
+
+Yanıt, personel kimliğini, görünen adı, izin türünü ve kalan günü verir.
+Yanıttaki `sources`, her alanın kaynak kayıt türünü gösterir.
+Eksik değer ve kaynağı `null` olur.
+İzin tahsisi yoksa bakiye `null` olur.
+HRMS sıfır gün hesapladıysa bakiye `0` olur.
+HRMS hesabı, sitenin bugünkü tarihine kadar olan izinleri kullanır.
+Eski bakiye yollarının engelleri korunur.
+
+Sözleşme `backend/contracts/hrms_tr.openapi.yaml` dosyasındadır.
+Aşağıdaki test, Frappe ve HRMS kurulu ortamda çalışır.
+
+```sh
+python -m unittest hrms_tr.test_api.LeaveRequestContextTest
+```
+
+Sözleşme denetimi, depo kökünde şu komutla çalışır.
+Komut Frappe, HRMS, PyYAML ve jsonschema paketlerini gerektirir.
+
+```sh
+python -m unittest discover -s backend/dev/hrms -p test_contract.py
+```

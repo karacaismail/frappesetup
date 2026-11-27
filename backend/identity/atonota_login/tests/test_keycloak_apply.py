@@ -15,6 +15,7 @@ from unittest import mock
 
 from atonota_login import keycloak_apply, platforms
 from atonota_login.keycloak_apply import ApplyError
+from tests.brand_values import LOGIN_HOST
 
 MASK = "**********"
 # The apply step never reads this value; tests only need the variable to exist.
@@ -148,10 +149,10 @@ class ApplyTest(unittest.TestCase):
 class KeycloakAddressTest(unittest.TestCase):
     def test_remote_needs_https_and_the_named_host(self):
         self.assertEqual(
-            keycloak_apply.checked_keycloak_url("https://api.login.atonota.net", "api.login.atonota.net"),
-            "https://api.login.atonota.net")
-        for url, host in (("https://api.login.atonota.net", None), ("http://api.login.atonota.net", "api.login.atonota.net"),
-                          ("https://evil.test", "api.login.atonota.net"), ("https://u@login.example.test", "login.example.test")):
+            keycloak_apply.checked_keycloak_url(f"https://{LOGIN_HOST}", LOGIN_HOST),
+            f"https://{LOGIN_HOST}")
+        for url, host in ((f"https://{LOGIN_HOST}", None), (f"http://{LOGIN_HOST}", LOGIN_HOST),
+                          ("https://evil.test", LOGIN_HOST), ("https://u@login.example.test", "login.example.test")):
             with self.subTest(url=url), self.assertRaises(ApplyError):
                 keycloak_apply.checked_keycloak_url(url, host)
 
@@ -221,12 +222,12 @@ class CommandTest(unittest.TestCase):
                 with self.subTest(arguments=arguments):
                     code, _ = self.run_command("--platforms-dir", folder, "--allow-local-http", *arguments)
                     self.assertNotEqual(code, 0)
-            remote = {"KC_PUBLIC_URL": "https://api.login.atonota.net", "KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
+            remote = {"KC_PUBLIC_URL": f"https://{LOGIN_HOST}", "KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
                       "KC_BOOTSTRAP_ADMIN_PASSWORD": UNUSED_BOOTSTRAP_VALUE}
             with mock.patch.dict("os.environ", remote), \
                     mock.patch.object(keycloak_apply, "admin_caller") as caller:
                 code, _ = self.run_command("--platforms-dir", folder, "--allow-local-http", "apply", "--from-env",
-                                           "--remote-host", "api.login.atonota.net")
+                                           "--remote-host", LOGIN_HOST)
             self.assertNotEqual(code, 0)
             caller.assert_not_called()
 

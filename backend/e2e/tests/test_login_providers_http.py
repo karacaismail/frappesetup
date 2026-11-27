@@ -1,4 +1,4 @@
-"""The two AtonotA Login reads over real HTTP on a running tenant site (AJA-516).
+"""The two atonota_login reads over real HTTP on a running tenant site (AJA-516).
 
 The test needs a running local stack. It never starts one. Point it at the tenant site:
 

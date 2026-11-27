@@ -1,6 +1,6 @@
-# AtonotA Login: üçüncü taraf lisansları
+# Giriş ürünü (`atonota_login`): üçüncü taraf lisansları
 
-AtonotA Login'in kendi kodu MIT lisanslıdır. Lisans metni bu klasördeki `LICENSE` dosyasındadır.
+Ürünün görünen adı `backend/brand.env` dosyasındaki `PRODUCT_NAME` değeridir. Ürünün kendi kodu MIT lisanslıdır. Lisans metni bu klasördeki `LICENSE` dosyasındadır.
 
 Ürün aşağıdaki parçalarla çalışır. Bu parçalar ürünün kodu değildir. Her parça kendi lisansını korur. Bu dosya iki lisansı birbirinden ayrı tutar.
 

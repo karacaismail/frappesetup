@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -57,6 +58,11 @@ class ReviewTests(unittest.TestCase):
         with patch.object(scans, "bandit_findings", return_value=[]), patch.object(scans, "git") as git:
             self.assertEqual(scans.scan_bandit().status, "fail")
             git.assert_not_called()
+
+    def test_repository_bandit_findings_match_reviewed_exceptions(self):
+        # Exercise the real inventory: new test helpers and stale signatures both fail.
+        result = scans.scan_bandit()
+        self.assertEqual(result.status, "pass", "\n".join(result.findings))
 
     def test_bandit_scans_a_tracked_backend_file(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -139,34 +145,55 @@ class ReviewTests(unittest.TestCase):
                         self.assertEqual(scans.scan_dependencies().status, "fail")
                         scan.assert_not_called()
 
+    def gate_harness(self, root, uv_body):
+        bin_dir = root / "backend/dev/bin"
+        bin_dir.mkdir(parents=True)
+        tools = root / "tools"
+        tools.mkdir()
+        shutil.copy(scans.ROOT / "backend/dev/bin/security-audit", bin_dir)
+        security = root / scans.SECURITY
+        security.mkdir()
+        for name in ("container-settings", "tool-versions.env"):
+            shutil.copy(scans.ROOT / scans.SECURITY / name, security)
+        for destination, body in {
+            tools / "git": 'case "$1" in merge-base) [ -n "$BASE" ] && printf "%s\\n" "$BASE";; esac',
+            tools / "uvx": "exit 0",
+            tools / "uv": uv_body,
+            # The system python3 may be 3.9, which cannot read 3.12 syntax (AJA-1101).
+            tools / "python3": 'echo "invalid syntax (decision_api.py, line 144)" >&2; exit 1',
+            tools / "docker": "cat >/dev/null",
+            security / "history-scan": "exit 0",
+            bin_dir / "ai-readiness": 'printf "%s\\n" "$*" >> "$CALLS"',
+        }.items():
+            destination.write_text(f"#!/bin/sh\n{body}\n")
+            destination.chmod(0o755)
+        calls = root / "calls"
+        env = {**os.environ, "PATH": f"{tools}:{os.environ['PATH']}", "CALLS": str(calls)}
+        return bin_dir / "security-audit", calls, env
+
+    def run_gate(self, gate, env):
+        return subprocess.run([gate], env=env, capture_output=True, text=True)
+
     def test_gate_requires_merge_base(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            bin_dir = root / "backend/dev/bin"
-            bin_dir.mkdir(parents=True)
-            tools = root / "tools"
-            tools.mkdir()
-            shutil.copy(scans.ROOT / "backend/dev/bin/security-audit", bin_dir)
-            security = root / scans.SECURITY
-            security.mkdir()
-            for name in ("container-settings", "tool-versions.env"):
-                shutil.copy(scans.ROOT / scans.SECURITY / name, security)
-            for destination, body in {
-                tools / "git": 'case "$1" in merge-base) [ -n "$BASE" ] && printf "%s\\n" "$BASE";; esac',
-                tools / "uvx": "exit 0",
-                tools / "uv": 'printf "%s\\n" "$*" >> "$CALLS"; exit "$BANDIT_STATUS"',
-                tools / "python3": "exit 0",
-                tools / "docker": "cat >/dev/null",
-                security / "history-scan": "exit 0",
-                bin_dir / "ai-readiness": 'printf "%s\\n" "$*" >> "$CALLS"',
-            }.items():
-                destination.write_text(f"#!/bin/sh\n{body}\n")
-                destination.chmod(0o755)
-            calls = root / "calls"
-            env = {**os.environ, "PATH": f"{tools}:{os.environ['PATH']}", "CALLS": str(calls)}
-            bandit_call = "run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py bandit"
-            # The gate also scans the Press lock offline (review 1, finding 3).
-            press_lock_call = "run --no-project --offline --python 3.12 python -B backend/dev/security/scans.py press-lock"
+            gate, calls, env = self.gate_harness(Path(directory), "\n".join((
+                'printf "%s\\n" "$*" >> "$CALLS"',
+                'case "$*" in *scans.py\\ bandit) exit "$BANDIT_STATUS";; esac',
+                "exit 0",
+            )))
+            # Every Python step runs on the pinned 3.12 interpreter, never on the system python3.
+            py = "run --no-project --offline --python 3.12 python -B"
+            python_calls = [
+                f"{py} -c import sys; sys.exit(sys.version_info[:2] != (3, 12))",
+                f"{py} backend/dev/security/scans.py bandit",
+                # The gate also scans the Press lock offline (review 1, finding 3).
+                f"{py} backend/dev/security/scans.py press-lock",
+                f"{py} backend/dev/security/semgrep_exceptions.py --snapshot",
+                f"{py} backend/dev/security/semgrep_exceptions.py  0 ",
+                f"{py} -m unittest discover -s backend/dev/security -p test_semgrep_exceptions.py",
+                f"{py} -m unittest discover -s backend/dev/security -p test_endpoints.py",
+                f"{py} backend/dev/security/endpoints.py backend",
+            ]
             for base, bandit_status, gate_status, remaining in (
                 ("abc", 0, 0, ["--self-test", "--commit-base abc"]),
                 ("", 0, 1, ["--self-test"]),
@@ -174,10 +201,26 @@ class ReviewTests(unittest.TestCase):
             ):
                 with self.subTest(base=base, bandit_status=bandit_status):
                     calls.write_text("")
-                    result = subprocess.run([bin_dir / "security-audit"], env={**env, "BASE": base,
-                                            "BANDIT_STATUS": str(bandit_status)}, capture_output=True, text=True)
+                    result = self.run_gate(gate, {**env, "BASE": base, "BANDIT_STATUS": str(bandit_status)})
                     self.assertEqual(result.returncode, gate_status, result.stderr)
-                    self.assertEqual(calls.read_text().splitlines(), [bandit_call, press_lock_call, *remaining])
+                    # The semgrep report path is a fresh temporary file. Compare without it.
+                    recorded = [re.sub(r"semgrep_exceptions.py \S*semgrep-review\.\S+", "semgrep_exceptions.py ", line)
+                                for line in calls.read_text().splitlines()]
+                    self.assertEqual(recorded, [*python_calls, *remaining])
+
+    def test_gate_stops_when_python_312_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            gate, calls, env = self.gate_harness(Path(directory), "\n".join((
+                'printf "%s\\n" "$*" >> "$CALLS"',
+                'echo "error: No interpreter found for Python 3.12" >&2',
+                "exit 2",
+            )))
+            calls.write_text("")
+            result = self.run_gate(gate, {**env, "BASE": "abc"})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Python 3.12 is required", result.stderr)
+            # No step runs on another interpreter after the check fails.
+            self.assertEqual(len(calls.read_text().splitlines()), 1)
 
     def test_handoff_describes_database_timestamp_limit(self):
         handoff = (scans.ROOT / "backend/docs/handoff/ci-security.md").read_text()

@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 platform_core.patches.migrate_route_targets
 platform_core.patches.ensure_route_target_unique
+platform_core.ai.patches.set_proposal_risk_level

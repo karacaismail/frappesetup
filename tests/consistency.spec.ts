@@ -1,3 +1,4 @@
+import { parseBrand, fillBrand, fillBrandData } from '../src/lib/brand.mjs';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -7,15 +8,17 @@ import { test, expect } from '@playwright/test';
 // İçerik tutarlılığı (rapor E-15): gereksinim JSON'u, fazlar, açık kararlar ve markdown sayfaları aynı karar setine
 // bağlı kalmalı. Tarayıcı gerektirmez; tek projede koşar.
 const root = new URL('../', import.meta.url);
+const brand = parseBrand(readFileSync(new URL('backend/brand.env', root), 'utf8'));
+const domainPattern = brand.BRAND_DOMAIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 type Req = { id: string; title: string; detail: string; rail: string; priority: string; phase: string; source: string; owner?: string };
-const reqs: Req[] = JSON.parse(read('src/data/requirements.json'));
+const reqs: Req[] = fillBrandData(JSON.parse(read('src/data/requirements.json')), brand);
 type Phase = { id: string; after: string[]; entryGate?: string };
-const phases: Phase[] = JSON.parse(read('src/data/phases.json'));
+const phases: Phase[] = fillBrandData(JSON.parse(read('src/data/phases.json')), brand);
 const docsDir = new URL('src/content/docs/', root);
 const docs = readdirSync(docsDir)
   .filter((f) => f.endsWith('.md'))
-  .map((f) => ({ slug: f.replace(/\.md$/, ''), text: readFileSync(new URL(f, docsDir), 'utf8') }));
+  .map((f) => ({ slug: f.replace(/\.md$/, ''), text: fillBrand(readFileSync(new URL(f, docsDir), 'utf8'), brand) }));
 const ids = new Set(reqs.map((r) => r.id));
 // release: commit'i içeren main yayını (PR numarası ve yayın commit'i); null ise commit henüz yayımlanmadı.
 type Release = { pr: number; commit: string } | null;
@@ -474,6 +477,45 @@ test.describe('content consistency', () => {
     expect(g169).toContain('Platform operatörü isteği onaylar.');
   });
 
+  test('26 November 2026 decisions are written in requirements and handoff notes (AJA-1070)', () => {
+    // Karar 5: her devir notu ortak kanalı "proje Telegram grubu" diye anar.
+    const handoffs = [
+      ...readdirSync(new URL('backend/docs/handoff/', root))
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => `backend/docs/handoff/${f}`),
+      'backend/dev/press/provisioning-handoff.md',
+    ];
+    expect(handoffs.length).toBeGreaterThan(5);
+    for (const file of handoffs) expect(read(file), file).toContain('proje Telegram grubu');
+    // Karar 1: Google, Apple ve LinkedIn geliştirici hesaplarını hesap sorumlusu açar.
+    const social = read('backend/docs/handoff/atonota-login-platforms.md');
+    for (const platform of ['Google', 'Apple', 'LinkedIn']) {
+      const section = social.split(/^### /m).find((part) => part.startsWith(platform));
+      expect(section, platform).toBeTruthy();
+      expect(section!, platform).toContain('hesap sorumlusu');
+    }
+    expect(read('src/content/docs/atonota-login.md')).toContain('hesap sorumlusu');
+    // Karar 2: zamanlayıcı ve düzenli yedek yalnız sunucularda açılır.
+    for (const id of ['G-5', 'G-114']) {
+      const d = reqs.find((x) => x.id === id)!.detail;
+      expect(d, id).toContain('Frappe zamanlayıcısı ve düzenli yedek sunucularda açıktır');
+      expect(d, id).toContain("Geliştirme Mac'inde zamanlanmış iş kurulmaz.");
+    }
+    for (const file of ['backend/docs/dagitim/ortamlar.md', 'src/content/docs/rail-6-operasyon.md', 'backend/PROJECT-RECORD.md']) {
+      const text = read(file);
+      expect(text, file).toContain("Geliştirme Mac'inde zamanlanmış iş kurulmaz.");
+      expect(text, file).not.toContain('Düzenli yedek yoktur');
+    }
+    // Karar 3: prod ortamına yalnız deneme verisi girer.
+    const envs = read('backend/docs/dagitim/ortamlar.md');
+    expect(envs).toContain('prod ortamına yalnız deneme verisi girer.');
+    expect(envs).not.toMatch(/^\| prod \| Gerçek müşteri \|/m);
+    // Karar 4: IPv6 önce deneme sunucusunda, sonra prod'da (AJA-507).
+    for (const file of ['backend/docs/dagitim/ortamlar.md', 'backend/docs/handoff/canli-deneme-listesi.md']) {
+      expect(read(file), file).toContain('IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).');
+    }
+  });
+
   test('built pages have no table rows rendered as paragraphs', () => {
     // Tablo içindeki boş satır markdown tablosunu böler; kalan satırlar `<p>| …` olarak yayımlanır.
     const dist = new URL('dist/', root);
@@ -644,7 +686,7 @@ test.describe('content consistency', () => {
     const RULES: [RegExp, string][] = [
       // Adın geçersiz olduğunu söyleyen yasak cümleleri ("... adı kullanılmaz", "... açılmaz") muaftır.
       [/(?<![_\w])press\.api\.ops(?!.{0,40}(kullanılmaz|açılmaz))/, 'press.api.ops (press_tr.api.ops olmalı)'],
-      [/<marka>\.com\.tr|<kiracı>\.atonota\.net/, 'eski ad: kiracı <kiracı>.app.atonota.net, marka alanı atonota.net olmalı (backend ad haritası)'],
+      [new RegExp(`<marka>\\.com\\.tr|<kiracı>\\.${domainPattern}`), `eski ad: kiracı <kiracı>.app.${brand.BRAND_DOMAIN}, marka alanı ${brand.BRAND_DOMAIN} olmalı (backend ad haritası)`],
       [/buy_credits_iyzico|press\.api\.billing\.create_iyzico/, 'iyzico ucu press_tr.api.billing.create_iyzico_checkout_form olmalı'],
       [/kullanıcının Keycloak token/, 'kiracı verisi kullanıcının Keycloak belirteciyle değil aracı belirteciyle (G-148)'],
     ];

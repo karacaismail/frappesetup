@@ -71,3 +71,7 @@ Press düzeltmeyi kabul edip yayımlarsa sırayla şunları yapın:
 4. O-18 ve O-52 kayıtlarını güncelleyin.
 
 Gerçek okurla denenmedi.
+
+## Yazışma kanalı
+
+Ortak işlerde ekip proje Telegram grubunda yazışır. Bu kural 26 Kasım 2026 Perşembe günü konuldu. Grubun adresi ve kişi adları depoya yazılmaz.

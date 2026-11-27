@@ -30,6 +30,12 @@ Realm dosyası kimlik-realm işinindir. Bu klasör realm dosyasını değiştirm
 
 Marka adı temaya yazılmaz. Marka adı tek bir değişkenden gelir: `IDENTITY_BRAND_NAME`.
 
+Değişkenin değeri `backend/brand.env` dosyasındadır. Değer o dosyadaki `PRODUCT_NAME` satırıdır. Ad değişince yalnız o satırı değiştirin.
+
+- Geliştirmede `bin/kc-dev.sh` betiği değeri o dosyadan okur.
+- `.env` dosyasında başka bir ad yazılıysa betik durur. O satırı silin.
+- Örnek ortam dosyaları yalnız `<PRODUCT_NAME>` yer tutucusunu yazar.
+
 | Tema | Marka adını nereden okur |
 | --- | --- |
 | Giriş teması | Realm'in görünen adından (`displayName`) |
@@ -187,7 +193,7 @@ Hesap konsolunun bilinen sınırları şunlardır:
 
 ## Temel temadan kopyalanan şablonlar
 
-Tema, Keycloak 26.8.2 kaynağındaki sekiz şablonun değiştirilmiş kopyasını kullanır. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
+Tema, Keycloak 26.8.2 kaynağındaki on bir şablonun değiştirilmiş kopyasını kullanır. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
 
 | Dosya | Fark |
 | --- | --- |
@@ -199,6 +205,31 @@ Tema, Keycloak 26.8.2 kaynağındaki sekiz şablonun değiştirilmiş kopyasın�
 | `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. |
 | `login/login-recovery-authn-code-config.ftl` | Uyarı çevrilir. Başlık sırası düzeltilir. Dosya ve çıktı tarihi ekranın dilini kullanır. |
 | `login/logout-confirm.ftl` | Onay düğmesi doğal Tab sırasını izler. |
+| `login/login.ftl` | E-posta yalnız yazı olarak görünüyorsa form gizli bir kullanıcı adı alanı taşır. |
+| `login/login-password.ftl` | Form gizli bir kullanıcı adı alanı taşır. |
+| `login/login-update-password.ftl` | Form gizli bir kullanıcı adı alanı taşır. Tarayıcı yeni parolayı doğru hesaba kaydeder. |
+
+### Parola formları ve parola yöneticisi
+
+Parola yöneticisi kaydı bir hesaba bağlar. Bunun için formda `autocomplete="username"` taşıyan bir alan gerekir. Keycloak bazı ekranlarda e-postayı yalnız yazı olarak gösterir. O ekranlarda böyle bir alan yoktu. Tarayıcı yeni parolayı kaydetmeyi önermiyordu ya da yanlış hesabı seçiyordu (AJA-648).
+
+Ortak alan `login/account-field.ftl` dosyasındadır. Alanın özellikleri şunlardır:
+
+- Alan gizlidir. Klavye ve ekran okuyucu alana ulaşmaz.
+- Alanın `name` değeri yoktur. Sunucu bu alanı hiç almaz.
+- Alanın türü `text` olur. Parola yöneticileri `hidden` türündeki alanı okumaz.
+- Değer Keycloak'ın verdiği kullanıcı adıdır. Bu realm'de kullanıcı adı e-postadır.
+
+Parola değiştirme yolları ve şablonları şunlardır:
+
+| Yol | Ekran | Şablon |
+| --- | --- | --- |
+| Hesap konsolundan parola değiştirme | “Yeni parola belirleyin” | `login-update-password.ftl` |
+| “Parolanızı mı unuttunuz?” bağlantısı ve e-postadaki bağlantı | “Yeni parola belirleyin” | `login-update-password.ftl` |
+| Yöneticinin zorunlu kıldığı parola değişikliği | “Yeni parola belirleyin” | `login-update-password.ftl` |
+| Yöneticinin e-postayla gönderdiği işlem | “Yeni parola belirleyin” | `login-update-password.ftl` |
+
+Giriş ekranlarında parola alanı `current-password` taşır. Yeni parola alanları `new-password` taşır. `tests/password-autocomplete.spec.ts` bu öznitelikleri ölçer. Gerçek bir parola yöneticisinin kayıt önerisini bu test göremez. Bu denetimi kişi elle yapar.
 
 ## Deneme ortamı
 
@@ -248,6 +279,7 @@ npx playwright test
 | `tests/realm-settings.spec.ts` | Keycloak'ın silme eylemi yanlışlıkla açılsa da konsol onu sunmaz. Test bu yanlış ayarı ayrı bir realm'de kurar. Adı `theme-test-delete-action-on` olur. Asıl deneme realm'inin ayarını hiçbir test değiştirmez. |
 | `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
+| `tests/password-autocomplete.spec.ts` | Parola formlarında kullanıcı adı alanı ve `autocomplete` değerleri |
 | `tests/visual.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
 
 Yerleşim testleri yedi görünümde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü. Öteki testler 320 ve masaüstü görünümünde koşar.
