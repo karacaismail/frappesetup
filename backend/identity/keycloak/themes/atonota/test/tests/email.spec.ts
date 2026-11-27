@@ -451,7 +451,7 @@ test.describe('sihirli bağlantı e-postası', () => {
       const alternative = page.locator('form:has([name="tryAnotherWay"])');
       await alternative.evaluate((form: HTMLFormElement) => form.requestSubmit());
       const signInOption = {
-        tr: 'E-posta bağlantısı E-postanıza gelen bağlantıyla oturum açın.',
+        tr: 'E-posta bağlantısı E-postanıza gelen bağlantıyla giriş yapın.',
         en: 'Email link Sign in with a link sent to your email.',
       };
       await page.getByRole('button', { name: signInOption[lang], exact: true }).click();
@@ -517,15 +517,17 @@ test('email colours are the light design tokens of the login theme', () => {
   const token = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(lightBlock)?.[1].toLowerCase();
   const template = readFileSync(`${root}email/html/template.ftl`, 'utf8');
   const value = (name: string) => new RegExp(`${name} = "(#[0-9a-fA-F]{3,8})"`).exec(template)?.[1].toLowerCase();
+  // The email button text is the text token. The theme button text is see-through black, which email cannot draw.
+  // The brand dot is the primary colour, like the brand mark of the sign-in screen (AJA-1125).
   const pairs: Record<string, string> = {
-    pageBg: '--at-color-page',
-    cardBg: '--at-color-surface',
-    ink: '--at-color-ink',
-    quiet: '--at-color-ink-soft',
-    buttonBg: '--at-color-action',
-    buttonInk: '--at-color-on-action',
+    pageBg: '--at-color-bg-layout',
+    cardBg: '--at-color-bg-panel',
+    ink: '--at-color-text',
+    quiet: '--at-color-text-quiet',
+    buttonBg: '--at-color-primary',
+    buttonInk: '--at-color-text',
     linkInk: '--at-color-link',
-    brandDot: '--at-color-seal',
+    brandDot: '--at-color-primary',
   };
   for (const [emailName, tokenName] of Object.entries(pairs)) {
     expect(token(tokenName), `${tokenName} exists in the login theme`).toBeTruthy();

@@ -131,7 +131,7 @@ test('theme source: no user-visible brand name outside comments', () => {
       .split('\n')
       .filter((line) => !/^\s*(#|\/\/)/.test(line)) // .properties and JS line comments
       // File and folder names of the theme are identifiers, not text shown to the user.
-      .map((line) => line.replace(/atonota(-account|-focus)?\.(css|js)/g, '').replace(/themes\/atonota/g, ''))
+      .map((line) => line.replace(/atonota(-account|-focus|-form)?\.(css|js)/g, '').replace(/themes\/atonota/g, ''))
       // A message key is an identifier too, for example atonotaEnterpriseSsoRequired. Only the value is shown.
       .map((line) => (file.endsWith('.properties') ? line.replace(/^[^=]*=/, '') : line));
     text.forEach((line, index) => {
