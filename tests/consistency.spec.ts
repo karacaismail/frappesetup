@@ -192,17 +192,22 @@ test.describe('content consistency', () => {
     expect(processFiles.filter((f) => !existsSync(new URL(f, dir))), 'depoda olmayan süreç belgesi').toEqual([]);
   });
 
-  test('review template does not present the merge rule as a decision', () => {
-    // Birleştirme yöntemine müşteri karar verecek; karar henüz kayıtlı değil (AJA-1460, AJA-1303).
+  test('review template follows the 7 step flow and ProPR merges', () => {
+    // Müşteri kararı, 27 Kasım 2026 (AJA-1548): PR main dalına açılır, CI koşar, PR'ı ProPR birleştirir (AJA-1596).
     const text = read('docs/standartlar/review-template.md');
-    expect(text, 'kaynak satırı').toContain('Kaynak: orkestratör çalışma düzeni, müşteri kararı bekleniyor.');
-    expect(text.replaceAll('müşteri kararı bekleniyor', ''), 'kaynak olarak müşteri kararı').not.toMatch(/müşteri kararı/i);
-    expect(text, 'kaynak olarak orkestratör kararı').not.toMatch(/orkestratörün[^.\n]*kararı/i);
-    expect(text, 'birleştireni kesin yazan cümle').not.toMatch(/orkestratör[^.\n]*birleştir(ir|sin)\b/i);
-    expect(text, 'birleştireni kesin yazan başlık').not.toMatch(/^#+ .*orkestratör/im);
-    expect(text, 'ajanların birleştirmediği').toContain('Ajanlar `backend` dalına kendileri birleştirme yapmaz.');
-    expect(text, '9. adım').toMatch(/^9\. Karar olumluysa yorumun sonuna “birleştirmeye hazır” yazın\.$/m);
+    expect(text, 'orkestratör birleştirir').not.toMatch(/orkestratör[^.\n]*birleştir(ir|sin)\b/i);
+    expect(text, 'müşteri kararı bekleniyor').not.toContain('müşteri kararı bekleniyor');
+    expect(text, 'eski karar paragrafı').not.toMatch(/müşteri karar verecek/i);
+    expect(text, 'ProPR birleştirir').toContain('ProPR birleştirir');
+    expect(text, 'AJA-1548 atfı').toContain('AJA-1548');
+    expect(text, 'kaynak satırı').toContain('Kaynak: müşteri kararı, 27 Kasım 2026 Cuma günü.');
+    expect(text, '7 adımlık akış').toMatch(/^7\. [^\n]+$/m);
+    expect(text, 'PR ve CI sorusu').toContain('PR `main` dalına açıldı mı? CI geçti mi?');
+    expect(text, 'son adım').toContain(
+      'Karar olumluysa PR\'ı ProPR birleştirir. PR\'ı GitHub düğmesiyle ya da `gh pr merge` ile birleştirmeyin.',
+    );
     expect(text, 'kural uyum listesi tablosu').toContain('| Kural kodu | Kaynak dosya | Sonuç | Kanıt veya gerekçe |');
+    expect(text, 'sonuç tablosu').toContain('| Sonuç | Anlamı |');
   });
 
   test('task board covers every requirement with a valid epic, status and level', () => {

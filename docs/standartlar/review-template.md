@@ -1,6 +1,8 @@
 # Kural uyumunu inceleme yorumuna yazın
 
-QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme kararını yazan kişidir. Ajanlar `backend` dalına kendileri birleştirme yapmaz. QA ve Committer kendi inceleme yorumlarında kural uyum listesini doldurur.
+QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme kararını yazan kişidir. QA ve Committer kendi inceleme yorumlarında kural uyum listesini doldurur. PR'ı ProPR birleştirir.
+
+PR, bir dalı başka bir dala katma isteğidir. CI, GitHub'ın her PR için koştuğu otomatik denetimdir. ProPR, PR'ları inceleyen ve birleştiren uygulamadır.
 
 ## İnceleme adımları
 
@@ -13,22 +15,27 @@ QA, işi deneyen kişidir. Committer, dalı inceleyen ve birleştirme kararını
 5. Her satıra kural kodunu ve sonucu yazın.
 6. Her satıra kanıtı veya eksikliği ekleyin.
 7. İncelenen son commit kimliğini yazın.
-8. Birleştirme kararını gerekçesiyle yazın.
-9. Karar olumluysa yorumun sonuna “birleştirmeye hazır” yazın.
+8. PR `main` dalına açıldı mı? CI geçti mi? Cevabı yoruma yazın.
+9. Birleştirme kararını gerekçesiyle yazın.
+10. Karar olumluysa PR'ı ProPR birleştirir. PR'ı GitHub düğmesiyle ya da `gh pr merge` ile birleştirmeyin.
 
 Commit, Git içindeki değişiklik kaydıdır. QA ve Committer aynı son commit'i inceler. Geliştirici yeni commit eklerse etkilenen kurallar yeniden incelenir.
 
-## Ajanlar birleştirme yapmaz
+## Standart akış
 
-Ajanlar `backend` dalına kendileri birleştirme yapmaz. Birleştirme kapıları birleştirmenin parçasıdır. Ajan dalı birleştirirse bu kapılar koşmaz.
+Bu akış [AJA-1548](/AJA/issues/AJA-1548) kararından gelir. Her iş şu 7 adımla ilerler:
 
-- Committer `backend` dalına `git merge` yapmaz.
-- Committer dalı `backend` dalına göndermez.
-- Committer inceleme yorumunu yazar. Karar olumluysa yorumun sonuna “birleştirmeye hazır” yazar.
+1. Geliştirici işi yerel dalda yapar. Dal güncel `origin/main` ucundan açılır.
+2. Geliştirici önce düşen testi yazar. Sonra kodu yazar.
+3. Geliştirici dalı GitHub'a gönderir. Sonra `main` dalına PR açar.
+4. GitHub CI koşar.
+5. QA ve Committer PR'ı kural uyum listesiyle inceler.
+6. İnceleme ve birleştirme ProPR'da yürür. PR'ı ProPR birleştirir.
+7. Hiçbir ajan `main` dalına doğrudan push etmez. Hiçbir ajan PR'ı GitHub düğmesiyle ya da `gh pr merge` ile birleştirmez.
 
-Birleştirmeyi kimin ve nasıl yapacağına müşteri karar verecek. Bu karar henüz kayıtlı değildir.
+Birleştirme kapıları birleştirmenin parçasıdır. Ajan dalı kendisi birleştirirse bu kapılar koşmaz. Örneğin CI denetimi atlanır.
 
-Kaynak: orkestratör çalışma düzeni, müşteri kararı bekleniyor.
+Kaynak: müşteri kararı, 27 Kasım 2026 Cuma günü.
 
 ## Yorum şablonu
 
@@ -61,7 +68,7 @@ QA şu satırı yazar:
 | --- | --- | --- | --- |
 | G-4 | [frappe-python-standartlari.md](frappe-python-standartlari.md) | uygun değil | Kullanıcının seçtiği kayıtta `ignore_permissions=True` kullanılıyor. |
 
-Committer aynı aykırılığı kendi yorumuna yazar. Committer dalı birleştirmez. Geliştirici izin atlamasını düzeltir. QA düzeltmeyi yeniden dener.
+Committer aynı aykırılığı kendi yorumuna yazar. ProPR bu PR'ı birleştirmez. Geliştirici izin atlamasını düzeltir. QA düzeltmeyi yeniden dener.
 
 ## Otomatik denetimin sınırı
 
