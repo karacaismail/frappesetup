@@ -66,7 +66,7 @@ Bu belgenin ana kararı şudur: dil ile bölge ayrı alanlarda tutulur. Dil metn
 
 ## 4. Kapsam tablosu
 
-Tabloda dört sütun var. "Parça" sütunu işin hangi GILT parçasına girdiğini söyler. "MVP" sütunu altyapının MVP'de bitip bitmeyeceğini söyler.
+Tabloda beş sütun var. "Parça" sütunu işin hangi GILT parçasına girdiğini söyler. "MVP" sütunu altyapının MVP'de bitip bitmeyeceğini söyler.
 
 | Konu | Neyi kapsar? | Parça | MVP | Kaynak |
 | --- | --- | --- | --- | --- |
@@ -133,7 +133,7 @@ Kılavuzun bu ürüne en çok yarayan kuralları şunlardır:
 - Tarihte sıra sayısı kullanılmaz. "2 June" yazılır, "2nd June" yazılmaz.
 - Tarihte virgül kullanılmaz. Örnek: "4 June 2017".
 - Saat "5:30pm" biçiminde yazılır.
-- 25 kelimeden uzun cümle bölünür.
+- 25 kelimeden uzun cümle denetlenir. Gerekirse cümle bölünür.
 - Paragraf en çok 5 cümle olur.
 
 Kılavuzda "-ise" ile "-ize" için ayrı bir madde bulunamadı. "Organise" örneği "American and UK English" maddesindedir. Oxford University Press "-ize" yazımını kullanır. Bu yüzden ürün "-ise" yazımını açıkça seçmelidir.
@@ -220,8 +220,8 @@ Kaynak satırları şunlardır:
 - Dil seçimi `frappe/translate.py` dosyasında 33. ile 81. satırlar arasındadır.
 - Dile göre biçim `frappe/locale.py` dosyasında 43. ile 53. satırlar arasındadır.
 - Sağdan sola dil listesi `frappe/utils/jinja_globals.py` dosyasının 160. ile 165. satırlarındadır.
-- Site saat dilimi boşsa Frappe Hindistan saat dilimini kullanır. Bu `frappe/utils/data.py` dosyasının 389. satırındadır. Kiracı kurulumu saat dilimini mutlaka yazmalıdır.
-- Veritabanı sıralama ayarı `frappe/database/mariadb/database.py` dosyasının 131. satırındadır.
+- Site saat dilimi boşsa Frappe Hindistan saat dilimini kullanır. Bu `frappe/utils/data.py` dosyasının 391. satırındadır. Kiracı kurulumu saat dilimini mutlaka yazmalıdır.
+- Veritabanı sıralama ayarı `frappe/database/mariadb/database.py` dosyasının 132. satırındadır.
 
 ### Frappe'den çıkan dersler
 
