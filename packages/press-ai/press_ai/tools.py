@@ -12,7 +12,7 @@ from .press_client import PressClient
 from .proposals import ProposalStore
 from .redaction import Redactor, envelope, envelope_exact
 from .schema import check_schema, validate
-from .util import utc_now
+from .util import canonical_json, sha256_hex, utc_now
 from .workspace import Workspace
 
 OP_ID = {"type": "string", "maxLength": 80, "pattern": r"[a-z][a-z_]*\.[a-z][a-z_]*"}
@@ -236,6 +236,10 @@ TOOLS = [
 ]
 
 
+PRESS_TOOLS = frozenset({"press_read", "press_triage_build", "press_propose", "press_execute", "press_track"})
+APP_TOOLS = frozenset({"app_inspect", "app_check", "app_propose_change", "app_apply"})
+
+
 class Toolbox:
     def __init__(self, ctx):
         self.ctx = ctx
@@ -248,9 +252,19 @@ class Toolbox:
     def has(self, name: str) -> bool:
         return name in self.tools
 
+    def configured(self, name: str) -> bool:
+        """A tool is listed only if its part is configured (G-84): Press tools need Press, app tools a workspace."""
+        if name in PRESS_TOOLS:
+            return self.ctx.config.press is not None
+        if name in APP_TOOLS:
+            return self.ctx.config.workspace is not None
+        return True
+
     def describe(self, protocol: str | None = None) -> list:
         out = []
         for name, tool in self.tools.items():
+            if not self.configured(name):
+                continue
             entry = {"name": name, "description": tool["description"], "inputSchema": tool["schema"]}
             if protocol and protocol != "2024-11-05":
                 entry["annotations"] = tool["annotations"]
@@ -258,8 +272,19 @@ class Toolbox:
         return out
 
     def call(self, name: str, arguments: dict):
-        tool = self.tools.get(name)
-        if tool is None:
-            raise KitError("Unknown tool " + name, code="unknown_tool")
-        validate(arguments, tool["schema"], "arguments")
-        return tool["handler"](self.ctx, arguments)
+        try:
+            tool = self.tools.get(name)
+            if tool is None:
+                raise KitError("Unknown tool " + name, code="unknown_tool")
+            validate(arguments, tool["schema"], "arguments")
+            return tool["handler"](self.ctx, arguments)
+        except KitError as error:
+            self.record_denial(name, arguments, error.code)
+            raise
+
+    def record_denial(self, name: str, arguments, reason: str) -> None:
+        """Every refusal lands in the audit log (G-85). The arguments are kept only as a digest."""
+        press = self.ctx.config.press
+        self.ctx.store.audit({"event": "denied", "tool": str(name)[:80], "reason": reason,
+                              "principal": press.principal if press else None,
+                              "args_digest": sha256_hex(canonical_json(arguments))})

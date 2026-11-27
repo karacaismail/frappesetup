@@ -118,6 +118,7 @@ class Server:
             if not isinstance(name, str) or not isinstance(arguments, dict):
                 raise _RpcError(-32602, "Tool name must be a string and arguments an object")
             if not self.toolbox.has(name):
+                self.toolbox.record_denial(name, arguments, "unknown_tool")
                 raise _RpcError(-32602, "Unknown tool: " + name)
             return self.call_tool(name, arguments)
         raise _RpcError(-32601, "Method not found")
