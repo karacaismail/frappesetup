@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 
 from . import __version__
-from .errors import PressError, PressTimeout
+from .errors import ConfigError, PressError, PressTimeout
 from .redaction import truncate
 
 MAX_RESPONSE = 8 * 1024 * 1024
@@ -62,6 +62,20 @@ class PressClient:
     @property
     def principal(self) -> str:
         return self.config.principal
+
+    def verify_identity(self):
+        expected = (self.credentials.subject if self.config.identity == "delegated" else self.config.subject)
+        user = self.call("frappe.auth.get_logged_user", http_method="GET")
+        if not isinstance(user, str) or user != expected or user in ("", "Guest", "Administrator"):
+            raise ConfigError("Press authenticated another account", code="identity_mismatch")
+
+    def authority(self):
+        authority = {"base_host": self.config.host, "principal": self.principal, "team": self.config.team}
+        if self.config.identity != "own_user":
+            authority.update(base_url=self.config.base_url, identity=self.config.identity,
+                             subject=(self.credentials.subject if self.config.identity == "delegated"
+                                      else self.config.subject))
+        return authority
 
     def _headers(self) -> dict:
         headers = {"Authorization": self.credentials.authorization(), "Accept": "application/json",

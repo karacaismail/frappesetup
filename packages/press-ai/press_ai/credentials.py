@@ -15,6 +15,7 @@ import stat
 import subprocess
 
 from .errors import ConfigError
+from .util import utc_now
 
 _ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{2,63}")
 _KEYCHAIN_TEXT = re.compile(r"[A-Za-z0-9._@:-]{1,128}")
@@ -39,6 +40,45 @@ class Credentials:
 
     def __repr__(self) -> str:
         return "Credentials(source={!r}, value=<redacted>)".format(self.source)
+
+
+class DelegatedBearer:
+    """A Press-issued grant supplied by a trusted embedding process, never a config source.
+
+    The caller supplies expiry from the Press grant response. Press remains authoritative
+    for token validity and revocation; a Keycloak login token is not a Press grant.
+    """
+
+    __slots__ = ("_token", "subject", "audience", "expires_at", "_clock", "source")
+
+    def __init__(self, token, subject, audience, expires_at, *, clock=utc_now):
+        if (not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9._~+/-]{1,8192}=*", token)
+                or not isinstance(subject, str) or not subject.strip() or subject in ("Guest", "Administrator")
+                or not isinstance(audience, str) or not audience):
+            raise ConfigError("Invalid delegated Press grant")
+        try:
+            remaining = (expires_at - clock()).total_seconds()
+        except (TypeError, AttributeError):
+            raise ConfigError("Delegated grant needs an aware expiry time") from None
+        if not 0 < remaining <= 300:
+            raise ConfigError("Delegated grant lifetime must be between 0 and 300 seconds")
+        self._token = token
+        self.subject = subject
+        self.audience = audience
+        self.expires_at = expires_at
+        self._clock = clock
+        self.source = "runtime"
+
+    def authorization(self):
+        if self._clock() >= self.expires_at:
+            raise ConfigError("Delegated Press grant expired")
+        return "Bearer " + self._token
+
+    def secret_values(self):
+        return [self._token]
+
+    def __repr__(self):
+        return "DelegatedBearer(value=<redacted>)"
 
 
 def _inside(path: str, root: str) -> bool:
