@@ -305,6 +305,7 @@ def list_role_permissions(doctype: str) -> dict:
 		_deny(_("Only a System Manager can change the permissions of {0}.").format(doctype))
 	stored = frappe.db.exists("Custom DocPerm", {"parent": doctype})
 	# The permission rows are system data of the type (exception to G-3).
+	# list-limit: the permission rows of one type, a few per role.
 	rows = frappe.get_all(
 		"Custom DocPerm" if stored else "DocPerm",
 		filters={"parent": doctype},
@@ -397,6 +398,7 @@ class GuardedRoleProfile:
 		if _trusted():
 			return super().update_all_users()
 		# The profile's own users, read for the sync (exception to G-3). A profile is small.
+		# list-limit: every user of the profile must be synced. Only the names are read.
 		users = frappe.get_all(
 			"User Role Profile", filters={"role_profile": self.name}, pluck="parent", limit=0
 		)

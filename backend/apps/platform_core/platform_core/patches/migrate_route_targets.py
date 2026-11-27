@@ -30,6 +30,7 @@ def migrate_route(name, legacy_json):
 		if any(not isinstance(value, str) or not value or value != value.strip() for value in entry.values()):
 			raise ValueError(f"Invalid legacy model/API reference in route {name}")
 
+	# list-limit: the targets of one route, a short child table.
 	existing = frappe.get_all(TARGET_DOCTYPE, filters=link, fields=["model", "api"], order_by="idx asc")
 	if existing:
 		if existing != targets:

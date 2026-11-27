@@ -63,10 +63,12 @@ def _topics_with_roles(filters: dict) -> list[dict]:
 	Help records are manager-editable. They are not directly readable by panel users.
 	The field entry point additionally checks the shell's DocType and field permissions.
 	"""
+	# list-limit: the help topics of one field or component, a small settings table.
 	topics = frappe.get_all(TOPIC, filters=filters, fields=TOPIC_FIELDS, order_by="modified desc")
 	if not topics:
 		return []
 	roles: dict[str, list[str]] = {}
+	# list-limit: the role rows of the topics read above, a few per topic.
 	for row in frappe.get_all(
 		TOPIC_ROLE,
 		filters={"parenttype": TOPIC, "parent": ["in", [topic.name for topic in topics]]},
@@ -131,6 +133,7 @@ def get_help_coverage(app: str) -> dict:
 		frappe.throw(
 			frappe._("Select an installed application.", context="shell.help"), frappe.ValidationError
 		)
+	# list-limit: the document types of one installed application, fixed by its code.
 	doctypes = frappe.get_all(
 		"DocType",
 		filters={"module": ["in", frappe.get_module_list(app)], "istable": 0},

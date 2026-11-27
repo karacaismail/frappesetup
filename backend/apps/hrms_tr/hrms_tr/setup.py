@@ -137,10 +137,12 @@ def before_migrate():
 	require_access_engine()
 	require_unshared_applications()
 	preserve_employee_permissions()
+	names = [row["name"] for row in fixture_rows(RULE_FIXTURE)]
 	frappe.local.hrms_tr_disabled_rules = frappe.get_all(
 		RULE_DOCTYPE,
-		filters={"name": ["in", [row["name"] for row in fixture_rows(RULE_FIXTURE)]], "is_active": 0},
+		filters={"name": ["in", names], "is_active": 0},
 		pluck="name",
+		limit=len(names),
 	)
 
 

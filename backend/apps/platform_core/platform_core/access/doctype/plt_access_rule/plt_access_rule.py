@@ -46,6 +46,7 @@ class PLTAccessRule(Document):
 		type would not be governed at all.
 		"""
 		# The role list is system data (exception to G-3).
+		# list-limit: every active rule of one type counts, and the rule table is small.
 		covered = set(
 			frappe.get_all(
 				rules.RULE_DOCTYPE,
