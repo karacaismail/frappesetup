@@ -466,6 +466,17 @@ test.describe('content consistency', () => {
     expect(broken).toEqual([]);
   });
 
+  test('G-11 lists press_tr.api methods one by one, without a wildcard path', () => {
+    const g11 = reqs.find((r) => r.id === 'G-11')!;
+    const text = `${g11.title} ${g11.detail}`;
+    // İş sahibi liste yolunu seçti: kod izinli yöntemleri tek tek listeler.
+    expect(text).not.toMatch(/ALLOWED_WILDCARD_PATHS/);
+    expect(text).not.toMatch(/press_tr\.api\.`/);
+    expect(g11.detail).toMatch(/tek tek listelenir/);
+    expect(g11.detail).toMatch(/[Jj]oker yol kullanılmaz/);
+    for (const kept of ['iyzico', 'ALLOWED_DOCTYPES', 'Method Permission', 'negatif test']) expect(g11.detail, kept).toContain(kept);
+  });
+
   test('phase decisions from the evaluation report hold (Y-01, Y-02)', () => {
     const phaseOf = (id: string) => reqs.find((r) => r.id === id)!.phase;
     // P2 kabulü operasyon sitesi finans çekirdeğine dayanır: çekirdek P2'de, P6'da değil.
