@@ -1,5 +1,7 @@
 ---
 // Yol haritası faz sırası — scripts/gen-diagrams.py üretir; elle düzenlemeyin.
+import { PRODUCT_NAME, BRAND_DOMAIN } from '../data/site';
+import DiagramBrandLabel from './DiagramBrandLabel.astro';
 ---
 <figure class="diagram diagram-timeline">
 <div class="diagram-scroll" tabindex="0" role="region" aria-label="Yol haritası faz sırası (yatay kaydırılabilir)">
@@ -32,7 +34,7 @@
 <text x='824' y='240' fill='var(--fs-ink)'>CRM · Webshop</text>
 <rect x='552' y='370' width='200' height='64' rx='10' fill='var(--fs-surface)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <text x='568' y='396' font-size='18' font-weight='650' fill='var(--fs-ink)'>P7</text>
-<text x='568' y='420' fill='var(--fs-ink)'>AtonotA Login ürünü</text>
+<DiagramBrandLabel name={`${PRODUCT_NAME} ürünü`} x={568} y={420} maxWidth={168} />
 <path data-edge='P0-P1' d='M240 222 L268 222 L268 132 L296 132' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P0-P2' d='M240 222 L268 222 L268 312 L296 312' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
 <path data-edge='P1-P3' d='M496 132 L552 132' fill='none' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#tl-arr)'/>
@@ -56,5 +58,5 @@
 <text x='556' y='564' fill='var(--fs-ink)'>M4 CRM/Webshop (P5 çıkışı)</text>
 </svg>
 </div>
-<figcaption class="diagram-note">P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. P7 AtonotA Login ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır.</figcaption>
+<figcaption class="diagram-note">P2 ticari katman, P1'deki Keycloak adımı bitince başlar ve operasyon sitesinin finans çekirdeğini içerir. P3 AI ve P4 HRMS TR, P1 çıkışından sonra paralel yürür. P6 operasyon düzlemi P2 bitince açılır. P5, ilk ödeyen müşteri kapısından sonra gelir. Bu kapı P2 ve P4 çıkışına bağlıdır. P7 {PRODUCT_NAME} ürünü MVP sonrasıdır. P7, P1 ve P2 bitince açılır.</figcaption>
 </figure>

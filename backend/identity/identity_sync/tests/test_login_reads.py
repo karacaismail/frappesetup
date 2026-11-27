@@ -1,4 +1,4 @@
-"""The two read endpoints of AtonotA Login (AJA-459): sign-in platforms and linked accounts.
+"""The two read endpoints of `atonota_login` (AJA-459): sign-in platforms and linked accounts.
 
 Requests use the real HTTP path (D-6). The expected replies come from the security review
 (AJA-458) and from the panel contract (`atonota-web`, `src/auth/README.md`):

@@ -110,8 +110,12 @@ class RealmBacklogFileTest(unittest.TestCase):
         self.assertEqual(self.realm["displayName"], "${IDENTITY_BRAND_NAME}")
         self.assertEqual(self.realm["displayNameHtml"], "${IDENTITY_BRAND_NAME}")
         self.assertEqual(self.realm["smtpServer"]["fromDisplayName"], "${IDENTITY_BRAND_NAME}")
-        self.assertEqual(self.dev_env["IDENTITY_BRAND_NAME"], "AtonotA Login")
-        self.assertEqual(self.prod_env["IDENTITY_BRAND_NAME"], "AtonotA Login")
+        # AJA-1062: the value comes from PRODUCT_NAME in backend/brand.env. Examples hold a placeholder.
+        self.assertEqual(self.dev_env["IDENTITY_BRAND_NAME"], "<PRODUCT_NAME>")
+        self.assertEqual(self.prod_env["IDENTITY_BRAND_NAME"], "<PRODUCT_NAME>")
+        brand = _env_values(DIRECTORY.parents[1] / "brand.env")
+        self.assertEqual(set(brand), {"PRODUCT_NAME", "BRAND_DOMAIN"})
+        self.assertTrue(brand["PRODUCT_NAME"].strip())
         # The account console theme reads the same variable from the Keycloak container (kimlik-tema request).
         self.assertIn("IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}", self.compose)
 

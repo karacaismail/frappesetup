@@ -370,13 +370,17 @@ class CodeScan(unittest.TestCase):
         block = re.search(r"REQUIRED = \((.*?)\)", source, re.S).group(1)
         needed = set(re.findall(r'"([a-z_]+)"', block))
         self.assertTrue(needed)
-        self.assertLessEqual(needed, required("tenant-site"))
+        self.assertLessEqual(needed - {"identity_brand_name"}, required("tenant-site"))
+        # The release owns this setting and writes it before migration.
+        self.assertIn("identity_brand_name", listed("tenant-site"))
+        self.assertIn('set-config -- identity_brand_name "$PRODUCT_NAME"',
+                      (DEPLOY / "remote/apply").read_text())
 
     def test_press_site_settings(self):
         self.check_site_list("press-site", ("press_tr",))
 
     def test_compose_variables(self):
-        known = release.ENV_KEYS | RELEASE_ENV | COMPOSE_DEFAULT_ONLY | listed("edge")
+        known = set(release.load_environments()["alpha"]) | RELEASE_ENV | COMPOSE_DEFAULT_ONLY | listed("edge")
         for path in (STACK, EDGE):
             for name in re.findall(r"\$\{([A-Z0-9_]+)", path.read_text()):
                 with self.subTest(file=path.name, name=name):
@@ -386,7 +390,7 @@ class CodeScan(unittest.TestCase):
         self.assertIn("ATONOTA_ACME_EMAIL", required("edge"))
 
     def test_remote_script_variables(self):
-        known = release.ENV_KEYS | SCRIPT_CONTROLS | listed("offsite")
+        known = set(release.load_environments()["alpha"]) | SCRIPT_CONTROLS | listed("offsite")
         for path in sorted((DEPLOY / "remote").iterdir()):
             if path.suffix == ".py":
                 continue
@@ -560,7 +564,7 @@ class FileCheck(unittest.TestCase):
 
 
 class SiteCheck(unittest.TestCase):
-    SITE = "demo.app.alpha.atonota.net"
+    SITE = "demo.app.alpha." + release.load_brand()["BRAND_DOMAIN"]
 
     def complete(self, differs=()):
         return {"set": sorted(required("tenant-site")), "differs": list(differs)}

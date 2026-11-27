@@ -384,7 +384,7 @@ Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/session
 - Yeni kiracı eklerken istemcisini bu listeye de yazın. Yazmazsanız o kiracı oturum kapatamaz.
 - Bu istemciler öteki uçları çağıramaz.
 
-## AtonotA Login okumaları
+## Giriş ürünü okumaları (`atonota_login`)
 
 Kiracı sitesi bu iki ucu giriş ekranı ve hesap sayfası için çağırır (AJA-459).
 

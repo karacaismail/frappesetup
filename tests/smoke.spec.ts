@@ -1,3 +1,4 @@
+import { parseBrand, fillBrandData } from '../src/lib/brand.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
@@ -6,8 +7,9 @@ import AxeBuilder from '@axe-core/playwright';
 import { waitForRequirementsView } from './requirements-view';
 
 const require = createRequire(import.meta.url);
+const brand = parseBrand(readFileSync(new URL('../backend/brand.env', import.meta.url), 'utf8'));
 const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
-  require('../src/data/requirements.json');
+  fillBrandData(require('../src/data/requirements.json'), brand);
 type Release = { pr: number; commit: string } | null;
 const board: {
   update: { date: string; commit: string; release: Release; note: string };
@@ -17,7 +19,7 @@ const board: {
   levels: { id: string; label: string }[];
   items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; release: Release } }>;
 } = require('../src/data/task-board.json');
-const phaseList: { id: string; title: string }[] = require('../src/data/phases.json');
+const phaseList: { id: string; title: string }[] = fillBrandData(require('../src/data/phases.json'), brand);
 
 // Kabul: 320→360→375→390→yatay telefon→tablet→masaüstü; yatay taşma yok; metin ≥ 1rem (SVG dahil);
 // tek odak göstergesi yalnız klavye odağında; menü, tema, gezgin, diyagramlar ve erişilebilirlik.
@@ -1810,7 +1812,7 @@ test.describe('content', () => {
 /* ------------------------------------------------------------------ */
 // G-165 tanıtım sayfası: değer önerisi gereksinime bağlıdır, fiyat yazmaz, ölçüm satıcısına istek gitmez,
 // durum tabloları görev panosuyla aynıdır.
-test.describe('AtonotA Login landing page', () => {
+test.describe(`${brand.PRODUCT_NAME} landing page`, () => {
   const PATH = 'atonota-login-tanitim/';
   const reqIds = new Set(requirements.map((r) => r.id));
 

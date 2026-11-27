@@ -1,4 +1,4 @@
-"""AtonotA Login verification inbox endpoint over the real HTTP path (G-164, AJA-231).
+"""`atonota_login` verification inbox endpoint over the real HTTP path (G-164, AJA-231).
 
 Expected behavior comes from the task AJA-231, the architecture note of AJA-213 and the contract
 (`contracts/platform_core-identity.openapi.yaml`, tag `atonota-login`):

@@ -1,4 +1,4 @@
-"""AtonotA Login action decision endpoints over the real HTTP path (G-161, G-166, AJA-230).
+"""`atonota_login` action decision endpoints over the real HTTP path (G-161, G-166, AJA-230).
 
 Expected behavior comes from the contract (`contracts/platform_core-identity.openapi.yaml`, tag
 `atonota-login`) and the architecture note of AJA-213:

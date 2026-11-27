@@ -4,6 +4,56 @@ Bu klasör canlı ortamların Jenkins hattını tutar. Tasarım [ortamlar belges
 
 Bu klasördeki kod henüz gerçek sunucuda çalışmadı.
 
+## Marka ayarı
+
+Ürün adı ve kök alan adı `backend/brand.env` dosyasından gelir.
+Dosya yalnız `PRODUCT_NAME` ve `BRAND_DOMAIN` anahtarlarını taşır.
+Bu dosyaya gizli bilgi yazmayın.
+
+Ortam dosyaları `ATONOTA_HOST_LABEL` anahtarını taşır.
+Değer alpha, beta ve rc için ortamın adıdır.
+Prod için değer boştur.
+`release.py`, bu etiketten ve kök alan adından beş adres üretir.
+Adresler ana adres, giriş adresi, Press adresi, kiracı bölgesi ve örnek kiracı adresidir.
+
+Çözülen ayarı şu komut gösterir:
+
+```sh
+python3 -I backend/deploy/release.py env-show alpha
+```
+
+`pack-deploy`, çözülen değerleri sürüm paketine yazar.
+Paketin dosya özetleri bu değerleri de korur.
+Yeni marka ayarı eski paketi değiştirmez.
+Yeni değerler için yeni paket hazırlayın.
+Sağlık denetimi paketteki adresleri kullanır.
+Yarım kalan dağıtım sürdürülürse denetim, tamamlanan sürümün adreslerini sunucudan okur.
+Bağlantı bilgileri çalışma dalındaki ortam ayarından gelir.
+Kabuk betikleri ayarları veri olarak okur.
+Betikler `brand.env` dosyasını `source` veya `eval` ile çalıştırmaz.
+
+Compose, Keycloak için `IDENTITY_BRAND_NAME` değerini paketteki `PRODUCT_NAME` değerinden alır.
+Sunucunun `keycloak.env` dosyasında ikinci marka değeri varsa dağıtım durur.
+DevOps sorumlusu bu ikinci değeri kaldırmalıdır.
+
+Dağıtım, kiracı sitesindeki `identity_brand_name` değerini yedekten sonra yazar.
+Ardından siteyi yeni sürüme hazırlar.
+Sitede farklı bir marka değeri varsa dağıtım ön kontrolde durur.
+DevOps sorumlusu farkın nedenini incelemelidir.
+
+Marka denetimini şu komutla çalıştırın:
+
+```sh
+python3 -I -m unittest discover -s backend/deploy/tests -p test_brand.py -v
+```
+
+Dağıtım komutları Python 3.9 ve sonrasını destekler.
+Tüm testler için Python 3.12 veya üstünü kullanın.
+Bazı testler uygulama kaynaklarını da okur.
+Bu kaynaklarda yeni Python yazımı vardır.
+Compose denetimi kurulu komut aracını kullanır. Servis başlatmaz.
+Sunucu betiği testleri sahte komutlarla çalışır.
+
 ## Klasörler
 
 | Klasör | İçerik |

@@ -880,7 +880,7 @@ You cannot open this exception record.,Bu istisna kaydını açamazsınız.,plat
 The sign-in service is not available. Try again later.,Giriş hizmeti şu anda çalışmıyor. Biraz sonra yeniden deneyin.,platform_core.identity
 This sign-in information cannot be read on this site.,Bu giriş bilgisi bu sitede okunamaz.,platform_core.identity
 This endpoint takes no parameters.,Bu işlem ek bilgi almaz.,platform_core.identity
-This session is not linked to an AtonotA Login account.,Bu oturum bir AtonotA Login hesabına bağlı değil.,platform_core.identity
+This session is not linked to a {0} account.,Bu oturum bir {0} hesabına bağlı değil.,platform_core.identity
 PLT AI File Job,Yapay Zekâ Dosya İşi,
 PLT AI File Chunk,Yapay Zekâ Dosya Parçası,
 Route,Yol,PLT AI File Job
