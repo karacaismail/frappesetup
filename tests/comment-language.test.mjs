@@ -252,3 +252,47 @@ for (const [file, aggregator] of [['ci.yml', 'build-and-test'], ['deploy.yml', '
     assert.match(block, /if: \$\{\{ always\(\)/);
   });
 }
+
+test('review fixes: the word rule counts across a block of line comments', () => {
+  const result = check('a.py', '# Bu ayar icin\n# boyle yapildi\nx = 1\n');
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].line, 1);
+  assert.deepEqual(result.errors[0].found, ['icin', 'boyle']);
+  assert.deepEqual(check('a.py', 'x = 1  # icin\ny = 2  # boyle\n').errors, []);
+});
+
+test('review fixes: an empty lang-ok in a docstring fails', () => {
+  const result = check('a.py', 'def f():\n    """Müller lang-ok:"""\n');
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].kind, 'lang-ok');
+});
+
+test('review fixes: shell arithmetic shifts are not here-documents', () => {
+  const comments = extractComments('a.sh', 'n=$((1<<x))\n# Yorum değer\nx\n');
+  assert.deepEqual(comments.map(c => c.startLine), [2]);
+});
+
+test('review fixes: script and style line numbers in markup', () => {
+  const text = '<p>x</p>\n<script>\n  const a = 1;\n  // Değer\n</script>\n<style>\n  /* Başlık */\n</style>\n';
+  assert.deepEqual(check('a.html', text).errors.map(e => e.line), [4, 7]);
+  assert.deepEqual(check('a.astro', `---\nconst a = 1;\n---\n${text}`).errors.map(e => e.line), [7, 10]);
+});
+
+test('review fixes: diff parsing keeps odd paths and content lines that look like headers', () => {
+  const dir = repo();
+  const base = git(dir, 'rev-parse', 'HEAD');
+  writeFileSync(join(dir, 'with space.ts'), '// Boşluklu yol\n');
+  writeFileSync(join(dir, 'notes.md'), '++ not a header\n+++ still not a header\n');
+  writeFileSync(join(dir, 'z.ts'), 'export {};\n// Son değer\n');
+  git(dir, 'add', '.');
+  git(dir, 'commit', '-qm', 'odd');
+  const result = run(dir, '--base', base);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /^with space\.ts:1: /m);
+  assert.match(result.stdout, /^z\.ts:2: /m);
+});
+
+test('review fixes: the message explains backticks and lang-ok', () => {
+  const [error] = check('a.ts', '// uses yeni_deger icin\n').errors;
+  assert.match(formatError(error), /backticks/);
+});
