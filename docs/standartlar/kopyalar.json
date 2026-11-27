@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "about": "Kapı 4b (AJA-1344). source dosyası tek doğruluk kaynağıdır. copy yolu ortak kural klasörüne göredir. notRules kural olmayan dosyaları listeler. Klasöre eklenen her yeni dosya bu iki listeden birine yazılır.",
+  "copies": [
+    { "source": "docs/standartlar/frappe-python-standartlari.md", "copy": "frappe-python-standartlari.md" },
+    { "source": "docs/standartlar/frappe-python-disi-standartlari.md", "copy": "frappe-python-disi-standartlari.md" },
+    { "source": "docs/standartlar/headless-frontend-standartlari.md", "copy": "headless-frontend-standartlari.md" },
+    { "source": "docs/standartlar/mobile.md", "copy": "mobile.md" }
+  ],
+  "notRules": ["README.md", "KARARLAR.md", "ACIK-ISLER.md", "SURECLER-VE-SONUCLAR.md", "kopyalar.json"]
+}

@@ -724,4 +724,16 @@ test.describe('content consistency', () => {
     for (const r of reqs) scan(r.id, `${r.title} ${r.detail}`);
     expect(offenders).toEqual([]);
   });
+  test('every file in docs/standartlar is mapped as a rule copy or listed as not a rule (Kapı 4b, AJA-1344)', () => {
+    // CI ortak kural klasörünü göremez. Bu yüzden burada yalnız eşlenmemiş dosya koşulu denetlenir.
+    // Kopya eşitliğini scripts/standards-copy-check.py denetler.
+    const dir = 'docs/standartlar/';
+    const map = JSON.parse(read(`${dir}kopyalar.json`)) as { copies: { source: string; copy: string }[]; notRules: string[] };
+    expect(map.copies.length).toBeGreaterThan(0);
+    const listed = new Set([...map.copies.map((c) => c.source.replace(dir, '')), ...map.notRules]);
+    const unmapped = readdirSync(new URL(dir, root)).filter((f) => statSync(new URL(dir + f, root)).isFile() && !listed.has(f));
+    expect(unmapped, 'docs/standartlar/kopyalar.json dosyasına ekleyin').toEqual([]);
+    const missing = [...listed].filter((f) => !existsSync(new URL(dir + f, root)));
+    expect(missing, 'eşleme dosyasındaki dosya klasörde yok').toEqual([]);
+  });
 });
