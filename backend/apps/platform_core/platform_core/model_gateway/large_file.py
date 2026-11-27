@@ -35,6 +35,9 @@ DEFAULT_MAX_CHUNKS = 200
 DEFAULT_PLANNED_TTL = 24 * 60 * 60
 DEFAULT_RUNNING_TTL = 60 * 60
 CLEANUP_ROLE = "System Manager"
+# One cleanup turn handles at most this many jobs and at most this many chunks (P-1, P-3).
+# The answer says "more" when rows are left, and the next turn goes on with them.
+CLEANUP_BATCH = 100
 
 
 @dataclass(frozen=True)
@@ -250,7 +253,8 @@ def _expire_stale():
 	"""Fail jobs and chunks that waited too long and remove their text.
 
 	There is no schedule. The entry functions call this first, and a System Manager
-	can call expire_stale_jobs by hand.
+	can call expire_stale_jobs by hand. One turn handles at most CLEANUP_BATCH jobs and
+	CLEANUP_BATCH chunks, oldest first. "more" is true when stale rows are left.
 	"""
 	now = now_datetime()
 	planned_before = add_to_date(
@@ -260,9 +264,16 @@ def _expire_stale():
 		now, seconds=-_setting("model_gateway_file_running_ttl", DEFAULT_RUNNING_TTL)
 	)
 	expired = 0
-	for name in frappe.get_all(
-		JOB, filters={"status": "planned", "modified": ["<", planned_before]}, pluck="name"
-	):
+	# One row more than the batch is read only to learn whether rows are left.
+	names = frappe.get_all(
+		JOB,
+		filters={"status": "planned", "modified": ["<", planned_before]},
+		pluck="name",
+		order_by="modified asc",
+		limit=CLEANUP_BATCH + 1,
+	)
+	more = len(names) > CLEANUP_BATCH
+	for name in names[:CLEANUP_BATCH]:
 		row = gateway.lock_row(JOB, name, ("name", "status", "modified"))
 		if row.status == "planned" and row.modified < planned_before:
 			frappe.db.set_value(JOB, name, {"status": "failed", "failure_code": "expired"})
@@ -270,11 +281,15 @@ def _expire_stale():
 			expired += 1
 		_commit()
 	lost = set()
-	for chunk in frappe.get_all(
+	chunks = frappe.get_all(
 		CHUNK,
 		filters={"parenttype": JOB, "status": "running", "modified": ["<", running_before]},
 		fields=["name", "parent"],
-	):
+		order_by="modified asc",
+		limit=CLEANUP_BATCH + 1,
+	)
+	more = more or len(chunks) > CLEANUP_BATCH
+	for chunk in chunks[:CLEANUP_BATCH]:
 		row = gateway.lock_row(CHUNK, chunk.name, ("name", "status", "modified"))
 		if row.status == "running" and row.modified < running_before:
 			values = {"status": "failed", "failure_code": "worker_lost", "content": None}
@@ -283,7 +298,7 @@ def _expire_stale():
 		_commit()
 	for parent in sorted({parent for parent, _name in lost}):
 		_settle(parent)
-	return {"expired_jobs": expired, "lost_chunks": len(lost)}
+	return {"expired_jobs": expired, "lost_chunks": len(lost), "more": more}
 
 
 def expire_stale_jobs():

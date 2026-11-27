@@ -725,9 +725,7 @@ class ExpiryTests(unittest.TestCase):
 					large_file.expire_stale_jobs()
 				self.assertEqual(job.status, "planned")
 		self.roles = ["System Manager"]
-		self.assertEqual(
-			large_file.expire_stale_jobs(), {"expired_jobs": 1, "lost_chunks": 0, "more": False}
-		)
+		self.assertEqual(large_file.expire_stale_jobs(), {"expired_jobs": 1, "lost_chunks": 0, "more": False})
 
 	def _old_jobs(self, count):
 		return [
@@ -750,7 +748,9 @@ class ExpiryTests(unittest.TestCase):
 		# The oldest jobs go first, so no job waits behind newer ones forever.
 		self.assertEqual(
 			sorted(job.name for job in expired),
-			sorted(job.name for job in sorted(jobs, key=lambda job: job.modified)[: large_file.CLEANUP_BATCH]),
+			sorted(
+				job.name for job in sorted(jobs, key=lambda job: job.modified)[: large_file.CLEANUP_BATCH]
+			),
 		)
 
 	def test_one_turn_fails_at_most_the_batch_size_of_lost_chunks(self):
