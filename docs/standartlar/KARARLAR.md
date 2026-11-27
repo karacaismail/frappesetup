@@ -969,7 +969,7 @@ Yönergenin bir kısmı uygulanmaz:
 
 Kaynak iş AJA-1378'dir. Bu kararı AJA-1379 işi yazdı.
 
-### Karar 45. Güvenlik yönergesi depoda korunur
+### Karar 46. Güvenlik yönergesi depoda korunur
 
 Müşterinin güvenlik yönergesi [frappe-guvenlik-onlemleri.md](frappe-guvenlik-onlemleri.md) dosyasına eklendi.
 Kaynak iş AJA-1387'dir. Bu kararı AJA-1388 işi yazdı.
@@ -980,7 +980,7 @@ Sonuç şudur:
 - “Tahta” başlığı “Ortak tahta” olur.
 - Başlıklar dışındaki kaynak metin aynen korunur. Metnin gövdesinde kişi adı bulunmadı.
 - README dosyaları güvenlik yönergesine ve köşe yönergesine bağlantı verir.
-- Köşe yönergesi yeniden eklenmez. Karar 44 geçerliliğini korur.
+- Köşe yönergesi yeniden eklenmez. Karar 45 geçerliliğini korur.
 - Ortak kural klasöründeki iki yönerge, depodaki kopyalarla aynı tutulur.
 - Dosya gereksinimleri anlatır. Dosyanın eklenmesi, güvenlik önlemlerinin uygulandığı anlamına gelmez.
 

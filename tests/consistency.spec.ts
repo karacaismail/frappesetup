@@ -226,12 +226,17 @@ test.describe('content consistency', () => {
     expect(new Set(numbers).size, 'Decision numbers must be unique.').toBe(numbers.length);
     const titles = new Map(headings.map((heading) => [heading[1], heading[2]]));
     expect(titles.get('43')).toBe('GILT kuralları onaylandı');
-    expect(titles.get('44')).toBe('Köşe yuvarlaklığının tek kuralı radius.md yönergesidir');
-    expect(titles.get('45')).toBe('Güvenlik yönergesi depoda korunur');
+    expect(titles.get('44')).toBe('Varsayılan dil İngiliz İngilizcesi olacak');
+    expect(titles.get('45')).toBe('Köşe yuvarlaklığının tek kuralı radius.md yönergesidir');
+    expect(titles.get('46')).toBe('Güvenlik yönergesi depoda korunur');
     expect(numbers.indexOf('44')).toBeGreaterThan(numbers.indexOf('43'));
     expect(numbers.indexOf('45')).toBeGreaterThan(numbers.indexOf('44'));
-    const security = decisions.split(/^### Karar 45\./m)[1]?.split(/^#{1,3} /m)[0];
-    expect(security).toContain('Karar 44 geçerliliğini korur.');
+    expect(numbers.indexOf('46')).toBeGreaterThan(numbers.indexOf('45'));
+    const security = decisions.split(/^### Karar 46\./m)[1]?.split(/^#{1,3} /m)[0];
+    expect(security).toContain('Karar 45 geçerliliğini korur.');
+    const summary = decisions.split(/^## En önemli kararlar$/m)[1]?.split(/^## /m)[0] ?? '';
+    expect(summary).toContain('(Karar 44)');
+    expect(summary).toMatch(/`radius\.md` yönergesidir\..*\(Karar 45\)/);
   });
 
   test('task board covers every requirement with a valid epic, status and level', () => {
