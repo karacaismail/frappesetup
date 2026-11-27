@@ -1,7 +1,7 @@
-// Merkezi klavye odak kipi.
-// Kip kapalı başlar. Yalnız Tab ve Shift+Tab kipi açar. İşaretçi ve dokunma kipi kapatır.
-// Odak göstergeleri atonota.css içinde bu duruma ve :focus-visible koşuluna bağlıdır.
-// Bu betik odağı taşımaz, blur() çağırmaz ve hiçbir tuşu engellemez.
+// Central keyboard focus mode.
+// The mode starts off. Only Tab and Shift+Tab turn it on. Pointer and touch turn it off.
+// In atonota.css the focus indicators depend on this state and on :focus-visible.
+// This script does not move focus, does not call blur() and does not block any key.
 (function () {
   var root = document.documentElement;
   root.setAttribute('data-at-js', '');

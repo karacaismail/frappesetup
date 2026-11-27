@@ -1,6 +1,6 @@
-# Tema deneme imajı. Sahibi kimlik-tema işidir. Yalnız yerel denemede kullanılır.
-# Colima'nın factory profili depo klasörünü sanal makineye bağlamaz.
-# Bu yüzden tema ve deneme realm'i imaja kopyalanır. Keycloak'ın kendi kodu değişmez.
+# Theme test image. Owned by the kimlik-tema work stream. Used for local testing only.
+# Colima's factory profile does not mount the repository folder into the virtual machine.
+# So the theme and the test realm are copied into the image. Keycloak's own code is unchanged.
 
 # Stage 1: the stock Keycloak image, pinned by digest. Its jars are the compile-time classpath of the provider.
 FROM quay.io/keycloak/keycloak:26.8.2@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3 AS keycloak

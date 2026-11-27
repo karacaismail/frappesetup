@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { diffBox, focusDiff, PAD, strayFocusDiff } from './focus-diff';
 import { openLogin, screen } from './helpers';
 
-// WebKit bağlantıları Tab sırasına almaz. Safari'deki Option+Tab karşılığı kullanılır.
+// WebKit leaves links out of the Tab order. The Safari Option+Tab equivalent is used.
 const keys = (browserName: string) =>
   browserName === 'webkit' ? { tab: 'Alt+Tab', back: 'Alt+Shift+Tab' } : { tab: 'Tab', back: 'Shift+Tab' };
 
@@ -14,7 +14,7 @@ const activeName = (page: Page) =>
     const href = element.getAttribute('href') ?? '';
     if (href.includes('reset-credentials')) return 'forgot-password';
     if (href.includes('registration')) return 'register-account';
-    // Kimliksiz öğeler sıra numarasıyla ayrılır. Böylece iki kimliksiz öğe aynı adı almaz.
+    // Elements without an id are told apart by their index. So two such elements never get the same name.
     const index = [...document.querySelectorAll(element.tagName)].indexOf(element);
     return `${element.tagName.toLowerCase()}[${index}]`;
   });
@@ -65,7 +65,7 @@ test('klavye odak kipini yalnız Tab açar, işaretçi kapatır', async ({ page,
   expect(await mode(page), 'Tab kipi açar').toBe('keyboard');
   await expect(page.locator('#password')).toBeFocused();
 
-  // İşaretçi yalnız görsel kipi kapatır. Odak yerinde kalır.
+  // The pointer only turns the visual mode off. Focus stays where it is.
   await page.locator('#password').dispatchEvent('pointerdown', { bubbles: true });
   expect(await mode(page), 'işaretçi kipi kapatır').toBe('');
   await expect(page.locator('#password')).toBeFocused();
@@ -74,7 +74,7 @@ test('klavye odak kipini yalnız Tab açar, işaretçi kapatır', async ({ page,
   expect(await mode(page), 'Shift+Tab kipi açar').toBe('keyboard');
   await expect(page.locator('#username')).toBeFocused();
 
-  // Dokunma da kipi kapatır.
+  // Touch turns the mode off too.
   await page.locator('#username').dispatchEvent('touchstart', { bubbles: true });
   expect(await mode(page)).toBe('');
 });
@@ -95,7 +95,7 @@ const focusCases = [
   { name: 'page-expired', scheme: 'light' },
 ] as const;
 
-// Her ekranda en az bu kadar kontrol ölçülmelidir. Döngü erken durursa test başarısız olur.
+// At least this many controls must be measured on each screen. The test fails if the loop stops early.
 const minimumChecked: Record<string, number> = {
   'sign-in': 8,
   register: 9,
@@ -127,14 +127,14 @@ for (const { name, scheme } of focusCases) {
       checked.push(current);
       const focused = page.locator(':focus');
       await focused.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      // Onay kutusunun göstergesi etiket metnindedir. Ölçüm etiketin tamamında yapılır.
+      // The checkbox indicator is in the label text. The whole label is measured.
       const isCheck = await focused.evaluate((element) => element.matches('input[type=checkbox], input[type=radio]'));
       // The label either wraps the box or stands next to it and points at it with "for".
       const wrapped = isCheck && (await focused.evaluate((element) => Boolean(element.closest('label'))));
       const checkId = isCheck ? await focused.getAttribute('id') : null;
       const target = !isCheck ? focused : wrapped ? focused.locator('xpath=ancestor::label[1]') : page.locator(`label[for="${checkId}"]`);
 
-      // Çevreleyen çizgi kaynakları: outline ve odakta değişen kenarlık ya da gölge halkası.
+      // Sources of a surrounding line: outline, and a border or shadow ring that changes on focus.
       const style = await focused.evaluate((element) => {
         const computed = getComputedStyle(element);
         return { outlineStyle: computed.outlineStyle, outlineWidth: computed.outlineWidth };
@@ -144,8 +144,8 @@ for (const { name, scheme } of focusCases) {
       const { diff, rect } = await focusDiff(page, target);
       expect(diff.count, `${current}: görünür odak göstergesi`).toBeGreaterThanOrEqual(24);
       expect(diff.contrast, `${current}: gösterge kontrastı`).toBeGreaterThanOrEqual(3);
-      // Gösterge yalnız öğenin alt yarısında ya da altındadır. Üstünü ve yanlarını sarmaz.
-      // Onay kutusunun etiketi birkaç satır olabilir. Her satırın altı çizilir, etiketin üstü boş kalır.
+      // The indicator is only in or below the lower half of the element. It does not wrap the top or sides.
+      // A checkbox label may span several lines. Each line is underlined, and the top of the label stays empty.
       const upperLimit = isCheck ? rect.top + 8 : rect.top + rect.height / 2;
       expect(diff.minY, `${current}: üst kenarda çizgi yok`).toBeGreaterThanOrEqual(upperLimit);
       expect(diff.minX, `${current}: sol kenarda çizgi yok`).toBeGreaterThanOrEqual(Math.floor(rect.left));

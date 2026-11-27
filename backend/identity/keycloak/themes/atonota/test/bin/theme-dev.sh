@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Tema deneme ortamını yönetir. Sahibi kimlik-tema işidir.
-# Kullanım: theme-dev.sh up | build | sync | tunnel | tunnel-close | down | env
-#   up    Container'ları var olan imajla açar. Keycloak hazır olana kadar bekler.
-#   build İmajı derler. Disk dar olduğu için yalnız imaj yokken çalıştırın.
-#   sync  Tema dosyalarını çalışan container'a kopyalar. Yeniden derleme gerekmez.
-#         "sync login", "sync email" ya da "sync account" yalnız o bölümü kopyalar.
-#   tunnel Keycloak ve Mailpit portlarını ssh tüneliyle bu bilgisayara taşır.
-#   tunnel-close Tüneli kapatır.
-#   down  Tüneli ve container'ları kapatır. Birimleri silmez.
-#   env   .env dosyasını üretir ve yolunu yazar.
+# Manages the theme test environment. Owned by the kimlik-tema work stream.
+# Usage: theme-dev.sh up | build | sync | tunnel | tunnel-close | down | env
+#   up    Starts the containers with the existing image. Waits until Keycloak is ready.
+#   build Builds the image. The disk is short of space, so run it only when the image is missing.
+#   sync  Copies the theme files into the running container. No rebuild is needed.
+#         "sync login", "sync email" or "sync account" copies only that part.
+#   tunnel Brings the Keycloak and Mailpit ports to this computer over an ssh tunnel.
+#   tunnel-close Closes the tunnel.
+#   down  Closes the tunnel and the containers. Does not delete volumes.
+#   env   Creates the .env file and prints its path.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
@@ -94,8 +94,8 @@ compose() { docker compose --env-file "$env_file" -f "$here/compose.yaml" "$@"; 
 tunnel_pid="$here/.tunnel.pid"
 
 tunnel_open() {
-  # colima-factory profilinin port yönlendirmesi bozuk. Yeni portlar bu bilgisayara açılmaz.
-  # Bu işlev sanal makineye ayrı bir ssh bağlantısı açar. Colima'nın kendi bağlantısına dokunmaz.
+  # The port forwarding of the colima-factory profile is broken. New ports do not open on this computer.
+  # This function opens a separate ssh connection to the virtual machine. It does not touch Colima's own connection.
   # The .env file is read value by value. It is not sourced, because a value may contain spaces.
   local KC_PORT MAILPIT_UI_PORT KC_PUBLIC_URL
   KC_PORT="$(env_value KC_PORT)"
@@ -130,7 +130,7 @@ tunnel_open() {
 
 tunnel_close() {
   if [[ -f "$tunnel_pid" ]]; then
-    # Numara başka bir sürece geçmiş olabilir. Yalnız ssh süreci kapatılır.
+    # The number may have passed to another process. Only an ssh process is stopped.
     local pid
     pid="$(cat "$tunnel_pid")"
     if ps -p "$pid" -o comm= 2>/dev/null | grep -q ssh; then
@@ -158,7 +158,7 @@ case "${1:-}" in
   sync)
     ensure_env_file
     cid="$(compose ps -q keycloak)"
-    # İkinci değer yalnız bir bölümü kopyalar: sync login ya da sync email.
+    # The second value copies only one part: sync login or sync email.
     case "${2:-}" in
       "" | login | email | account) ;;
       *)

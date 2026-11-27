@@ -1,6 +1,6 @@
-"""Realm dosyalarının depo kurallarını sınar. Keycloak gerekmez.
+"""Check the repository rules for the realm files. Keycloak is not needed.
 
-Beklenen değerler docs/sozlesmeler.md 2. bölümünden ve görev belgesinden alındı.
+The expected values come from section 2 of docs/sozlesmeler.md and from the task document.
 """
 
 import hashlib
@@ -22,7 +22,7 @@ class RealmFileTest(unittest.TestCase):
         cls.scopes = {k["name"]: k for k in cls.realm.get("clientScopes", [])}
 
     def test_filename_matches_realm_name(self):
-        # Keycloak dizin içe alımı <realm>-realm.json adını ister (DirImportProvider.java:138).
+        # Keycloak directory import needs the name <realm>-realm.json (DirImportProvider.java:138).
         self.assertEqual(self.realm["realm"], "platform")
         self.assertEqual(REALM_FILE.name, "platform-realm.json")
 
@@ -34,7 +34,7 @@ class RealmFileTest(unittest.TestCase):
         self.assertEqual(set(self.realm["supportedLocales"]), {"tr", "en"})
 
     def test_login_and_email_use_project_theme(self):
-        # Sözleşme 2. bölüm: giriş ve e-posta teması atonota adını taşır. Tema kimlik-tema işinden gelir.
+        # Contract section 2: the login and e-mail themes are named atonota. The theme comes from the kimlik-tema work.
         self.assertEqual(self.realm["loginTheme"], "atonota")
         self.assertEqual(self.realm["emailTheme"], "atonota")
 
@@ -96,7 +96,7 @@ class RealmFileTest(unittest.TestCase):
         self.assertNotIn("aud-press", self.clients["press-service"]["optionalClientScopes"])
 
     def test_service_clients_do_not_use_full_scope(self):
-        # Tam kapsam açık olsaydı hesap rolleri belirtece girer ve aud ikinci değer alırdı.
+        # If full scope were on, the account roles would enter the token and aud would get a second value.
         for name in ("identity-sync", "press-service"):
             self.assertTrue(self.clients[name]["serviceAccountsEnabled"], name)
             self.assertFalse(self.clients[name]["standardFlowEnabled"], name)
@@ -154,7 +154,7 @@ class RealmFileTest(unittest.TestCase):
         self.assertFalse(r["rememberMe"])
 
     def test_signature_algorithm_is_rs256(self):
-        # Sözleşme 3. bölüm: kitaplık yalnız RS256 kabul eder. Realm de RS256 ile imzalar.
+        # Contract section 3: the library accepts only RS256. The realm also signs with RS256.
         self.assertEqual(self.realm["defaultSignatureAlgorithm"], "RS256")
 
     def test_totp_and_passkey(self):
@@ -245,7 +245,7 @@ class ExampleEnvTest(unittest.TestCase):
         self.assertTrue(keys)
         example = EXAMPLE_ENV.read_text(encoding="utf-8")
         env_anahtarlari = set(re.findall(r"^([A-Z0-9_]+)=", example, re.M))
-        # Betiğin PANE_PORT'tan türettiği anahtarlar örnek dosyada "# Türetilen:" satırında yazılıdır.
+        # The keys the script derives from PANE_PORT are listed on the derived-keys marker line of the example file (the prefix below).
         for line in example.splitlines():
             if line.startswith("# Türetilen:"):
                 env_anahtarlari |= set(line.split(":", 1)[1].split())

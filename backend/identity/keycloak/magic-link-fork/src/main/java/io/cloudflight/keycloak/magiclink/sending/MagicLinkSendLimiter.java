@@ -1,7 +1,7 @@
 /*
  * Added by Atonota for G-162 (24 November 2026). Not part of cloudflightio/keycloak-magic-link.
  * Licensed under the Apache License, Version 2.0, like the extension it extends.
- * Design: backend/docs/decisions/0003-keycloak-extensions.md, sections "G-162" and "G-162 ek iş".
+ * Design: backend/docs/decisions/0003-keycloak-extensions.md, the "G-162" section and the "G-162 follow-up work" section.
  */
 package io.cloudflight.keycloak.magiclink.sending;
 

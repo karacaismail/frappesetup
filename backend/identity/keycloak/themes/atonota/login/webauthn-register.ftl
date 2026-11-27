@@ -1,6 +1,6 @@
 <#--
-  ATONOTA: Kaynak Keycloak 26.8.2, keycloak.v2/login/webauthn-register.ftl.
-  Tek fark: formun üstünde geçiş anahtarını anlatan bir açıklama vardır ("atPasskeyIntro").
+  ATONOTA: Source Keycloak 26.8.2, keycloak.v2/login/webauthn-register.ftl.
+  Only difference: above the form there is a description that explains the passkey ("atPasskeyIntro").
 -->
 <#import "template.ftl" as layout>
 <#import "password-commons.ftl" as passwordCommons>
@@ -12,7 +12,7 @@
     <#elseif section = "header">
         ${msg("webauthn-registration-title")}
     <#elseif section = "form">
-    <#-- ATONOTA: ekranın ne istediğini anlatan açıklama -->
+    <#-- ATONOTA: description of what the screen asks for -->
     <p id="at-passkey-intro" class="instruction at-intro">${msg("atPasskeyIntro")}</p>
     <div class="${properties.kcFormClass!}">
         <form id="register" action="${url.loginAction}" method="post" >
