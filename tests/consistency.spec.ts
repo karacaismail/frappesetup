@@ -283,6 +283,16 @@ test.describe('content consistency', () => {
     expect.soft(board.items['G-2'].status).toBe('not-started');
   });
 
+  test('PR 59 release reading is recorded without altering released evidence (AJA-978)', () => {
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    expect(board.update.note).toContain('PR 59 yayını okundu (AJA-978).');
+    expect(board.update.note).toContain("Yayın commit'i f2e3a401 commit'idir.");
+    expect(board.update.note).toContain("Kaynak commit 3b818084 commit'idir.");
+    expect(board.update.note).toContain('hiçbir release alanı değişmedi.');
+    const pr59Items = Object.entries(board.items).filter(([, it]) => it.evidence?.release?.pr === 59);
+    expect(pr59Items, 'PR 59 release alanı atanmış kayıt olmamalı').toEqual([]);
+  });
+
   test('fabricated evidence commits fail in full history', () => {
     // Uydurma commit kodu tam geçmişte geçmez (inceleme r2-1, E-1). release null olsa da geçmez.
     // Sığ kopyada geçmiş yoktur; orada bu denetim koşamaz.
