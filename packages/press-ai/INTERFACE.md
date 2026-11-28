@@ -28,6 +28,51 @@ frappe/skills: LICENSE yok) metin kopyalanmaz; yol + commit ile atıf yapılır.
 - Kurulu canlı Press'in commit'i bilinmiyor (kılavuz: Press 0.7.0 develop, panel Frappe version-15). Kontrat develop@ebf3e22'ye göre
   statik doğrulanır; canlı uyum `unknown`, canlı Press testi `not_run`.
 
+## Servis ve kullanıcı kimliği
+
+`press.identity` alanı, kimliğin kullanım biçimini belirler.
+`principal` alanı ise Press içindeki yetki rolünü belirler.
+
+| Kimlik | Rol | Erişim bilgisi | Sınır |
+| --- | --- | --- | --- |
+| `own_user` | `team` veya `operator` | Kullanıcının kendi API anahtarı. | Mevcut yerel araç. Varsayılan değer budur. |
+| `service_account` | Yalnız `operator` | Ayrı servis hesabının API anahtarı. | Yalnız kayıtlı operasyon araçları. |
+| `delegated` | Yalnız `team` | Press'in verdiği kısa süreli kullanıcı izni. | İzin yalnız bellekte tutulur. |
+
+Servis hesabında `press.subject` alanı zorunludur.
+Bu alan, Press'in doğrulayacağı hesap adıdır.
+Servis kendi anahtarını kullanır. Servis, müşterinin kalıcı anahtarını saklamaz.
+Hesabın gerçekten ayrı olması, sunucu kurulumunda ayrıca doğrulanır.
+
+`delegated` kipinde yapılandırma dosyası erişim bilgisi taşımaz.
+Çağıran uygulama, `Context` kurucusuna `delegated_bearer` verir.
+Bu nesnenin türü `credentials.DelegatedBearer` olur.
+Nesne erişim iznini, hesap adını, hedefi ve bitiş zamanını taşır.
+Kalan süre en çok 300 saniyedir. Yenileme izni saklanmaz.
+Çağıran uygulama, süreyi Press'in yanıtından alır.
+Yerel süre denetimi, Press'in sunucu denetiminin yerine geçmez.
+
+Her araç çağrısında Press hesap adı yeniden doğrulanır.
+Sunucu, `frappe.auth.get_logged_user` sonucunu beklenen hesapla karşılaştırır.
+Hedef, yapılandırılan tam Press adresiyle aynı olmalıdır.
+Süresi dolan izin ağa gönderilmez. Ret yanıtı yeniden denenmez.
+Keycloak giriş izni, Press erişim izni sayılmaz.
+
+Servis hesabı müşteri işlemlerini ve uygulama dosyası araçlarını kullanamaz.
+Servis hesabı yalnız açık operasyon listesindeki işlemleri kullanır.
+Yeni bir işlem bu listeye kendiliğinden girmez.
+Müşteri sitesine giden `site.https_check` aracı da bu kipte kapalıdır.
+Onay gerektiren işlem, onay verilene kadar yalnız öneri üretir.
+Onay sonrasında hesap veya hedef değişirse yürütme reddedilir.
+
+Servis ve kullanıcı izni kiplerinde araç sonucu geçmişe yazılır.
+Retler de geçmişe yazılır. Erişim bilgileri geçmişe yazılmaz.
+Çağrı öncesinde geçmiş yazılamazsa işlem başlamaz.
+Bu yerel araç sınırıdır. İşletim sistemi hesabı ayrı bir güvenlik sınırı değildir.
+
+Sunucudaki OAuth kurulumu ve ticari araç sunucusu bu pakette bulunmaz.
+Gerçek Press doğrulaması ayrıca yapılmalıdır.
+
 ## Yetki rolleri (principal) ve iki MCP'nin ayrımı
 
 - `team`: Press Dashboard API. `POST {base}/api/method/press.api.<modül>.<fn>`; başlıklar `Authorization: token <key>:<secret>`,

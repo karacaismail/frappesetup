@@ -18,7 +18,7 @@ const board: {
   statuses: { id: string; label: string }[];
   levels: { id: string; label: string }[];
   items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; release: Release } }>;
-} = require('../src/data/task-board.json');
+} = fillBrandData(require('../src/data/task-board.json'), brand);
 const phaseList: { id: string; title: string }[] = fillBrandData(require('../src/data/phases.json'), brand);
 
 // Kabul: 320→360→375→390→yatay telefon→tablet→masaüstü; yatay taşma yok; metin ≥ 1rem (SVG dahil);
@@ -369,6 +369,42 @@ test('requirement fragment does not pull the reader back after a late hydration'
   });
   expect(await page.evaluate(() => scrollY)).toBe(0);
   await expect(page.locator('#req-G-151')).not.toBeFocused();
+});
+
+test('requirement fragment keeps a scripted scroll made while the page is still loading', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // Yazı tipleri geç iner. Sayfa bu sürede yükleniyor durumunda kalır.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(/\.woff2$/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto('gereksinimler/#req-G-151', { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.readyState)).toBe('interactive');
+  // Düzen bayatken betik sayfayı başa alır. WebKit bu sırada satıra kaydırma işini sıraya koyar.
+  await page.evaluate(() => {
+    document.body.append(document.createElement('div'));
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  });
+  const settle = () => page.evaluate(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+  });
+  await settle();
+  expect(await page.evaluate(() => scrollY), 'yükleme sürerken').toBe(0);
+  release();
+  await page.waitForFunction(() => document.readyState === 'complete');
+  await page.waitForFunction(() => !document.querySelector('astro-island[component-url*="RequirementsExplorer"][ssr]'));
+  await page.evaluate(() => document.fonts.ready);
+  await settle();
+  expect(await page.evaluate(() => scrollY), 'yükleme bitince').toBe(0);
+  await expect(page.locator('#req-G-151')).not.toBeFocused();
+  expect(new URL(page.url()).hash).toBe('#req-G-151');
 });
 
 for (const [width, height, cpu] of [[1366, 900, 1], [800, 1000, 1], [1024, 1366, 1], [1366, 900, 8]]) {

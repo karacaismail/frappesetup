@@ -10,6 +10,7 @@ underscore and the command name uses a hyphen, so neither equals the product nam
 Design: AJA-1059 plan, section 3.
 """
 
+import json
 import re
 import subprocess
 import tempfile
@@ -70,8 +71,22 @@ def patterns(values):
     return [re.compile(re.escape(values[key]), re.IGNORECASE) for key in KEYS]
 
 
+def json_strings(value, pointer=""):
+    """Yield exact JSON pointers and string values, including object keys."""
+    if isinstance(value, str):
+        yield pointer, value
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            child_pointer = pointer + "/" + key.replace("~", "~0").replace("/", "~1")
+            yield child_pointer + " (key)", key
+            yield from json_strings(child, child_pointer)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from json_strings(child, pointer + "/" + str(index))
+
+
 def find_hits(root, files, values, entries):
-    """Return 'path:line: text' for every line outside the exclusions that holds a value."""
+    """Report matching lines or JSON fields outside the exact exclusions."""
     regexes = patterns(values)
     hits = []
     for rel in files:
@@ -85,6 +100,13 @@ def find_hits(root, files, values, entries):
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
+        fields = {entry.split("::", 1)[1] for entry, _ in entries if entry.startswith(rel + "::")}
+        if fields:
+            # Parse fields so a note never hides adjacent labels, even on one line.
+            for pointer, value in json_strings(json.loads(text)):
+                if pointer not in fields and any(r.search(value) for r in regexes):
+                    hits.append(f"{rel}::{pointer}: {value[:160]}")
+            continue
         for number, line in enumerate(text.splitlines(), 1):
             if any(r.search(line) for r in regexes):
                 hits.append(f"{rel}:{number}: {line.strip()[:160]}")
@@ -95,7 +117,12 @@ def missing_exclusions(root, files, entries):
     """Return the exclusion entries that match no tracked file."""
     missing = []
     for entry, _ in entries:
-        if entry.endswith("/"):
+        if "::" in entry:
+            rel, pointer = entry.split("::", 1)
+            found = rel in files and pointer in dict(json_strings(json.loads(
+                (root / rel).read_text(encoding="utf-8")
+            )))
+        elif entry.endswith("/"):
             found = any(rel.startswith(entry) for rel in files)
         else:
             found = entry in files
@@ -171,6 +198,30 @@ class BrandScannerTests(unittest.TestCase):
             path.write_text("a.md\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 read_exclusions(path)
+
+    def test_json_field_exclusion_preserves_adjacent_live_labels(self):
+        data = {"update": {"note": "Ornek Giris"}, "epics": [{"title": "Ornek Giris"}],
+                "levels": [{"rule": "ornek.test"}]}
+        entries = [("board.json::/update/note", "Historical note")]
+        hits = self.scan({"board.json": json.dumps(data)}, entries)
+        self.assertEqual(len(hits), 2)
+        self.assertIn("/epics/0/title", hits[0])
+        self.assertIn("/levels/0/rule", hits[1])
+
+    def test_json_field_exclusion_keeps_history_only(self):
+        entries = [("board.json::/update/note", "Historical note")]
+        self.assertEqual(self.scan({"board.json": '{"update":{"note":"Ornek Giris"}}'}, entries), [])
+
+    def test_invalid_json_with_field_exclusions_fails(self):
+        with self.assertRaises(ValueError):
+            self.scan({"board.json": '{"update":'}, [("board.json::/update/note", "History")])
+
+    def test_stale_json_field_exclusion_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "board.json").write_text('{"update":{"note":"History"}}', encoding="utf-8")
+            entries = [("board.json::/update/note", "History"), ("board.json::/audit/note", "Missing")]
+            self.assertEqual(missing_exclusions(root, ["board.json"], entries), ["board.json::/audit/note"])
 
     def test_brand_file_rejects_extra_key(self):
         with tempfile.TemporaryDirectory() as tmp:

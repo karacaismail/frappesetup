@@ -52,7 +52,7 @@ def _loopback(host: str) -> bool:
 class PressConfig:
     def __init__(self, data: dict):
         allowed = {"base_url", "principal", "team", "credentials", "timeout_seconds", "enabled_mutations",
-                   "allow_insecure_loopback"}
+                   "allow_insecure_loopback", "identity", "subject"}
         unknown = set(data) - allowed
         if unknown:
             raise ConfigError("unknown press keys: " + ", ".join(sorted(unknown)))
@@ -82,7 +82,22 @@ class PressConfig:
         if principal == "team" and not team:
             raise ConfigError("press.team is required for the team principal")
         self.team = team
-        self.credentials_spec = _credentials.validate_spec(data.get("credentials"))
+        self.identity = data.get("identity", "own_user")
+        if self.identity not in ("own_user", "service_account", "delegated"):
+            raise ConfigError("press.identity must be own_user, service_account or delegated")
+        self.subject = data.get("subject")
+        if self.identity == "service_account":
+            if (principal != "operator" or not isinstance(self.subject, str) or not self.subject.strip()
+                    or self.subject in ("Guest", "Administrator")):
+                raise ConfigError("Service identity needs operator role and a dedicated named account")
+        elif self.subject is not None:
+            raise ConfigError("press.subject is only used for service_account")
+        if self.identity == "delegated":
+            if principal != "team" or "credentials" in data:
+                raise ConfigError("Delegated identity needs team role and runtime credentials only")
+            self.credentials_spec = None
+        else:
+            self.credentials_spec = _credentials.validate_spec(data.get("credentials"))
         timeout = data.get("timeout_seconds", 30)
         if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 1 <= timeout <= 120:
             raise ConfigError("press.timeout_seconds must be between 1 and 120")
@@ -97,7 +112,9 @@ class PressConfig:
 
     def summary(self) -> dict:
         return {"base_host": self.host, "principal": self.principal, "team": self.team,
-                "credentials_source": self.credentials_spec["source"], "timeout_seconds": self.timeout,
+                "identity": self.identity,
+                "credentials_source": self.credentials_spec["source"] if self.credentials_spec else "runtime",
+                "timeout_seconds": self.timeout,
                 "enabled_mutations": self.enabled_mutations}
 
 

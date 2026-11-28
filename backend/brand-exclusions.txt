@@ -1,6 +1,7 @@
 # Marka taramasının dışında kalan yollar.
 # Her satırda bir yol ve bir neden bulunur. Biçim: yol  # neden
 # "/" ile biten yol bir klasördür. Klasörün altındaki bütün dosyalar dışarıda kalır.
+# JSON dosyasında "::/alan/alt-alan" yalnız belirtilen metin alanını dışarıda bırakır.
 # Listedeki bir yol artık yoksa test düşer.
 # Test: backend/deploy/tests/test_brand_hardcode.py
 backend/brand.env  # Tek kaynak. Değerler burada yazılıdır.
@@ -11,4 +12,5 @@ backend/docs/handoff/  # Devir belgeleri.
 src/content/docs/acik-kararlar.md  # Açık kararlar kaydı.
 src/content/docs/karar-katalogu.md  # Karar kataloğu.
 src/content/docs/izlenebilirlik.md  # İzlenebilirlik kaydı.
-src/data/task-board.json  # Görev panosu. Notlar geçmiş işi anlatır.
+src/data/task-board.json::/audit/note  # İlk denetimin notu o günkü adı korur.
+src/data/task-board.json::/update/note  # Geçmiş güncelleme notu o günkü adı korur.
