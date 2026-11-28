@@ -12,8 +12,7 @@
 //
 // Only changed lines are checked. When a changed line touches a comment, the whole
 // comment block is checked. A comment may keep Turkish letters when it ends with a
-// lang-ok note and a reason. The next line is an example and is counted in the report.
-// Written by Müller. lang-ok: example of a German surname
+// lang-ok note and a reason (e.g. a proper name with a brief justification).
 // Exit code: 0 clean, 1 problems found, 2 usage or Git error.
 
 import { spawnSync } from 'node:child_process';

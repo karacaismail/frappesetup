@@ -90,6 +90,8 @@ DATA_NAMES = {"LICENSE", "NOTICE", ".frappe"}
 # Translation catalogues hold screen text. Their own work item translates them.
 CATALOGUE = re.compile(r"(^|/)(messages_tr\.properties|tr\.po|tr\.csv)$")
 DATA_PATHS = re.compile(r"(^|/)(password-blacklists/|META-INF/services/)|(^|/)[^/]*license[^/]*\.txt$|(^|/)OFL\.txt$", re.I)
+# Deliberate Turkish comment-language test fixtures; not code comments (AJA-2494).
+EXCLUDED_PREFIXES = ("tests/comment-language/fixtures/",)
 
 CODE_EXTENSIONS = {
     ".py": "python",
@@ -115,11 +117,14 @@ CODE_NAMES = {
 
 def classify(path: str, head: str = "") -> str:
     """Return the scanner name for a repository path, "data" or "unknown"."""
-    name = path.rsplit("/", 1)[-1]
-    if CATALOGUE.search(path) or DATA_PATHS.search(path) or name in DATA_NAMES:
+    norm = path.replace("\\", "/")
+    if norm.startswith(EXCLUDED_PREFIXES):
+        return "data"
+    name = norm.rsplit("/", 1)[-1]
+    if CATALOGUE.search(norm) or DATA_PATHS.search(norm) or name in DATA_NAMES:
         return "data"
     if name.endswith(".example"):
-        return classify(path[: -len(".example")], head)
+        return classify(norm[: -len(".example")], head)
     if name in CODE_NAMES:
         return CODE_NAMES[name]
     if name.startswith("Dockerfile."):
