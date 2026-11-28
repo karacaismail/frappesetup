@@ -1,0 +1,18 @@
+---
+// The page title comes from here.
+const title = '// başlık';
+---
+<!-- Main section -->
+<main>
+  <p>// Türkçe metin</p>
+  {/* Content */}
+  <h1>{title}</h1>
+</main>
+<style>
+  /* Keeps the heading readable. */
+  h1::before { content: "/* ş */"; }
+</style>
+<script>
+  // Runs after load.
+  const s = "// ç";
+</script>

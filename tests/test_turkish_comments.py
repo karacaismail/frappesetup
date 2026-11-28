@@ -140,6 +140,45 @@ class Gate(unittest.TestCase):
             self.assertEqual(after["scripts"], before.get("scripts", 0) + 1)
             self.assertNotEqual(tc.compare(after, baseline), [])
 
+    def test_comment_language_fixtures_are_excluded_but_other_tests_still_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = [
+                "tests/comment-language/fixtures/py/tr.py",
+                "tests/comment-language/fixtures/ts/tr.ts",
+                "tests/comment-language/other.py",
+                "tests/comment-language/fixtures-other/a.py",
+                "tests/other.py",
+                "other/tests/comment-language/fixtures/a.py",
+            ]
+            for rel in paths:
+                target = root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                content = "// Geçici yorum\n" if rel.endswith(".ts") else "# Geçici yorum\n"
+                target.write_text(content, encoding="utf-8")
+
+            self.assertEqual(tc.classify("tests/comment-language/fixtures/py/tr.py"), "data")
+            self.assertEqual(tc.classify("tests/comment-language/fixtures/ts/tr.ts"), "data")
+            self.assertEqual(tc.classify("tests/other.py"), "python")
+            self.assertEqual(tc.classify("tests/comment-language/other.py"), "python")
+            self.assertEqual(tc.classify("tests/comment-language/fixtures-other/a.py"), "python")
+            self.assertEqual(tc.classify("other/tests/comment-language/fixtures/a.py"), "python")
+
+            result = tc.scan(root, paths)
+            found_paths = sorted(f.path for f in result.findings)
+            self.assertEqual(
+                found_paths,
+                [
+                    "other/tests/comment-language/fixtures/a.py",
+                    "tests/comment-language/fixtures-other/a.py",
+                    "tests/comment-language/other.py",
+                    "tests/other.py",
+                ],
+            )
+            counts = tc.count_by_folder(result)
+            self.assertEqual(counts["tests"], 3)
+            self.assertEqual(counts["other"], 1)
+
 
 class Repository(unittest.TestCase):
     """The real gate: today's repository must not exceed the baseline."""

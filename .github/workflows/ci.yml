@@ -13,6 +13,27 @@ concurrency:
 # Akış: press-ai ve build paralel → e2e (4 parça, aynı dist) → build-and-test (toplayıcı).
 # ProPR kapısı `build-and-test` denetimini bekler; bu iş yalnız bütün işler geçince yeşil olur.
 jobs:
+  comment-language:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, so the merge base with the target branch is available.
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: comment-language tests
+        run: npm run test:comments
+
+      - name: New comments are in English (changed lines only)
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: npm run lint:comments -- --merge-base-with "origin/$BASE_REF"
+
   press-ai:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -91,7 +112,7 @@ jobs:
           retention-days: 1
 
   build-and-test:
-    needs: [press-ai, build, e2e]
+    needs: [comment-language, press-ai, build, e2e]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -125,7 +146,7 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "press-ai, build, e2e: $RESULTS"
+          echo "comment-language, press-ai, build, e2e: $RESULTS"
           for r in $RESULTS; do
             if [ "$r" != "success" ]; then
               echo "::error::Bir iş başarısız, iptal ya da atlandı: $r"

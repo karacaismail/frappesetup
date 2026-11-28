@@ -1,0 +1,8 @@
+# İş akışı adı
+name: CI
+jobs:
+  a:
+    steps:
+      - run: |
+          echo ok
+          # Kabuk yorumu: önbellek

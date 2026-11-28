@@ -12,6 +12,17 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 - Diyagramlar: `python3 scripts/gen-diagrams.py` (`Rails.astro`, `Timeline.astro`; faz sırası çizimi `phases.json`'daki `after` bağımlılıklarından üretilir; elle düzenlenmez).
 - Markdown eklentisi (`src/lib/satteri-table-wrap.mjs`) değişince içerik önbelleğini temizleyin: `rm -rf node_modules/.astro`.
 - Tip denetimi için ayrı bir `astro check` kurulumu yok; derleme ve testler kapıdır.
+- Yorum dili denetimi yeni Türkçe kod yorumunu reddeder. Kuralın kaynağı AJA-1454 işindeki mimar cevabıdır.
+  - Betik `scripts/check-comment-language.mjs` dosyasıdır. Betik yalnız yorumlara bakar. Dizgiye ve değişken adına bakmaz.
+  - Betik yalnız değişen satırlara bakar. Değişen satır bir yoruma değerse betik bütün yorum bloğuna bakar.
+  - Türkçe harfli yorum ve iki liste kelimesi taşıyan yorum geçmez. Örneğin "bu alan icin degil" geçmez.
+  - Bir ad Türkçe harf taşıyabilir. Bu durumda yorumun sonuna `lang-ok: <neden>` notunu yazın. Betik bu notları sayar.
+  - Denetim dışı yerler `scripts/comment-language.config.json` dosyasındadır. Her satırın bir nedeni olmalıdır. Kalıpları dar yazın.
+  - Yerel deneme için `npm run lint:comments` komutunu çalıştırın. Bu komut commit edilmemiş değişikliğe bakar. Dal için `npm run lint:comments -- --merge-base-with backend` komutunu kullanın. Bütün depo için `--all` ekleyin.
+  - Testler için `npm run test:comments` komutunu çalıştırın.
+  - Yerel kancayı `npm run hooks:comments` kurar. Kanca `.git/hooks/pre-commit` dosyasına yazılır. Kanca yalnız hazırlanan değişikliğe bakar. `core.hooksPath` ayarı değişmez. Yazar koruması bu kancayı kendisi çağırır.
+  - Asıl kapı CI'daki `comment-language` işidir. `build-and-test` ve "Build and test" işleri bu işi bekler.
+  - `typescript` paketi 6.0.3 sürümüne sabittir. 7 sürümü kararlı JS API sunmaz. Paket siteye girmez.
 
 ## Mimari kararlar
 
