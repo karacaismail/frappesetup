@@ -6,13 +6,14 @@ Belge, ProPR'ı bu Mac'te baştan kurmayı anlatır. Adımları sırayla izleyin
 
 ## Bu klasörde ne var
 
-Bu klasör depoda `Propr_setup` adıyla durur. Klasörde beş dosya vardır:
+Bu klasör depoda `Propr_setup` adıyla durur. Klasörde altı dosya vardır:
 
 - `propr_setup.md` dosyası bu belgedir.
 - `open-propr.sh` betiği ProPR'ı doğru ayarla açar.
 - `set-oauth-secret.sh` betiği GitHub istemci sırrını gizli olarak alır.
 - `devir-notu-devops.md` dosyası `main` dalının korunması için devir notudur.
 - `restart-propr-stack.mjs` betiği ProPR servislerini ProPR'ın kendi koduyla yeniden kurar.
+- `devops-runbook.md` dosyası repo taşıma kontrol listesini ve takılı dal runbook'unu içerir.
 
 İki betiğin asıl yeri `~/.config/propr-docker` klasörüdür. Devir notunun asıl yeri `~/.config/frappesetup-pr` klasörüdür. Buradaki dosyalar yedektir.
 
