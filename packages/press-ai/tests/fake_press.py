@@ -35,6 +35,7 @@ class FakePress:
         self.default_team = team    # üyelik dışı başlıkta Press'in sessizce düştüğü takım (utils.get_current_team)
         self.current = team         # bu istek için çözülen takım
         self.user = user
+        self.delegated_tokens = {}
         self.auto_start_benches = True  # False: Deploy yalnız New Bench Queue açar, bench'ler sonra (start_bench)
         self.requests = []  # (method, args, headers)
         self.fail = {}      # method -> (status, exc_type, message)
@@ -159,7 +160,12 @@ class FakePress:
             self.requests.append((method, copy.deepcopy(args), dict(headers)))
         if method in self.delay:
             time.sleep(self.delay[method])
-        if headers.get("Authorization") != "token {}:{}".format(KEY, SECRET):
+        authorization = headers.get("Authorization", "")
+        delegated_user = self.delegated_tokens.get(authorization.removeprefix("Bearer "))
+        if authorization.startswith("Bearer ") and delegated_user:
+            if delegated_user != self.user:
+                return frappe_error(401, "AuthenticationError", "Revoked token")
+        elif authorization != "token {}:{}".format(KEY, SECRET):
             return frappe_error(401, "AuthenticationError", "Invalid token")
         if method in self.fail:
             return frappe_error(*self.fail[method])

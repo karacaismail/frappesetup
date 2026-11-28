@@ -1089,8 +1089,7 @@ def press_triage_build(ctx, args):
 
 
 def _authority(ctx) -> dict:
-    press = ctx.config.press
-    return {"base_host": press.host, "principal": press.principal, "team": press.team}
+    return ctx.press().authority()
 
 
 def _require_enabled(ctx, op_id):
