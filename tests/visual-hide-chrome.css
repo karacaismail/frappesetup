@@ -1,5 +1,5 @@
-/* Görsel testler: diyagram öğe görüntülerinde sabit başlık ve okuma çubuğu figürü örtmesin.
-   Başlığın kendisi görünüm (viewport) görüntülerinde kapsanır. */
+/* Visual tests: the fixed header and reading bar must not cover the figure in diagram element screenshots.
+   The header itself is covered in viewport screenshots. */
 .site-header,
 .progress {
   visibility: hidden !important;

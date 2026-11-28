@@ -1,5 +1,5 @@
 ---
-// Görev panosu kuralları: durum, olgunluk düzeyi ve epic tabloları src/data/task-board.json'dan derleme anında üretilir.
+// Task board rules: the status, maturity level and epic tables are generated at build time from src/data/task-board.json.
 import requirements from '../data/requirements.json';
 import board from '../data/task-board.json';
 import { REPO_URL } from '../data/site';
@@ -9,7 +9,7 @@ const items = board.items as Record<string, Item>;
 const all = requirements.map((r) => ({ ...r, ...items[r.id] }));
 const done = (list: typeof all) => list.filter((r) => r.status === 'done').length;
 
-// Tarih gün, ay adı, yıl ve gün adıyla yazılır: "23 Kasım 2026 Pazartesi".
+// The date is written with day, month name, year and weekday, in the page language: for example "23 November 2026 Monday".
 const longDate = (iso: string) => {
   const parts = new Intl.DateTimeFormat('tr-TR', {
     day: 'numeric',
@@ -22,7 +22,7 @@ const longDate = (iso: string) => {
     .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
   return `${parts.day} ${parts.month} ${parts.year} ${parts.weekday}`;
 };
-// Kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer. Okur commit'i yayın PR'ından bulur.
+// Evidence commits are on the backend branch; each release enters the main branch as one commit. The reader finds the commit through the release PR.
 type Release = { pr: number; commit: string } | null;
 const prUrl = (r: NonNullable<Release>) => `${REPO_URL}/pull/${r.pr}`;
 const updateRelease = board.update.release as Release;

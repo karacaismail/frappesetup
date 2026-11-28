@@ -26,7 +26,7 @@ export interface Requirement {
   owner?: string;
 }
 
-// Görev panosu verisi (src/data/task-board.json). Gereksinim kaydı değişmez; durum, düzey ve epic ayrı dosyadadır.
+// Task board data (src/data/task-board.json). The requirement record does not change; status, level and epic are in a separate file.
 export interface TaskBoard {
   epics: { id: string; title: string }[];
   statuses: { id: string; label: string }[];
@@ -34,7 +34,7 @@ export interface TaskBoard {
   items: Record<string, { epic: string; status: string; level: string; evidence?: { commit: string; tests: string[]; release: { pr: number; commit: string } | null } }>;
 }
 
-// Kanıt: commit, yayın PR numarası (0: henüz yayımlanmadı) ve test dosyası adları.
+// Evidence: commit, release PR number (0: not released yet) and test file names.
 type Evidence = [commit: string, pr: number, tests: string];
 
 interface Task extends Requirement {
@@ -50,7 +50,7 @@ type RequirementRow = [
   epic: number, status: number, level: number, evidence?: Evidence,
 ];
 
-// Adaya giden sözlük: epic, durum, düzey ve faz adları bir kez gönderilir; satırlar yalnız sıra numarası taşır.
+// Dictionary sent to the island: epic, status, level and phase names are sent once; rows carry only an index.
 export interface BoardMeta {
   epics: [id: string, title: string][];
   statuses: [id: string, label: string][];
@@ -69,7 +69,7 @@ export function toBoardMeta(board: TaskBoard, phases: { id: string; title: strin
 
 const fileName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
-// Ada verisinde her gereksinim için alan adlarını yinelemeyin.
+// Do not repeat field names for each requirement in the island data.
 export function toRequirementRow(
   { id, title, detail, rail, priority, phase, source, owner }: Requirement,
   board: TaskBoard,
@@ -104,11 +104,11 @@ interface Props {
 }
 
 const PRIORITIES = ['MUST', 'SHOULD', 'MAY'];
-// Dolgulu rozet/düğme renkleri: sea-8 üzerinde beyaz 5.1:1, amber-7 üzerinde koyu metin (autoContrast),
-// gray-7 üzerinde beyaz 7:1.
-// Açık tonlar şemaya göre değişmez (bileşen düzeyi autoContrast şemayı bilmez): sea-8 üzerinde beyaz 5.1:1.
+// Filled badge/button colours: white on sea-8 is 5.1:1, dark text on amber-7 (autoContrast),
+// white on gray-7 is 7:1.
+// Light tones do not change with the scheme (component-level autoContrast does not know the scheme): white on sea-8 is 5.1:1.
 const PRIORITY_COLOR: Record<string, string> = { MUST: 'sea.8', SHOULD: 'amber.7', MAY: 'gray.7' };
-// Seçili süzgeç ve görünüm düğmesinin dolgusu: koyu temada da sea-8 üzerinde beyaz metin 5.1:1.
+// Fill of the selected filter and view button: white text on sea-8 is 5.1:1 in the dark theme too.
 const FILL = 'sea.8';
 const PRIORITY_HINT: Record<string, string> = {
   MUST: 'sabit kararların veya mevzuatın doğrudan sonucu',
@@ -140,8 +140,8 @@ function byId(a: Requirement, b: Requirement) {
   return pa - pb || na - nb;
 }
 
-// `kod` parçalarını <code> olarak gösterir; başka markdown işlenmez. Kod dışı parçalar sarmalayıcısız düz metindir
-// (Gereksinimler HTML bütçesi; görünüm aynı).
+// Shows `code` parts as <code>; no other markdown is processed. Non-code parts are plain text without a wrapper
+// (Requirements HTML budget; same look).
 function inlineCode(text: string): ReactNode[] {
   return text.split('`').map((part, i) =>
     i % 2 === 1 ? (
@@ -169,7 +169,7 @@ function countBy(items: Task[], key: FacetKey) {
   return m;
 }
 
-// Tek seçimli süzgeç: açılır liste yerine aria-pressed düğme grubu (kabuk/ada JS bütçesi; açılır panel kodu yok).
+// Single-choice filter: an aria-pressed button group instead of a dropdown (shell/island JS budget; no dropdown panel code).
 function ToggleGroup(props: {
   label: string;
   values: string[];
@@ -209,7 +209,7 @@ function doneCount(items: Task[]) {
   return items.reduce((n, r) => n + (r.status === DONE ? 1 : 0), 0);
 }
 
-// Durum etiketi görünür metindir (ekran okuyucu da okur); simge yalnız süstür ve CSS'tedir.
+// The status label is visible text (screen readers read it too); the icon is decoration only and lives in CSS.
 function StatusLabel({ status, label }: { status: string; label: string }) {
   return (
     <span className="task-status" data-status={status}>
@@ -232,9 +232,9 @@ function Explorer({ items, meta: board }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
   const detailRef = useRef<HTMLInputElement>(null);
 
-  // Ada JS'i inmeden önce sunucu HTML'ine yazılan metin DOM'da kalır, ama React durumu boş başlar:
-  // React 19 hidrasyonda DOM değerini korur, değer izleyicisini bu değerle başlatır ve değişikliği
-  // onChange olarak yeniden oynatmaz. Bağlanınca erken girdiyi (arama metni, ayrıntı anahtarı) duruma al.
+  // Text typed into the server HTML before the island JS arrives stays in the DOM, but React state starts empty:
+  // React 19 keeps the DOM value during hydration, initialises its value tracker with it and does not replay
+  // the change as onChange. On mount, take the early input (search text, details switch) into state.
   useEffect(() => {
     if (searchRef.current) setQ(searchRef.current.value);
     if (detailRef.current) setShowDetail(detailRef.current.checked);
@@ -245,12 +245,12 @@ function Explorer({ items, meta: board }: Props) {
     if (!hash.startsWith('#req-')) return;
     const row = document.getElementById(hash.slice(1));
     if (!row || getComputedStyle(row).display !== 'table-row') return;
-    // Ada geç bağlanabilir. Okur bu sırada satırdan uzaklaştıysa okurun yeri korunur. Satır ekranda değilse gezgin
-    // kaydırmaz ve odak vermez.
+    // The island may mount late. If the reader has moved away from the row meanwhile, the reader's place is kept. If the row
+    // is not on screen, the explorer does not scroll or move focus.
     const bounds = row.getBoundingClientRect();
     if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) return;
 
-    // Yazı tiplerini ve sayfanın sonraki karede ölçtüğü satır içi kodu bekle.
+    // Wait for the fonts and for the inline code that the page measures in the next frame.
     let cancelled = false;
     let frame = 0;
     void document.fonts.ready.then(() => {
@@ -316,7 +316,7 @@ function Explorer({ items, meta: board }: Props) {
     setLevel(null);
   };
 
-  // Gruplu görünüm: önce faz, sonra epic (task-board.json sırası). Boş grup gösterilmez.
+  // Grouped view: phase first, then epic (task-board.json order). Empty groups are not shown.
   const groups = useMemo(() => {
     if (view !== 'grouped') return [];
     return board.phases
@@ -350,7 +350,7 @@ function Explorer({ items, meta: board }: Props) {
     </>
   );
 
-  // Kanıt commit'i backend dalındadır; okur onu main yayınının PR'ından bulur.
+  // The evidence commit is on the backend branch; the reader finds it through the PR of the main release.
   const evidence = (r: Task, className: string) => {
     if (!r.evidence) return null;
     const [commit, pr, tests] = r.evidence;
@@ -371,7 +371,7 @@ function Explorer({ items, meta: board }: Props) {
         </span>
         <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
       </div>
-      {/* Liste satırlarında Mantine Text yerine sade <p>: aynı görünüm global.css'teki sınıf kurallarından. */}
+      {/* Plain <p> instead of Mantine Text in list rows: same look from the class rules in global.css. */}
       <p className={r.status === DONE ? 'req-card-title req-title is-done' : 'req-card-title req-title'}>{r.title}</p>
       {showDetail && <p className="req-card-detail req-detail">{inlineCode(r.detail)}</p>}
       <div className="req-meta">{meta(r)}</div>
@@ -570,7 +570,7 @@ function Explorer({ items, meta: board }: Props) {
                     </p>
                     <p className={r.status === DONE ? 'req-title is-done' : 'req-title'}>{r.title}</p>
                     {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
-                    {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
+                    {/* The owner is not a separate column; as in the card view it is in the requirement cell; if the content does not fit, the table scrolls in its own container. */}
                     {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
                     <p className="req-owner">
                       Epic: {epicName.get(r.epic)} · Düzey: {levelName.get(r.level)}
@@ -600,8 +600,8 @@ function Explorer({ items, meta: board }: Props) {
   );
 }
 
-// Kabuk (Shell) renk şemasını yönetir; bu ada html özniteliğini izleyip aynı şemayı zorlar.
-// Böylece iki MantineProvider arasında şema sapması olmaz; CSS değişkenleri kabuktan gelir.
+// The shell (Shell) manages the colour scheme; this island follows the html attribute and forces the same scheme.
+// So the two MantineProviders never drift apart in scheme; CSS variables come from the shell.
 function useDocumentColorScheme(): MantineColorScheme | undefined {
   const [scheme, setScheme] = useState<MantineColorScheme | undefined>(undefined);
   useEffect(() => {

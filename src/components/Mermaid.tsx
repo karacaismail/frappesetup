@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 
-// Markdown'daki ```mermaid bloklarını (Shiki dışında bırakıldı) istemcide çizer.
-// - Renkleri sayfanın tasarım tokenlarından okur, tema değişiminde yeniden çizer.
-// - SVG genişliği doğal genişliğe (rem) sabitlenir: metin 1rem altına küçülmez, figür yatay kayar.
-// - Erişilebilir ad önceki etiket paragrafından veya başlıktan türer ve sayfada benzersizdir; kaynak metin <details> içinde korunur.
+// Draws the ```mermaid blocks in Markdown (left out of Shiki) in the browser.
+// - Reads colours from the page's design tokens and redraws when the theme changes.
+// - The SVG width is fixed to its natural width (rem): text does not shrink below 1rem, the figure scrolls horizontally.
+// - The accessible name comes from the preceding label paragraph or the heading and is unique on the page; the source text is kept in <details>.
 export default function Mermaid() {
   useEffect(() => {
     let disposed = false;
@@ -11,7 +11,7 @@ export default function Mermaid() {
     const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre > code.language-mermaid'));
     if (blocks.length === 0) return;
 
-    // Ad: bloktan hemen önceki yalnız-kalın etiket paragrafı (ör. **Giriş — …**) ya da en yakın başlık.
+    // Name: the bold-only label paragraph just before the block (e.g. **Login — …**) or the nearest heading.
     const labelBefore = (el: Element): string | null => {
       let node: Element | null = el;
       while (node) {
@@ -29,7 +29,7 @@ export default function Mermaid() {
       }
       return null;
     };
-    // Bölge (region) adları sayfada benzersiz olmalı: aynı ad yinelenirse sıra numarası eklenir.
+    // Region names must be unique on the page: if a name repeats, a sequence number is added.
     const used = new Map<string, number>();
     const uniqueLabel = (label: string) => {
       const n = (used.get(label) ?? 0) + 1;
@@ -44,7 +44,7 @@ export default function Mermaid() {
       fig.className = 'mermaid-figure';
       fig.dataset.source = source;
       fig.dataset.index = String(i);
-      // Kaydırılabilir bölge: klavyeyle kaydırma için odaklanabilir; SVG'nin kendisi gizlenir, ad figürde.
+      // Scrollable region: focusable for keyboard scrolling; the SVG itself is hidden, the name is on the figure.
       fig.setAttribute('role', 'region');
       fig.tabIndex = 0;
       const heading = labelBefore(pre);
@@ -83,7 +83,7 @@ export default function Mermaid() {
         theme: 'base',
         fontFamily: token('--mantine-font-family', '"Outfit Variable", Outfit, system-ui, sans-serif'),
         fontSize: 16,
-        // 1rem kuralı: diyagram türlerinin kendi varsayılan yazı boyutları (12–14px) 16'ya çekilir.
+        // 1rem rule: the diagram types' own default font sizes (12–14px) are raised to 16.
         sequence: { actorFontSize: 16, noteFontSize: 16, messageFontSize: 16, wrap: true },
         flowchart: { htmlLabels: false },
         gantt: { fontSize: 16, sectionFontSize: 16 },
@@ -118,12 +118,12 @@ export default function Mermaid() {
         try {
           const { svg } = await mermaid.render(id, src);
           if (disposed || seq !== renderSeq) return;
-          // SVG önce bellekte boyutlandırılır, sonra tek seferde yerleştirilir (ara durumda ölçek < 1 olmaz).
+          // The SVG is sized in memory first, then placed in one go (the scale is never < 1 in between).
           const tpl = document.createElement('template');
           tpl.innerHTML = svg.trim();
           const el = tpl.content.querySelector('svg');
           if (el) {
-            // Doğal genişlik (viewBox birimi = px @16px kök): rem olarak sabitle → metin ≥ 1rem.
+            // Natural width (viewBox unit = px @16px root): fix it in rem → text ≥ 1rem.
             const vbWidth = el.viewBox.baseVal.width;
             if (vbWidth > 0) {
               const rem = vbWidth / 16;
@@ -131,8 +131,8 @@ export default function Mermaid() {
               el.style.maxWidth = `${rem}rem`;
               el.style.width = `${rem}rem`;
             }
-            // Sıra numaraları (autonumber) mermaid'de 12px sabittir; 1rem kuralı için 16px'e çekilir
-            // ve işaretleyici dairesi büyütülür.
+            // Sequence numbers (autonumber) are a fixed 12px in mermaid; they are raised to 16px for the 1rem rule
+            // and the marker circle is enlarged.
             el.querySelectorAll<SVGTextElement>('text.sequenceNumber').forEach((t) => {
               t.setAttribute('font-size', '16px');
               t.removeAttribute('font-family');

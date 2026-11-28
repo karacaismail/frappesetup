@@ -1,13 +1,13 @@
 ---
-// Faz tablosu — hedef, çıkış ve sahip src/data/phases.json'dan; gereksinim kimlikleri requirements.json'daki
-// faz alanından derleme anında türetilir (elle kopya yok, faz–gereksinim çelişkisi oluşamaz).
+// Phase table — goal, exit and owner come from src/data/phases.json; requirement IDs are derived at build time from
+// the phase field in requirements.json (no hand copy, so phase and requirement cannot contradict each other).
 import { fillBrandData } from '../data/site';
 import phasesSource from '../data/phases.json';
 const requirements = fillBrandData(requirementsSource);
 const phases = fillBrandData(phasesSource);
 import requirementsSource from '../data/requirements.json';
 
-// Ardışık kimlikleri aralığa sıkıştırır: G-7, G-8, G-9 → G-7..G-9.
+// Compresses consecutive IDs into a range: G-7, G-8, G-9 → G-7..G-9.
 function compress(ids: string[]): string {
   const out: string[] = [];
   for (const prefix of ['G', 'SA']) {
@@ -66,13 +66,13 @@ const rows = phases.map((p) => {
 </div>
 
 <style>
-  /* Faz adının altında yalnız önkoşul yazar; süre, hafta ve iş yükü tahmini yazılmaz (tests/consistency.spec.ts). */
+  /* Only the prerequisite is written below the phase name; no duration, week or effort estimate is written (tests/consistency.spec.ts). */
   .phase-meta {
     display: block;
     font-weight: 400;
     color: var(--fs-quiet);
   }
-  /* Faz sütunu önkoşul metnini okunur tutar; tablo kendi kapsayıcısında yatay kayar, sözcük bölünmez. */
+  /* The phase column keeps the prerequisite text readable; the table scrolls horizontally in its own container, words are not split. */
   .phase-table th[scope='row'] {
     min-width: 10rem;
   }

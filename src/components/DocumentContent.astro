@@ -1,8 +1,8 @@
 ---
-// Yalnız depo içindeki Markdown içeriği ve Astro bileşenleri HTML olarak birleştirilir.
+// Only Markdown content inside the repository and Astro components are joined as HTML.
 const content = (await Astro.slots.render('default')) ?? '';
 const placeholderPattern = /<div data-embed="([a-z0-9-]+)"><\/div>/g;
-// Değerin içindeki açı işaretleri etiketi bitirmez.
+// Angle brackets inside the value do not close the tag.
 const malformedPlaceholder = /<[a-z][\w:-]*(?:[^"'<>]|"[^"]*"|'[^']*')*?\sdata-embed(?=\s|=|\/?>)/i;
 
 if (malformedPlaceholder.test(content.replace(placeholderPattern, ''))) {

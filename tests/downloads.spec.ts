@@ -10,9 +10,9 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { generatePressAiDownloads } from '../scripts/press-ai-downloads.mjs';
 
-// press-ai indirmeleri: derlenmiş çıktıdaki dosyalar (dist/downloads/press-ai/) gerçek içerikle, sayfadaki bağlantılar
-// gerçek tarayıcı indirmesiyle denetlenir. ZIP'ler üreticiden bağımsız iki okuyucuyla (aşağıdaki yerel ayrıştırıcı ve
-// Python zipfile) açılır; tam paket ve MCP paketi açıldıkları dizinden çalıştırılır.
+// press-ai downloads: the files in the built output (dist/downloads/press-ai/) are checked with their real content, the page links
+// with a real browser download. The ZIPs are opened with two readers independent of the generator (the local parser below and
+// Python zipfile); the full package and the MCP package are run from the folder they were unpacked into.
 const ROOT = new URL('../', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist/downloads/press-ai');
 const PKG = join(ROOT, 'packages/press-ai');
@@ -37,7 +37,7 @@ const ARTIFACTS: Artifact[] = [
 ];
 const SINGLE_SOURCE = (p: string) => join(PKG, p.replace(/^files\//, ''));
 
-// Sayfa → beklenen indirme bağlantıları (tüm paket her blokta ayrı birincil düğmedir).
+// Page → expected download links (the full package is a separate primary button in every block).
 const PAGES: Record<string, string[]> = {
   'ai-mcp': ['press-ai-mcp.zip', 'press-ai.zip'],
   'ai-skills': [
@@ -51,7 +51,7 @@ const PAGES: Record<string, string[]> = {
 
 type Entry = { name: string; data: Buffer; method: number; time: number; date: number; mode: number };
 
-/** Yerel ZIP okuyucu: EOCD → merkezi dizin → yerel başlık; CRC ve boyut doğrulanır (üretici kodu kullanılmaz). */
+/** Local ZIP reader: EOCD → central directory → local header; CRC and size are checked (the generator code is not used). */
 function readZip(buf: Buffer): Entry[] {
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65535); i--) {
@@ -90,7 +90,7 @@ function readZip(buf: Buffer): Entry[] {
   return out;
 }
 
-/** Kaynak paket ağacı (önbellek ve gizli dosyalar hariç): tam paket ZIP'iyle birebir aynı küme olmalı. */
+/** Source package tree (caches and hidden files excluded): must be exactly the same set as the full package ZIP. */
 function packageTree(): string[] {
   const files: string[] = [];
   const walk = (dir: string) => {
@@ -114,7 +114,7 @@ function python(args: string[], opts: { cwd?: string; input?: string } = {}) {
   return { code: r.status, out: r.stdout ?? '', err: r.stderr ?? '' };
 }
 
-/** Python zipfile ile aç (bağımsız standart uygulama; testzip CRC'leri yeniden doğrular). */
+/** Open with Python zipfile (an independent standard implementation; testzip checks the CRCs again). */
 function extract(zipPath: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'press-ai-dl-'));
   const r = python(
@@ -345,8 +345,8 @@ test.describe('press-ai downloads: pages', () => {
     }
   });
 
-  // Aynı layout denetimi 320'den masaüstüne: hesaplanan yazı ≥ 1rem, taşma yok, bağlantılar görünümde, etkili alan.
-  // Kanıt ekranları test çıktısına yazılır ve rapora eklenir (bağımsız görsel inceleme için; referans değildir).
+  // The same layout check from 320 to desktop: computed text ≥ 1rem, no overflow, links in view, effective area.
+  // Evidence screenshots are written to the test output and attached to the report (for independent visual review; they are not references).
   const VIEWPORTS = [
     { name: '320', width: 320, height: 640 },
     { name: '360', width: 360, height: 740 },
@@ -391,7 +391,7 @@ test.describe('press-ai downloads: pages', () => {
         }
         if (slug === 'ai-skills' || vp.name === '320') {
           const shot = testInfo.outputPath(`${slug}-${vp.name}.png`);
-          // Kanıt görüntüsü: sabit başlık, okuma çubuğu ve atlama bağlantısı bloğun üstüne binmesin (referans değildir).
+          // Evidence screenshot: the fixed header, reading bar and skip link must not cover the block (not a reference).
           await page.locator('.prose [data-embed-source^="dl-"]').screenshot({
             path: shot,
             animations: 'disabled',
@@ -424,7 +424,7 @@ test.describe('press-ai downloads: pages', () => {
     expect(sha256(readFileSync(await download.path())), 'dokunarak indirilen bayt').toBe(art.sha256);
   });
 
-  // Blok kapsamlı axe: WCAG 2.0/2.1/2.2 A ve AA; her etki düzeyi başarısızlıktır. Tam AA uyumu iddiası değildir.
+  // Block-scoped axe: WCAG 2.0/2.1/2.2 A and AA; every impact level is a failure. This is not a claim of full AA conformance.
   for (const scheme of ['light', 'dark'] as const) {
     test(`axe AA on download blocks (${scheme})`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });
@@ -456,7 +456,7 @@ test.describe('press-ai downloads: pages', () => {
     await page.mouse.up();
     const afterMouse = await frame();
     expect(afterMouse.outline.startsWith('none') || afterMouse.outline.endsWith(' 0px'), `${browserName}: fare halkası`).toBe(true);
-    // Klavye: önceki odaklanabilir öğeden Tab ile gel.
+    // Keyboard: arrive with Tab from the previous focusable element.
     await first.evaluate((el) => {
       const all = Array.from(document.querySelectorAll<HTMLElement>('a[href], button, [tabindex="0"], summary'));
       const i = all.indexOf(el);

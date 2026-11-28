@@ -1,7 +1,7 @@
-// Sätteri hast eklentisi: markdown tablolarını yatay kaydırılabilir bir sarmalayıcıya alır.
-// Sarmalayıcı klavyeyle kaydırılabilsin diye odaklanabilir (WebKit kaydırıcıları
-// kendiliğinden odaklanabilir yapmaz); gösterge yalnız :focus-visible'da çıkar.
-// Her bölge (role=region) sayfada benzersiz ad taşır: en yakın önceki başlık + aynı başlık altındaki sıra.
+// Sätteri hast plugin: puts markdown tables into a horizontally scrollable wrapper.
+// The wrapper is focusable so it can be scrolled with the keyboard (WebKit does not make
+// scrollers focusable by itself); the indicator appears only on :focus-visible.
+// Each region (role=region) has a unique name on the page: the nearest preceding heading + its index under the same heading.
 export const tableWrap = {
   name: 'table-wrap',
   element: {

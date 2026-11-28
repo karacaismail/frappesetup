@@ -1,5 +1,5 @@
-// Görsel kanıt: belirli sayfaları açık/koyu şema ve farklı genişliklerde PNG olarak kaydeder.
-// Kullanım: node scripts/screenshots.mjs <baseURL> <çıktıKlasörü>
+// Visual evidence: saves given pages as PNG in light/dark scheme and at different widths.
+// Usage: node scripts/screenshots.mjs <baseURL> <outputFolder>
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 const [base = 'http://127.0.0.1:4329/frappesetup/', out = 'playwright-report/shots'] = process.argv.slice(2);

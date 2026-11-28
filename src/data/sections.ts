@@ -1,6 +1,6 @@
 import { PRODUCT_NAME } from './site';
-// Bölüm üst verisi: navigasyon grubu, ikon adı ve tek cümlelik özet.
-// İçeriğin kendisi src/content/docs içindedir; burada yalnızca sunum bilgisi tutulur.
+// Section metadata: navigation group, icon name and one-sentence summary.
+// The content itself is in src/content/docs; only presentation data is kept here.
 export type IconName =
   | 'home'
   | 'scale'
@@ -36,7 +36,7 @@ export interface SectionMeta {
 
 export const GROUP_ORDER: SectionMeta['group'][] = ['Çerçeve', 'Raylar', 'Sözleşmeler', 'Teslim', 'AI'];
 
-// Kenar çubuğunda açılır-kapanır tek bir üst öğe olarak çizilen gruplar (grup adı → ikon).
+// Groups drawn in the sidebar as a single collapsible parent item (group name → icon).
 export const COLLAPSIBLE_GROUPS: Record<string, IconName> = { AI: 'sparkles' };
 
 export const SECTIONS: Record<string, SectionMeta> = {

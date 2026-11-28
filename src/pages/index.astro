@@ -38,7 +38,7 @@ const groups = GROUP_ORDER.map((label) => ({
   docs: docs.filter((d) => SECTIONS[d.id]?.group === label),
 }));
 
-// phases.json yol haritası sırasındadır (bağımlılık sırası; P6 operasyon düzlemi P5'ten önce gelir).
+// phases.json is in roadmap order (dependency order; P6 operations plane comes before P5).
 const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }));
 ---
 
@@ -192,7 +192,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     overflow: hidden;
   }
   .hero::before {
-    /* Ray motifi: altı ince yatay çizgi */
+    /* Rail motif: six thin horizontal lines */
     content: '';
     position: absolute;
     inset: auto -10% -2.5rem;
@@ -207,13 +207,13 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     -webkit-mask-image: linear-gradient(90deg, transparent, black 30%, black 70%, transparent);
     z-index: -1;
   }
-  /* İki sütun kapsayıcının gerçek genişliğine bağlı (rem kök yazıyla büyür): kullanıcı yazı boyutunu
-     büyütünce ya da gezinme çubuğu genişleyince ızgara tek sütuna döner, başlık sıkışmaz. */
+  /* The two columns depend on the real width of the container (rem grows with the root font): when the user enlarges
+     the font or the navigation bar widens, the grid falls back to one column and the heading is not squeezed. */
   .hero {
     container-type: inline-size;
   }
-  /* Tek sütun kapsayıcı genişliğindedir (minmax(0, 1fr)): örtük auto sütun büyük kök yazıda başlığın en uzun sözcüğüne
-     açılıp sayfayı taşırıyordu; sığmayan sözcük artık .page'in break-word ağıyla satır sonunda kırılır. */
+  /* The single column is as wide as the container (minmax(0, 1fr)): the implicit auto column opened to the longest word of the
+     heading at a large root font and made the page overflow; a word that does not fit now breaks at the line end via the break-word net of .page. */
   .hero-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -283,8 +283,8 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .btn > svg {
     flex: none;
   }
-  /* Kök yazı %200 iken 320 ve 360 px ekranda iç alan 8rem altına iner.
-     Bu genişlikte ok simgesi etiketle aynı satıra girer. */
+  /* At a 200% root font the inner area drops below 8rem on 320 and 360 px screens.
+     At this width the arrow icon goes onto the same line as the label. */
   @container (max-width: 8rem) {
     .btn-primary {
       display: block;
@@ -372,7 +372,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     line-height: var(--fs-leading-body);
   }
 
-  /* Sayılar */
+  /* Numbers */
   .stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
@@ -525,7 +525,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     text-wrap: pretty;
   }
 
-  /* Bölüm kartları */
+  /* Section cards */
   .group {
     margin-bottom: 1.5rem;
   }
@@ -599,8 +599,8 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     line-height: var(--fs-leading-body);
     text-wrap: pretty;
   }
-  /* Büyük kök yazıda dar kapsayıcı: numara/ikon üstte, metin tam genişlikte; kırılamayan uzun dizgi
-     yalnız sığmadığında satır sonunda kırılır. Varsayılan yazıda 320 px'te yerleşim değişmez (14rem = 224px). */
+  /* Narrow container at a large root font: number/icon on top, text at full width; a long unbreakable string
+     breaks at the line end only when it does not fit. At the default font the layout does not change at 320 px (14rem = 224px). */
   @container (max-width: 14rem) {
     .decision,
     .phase,

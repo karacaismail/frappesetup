@@ -152,7 +152,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
 </Site>
 
 <script>
-  // Başlık bağlantıları: h2/h3 kimliğine kopyalanabilir # bağlantısı.
+  // Heading links: a copyable # link to the h2/h3 id.
   for (const h of document.querySelectorAll<HTMLElement>('.prose h2[id], .prose h3[id]')) {
     const a = document.createElement('a');
     a.className = 'heading-anchor';
@@ -184,12 +184,12 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
     update();
   }
 
-  // 4) Satır içi kod metinle akar; satırına sığmayan kesintisiz dizinin parçası olan kod `data-scroll` alır ve kendi
-  //    kutusunda kayar (global.css). Dizi kod tek başına ya da bitişik kod/metinle (ör. `a`/`b`) oluşabilir; kutuya
-  //    alınan kodun iki yanı kırılabilir olur. Karar her geçişte aynı ölçüyle verilir (kodlar satır içi, satır kutusunda
-  //    break-word ağı kapalı: kodun satırı taşıyor mu?), böylece durum salınmaz. Yalnız gerçekten taşan kaydırma kutusu
-  //    Tab sırasına girer. Sayfanın boyutu (genişlik, kök yazı, yazı tipi), yazı tipi yüklemesi ve gezginin yeniden
-  //    çizimi durumu yeniler; kutunun kaydırma konumu korunur.
+  // 4) Inline code flows with the text; code that is part of an unbreakable run that does not fit its line gets `data-scroll` and
+  //    scrolls in its own box (global.css). A run can be code alone or code next to code/text (e.g. `a`/`b`); code
+  //    moved into a box can break on both sides. The decision uses the same measure on every pass (code inline, the
+  //    break-word net off in the line box: does the code overflow its line?), so the state does not oscillate. Only a scroll box
+  //    that really overflows enters the Tab order. Page size (width, root font, typeface), font loading and the explorer
+  //    redrawing refresh the state; the box's scroll position is kept.
   const CODE = '.prose :not(pre, a) > code, .req-detail > code';
   const lineBox = (code: HTMLElement) => {
     let box = code.parentElement!;
@@ -211,7 +211,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
     const focused = document.activeElement;
     for (const c of codes) c.removeAttribute('data-scroll');
     document.documentElement.setAttribute('data-code-measuring', '');
-    // Satır kutusunun içerik kenarından taşan parçalar (yalnız sığmayan kesintisiz dizilerin satırları).
+    // Parts that overflow the content edge of the line box (only the lines of unbreakable runs that do not fit).
     const overflowing = new Map<HTMLElement, DOMRect[]>();
     const range = document.createRange();
     for (const b of unique) {
@@ -234,7 +234,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
     const overflows = codes.map((c, i) => long[i] && c.scrollWidth > c.clientWidth);
     codes.forEach((c, i) => {
       if (c === focused) {
-        // Odaktaki kod kutusu durumunu korur (tabindex kalkarsa odak gövdeye düşer); odak çıkınca yeniden ölçülür.
+        // A focused code box keeps its state (if tabindex were removed, focus would drop to the body); it is measured again on blur.
         c.scrollLeft = scrolled[i];
         c.addEventListener('blur', schedule, { once: true });
       } else if (overflows[i]) {
@@ -292,7 +292,7 @@ const hasMermaid = (entry.body ?? '').includes('```mermaid');
       measureResults();
     });
   };
-  // Ölçüm başlayınca satır içi kodda break-word ağı kapanır (global.css); betik yoksa ağ yerinde kalır.
+  // Once measuring starts, the break-word net is turned off for inline code (global.css); without the script the net stays in place.
   document.documentElement.setAttribute('data-code-measured', '');
   markScrollingCode();
   const resize = new ResizeObserver(schedule);

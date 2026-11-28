@@ -1,7 +1,7 @@
 ---
-// press-ai indirme bloğu (statik HTML, JS yok). Dosyalar derlemede scripts/press-ai-downloads.mjs ile üretilir;
-// boyut ve SHA-256 aynı derlemenin manifestinden okunur. Bağlantılar aynı kökenli `download` bağlantılarıdır.
-// Düğme görünümü ana sayfadaki .btn ile aynı token'lardan gelir; odak global :focus-visible kuralıdır.
+// press-ai download block (static HTML, no JS). The files are generated during the build by scripts/press-ai-downloads.mjs;
+// size and SHA-256 are read from the same build's manifest. The links are same-origin `download` links.
+// The button look comes from the same tokens as .btn on the home page; focus is the global :focus-visible rule.
 import { readPressAiManifest } from '../../scripts/press-ai-downloads.mjs';
 
 type Group = 'mcp' | 'skills' | 'agents' | 'package';
@@ -138,7 +138,7 @@ const agents = of('agent-file');
     flex-wrap: wrap;
     gap: var(--mantine-spacing-sm);
   }
-  /* index.astro .btn ile aynı görünüm (global.css --fs-control-* token'ları); odak yalnız global outline. */
+  /* Same look as .btn in index.astro (global.css --fs-control-* tokens); focus is only the global outline. */
   .dl-link {
     display: inline-flex;
     flex-wrap: wrap;
