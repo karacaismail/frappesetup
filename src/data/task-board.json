@@ -93,7 +93,7 @@
   {
    "id": "post-mvp",
    "label": "MVP sonrası",
-   "rule": "P2 ve P7 kalemleri MVP sonrası olur. MVP kararına göre ödeme katmanı MVP'ye girmez. K-61 kararına göre AtonotA Login MVP sonrasıdır. P4'teki kendi kendine deneme ve etkinleştirme kalemleri de MVP sonrasıdır.",
+   "rule": "P2 ve P7 kalemleri MVP sonrası olur. MVP kararına göre ödeme katmanı MVP'ye girmez. K-61 kararına göre {{PRODUCT_NAME}} MVP sonrasıdır. P4'teki kendi kendine deneme ve etkinleştirme kalemleri de MVP sonrasıdır.",
    "phases": [
     "P2",
     "P7"
@@ -230,7 +230,7 @@
   },
   {
    "id": "login-product",
-   "title": "AtonotA Login ürünü",
+   "title": "{{PRODUCT_NAME}} ürünü",
    "goal": "Giriş ekranı ayrı ve ücretli bir ürün olarak yayına çıkar."
   }
  ],
