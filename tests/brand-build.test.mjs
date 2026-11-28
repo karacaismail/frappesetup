@@ -61,7 +61,10 @@ function checkBrandGrammar(directory, name) {
     'atonota-login/index.html': [`${name} ürününü satın alabilir`, `${name} ürününün kodu`],
     'index.html': [`${name} ürününü bağımsız ve ücretli`],
     'yol-haritasi/index.html': [`${name} ürününü bağımsız ve ücretli`],
-    'gereksinimler/index.html': [`${name} ürününün bir tanıtım sayfası`, `Müşteri ${name} ürününü ücret karşılığında`],
+    'gereksinimler/index.html': [
+      `${name} ürününün bir tanıtım sayfası`, `Müşteri ${name} ürününü ücret karşılığında`,
+      `${name} ürünü`, `K-61 kararına göre ${name} MVP sonrasıdır.`,
+    ],
   };
   for (const [path, expected] of Object.entries(phrases)) {
     const html = readFileSync(join(directory, path), 'utf8');
@@ -90,6 +93,22 @@ async function checkDiagrams(directory, name) {
     browser = await chromium.launch();
     const page = await browser.newPage({ viewport: { width: 320, height: 740 } });
     const base = `http://127.0.0.1:${server.address().port}/frappesetup/`;
+    await page.goto(base + 'gereksinimler/');
+    await expect(page.locator('astro-island[component-export="default"][component-url*="RequirementsExplorer"]')).not.toHaveAttribute('ssr', '');
+    await page.locator('.req-more > summary').click();
+    const epic = page.getByRole('group', { name: 'Epic', exact: true })
+      .getByRole('button').filter({ hasText: `${name} ürünü` });
+    await expect(epic).toHaveCount(1);
+    await epic.click();
+    await expect(epic).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.task-rules')).toContainText(`K-61 kararına göre ${name} MVP sonrasıdır.`);
+    for (const width of [320, 1366]) {
+      await page.setViewportSize({ width, height: 740 });
+      await expect(page.locator('[data-testid="req-table"]')).toContainText(`${name} ürünü`);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'requirements overflow');
+    }
+    await page.getByRole('button', { name: 'Gruplu', exact: true }).click();
+    await expect(page.locator('.task-epic-title > span:first-child').first()).toHaveText(`${name} ürünü`);
     await page.goto(base + 'yol-haritasi/');
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator('[data-brand-label]')).toHaveAttribute('data-brand-ready', 'true');

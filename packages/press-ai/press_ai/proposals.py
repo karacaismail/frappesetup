@@ -18,7 +18,7 @@ import re
 import stat
 import uuid
 
-from .errors import ApprovalError, KitError
+from .errors import ApprovalError, ConfigError, KitError
 from .util import canonical_json, ensure_private_dir, iso, parse_iso, sha256_hex, utc_now, write_private_file
 
 _ID = re.compile(r"p-[0-9a-f]{20}")
@@ -329,7 +329,7 @@ class ProposalStore:
         return self.record_outcome(proposal_id, outcome)
 
     # -- denetim ----------------------------------------------------------------------------------
-    def audit(self, event: dict) -> None:
+    def audit(self, event: dict, *, required=False) -> None:
         try:
             ensure_private_dir(self.root)
             event = dict(event, at=iso(self.clock()))
@@ -340,6 +340,8 @@ class ProposalStore:
             with os.fdopen(fd, "ab") as handle:
                 handle.write(canonical_json(event) + b"\n")
         except OSError:
+            if required:
+                raise ConfigError("Required identity audit could not be written") from None
             # Denetim kaydı yazılamazsa işlem durmaz; sonuç kaydı ayrıca tutulur.
             pass
 

@@ -21,10 +21,13 @@ OPEN_OBJECT = {"type": "object", "additionalProperties": True}
 
 
 class Context:
-    def __init__(self, config, clock=utc_now):
+    def __init__(self, config, clock=utc_now, *, delegated_bearer=None):
         self.config = config
         self.clock = clock
+        self.delegated_bearer = delegated_bearer
         self.redactor = Redactor()
+        if isinstance(delegated_bearer, _credentials.DelegatedBearer):
+            self.redactor.add_secrets(delegated_bearer.secret_values())
         self.https_timeout = min(config.press.timeout, 15.0) if config.press else 10.0
         self._contract = None
         self._store = None
@@ -47,7 +50,16 @@ class Context:
         if self.config.press is None:
             raise ConfigError("Press is not configured (no press section in the config file)")
         if self._client is None:
-            creds = _credentials.load(self.config.press.credentials_spec, self.config.forbidden_roots)
+            if self.config.press.identity == "delegated":
+                creds = self.delegated_bearer
+                if not isinstance(creds, _credentials.DelegatedBearer):
+                    raise ConfigError("Delegated identity requires a runtime Press grant")
+                if creds.audience != self.config.press.base_url:
+                    raise ConfigError("Delegated grant targets another Press address")
+            else:
+                if self.delegated_bearer is not None:
+                    raise ConfigError("Runtime grant requires delegated identity")
+                creds = _credentials.load(self.config.press.credentials_spec, self.config.forbidden_roots)
             self._client = PressClient(self.config.press, creds, self.redactor)
         return self._client
 
@@ -88,7 +100,7 @@ def kit_status(ctx, args):
         "contract": {"operations": len(contract.order), "load_errors": len(contract.load_errors),
                      "coverage": contract.coverage()},
         "boundaries": {
-            "authority": "The user's own Press API key (team header for the team principal). Press enforces its own "
+            "authority": "Configured local user, dedicated service account or runtime Press user grant. Press enforces its own "
                          "permissions; this server adds an allowlist, preconditions and human approval.",
             "not_available": ["shell or SSH", "Server Script", "raw SQL or Python", "approve or confirm tools",
                               "deletes, restores, archives, server reboots", "DNS, payment and legal acceptance"],
@@ -258,8 +270,29 @@ class Toolbox:
         return out
 
     def call(self, name: str, arguments: dict):
+        from . import identity
+
+        scoped = self.ctx.config.press is not None and self.ctx.config.press.identity != "own_user"
+        audit_name = name if isinstance(name, str) and name in self.tools else "unknown_tool"
+        if scoped:
+            identity.audit(self.ctx, audit_name, "tool_started", arguments)
+        try:
+            return self._call(name, arguments, scoped)
+        except Exception:
+            if scoped:
+                identity.audit(self.ctx, audit_name, "tool_failed", arguments)
+            raise
+
+    def _call(self, name: str, arguments: dict, scoped: bool):
+        from . import identity
+
         tool = self.tools.get(name)
         if tool is None:
-            raise KitError("Unknown tool " + name, code="unknown_tool")
+            raise KitError("Unknown tool", code="unknown_tool")
         validate(arguments, tool["schema"], "arguments")
-        return tool["handler"](self.ctx, arguments)
+        if scoped:
+            identity.require_tool(self.ctx, name, arguments)
+        result = tool["handler"](self.ctx, arguments)
+        if scoped:
+            identity.audit(self.ctx, name, "tool_completed", arguments)
+        return result

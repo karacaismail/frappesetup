@@ -22,6 +22,9 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 - Eklenti adı marka ayarından üretilen bir özet taşır. Ayar değişince Astro eski içerik önbelleğini bırakır.
 - Başlıkları, gezinme adlarını ve JSON metinlerini gösteren bileşenler aynı ayarı kullanır. Teknik adresler ve gereksinim kimlikleri değişmez.
 - Tarihsel sayfalar `acik-kararlar.md`, `karar-katalogu.md` ve `izlenebilirlik.md` dosyalarıdır. `task-board.json` içindeki geçmiş notlar da korunur. Tam liste `backend/brand-exclusions.txt` dosyasındadır.
+- Görev panosundaki epic adı ve düzey kuralı `{{PRODUCT_NAME}}` kullanır. Sayfa ve kural tablosu veriyi `fillBrandData` ile çözer.
+- Görev panosunun tamamı tarama dışı bırakılamaz. Yalnız `audit.note` ve `update.note` alanları geçmiş not sayılır. Liste, bu alanları `dosya::/alan/not` biçiminde belirtir. Her kaydın nedeni yazılır. Eksik alan testi düşürür.
+- Marka taramasını `python3 -m unittest discover -s backend/deploy/tests -p test_brand_hardcode.py` komutuyla denetleyin. `npm run test:brand-build`, değişen marka ile epic süzgecini ve düzey kuralını da dener.
 - Diyagram üreticisi marka değerini çıktıya yazmaz. Üretilen Astro bileşeni marka değerini site ayarından alır. Marka değişince yalnız siteyi derlemek yeterlidir.
 - Diyagram etiketi, gerçek yazı genişliğini ölçer. Ad kutuya sığmazsa etiket “Giriş ürünü” olur. Tam ad, diyagram açıklamasında görünür kalır. Yazı küçültülmez.
 - `npm run build`, önce `npm run test:brand` kontrolünü çalıştırır. `npm run test:brand-build`, farklı ayarla ayrı çıktı üretir. Bu kontrol geçici olarak marka dosyasını değiştirir. Kontrol bitince dosya geri yüklenir. Bu kontrolü aynı klasördeki diğer derlemelerle birlikte çalıştırmayın.
