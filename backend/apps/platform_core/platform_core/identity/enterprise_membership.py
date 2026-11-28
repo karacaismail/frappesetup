@@ -99,6 +99,7 @@ def check_or_throw(function, record: dict) -> dict:
 
 def _effective(filters: dict) -> list:
 	"""Approved grants and revocations, newest first. A request waiting for approval does not count."""
+	# list-limit: the whole chain is needed to find the current record. A manager adds each row.
 	rows = frappe.get_all(
 		DOCTYPE,
 		filters=filters,

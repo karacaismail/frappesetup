@@ -97,6 +97,7 @@ def active_rules() -> dict[str, list[dict]]:
 def _load() -> dict[str, list[dict]]:
 	grouped: dict[str, list[dict]] = {}
 	# The rule table is small and is system data. Permission filtering would create a loop here (exception to G-3).
+	# list-limit: the engine needs every active rule, and the rule table is small.
 	rows = frappe.get_all(
 		RULE_DOCTYPE,
 		filters={"is_active": 1},

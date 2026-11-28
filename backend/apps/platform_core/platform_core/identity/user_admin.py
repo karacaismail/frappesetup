@@ -101,6 +101,7 @@ def set_user_role_profiles(user: object, role_profiles: object) -> dict:
 	names = _profile_names(role_profiles)
 	user = tenant_user(user)
 	# The profile roles are system data (exception to G-3).
+	# list-limit: the roles of the given profiles, a few per profile.
 	roles = set(
 		frappe.get_all(
 			"Has Role",

@@ -235,6 +235,22 @@ class FixtureLifecycleTest(unittest.TestCase):
 			with self.assertRaisesRegex(RuntimeError, "existing Leave Application shares"):
 				setup.before_migrate()
 
+	def test_migration_reads_at_most_one_row_per_fixture_rule(self):
+		# P-1 and P-3: the read of the switched-off rules is limited to the fixture rules (AJA-1330).
+		rules = [{"doctype": "PLT Access Rule", "name": f"HRMS TR Rule {index}"} for index in range(3)]
+		with (
+			patch.object(setup, "frappe") as fake,
+			patch.object(setup, "require_access_engine"),
+			patch.object(setup, "require_unshared_applications"),
+			patch.object(setup, "preserve_employee_permissions"),
+			patch.object(setup, "fixture_rows", return_value=rules),
+		):
+			fake.local = SimpleNamespace()
+			fake.get_all.return_value = ["HRMS TR Rule 1"]
+			setup.before_migrate()
+		self.assertEqual(fake.local.hrms_tr_disabled_rules, ["HRMS TR Rule 1"])
+		self.assertEqual(fake.get_all.call_args.kwargs["limit"], 3)
+
 	def test_uninstall_dry_run_never_deletes_policy_fixtures(self):
 		with patch.object(setup, "frappe") as fake, patch.object(setup, "fixture_rows", return_value=[]):
 			fake.local = SimpleNamespace()

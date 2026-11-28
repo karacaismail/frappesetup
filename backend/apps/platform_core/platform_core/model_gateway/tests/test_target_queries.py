@@ -74,6 +74,15 @@ class TargetQueryTests(unittest.TestCase):
 			[(item.api, item.model) for item in self.names],
 		)
 
+	def test_selection_read_is_limited_to_the_requested_names(self):
+		# P-1 and P-3: the read never asks for more rows than names (AJA-1330).
+		rows = [SimpleNamespace(name="a"), SimpleNamespace(name="b")]
+		with patch.object(gateway.frappe, "get_all", return_value=rows) as get_all:
+			result = gateway._selection_rows("PLT AI API", ["a", "b", "a", "", None], ("enabled",))
+		self.assertEqual(set(result), {"a", "b"})
+		self.assertEqual(get_all.call_args.kwargs["filters"], {"name": ["in", ["a", "b"]]})
+		self.assertEqual(get_all.call_args.kwargs["limit"], 2)
+
 	def test_empty_route_keeps_dispatch_behavior_without_target_queries(self):
 		docs, batches, dispatch = self._complete([])
 		docs.assert_called_once_with("PLT AI Route", "route")

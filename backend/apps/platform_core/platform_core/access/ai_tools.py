@@ -192,6 +192,7 @@ def _require_links(doc) -> None:
 def _rule_set_version(document_type: str) -> str:
 	"""Changes whenever any rule of the document type is added, changed or removed."""
 	# Version stamp only. The rows are not returned (exception to G-3).
+	# list-limit: the stamp needs every rule of the type, and the rule table is small.
 	rows = frappe.get_all(
 		RULE,
 		filters={"document_type": document_type},
