@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "prebuild": "npm run test:brand",
+    "prebuild": "npm run test:brand && npm run test:comments",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
@@ -16,7 +16,7 @@
     "test:brand-build": "node --test tests/brand-build.test.mjs",
     "test:e2e:report": "playwright show-report",
     "lint:comments": "node scripts/check-comment-language.mjs",
-    "test:comments": "node --test tests/comment-language.test.mjs",
+    "test:comments": "node --test tests/comment-language.test.mjs && python3 -I -m unittest discover -s tests -p test_turkish_comments.py",
     "hooks:comments": "node scripts/install-comment-hook.mjs"
   },
   "dependencies": {

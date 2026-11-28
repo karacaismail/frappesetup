@@ -1,4 +1,4 @@
-"""Test yardımcıları. Yalnız Python'un kendi kitaplığını kullanır."""
+"""Test helpers. Uses only the Python standard library."""
 
 from __future__ import annotations
 

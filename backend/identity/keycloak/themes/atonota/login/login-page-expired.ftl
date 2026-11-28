@@ -1,7 +1,7 @@
 <#--
-  ATONOTA: Kaynak Keycloak 26.8.2, base/login/login-page-expired.ftl.
-  Fark: iki bağlantı tam birer eylem cümlesidir.
-  Temel şablon cümleyi parçalardan birleştirir. Türkçede bu birleşim bozuk okunur.
+  ATONOTA: Source Keycloak 26.8.2, base/login/login-page-expired.ftl.
+  Difference: each of the two links is a full action sentence.
+  The base template builds the sentence from pieces. In Turkish the joined sentence reads badly.
 -->
 <#import "template.ftl" as layout>
 <@layout.registrationLayout; section>

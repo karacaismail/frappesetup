@@ -121,7 +121,9 @@ def _selection_rows(doctype, names, fields):
 		return {}
 	return {
 		_record_key(row.name): row
-		for row in frappe.get_all(doctype, filters={"name": ["in", names]}, fields=["name", *fields])
+		for row in frappe.get_all(
+			doctype, filters={"name": ["in", names]}, fields=["name", *fields], limit=len(names)
+		)
 	}
 
 

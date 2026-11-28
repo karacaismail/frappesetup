@@ -1,12 +1,12 @@
 <#--
-  Atonota giriş şablonu. Kaynak: Keycloak 26.8.2, keycloak.v2/login/template.ftl.
-  Temel şablondan farklar "ATONOTA" notuyla işaretlidir:
-  1. Sayfa simgesi temanın kendi SVG dosyasıdır.
-  2. Kartın en üstünde marka işareti ve realm'in görünen adı durur. Marka adı şablona yazılmaz.
-     Ayrı bir başlık bölgesi yoktur. Bütün içerik tek main bölgesindedir.
-  3. Dil seçimi işletim sisteminin açılır listesi değildir. Kartın altında bağlantı listesidir.
-  4. Girişi başlatan e-posta adresi düz metindir. Baştan başlama bağlantısı yazıyla görünür.
-  Keycloak sürümü değişince bu dosyayı yeni temel şablonla karşılaştırın.
+  Atonota sign-in template. Source: Keycloak 26.8.2, keycloak.v2/login/template.ftl.
+  Differences from the base template are marked with an "ATONOTA" note:
+  1. The page icon is the theme's own SVG file.
+  2. The brand mark and the realm's display name sit at the top of the card. The brand name is not written into the template.
+     There is no separate header region. All content is in a single main region.
+  3. The language choice is not the operating system's drop-down list. It is a list of links below the card.
+  4. The e-mail address that started the login is plain text. The start-over link is visible as text.
+  When the Keycloak version changes, compare this file with the new base template.
 -->
 <#import "field.ftl" as field>
 <#import "footer.ftl" as loginFooter>
@@ -15,7 +15,7 @@
   <#assign label>
     <#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if>
   </#assign>
-  <#-- ATONOTA 4: adres düz metindir ve alt satıra iner. Baştan başlama bağlantısı yazıyla görünür. -->
+  <#-- ATONOTA 4: the address is plain text and wraps to the next line. The start-over link is visible as text. -->
   <div class="at-attempted">
     <div class="at-attempted__text">
       <span class="at-attempted__label">${label}</span>
@@ -155,8 +155,8 @@
 <div class="${properties.kcLogin!}">
   <div class="${properties.kcLoginContainer!}">
     <main class="${properties.kcLoginMain!}">
-      <#-- ATONOTA 2: marka kartın en üstündedir. Bütün içerik tek main bölgesindedir (AJA-1125).
-           İşaret, marka adının ilk harfidir. Ad ve harf realm'in görünen adından gelir, şablona yazılmaz. -->
+      <#-- ATONOTA 2: the brand is at the top of the card. All content is in a single main region (AJA-1125).
+           The mark is the first letter of the brand name. The name and the letter come from the realm's display name and are not written into the template. -->
       <#assign atBrandName = (realm.displayName!"")?trim>
       <#if !atBrandName?has_content><#assign atBrandName = realm.name></#if>
       <div id="kc-header-wrapper" class="at-brand">
@@ -255,7 +255,7 @@
         <#if realm.internationalizationEnabled && locale.supported?size gt 1>
         <nav class="at-locale" aria-label="${msg("atLocaleLabel")}">
           <ul class="at-locale__list" role="list">
-            <#-- Önce seçili dil, sonra öteki diller ada göre sıralı yazılır. -->
+            <#-- The selected language comes first, then the other languages sorted by name. -->
             <#list locale.supported?sort_by("label") as l>
               <#if l.languageTag == locale.currentLanguageTag>
               <li>

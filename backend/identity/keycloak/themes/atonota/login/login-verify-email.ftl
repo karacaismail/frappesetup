@@ -1,7 +1,7 @@
 <#--
-  ATONOTA: Kaynak Keycloak 26.8.2, keycloak.v2/login/login-verify-email.ftl.
-  Fark: yeniden gönderme bağlantısı tam bir eylem cümlesidir ("emailVerifyResend").
-  Temel şablon cümleyi üç parçadan birleştirir. Türkçede bu birleşim bozuk okunur.
+  ATONOTA: Source Keycloak 26.8.2, keycloak.v2/login/login-verify-email.ftl.
+  Difference: the resend link is a full action sentence ("emailVerifyResend").
+  The base template builds the sentence from three pieces. In Turkish the joined sentence reads badly.
 -->
 <#import "template.ftl" as layout>
 <#import "buttons.ftl" as buttons>

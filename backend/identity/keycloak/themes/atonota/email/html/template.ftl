@@ -1,8 +1,8 @@
 <#--
-  Atonota e-posta düzeni. Bütün HTML e-postalar bu dosyadaki makroları kullanır.
-  E-posta istemcileri dış stil ve betik yüklemez. Bu yüzden stil satır içidir.
-  Dış betik, dış stil, dış yazı tipi ve dış görsel yoktur.
-  Görsel değerler aşağıda tek yerde durur. Giriş temasının tokenlarıyla aynıdır.
+  Atonota e-mail layout. Every HTML e-mail uses the macros in this file.
+  E-mail clients do not load external styles or scripts, so the styles are inline.
+  There are no external scripts, styles, fonts or images.
+  The visual values sit in one place below. They match the login theme's tokens.
 -->
 <#assign
   pageBg = "#f4f5f7"
@@ -20,7 +20,7 @@
   textQuiet = "font-family:${fontStack};font-size:14px;line-height:22px;color:${quiet};"
 >
 
-<#-- Sayfa çerçevesi: üstte marka, ortada kart, altta güvenlik notu. -->
+<#-- Page frame: brand at the top, card in the middle, security note at the bottom. -->
 <#macro frame title="" note="">
 <!DOCTYPE html>
 <html lang="${locale.language}" dir="${(ltr)?then('ltr','rtl')}">
@@ -62,7 +62,7 @@
 </html>
 </#macro>
 
-<#-- Keycloak'ın öteki hazır e-postaları bu makroyu çağırır. Adı ve imzası değişmez. -->
+<#-- Keycloak's other built-in e-mails call this macro. Its name and signature do not change. -->
 <#macro emailLayout>
 <@frame>
 <#nested>
@@ -77,7 +77,7 @@
 <p style="margin:0 0 16px 0;${textBody}"><#nested></p>
 </#macro>
 
-<#-- Ana düğme ve altında bağlantının düz hâli. Düğme çalışmazsa kullanıcı adresi kopyalar. -->
+<#-- Main button with the plain link below it. If the button does not work, the user copies the address. -->
 <#macro action link label expiry note="">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px 0;">
 <tr>
@@ -87,16 +87,16 @@
 </tr>
 </table>
 <p style="margin:0 0 8px 0;${textBody}">${expiry}</p>
-<#-- Güvenlik notu düğmenin hemen altındadır. Uzun adres en sonda ve sessiz renkte durur. -->
+<#-- The security note sits just below the button. The long address comes last, in the quiet colour. -->
 <#if note?has_content>
 <p style="margin:0 0 24px 0;${textBody}">${note}</p>
 </#if>
 <p style="margin:0 0 4px 0;${textQuiet}">${msg("atCopyHint")}</p>
-<#-- Açık istisna: bu satır yalnız adres taşır. Adres sözcük değildir ve tablo hücresinde başka yolla 320 piksele sığmaz. -->
+<#-- Explicit exception: this line holds only the address. An address is not a word and cannot fit 320 pixels in a table cell any other way. -->
 <p style="margin:0;${textQuiet}word-break:break-all;"><a href="${link}" style="color:${quiet};text-decoration:none;">${link}</a></p>
 </#macro>
 
-<#-- İşlem e-postası: başlık, açıklama (iç içerik), düğme, süre ve güvenlik notu. -->
+<#-- Action e-mail: heading, description (nested content), button, expiry and security note. -->
 <#macro actionEmail title link label expiry note>
 <@frame title=title>
 <@heading text=title />

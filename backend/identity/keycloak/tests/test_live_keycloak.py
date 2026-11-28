@@ -1,7 +1,7 @@
-"""Çalışan Keycloak ile belirteç ve realm testleri.
+"""Token and realm tests against a running Keycloak.
 
-Beklenen değerler docs/sozlesmeler.md 2. bölümünden alındı. Testler bin/kc-dev.sh test ile çalışır.
-Keycloak yoksa testler atlanır ve not_run sayılır.
+The expected values come from section 2 of docs/sozlesmeler.md. The tests run with bin/kc-dev.sh test.
+Without Keycloak the tests are skipped and count as not_run.
 """
 
 import hmac
@@ -53,14 +53,14 @@ class ServiceTokenTest(unittest.TestCase):
         self.assertNotIn("realm-management", body.get("resource_access", {}))
         self.assertNotIn("account", body.get("resource_access", {}))
         self.assertEqual(audiences(body), ["site-tenant1"])
-        # Gerçek giriş yolu: Admin API bu belirteci reddetmeli (D-6).
+        # Real entry path: the Admin API must reject this token (D-6).
         response = admin("/users?max=1", request_body["access_token"])
         # Contract section 2 accepts either authorization rejection.
         self.assertIn(response.status, (401, 403), safe_detail(response))
 
     def test_admin_permission_requires_separate_scope(self):
-        # Keycloak 26.8 Admin API'si belirteçte kc-admin-api kapsamını ve Admin API hedefini ister
-        # (Upgrading Guide, "Admin REST API audience"). Roller admin-api kapsamından gelir.
+        # The Keycloak 26.8 Admin API needs the kc-admin-api scope and the Admin API audience in the token
+        # (Upgrading Guide, "Admin REST API audience"). The roles come from the admin-api scope.
         request_body = self.token("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")
         body = jwt_payload(request_body["access_token"])
         roles = set(body["resource_access"]["realm-management"]["roles"])
@@ -105,8 +105,8 @@ class ServiceTokenTest(unittest.TestCase):
     def test_press_service_accepts_only_tenant_scope(self):
         request_body = self.token("press-service", "ATONOTA_PRESS_SERVICE_SECRET", "aud-site-tenant1")
         self.assertEqual(jwt_payload(request_body["access_token"])["aud"], "site-tenant1")
-        # Sözleşme: aud-press kapsamını yalnız identity-sync kullanır. press-service hiçbir yolla
-        # press hedefli belirteç alamaz. Keycloak 26.8.2 isteği invalid_scope ile reddeder.
+        # Contract: only identity-sync uses the aud-press scope. press-service cannot get a token
+        # aimed at press by any route. Keycloak 26.8.2 rejects the request with invalid_scope.
         response = client_token("press-service", get_environment_value("ATONOTA_PRESS_SERVICE_SECRET"), "aud-press")
         self.assertEqual(safe_detail(response), "HTTP 400 invalid_scope")
 
@@ -213,7 +213,7 @@ class RealmSettingsTest(unittest.TestCase):
         self.assertEqual(self.realm["defaultSignatureAlgorithm"], "RS256")
 
     def test_anonymous_client_registration_is_disabled(self):
-        # G-144: anonim dinamik istemci kaydı kapalı kalır. Gerçek uçla denenir (D-6).
+        # G-144: anonymous dynamic client registration stays off. Tested against the real endpoint (D-6).
         response = request(
             "POST",
             f"{get_environment_value('KC_PUBLIC_URL')}/realms/platform/clients-registrations/default",

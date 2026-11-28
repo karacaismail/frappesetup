@@ -1,8 +1,8 @@
-"""Sihirli bağlantı ve Apple ile giriş eklentilerinin testleri (kontrol noktası 3).
+"""Tests for the magic link and Sign in with Apple extensions (checkpoint 3).
 
-Dosya testleri Keycloak gerektirmez. Canlı testler bin/kc-dev.sh test ile çalışır.
-Beklenen değerler docs/kararlar/0003-keycloak-eklentileri.md notundan ve eklentilerin
-belgelerinden alındı. Sihirli bağlantı kısa ömürlü ve tek kullanımlık olmalıdır.
+The file tests do not need Keycloak. The live tests run with bin/kc-dev.sh test.
+The expected values come from the docs/kararlar/0003-keycloak-eklentileri.md note and the
+extensions' own documentation. A magic link must be short-lived and single-use.
 """
 
 import re
@@ -78,16 +78,16 @@ class ExtensionFileTest(unittest.TestCase):
 def _cookie_opener() -> urllib.request.OpenerDirector:
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
-            return None  # yönlendirmeyi izleme, Location başlığını oku
+            return None  # do not follow the redirect; read the Location header
 
-    # Keycloak çerezleri Secure bayrağıyla verir. Tarayıcılar *.localhost adresini güvenli sayar ve
-    # çerezi http üzerinden de gönderir. Python'un kavanozu aynı davranışı bu ayarla verir.
+    # Keycloak sets its cookies with the Secure flag. Browsers treat *.localhost as secure and
+    # also send the cookie over http. This setting gives the Python cookie jar the same behaviour.
     kavanoz = CookieJar(DefaultCookiePolicy(secure_protocols=("https", "wss", "http")))
     return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(kavanoz), NoRedirect())
 
 
 def _open(opener, address, request_body=None):
-    """Yanıtı (durum, başlıklar, gövde) olarak döner. Yönlendirme izlenmez."""
+    """Return the response as (status, headers, body). Redirects are not followed."""
     try:
         with opener.open(urllib.request.Request(address, data=request_body), timeout=30) as response:
             return response.status, dict(response.headers), response.read().decode("utf-8", "replace")
@@ -97,7 +97,7 @@ def _open(opener, address, request_body=None):
 
 
 def _follow_keycloak_redirect(opener, address: str, kc: str):
-    """Keycloak içindeki yönlendirmeleri izler. Keycloak dışına çıkan ilk adreste durur."""
+    """Follow redirects inside Keycloak. Stop at the first address outside Keycloak."""
     status, headers, body = _open(opener, address)
     for _ in range(5):
         location = headers.get("Location", "")
@@ -125,7 +125,7 @@ class LiveExtensionTest(unittest.TestCase):
         bilgi = request("GET", f"{self.kc}/admin/serverinfo", token=self.admin_token).json()
         saglayicilar = bilgi["providers"]
         self.assertIn("apple", saglayicilar["social"]["providers"])
-        # Passkey özelliği sunucuda açık olmalı. Yoksa realm'deki passkey ayarı etkisizdir.
+        # The passkey feature must be on in the server. Otherwise the realm's passkey setting has no effect.
         ozellikler = {o["name"]: o for o in bilgi.get("features", [])}
         self.assertIn("PASSKEYS", ozellikler, sorted(ozellikler))
         self.assertTrue(ozellikler["PASSKEYS"]["enabled"])

@@ -313,6 +313,22 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('task board update note names a test file from its own merge', () => {
+    // The update note names its evidence: it mentions at least one test file path (AJA-464).
+    // Every file path in the note exists in the repository. If the commit is local, the test file changed in that merge.
+    const u: TaskBoard['update'] = JSON.parse(read('src/data/task-board.json')).update;
+    const paths = [...u.note.matchAll(/(?:[\w.-]+\/)+[\w.-]+\.(?:py|ts|tsx|mjs|js|json|ftl|yaml)\b/g)].map((m) => m[0]);
+    expect(paths.filter((p) => !existsSync(new URL(p, root))), 'notta adı geçen ama depoda olmayan dosya').toEqual([]);
+    const tests = paths.filter((p) => /(^|\/)tests?\/|\.spec\.ts$|(^|\/)test_[\w-]+\.py$/.test(p));
+    expect(tests.length, 'update.note en az bir test dosyasını adıyla anar').toBeGreaterThan(0);
+    if (hasCommit(u.commit)) {
+      const parents = git('rev-list', '--parents', '-n', '1', u.commit).split(' ');
+      const base = parents.length > 1 ? parents[1] : `${u.commit}^`;
+      const changed = new Set(git('diff', '--name-only', base, u.commit).split('\n'));
+      expect(tests.filter((p) => changed.has(p)).length, `notta ${u.commit} birleşmesinde değişen test dosyası`).toBeGreaterThan(0);
+    }
+  });
+
   test('brand merge review preserves released product evidence and incomplete delivery', () => {
     const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
     const product = board.items['G-157'];
@@ -592,6 +608,43 @@ test.describe('content consistency', () => {
     for (const file of ['backend/docs/dagitim/ortamlar.md', 'backend/docs/handoff/canli-deneme-listesi.md']) {
       expect(read(file), file).toContain('IPv6 ağ ayarı önce deneme sunucusunda yapılır. Sonuç doğrulanınca prod ortamına uygulanır (AJA-507).');
     }
+  });
+
+  test('G-73 requires British English source content and fallbacks (AJA-1414)', () => {
+    const g73 = reqs.find((r) => r.id === 'G-73');
+    expect(g73, 'G-73 keeps its identity').toBeDefined();
+    const detail = g73!.detail;
+    for (const required of [
+      "Varsayılan dil MVP'de İngiliz İngilizcesidir (`en-GB`).",
+      'Kaynak katalog İngiliz İngilizcesidir (`en-GB`).',
+      'Bütün içerik önce İngiliz İngilizcesiyle yazılır.',
+      'Türkçe ve öteki diller kullanıcının tercihiyle gelir.',
+      'İngilizce metin özenle yazılır ve gözden geçirilir.',
+      'Arayüzün yedek dili `en-GB` olur.',
+      "Backend'in yedek dili `en` kalır.",
+    ]) expect.soft(detail, required).toContain(required);
+    for (const superseded of [
+      'Varsayılan dilin İngilizce olması da MVP dışıdır.',
+      'İngilizce metin uydurulmaz.',
+      'Varsayılan dil sonra İngilizce yapılır.',
+      "Arayüzün yedek dili MVP'de `tr` olur.",
+      'Var olan Türkçe metin bugün `tr` kataloğuna harfi harfine girer.',
+      'İngilizce metin çeviri işinde girer.',
+    ]) expect.soft(detail, superseded).not.toContain(superseded);
+  });
+
+  test('G-171 appends country-based units with an unstarted board item (AJA-1414)', () => {
+    const units = reqs.find((r) => r.id === 'G-171');
+    const g73 = reqs.find((r) => r.id === 'G-73');
+    expect(units, 'Country-based units have a requirement').toBeDefined();
+    expect(g73).toBeDefined();
+    expect(reqs.at(-1)?.id, 'New requirements are appended').toBe('G-171');
+    expect(units).toMatchObject({ rail: 'R3 Frontend', priority: g73!.priority, phase: g73!.phase });
+    expect(units!.detail).toContain('Ölçü birimi kullanıcının ülkesine göre değişir.');
+    expect(units!.detail).toContain('metre ya da inç');
+    expect(units!.detail).toContain('kilogram ya da libre');
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    expect(board.items['G-171']).toMatchObject({ epic: 'panel-core', status: 'not-started', level: 'mvp' });
   });
 
   test('GILT approval is recorded in decision 43 (AJA-1358)', () => {

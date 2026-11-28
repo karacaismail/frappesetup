@@ -1,7 +1,7 @@
 import { createTheme, type CSSVariablesResolver, type MantineColorsTuple } from '@mantine/core';
 
-// Görsel kimlik: koyu deniz yeşili birincil renk, kehribar vurgu.
-// Tüm bileşenler bu tokenlardan türer; bileşen içinde sabit renk yazılmaz.
+// Visual identity: dark sea green primary colour, amber accent.
+// All components derive from these tokens; no fixed colour is written inside a component.
 const sea: MantineColorsTuple = [
   '#e6f7f5',
   '#c7ebe6',
@@ -30,12 +30,12 @@ const amber: MantineColorsTuple = [
 
 export const theme = createTheme({
   primaryColor: 'sea',
-  // Açık temada sea-8 (#077c6a): beyaz üzerinde 5.1:1 — metin ve dolgu için WCAG AA.
+  // In the light theme sea-8 (#077c6a): 5.1:1 on white — WCAG AA for text and fill.
   primaryShade: { light: 8, dark: 4 },
   colors: { sea, amber },
-  // Dolgulu bileşenlerde metin rengi parlaklığa göre seçilir (ör. kehribar üzerinde koyu metin).
+  // In filled components the text colour is chosen by luminance (e.g. dark text on amber).
   autoContrast: true,
-  // amber-7 (L≈0.38) üzerinde koyu metin, sea-8 / gray-7 (L<0.2) üzerinde beyaz metin.
+  // Dark text on amber-7 (L≈0.38), white text on sea-8 / gray-7 (L<0.2).
   luminanceThreshold: 0.3,
   fontFamily:
     '"Outfit Variable", Outfit, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -52,7 +52,7 @@ export const theme = createTheme({
       h4: { fontSize: '1.05rem', lineHeight: '1.4' },
     },
   },
-  // Kalıcı kural: okunabilir hiçbir metin 1rem altına inmez.
+  // Permanent rule: no readable text goes below 1rem.
   fontSizes: {
     xs: '1rem',
     sm: '1rem',
@@ -70,8 +70,8 @@ export const theme = createTheme({
     Table: {
       defaultProps: { verticalSpacing: 'sm', horizontalSpacing: 'md', striped: 'odd' },
     },
-    // Badge yazı boyutu Mantine'de sabit px'tir (lg = 13px); 1rem kuralı için token düzeyinde yükseltilir.
-    // Dolgulu varyant + autoContrast: açık renkli "light" varyantın 3.4:1 kontrastından kaçınılır.
+    // Badge font size is a fixed px value in Mantine (lg = 13px); it is raised at token level for the 1rem rule.
+    // Filled variant + autoContrast: avoids the 3.4:1 contrast of the light-coloured "light" variant.
     Badge: {
       defaultProps: { radius: 'sm', variant: 'filled', size: 'xl' },
       vars: () => ({ root: { '--badge-fz': '1rem', '--badge-height': '1.75rem', '--badge-padding-x': '0.6rem' } }),
@@ -80,8 +80,8 @@ export const theme = createTheme({
   },
 });
 
-// Mantine'in "dimmed" metni (gray-6 / dark-2) AA kontrastını sağlamaz; ikincil metin tokenı
-// gray-7 (≈7:1) ve dark-1 (≈8:1) olarak yeniden bağlanır. --fs-quiet bu değişkenden türer.
+// Mantine's "dimmed" text (gray-6 / dark-2) does not meet AA contrast; the secondary text token is
+// rebound to gray-7 (≈7:1) and dark-1 (≈8:1). --fs-quiet derives from this variable.
 export const cssVariablesResolver: CSSVariablesResolver = (t) => ({
   variables: {},
   light: { '--mantine-color-dimmed': t.colors.gray[7] },

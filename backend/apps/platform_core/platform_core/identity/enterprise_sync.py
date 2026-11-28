@@ -26,6 +26,7 @@ from platform_core.identity import enterprise_membership, enterprise_rules
 
 def current_grants() -> list[dict]:
 	"""Every current grant, checked by the rules. A rule break stops the export."""
+	# list-limit: the export must hold every provider and organisation pair. A manager adds each pair.
 	pairs = frappe.get_all(
 		enterprise_membership.DOCTYPE,
 		fields=["provider_alias", "organization"],

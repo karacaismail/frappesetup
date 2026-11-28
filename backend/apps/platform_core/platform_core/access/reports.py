@@ -294,6 +294,7 @@ def switch_off_governed_auto_email_reports() -> None:
 	if not governed:
 		return
 	# System maintenance over every record, not a read for a user (exception to G-3).
+	# list-limit: every enabled report must be checked. Two short fields per row are read.
 	rows = frappe.get_all(
 		AUTO_EMAIL_REPORT,
 		filters={"enabled": 1},

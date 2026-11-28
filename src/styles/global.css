@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------
-   Semantik tokenlar — Mantine tokenlarının üstünde sayfa düzeyi kimlik.
-   Bileşenler yalnız bu değişkenleri kullanır; sabit değer yazılmaz.
+   Semantic tokens — page-level identity on top of the Mantine tokens.
+   Components use only these variables; no fixed values are written.
    ------------------------------------------------------------------ */
 :root {
   --fs-ink: var(--mantine-color-text);
@@ -35,15 +35,15 @@
   --fs-content-max: 76ch;
   --fs-gutter: 1rem;
   --fs-header-h: 60px;
-  /* Etkili dokunma alanı görsel boyuttan ayrı tokendır: tek başına duran kontrol ≥ 44 CSS px, kaba işaretçi
-     varsa (hibrit cihaz dahil) ≥ 48. Metin içi bağlantılar politikanın açık istisnasıdır. */
+  /* The effective touch area is a token separate from the visual size: a standalone control is ≥ 44 CSS px, ≥ 48 when a coarse
+     pointer is present (hybrid devices included). Inline text links are an explicit exception of the policy. */
   --fs-hit: 44px;
-  /* Başlığın kenar simge düğmelerinin görsel kutusu (önceki Mantine ActionIcon lg). Etkili alan (--fs-hit) bundan
-     büyüktür; fark başlığın iç boşluğuna taşar, simgeler kenar boşluğuna göre aynı hizada kalır. */
+  /* Visual box of the header's edge icon buttons (formerly Mantine ActionIcon lg). The effective area (--fs-hit) is larger
+     than this; the difference spills into the header's inner padding, and the icons stay aligned with the edge spacing. */
   --fs-icon-box: 34px;
   --fs-hero-pad: min(clamp(1.25rem, 1rem + 2vw, 2.5rem), 8vw);
-  /* Düğme biçimli kontrol (indirme bağlantıları): iç boşluk, öğe arası, kenar, hover kalkışı ve ağırlık.
-     Ana sayfa düğmeleri dar alanda yatay iç boşluğu azaltır. */
+  /* Button-like control (download links): inner padding, gap, border, hover lift and weight.
+     Home page buttons reduce the horizontal inner padding in narrow space. */
   --fs-control-pad-block: 0.55rem;
   --fs-control-pad-inline: 1.1rem;
   --fs-hero-control-pad-inline: min(var(--fs-control-pad-inline), 6cqi);
@@ -106,8 +106,8 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Tek odak göstergesi: yalnız klavye odağında, yalnız odaklanan kontrolde.
-   Yarıçap kontrolün kendisinden gelir; outline-radius tarayıcıda otomatik izler. */
+/* Single focus indicator: only on keyboard focus, only on the focused control.
+   The radius comes from the control itself; the browser follows outline-radius automatically. */
 :focus-visible {
   outline: 2px solid var(--fs-focus);
   outline-offset: 2px;
@@ -136,9 +136,9 @@ body {
   outline: 2px solid var(--fs-focus);
   outline-offset: 2px;
 }
-/* Mantine girişleri (TextInput, Select): varsayılan :focus kuralı outline'ı kaldırıp kenarlık rengini
-   değiştirir (ikinci, 1px'lik bir gösterge). Kenarlık odakta sabit kalır; tek gösterge :focus-visible
-   outline'ıdır. Hata/başarı kenarlık renkleri Mantine'in kendi odak kurallarıyla korunur. */
+/* Mantine inputs (TextInput, Select): the default :focus rule removes the outline and changes the border colour
+   (a second, 1px indicator). The border stays fixed on focus; the single indicator is the :focus-visible
+   outline. Error/success border colours are kept by Mantine's own focus rules. */
 [data-mantine-color-scheme] .mantine-Input-wrapper[data-variant] {
   --input-bd-focus: var(--input-bd);
 }
@@ -148,15 +148,15 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Kabuk: başlık, marka, navigasyon, içindekiler, alt bilgi
+   Shell: header, brand, navigation, table of contents, footer
    ------------------------------------------------------------------ */
 .site-header {
   backdrop-filter: saturate(1.4) blur(10px);
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
   background: color-mix(in srgb, var(--fs-surface) 86%, transparent);
 }
-/* Büyük kök yazıda dar başlık çubuğu: eylem düğmeleri her zaman görünür kalır, marka adı kısalır
-   (erişilebilir ad DOM'da tamdır). */
+/* Narrow header bar at a large root font: the action buttons always stay visible, the brand name shortens
+   (the accessible name is complete in the DOM). */
 .header-start {
   min-width: 0;
 }
@@ -170,8 +170,8 @@ body {
   min-width: 0;
   min-height: var(--fs-hit);
 }
-/* Menü düğmesi: etkili alan sabittir (esnek öğe olarak daralmaz); çizgiler iç boşluksuz kutuda ortalanır, kök yazı
-   büyüyünce (çizgi boyu rem) de ortada kalır. */
+/* Menu button: the effective area is fixed (it does not shrink as a flex item); the lines are centred in a box without
+   inner padding and stay centred when the root font grows (line length in rem). */
 .site-header .burger {
   display: grid;
   place-items: center;
@@ -180,8 +180,8 @@ body {
   height: var(--fs-hit);
   padding: 0;
 }
-/* Kenardaki düğmelerin görsel kutusu ile etkili alanı arasındaki fark başlığın iç boşluğuna taşar: simgeler eski
-   hizasında kalır, 320 px'te marka adı kısalmadan sığar. */
+/* The difference between the visual box and the effective area of the edge buttons spills into the header's inner padding: the icons
+   keep their old alignment, and at 320 px the brand name fits without shortening. */
 .site-header .burger {
   margin-inline-start: calc((var(--fs-icon-box) - var(--fs-hit)) / 2);
 }
@@ -223,7 +223,7 @@ body {
   text-transform: uppercase;
   color: var(--fs-quiet);
 }
-/* Gezinme bağlantısı: Mantine NavLink'in 'light' varyantıyla aynı tokenlar, React bileşeni olmadan (kabuk JS bütçesi). */
+/* Navigation link: the same tokens as the 'light' variant of Mantine NavLink, without the React component (shell JS budget). */
 .nav-link {
   display: flex;
   align-items: center;
@@ -260,13 +260,13 @@ body {
 .nav-link[data-active]:hover {
   background: var(--mantine-primary-color-light-hover);
 }
-/* Gezinme listesi kendi içinde yerel kaydırma ile kayar (ScrollArea yok). */
+/* The navigation list scrolls on its own with native scrolling (no ScrollArea). */
 .nav-scroll {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
-/* Simge düğmesi: Mantine ActionIcon 'subtle' renk tokenları; boyut etkili dokunma alanıdır (--fs-hit). */
+/* Icon button: Mantine ActionIcon 'subtle' colour tokens; the size is the effective touch area (--fs-hit). */
 .icon-btn {
   display: inline-grid;
   place-items: center;
@@ -342,10 +342,10 @@ body {
   box-shadow: inset 2px 0 0 var(--fs-accent);
 }
 
-/* Satır kırılımı: metin sözcük aralarından (ve tireden sonra) doğal sarılır. `break-word` yalnız satırın tamamından
-   uzun tek dizgiyi (büyük yazı ölçeğinde uzun sözcük, kod dışı uzun tanımlayıcı) satır sonunda kırar; içsel genişliği
-   değiştirmez, tablo sütunu ve esnek öğe sığan sözcüğü bölmez. `overflow-wrap: anywhere` ve `word-break: break-all`
-   kullanılmaz; satır içi kod hiç bölünmez (aşağıda). */
+/* Line breaking: text wraps naturally between words (and after hyphens). `break-word` breaks only a single string longer
+   than the whole line (a long word at a large font scale, a long identifier outside code) at the line end; it does not change
+   the intrinsic width, so table columns and flex items do not split a word that fits. `overflow-wrap: anywhere` and `word-break: break-all`
+   are not used; inline code is never split (see below). */
 .page {
   max-width: min(100%, 80rem);
   margin: 0 auto;
@@ -386,9 +386,9 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   İçerik tipografisi
+   Content typography
    ------------------------------------------------------------------ */
-/* Metin satır uzunluğu 76ch ile sınırlı; tablo, diyagram ve kod blokları sütunun tamamını kullanır */
+/* Text line length is limited to 76ch; tables, diagrams and code blocks use the full column */
 .prose {
   max-width: 100%;
   font-size: var(--fs-font-body);
@@ -455,7 +455,7 @@ body {
 .prose a:hover {
   color: var(--fs-accent-strong);
 }
-/* Bağlantı içindeki kod: kod zemini (--fs-tint) üzerinde AA kontrastı için mürekkep tonu; alt çizgi bağlantıyı belirtir. */
+/* Code inside a link: ink tone for AA contrast on the code background (--fs-tint); the underline marks the link. */
 .prose a code {
   color: var(--fs-accent-ink);
 }
@@ -484,19 +484,19 @@ body {
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
-/* Satır içi kod metinle birlikte akar ve yalnız tarayıcının doğal fırsatlarında sarılır; bitişik noktalama ve ekler
-   ("’dan", "),") koddan ayrı satıra düşmez. Satırının tamamından uzun kodu sayfa betiği `data-scroll` ile işaretler:
-   kod bölünmez, kendi kutusunda yatay kayar (tüm karakterler yerinde) ve yalnız gerçekten taşan kutu Tab sırasına
-   girer (WebKit taşan kutuyu kendiliğinden odaklamaz). Betik çalışmadan önce ya da hiç çalışmazsa `.page`'in break-word
-   ağı uzun kodu satır sonunda kırar, sayfa taşmaz. Tablo hücresindeki kod sarılmaz (sütun genişler, tablo kendi
-   kapsayıcısında kayar); bağlantı içindeki kod satır içi kalır. */
+/* Inline code flows with the text and wraps only at the browser's natural opportunities; adjacent punctuation and suffixes
+   ("’dan", "),") do not drop to a separate line from the code. The page script marks code longer than its whole line with `data-scroll`:
+   the code is not split, it scrolls horizontally in its own box (all characters in place) and only a box that really overflows enters
+   the Tab order (WebKit does not focus an overflowing box by itself). Before the script runs, or if it never runs, the break-word
+   net of `.page` breaks long code at the line end and the page does not overflow. Code in a table cell does not wrap (the column widens, the table
+   scrolls in its own container); code inside a link stays inline. */
 [data-code-measuring] .page {
   overflow-wrap: normal;
 }
 [data-code-measured] .prose code,
 [data-code-measured] .req-detail > code {
-  /* Betik ölçtükten sonra ağ satır içi kodda kapanır: Gecko ağ açıkken kodun bitiş dolgusunu sığma hesabına katıp
-     satırına sığan kodu da bölüyor. Satırdan uzun dizileri kod kutuları çözer. */
+  /* After the script measures, the net is turned off for inline code: with the net on, Gecko counts the code's end padding in the fit
+     calculation and splits code that fits its line too. Code boxes handle runs longer than the line. */
   overflow-wrap: normal;
 }
 [data-code-measured] .req-detail > code:not(.req-code-wrap),
@@ -527,7 +527,7 @@ code[data-scroll="single-line"] {
   padding: 0;
   font-size: var(--fs-font-body);
 }
-/* Shiki çift tema: koyu şemada --shiki-dark değişkenleri uygulanır */
+/* Shiki dual theme: the --shiki-dark variables apply in the dark scheme */
 [data-mantine-color-scheme='dark'] .astro-code,
 [data-mantine-color-scheme='dark'] .astro-code span {
   color: var(--shiki-dark) !important;
@@ -551,9 +551,9 @@ code[data-scroll="single-line"] {
 }
 
 /* ------------------------------------------------------------------
-   Akışkan tablolar: sütunlar okunabilir genişliğini korur, tablo kendi
-   sarmalayıcısında kayar. Dar ekranda sütunları sıkıştırmak yerine tablo
-   64rem'e kadar genişleyip kaydırılır.
+   Fluid tables: columns keep their readable width, the table scrolls in its own
+   wrapper. On a narrow screen, instead of squeezing the columns, the table
+   widens up to 64rem and scrolls.
    ------------------------------------------------------------------ */
 .table-wrap {
   max-width: 100%;
@@ -603,7 +603,7 @@ code[data-scroll="single-line"] {
 .prose td:nth-child(2) {
   min-width: 18rem;
 }
-/* Sayısal dağılım özeti: grup adı kelime aralarından sarılır, sayı sütunları dar ve hizalı. */
+/* Numeric distribution summary: the group name wraps between words, the number columns are narrow and aligned. */
 .prose table.req-summary th,
 .prose table.req-summary td {
   min-width: 3.5rem;
@@ -661,7 +661,7 @@ code[data-scroll="single-line"] {
   border-radius: var(--mantine-radius-lg);
   background: var(--fs-surface-2);
 }
-/* Kaydırma bölgesi figürün içindedir (figcaption'lı figure role=region alamaz). */
+/* The scroll region is inside the figure (a figure with a figcaption cannot take role=region). */
 .diagram-scroll {
   overflow-x: auto;
   border-radius: var(--mantine-radius-md);
@@ -673,7 +673,7 @@ code[data-scroll="single-line"] {
 }
 .diagram svg {
   width: 100%;
-  min-width: 65rem; /* 1040px: 16 birimlik SVG yazısı ≥ 1rem kalır */
+  min-width: 65rem; /* 1040px: 16-unit SVG text stays ≥ 1rem */
   height: auto;
   display: block;
 }
@@ -698,7 +698,7 @@ code[data-scroll="single-line"] {
 .req-head > div:first-child {
   max-width: 62ch;
 }
-/* Arama tek alandır (süzgeçler aşağıdaki düğme gruplarında): okunur genişlikte, ızgara yok. */
+/* Search is a single field (the filters are in the button groups below): readable width, no grid. */
 .req-filters {
   max-width: 36rem;
   margin-bottom: 0.75rem;
@@ -709,8 +709,8 @@ code[data-scroll="single-line"] {
 .req-explorer .mantine-Input-input {
   min-height: var(--fs-hit);
 }
-/* Gezgin düğmeleri: etiket dar kapsayıcıda (uzun ray adı, büyük kök yazı) sözcük aralarından sarılır, düğme kapsayıcıyı
-   aşmaz; etkili alan korunur, etiket dikeyde ortalanır. Tek satırlık etikette görünüm değişmez. */
+/* Explorer buttons: the label wraps between words in a narrow container (long rail name, large root font), the button does not exceed
+   the container; the effective area is kept and the label is centred vertically. A single-line label looks the same. */
 .req-explorer .mantine-Button-root {
   height: auto;
   min-height: var(--fs-hit);
@@ -723,8 +723,8 @@ code[data-scroll="single-line"] {
   line-height: var(--fs-leading-body);
   text-align: center;
 }
-/* Öncelik rozeti hiçbir genişlikte kısalmaz: Mantine Badge taşmayı gizlediği için içerik katkısı ~0'dır ve sütun ya da
-   kart başlığı rozeti daraltıp etiketi kesiyordu. Rozet tam genişliğini ayırır; dar kart başlığında alt satıra sarılır. */
+/* The priority badge never shrinks at any width: Mantine Badge hides overflow, so its content contribution is ~0, and the column or
+   card header narrowed the badge and cut the label. The badge reserves its full width; in a narrow card header it wraps to the next line. */
 .req-explorer .mantine-Badge-root {
   min-width: max-content;
 }
@@ -732,7 +732,7 @@ code[data-scroll="single-line"] {
   min-height: var(--fs-hit);
   align-items: center;
 }
-/* Faz, ray, kaynak süzgeçleri: yerel açılır bölüm (JS gerektirmez) + aria-pressed düğme grupları. */
+/* Phase, rail and source filters: native disclosure section (needs no JS) + aria-pressed button groups. */
 .req-more {
   margin: 0 0 0.75rem;
   border-radius: var(--mantine-radius-md);
@@ -785,9 +785,9 @@ code[data-scroll="single-line"] {
   padding: 0.05em 0.3em;
   border-radius: 4px;
 }
-/* Kart ve tablo satırının metinleri sade <p>'dir (Gereksinimler HTML bütçesi). Mantine Text kökünün etkili stilleri
-   aynı tokenlarla: md yazı boyutu ve satır yüksekliği, dış boşluk yok; başlık 600, ayrıntı ikincil renk, tabloda
-   ayrıntı ve sahip 0.25rem üst boşlukla. Aşağıdaki özel kurallar (satır yüksekliği, en fazla 60ch) bunları daraltır. */
+/* The texts of card and table rows are plain <p> elements (Requirements HTML budget). The effective styles of the Mantine Text root
+   with the same tokens: md font size and line height, no outer margin; title 600, detail in the secondary colour, in the table
+   detail and owner with a 0.25rem top margin. The special rules below (line height, at most 60ch) narrow these. */
 .req-title,
 .req-detail,
 .req-owner {
@@ -808,8 +808,8 @@ code[data-scroll="single-line"] {
 .req-detail {
   max-width: 60ch;
 }
-/* Tabloda ayrıntı sütun genişliğine katılmaz (içsel genişliği yok sayılır): tek satırdaki bölünemez kod sütunu 60ch'e
-   zorlamaz, sütun başlık/sahip ve 24rem alt sınırıyla belirlenir; satırdan uzun kod kendi kutusunda kayar. */
+/* In the table the detail does not take part in the column width (its intrinsic width is ignored): unbreakable code on one line does not force
+   the column to 60ch; the column is set by the title/owner and the 24rem minimum; code longer than the line scrolls in its own box. */
 .req-table .req-detail {
   contain: inline-size;
 }
@@ -905,9 +905,9 @@ tr[id^="req-"][tabindex="-1"]:focus {
   }
 }
 
-/* Gruplu görünümün kartları liste öğesidir. Tablo satırları da `req-card` sınıfını taşır. Bu yüzden kart kuralları
-   yalnız görev listesinin öğelerinde çalışır. Kart metni tablo satırıyla aynı `req-title` ve `req-detail` kurallarını
-   kullanır. Satırdan uzun kod da aynı betikle kendi kutusunda kayar. */
+/* The cards of the grouped view are list items. Table rows also carry the `req-card` class. So the card rules
+   apply only to the items of the task list. Card text uses the same `req-title` and `req-detail` rules as the table
+   row. Code longer than the line also scrolls in its own box through the same script. */
 .task-list > .req-card,
 .task-list > .req-card > * {
   min-width: 0;
@@ -937,13 +937,13 @@ tr[id^="req-"][tabindex="-1"]:focus {
   font-size: var(--fs-font-body);
   line-height: var(--fs-leading-body);
 }
-/* Uzun sahip adı gibi öğe satırdan genişse satır genişliğine iner ve sözcük aralarından sarılır (kart taşmaz). */
+/* If an item such as a long owner name is wider than the row, it shrinks to the row width and wraps between words (the card does not overflow). */
 .task-list .req-meta > * {
   min-width: 0;
 }
 
-/* Görev panosu: durum etiketi görünür metindir; simge süstür ve ekran okuyucuya alternatif metinsiz gider. Biten görevin
-   başlığı üstü çizilir ama rengi değişmez (karşıtlık açık başlıkla aynı kalır). */
+/* Task board: the status label is visible text; the icon is decoration and reaches screen readers without alternative text. The title of a finished
+   task is struck through but its colour does not change (contrast stays the same as an open title). */
 .task-card-id {
   display: inline-flex;
   flex-wrap: wrap;

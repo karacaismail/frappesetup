@@ -65,6 +65,7 @@ def _rows(
 		if for_update:
 			page = frappe.qb.get_query(doctype, **query, for_update=True).run(as_dict=True)
 		else:
+			# list-limit: `query` sets `limit` to PAGE_SIZE, and the loop pages by name.
 			page = frappe.get_all(doctype, **query)
 		for row in page:
 			yield row[pluck] if pluck else row

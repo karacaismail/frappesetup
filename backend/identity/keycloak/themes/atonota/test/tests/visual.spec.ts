@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { screens } from './helpers';
 
-// Bağımsız inceleme için ekran görüntüsü üretir. Karşılaştırma yapmaz.
-// Yalnız VISUAL=1 ile koşar: VISUAL=1 npx playwright test visual
+// Produces screenshots for independent review. It does not compare.
+// Runs only with VISUAL=1: VISUAL=1 npx playwright test visual
 const out = fileURLToPath(new URL('../reference/', import.meta.url));
 
 for (const scheme of ['light', 'dark'] as const) {
