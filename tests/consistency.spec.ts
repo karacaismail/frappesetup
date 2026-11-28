@@ -47,7 +47,6 @@ const gitOk = (...args: string[]) => {
 };
 const isShallow = () => git('rev-parse', '--is-shallow-repository') === 'true';
 const hasCommit = (c: string) => gitOk('cat-file', '-e', `${c}^{commit}`);
-const inHead = (c: string) => hasCommit(c) && gitOk('merge-base', '--is-ancestor', c, 'HEAD');
 // Yayın commit'i backend commit'ini metninde adlandırır: "Birleşmeler" listesinde "- <kısa ad> " satırıyla ya da
 // "Kaynak: <tam ad>" satırıyla. Kısa ad en az 7 karakterdir; iki ad önek olarak karşılaştırılır.
 const samePrefix = (a: string, b: string) => a.length >= 7 && b.length >= 7 && (a.startsWith(b) || b.startsWith(a));
@@ -78,17 +77,21 @@ const hasBackendHistory = () => {
   return backendCache;
 };
 // Denetim kopyanın türüne göre ayrılır (inceleme 1 Ö-2, inceleme r2-1 E-1 ve K-1):
-// 1. Commit yerelde varsa HEAD geçmişinde olmalıdır. release doluysa yayın commit'i de yerelde olmalı ve metninde kanıt
+// 1. Commit yerelde varsa ve HEAD geçmişindeyse release doluysa yayın commit'i de yerelde olmalı ve metninde kanıt
 //    commit'ini adlandırmalıdır. release null ise origin/main'deki hiçbir yayın commit'i onu adlandırmamalıdır.
-// 2. Commit yerelde yoksa ve backend geçmişi varsa commit uydurmadır.
-// 3. Tam geçmişli main kopyasında commit yoktur. release doluysa yayın commit'i HEAD geçmişinde olmalı ve kanıt commit'ini
+// 2. Commit yerelde var ama HEAD geçmişinde yoksa commit ancak bir yayınla gelmiş olabilir. Bu, yerel backend dalı olan
+//    ana dal kopyasında olur (AJA-1371). 4. maddedeki yayın denetimi uygulanır. Yayımlanmamış commit düşer.
+// 3. Commit yerelde yoksa ve backend geçmişi varsa commit uydurmadır.
+// 4. Tam geçmişli main kopyasında commit yoktur. release doluysa yayın commit'i HEAD geçmişinde olmalı ve kanıt commit'ini
 //    adlandırmalıdır. release null ise HEAD geçmişindeki bir yayın commit'i onu adlandırmalıdır. Bu, dosyayı main'e
 //    getiren yayındır.
-// 4. Sığ kopyada geçmiş yoktur. Yayın commit'i yerelde varsa onu adlandırmalıdır. Yoksa yalnız alan biçimi denetlenir.
+// 5. Sığ kopyada geçmiş yoktur. Yayın commit'i yerelde varsa onu adlandırmalıdır. Yoksa yalnız alan biçimi denetlenir.
 //    release null ise kayıt açıkça "henüz yayımlanmadı" der. Alan eksik olamaz (releaseShape).
-const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
+// head yalnız testte değişir: ana dal kopyası HEAD yerine origin/main ile denenir.
+const evidenceProblems = (label: string, c: string, rel: Release, head = 'HEAD'): string[] => {
   const out: string[] = [];
   const shallow = isShallow();
+  const inRef = (x: string) => hasCommit(x) && gitOk('merge-base', '--is-ancestor', x, head);
   const relNames = (r: NonNullable<Release>) => {
     if (hasCommit(r.commit)) {
       if (!namesCommit(git('log', '-1', '--format=%B', r.commit), c))
@@ -97,8 +100,20 @@ const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
       out.push(`${label}: yayın commit'i ${r.commit} depoda yok (origin/main çekilmemiş olabilir)`);
     }
   };
+  // Kanıt commit'i HEAD geçmişine bir yayın commit'iyle gelmiş olmalıdır (madde 2 ve 4).
+  const viaRelease = (missing: string) => {
+    if (rel) {
+      relNames(rel);
+      if (hasCommit(rel.commit) && !inRef(rel.commit)) out.push(`${label}: yayın commit'i ${rel.commit} HEAD geçmişinde değil`);
+    } else if (!releaseMessages(head).some((e) => namesCommit(e.body, c))) {
+      out.push(`${label}: ${c} ${missing} ve HEAD geçmişindeki hiçbir yayın commit'i onu adlandırmıyor`);
+    }
+  };
   if (hasCommit(c)) {
-    if (!inHead(c)) out.push(`${label}: ${c} HEAD geçmişinde değil`);
+    if (!inRef(c)) {
+      viaRelease('HEAD geçmişinde değil');
+      return out;
+    }
     if (rel) relNames(rel);
     else if (mainRef()) {
       const named = releaseMessages(mainRef()!).filter((e) => namesCommit(e.body, c));
@@ -114,12 +129,7 @@ const evidenceProblems = (label: string, c: string, rel: Release): string[] => {
     out.push(`${label}: ${c} depoda yok`);
     return out;
   }
-  if (rel) {
-    relNames(rel);
-    if (hasCommit(rel.commit) && !inHead(rel.commit)) out.push(`${label}: yayın commit'i ${rel.commit} HEAD geçmişinde değil`);
-  } else if (!releaseMessages('HEAD').some((e) => namesCommit(e.body, c))) {
-    out.push(`${label}: ${c} depoda yok ve HEAD geçmişindeki hiçbir yayın commit'i onu adlandırmıyor`);
-  }
+  viaRelease('depoda yok');
   return out;
 };
 const releaseShape = (label: string, rel: unknown): string[] => {
@@ -294,6 +304,37 @@ test.describe('content consistency', () => {
     }
     // Yayın commit'i uydurmaysa da geçmez (inceleme r2-1, K-1).
     expect(evidenceProblems('sahte', '36afb874', { pr: 18, commit: 'abcdef12' }), 'uydurma yayın commit').not.toEqual([]);
+  });
+
+  test('main copy with local backend history accepts released evidence (AJA-1371)', () => {
+    // Ana dal kopyasında yerel backend dalı da olabilir. Kanıt commit'i o zaman yerelde vardır.
+    // Commit ana dalın geçmişinde yoktur, çünkü ana dala yayın commit'iyle gelir. Bu commit'i yayın kabul ettirir.
+    // Denetim ana dal ucunun pano dosyasıyla, HEAD yerine ana dal ucuna göre koşar.
+    test.skip(isShallow(), 'Sığ kopya: commit geçmişi yok.');
+    const main = mainRef();
+    test.skip(main === null, 'origin/main yok.');
+    test.skip(!hasBackendHistory(), 'Yerel backend geçmişi yok.');
+    const board: TaskBoard = JSON.parse(git('show', `${main}:src/data/task-board.json`));
+    const done = Object.entries(board.items).filter(([, it]) => it.status === 'done');
+    const evidence = done.map(([id, it]) => [id, it.evidence!.commit, it.evidence!.release] as const);
+    evidence.push(['update', board.update.commit, board.update.release], ['audit', board.audit.commit, board.audit.release]);
+    // Senaryo gerçek olmalı: en az bir kanıt commit'i yerelde var ama ana dal geçmişinde yok.
+    expect(
+      evidence.some(([, c]) => hasCommit(c) && !gitOk('merge-base', '--is-ancestor', c, main!)),
+      'ana dal geçmişinde olmayan yerel kanıt commit',
+    ).toBe(true);
+    expect(evidence.flatMap(([id, c, rel]) => evidenceProblems(id, c, rel, main!)), 'ana dal kopyası').toEqual([]);
+    // Kural gevşemez: uydurma commit yine düşer.
+    for (const c of ['deadbeef', 'abcdef12']) {
+      expect(evidenceProblems('sahte', c, null, main!), `${c}, release null`).not.toEqual([]);
+      expect(evidenceProblems('sahte', c, { pr: 18, commit: '1d3e6344' }, main!), `${c}, release dolu`).not.toEqual([]);
+    }
+    // Yayımlanmamış backend commit'i de yine düşer. Örnek: hiçbir ana dal yayınının adlandırmadığı backend ucu.
+    const tip = gitOk('rev-parse', '--verify', '--quiet', 'refs/heads/backend') ? git('rev-parse', 'refs/heads/backend') : null;
+    if (tip && !gitOk('merge-base', '--is-ancestor', tip, main!) && !releaseMessages(main!).some((e) => namesCommit(e.body, tip))) {
+      expect(evidenceProblems('yayımlanmamış', tip, null, main!), 'yayımlanmamış, release null').not.toEqual([]);
+      expect(evidenceProblems('yayımlanmamış', tip, { pr: 18, commit: '1d3e6344' }, main!), 'yayımlanmamış, uydurma yayın').not.toEqual([]);
+    }
   });
 
   test('task board names environments, not staging', () => {
