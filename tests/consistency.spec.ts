@@ -766,6 +766,60 @@ test.describe('content consistency', () => {
     expect(readme).toContain(`${docs.length} bölüm`);
   });
 
+  test('KVKK roles, official sources, decisions and G-171 stay consistent (AJA-2608)', () => {
+    const kvkk = docs.find((d) => d.slug === 'kvkk-roller-verbis')?.text ?? '';
+    expect(kvkk, 'kvkk-roller-verbis.md bulunmalı').not.toBe('');
+    expect(kvkk).toContain('## Veri sorumlusu');
+    expect(kvkk).toContain('## Veri işleyen');
+    expect(kvkk).toContain('### Bizim veri sorumlusu olduğumuz veriler');
+    expect(kvkk).toContain('### Bizim veri işleyen olduğumuz veriler');
+    expect(kvkk).toContain('kesin hukuki görüş değildir');
+    expect(kvkk).toContain('avukat incelemesinden geçmelidir');
+    expect(kvkk).toContain('"doğrulanmadı"');
+    expect(kvkk).toContain('28 Kasım 2026');
+    for (const url of [
+      'https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=6698&MevzuatTur=1&MevzuatTertip=5',
+      'https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=24276&MevzuatTur=7&MevzuatTertip=5',
+      'https://www.resmigazete.gov.tr/eskiler/2023/07/20230725-5.pdf',
+      'https://www.resmigazete.gov.tr/eskiler/2025/10/20251001-4.pdf',
+      'https://verbis.kvkk.gov.tr/sharedFolder/sorularla-verbis.pdf',
+      'https://www.kvkk.gov.tr/Icerik/7929/Standart-Sozlesmeler',
+    ]) expect(kvkk, url).toContain(url);
+
+    const sectionsSrc = read('src/data/sections.ts');
+    expect(sectionsSrc).toContain("'kvkk-roller-verbis'");
+
+    const g116 = reqs.find((r) => r.id === 'G-116')!;
+    expect(g116.detail).toContain('veri sorumlusu');
+    expect(g116.detail).toContain('veri işleyen');
+    expect(g116.detail).toContain('G-171');
+    expect(g116.detail).toContain('6698 m.9/5');
+    expect(g116.detail).toContain('m.18/2');
+    expect(g116.detail).toContain('"doğrulanmadı"');
+    expect(g116.detail).not.toMatch(/Anthropic/i);
+
+    const g171 = reqs.find((r) => r.id === 'G-171')!;
+    expect(reqs.at(-1)?.id, 'G-171 listenin sonunda olmalı').toBe('G-171');
+    expect(g171.priority).toBe('SHOULD');
+    expect(g171.phase).toBe('P2');
+    expect(g171.rail).toBe('Çapraz');
+    expect(g171.source).toBe('develop');
+    expect(g171.detail).toContain('user_data_fields');
+    expect(g171.detail).toContain('avukat incelemesi');
+
+    const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
+    expect(board.audit.addedAfter).toContain('G-171');
+    expect(board.items['G-171']).toEqual({ epic: 'compliance', status: 'unverified', level: 'post-mvp' });
+
+    const decisions = new Map(decisionRows.map((row) => [row[1], row[0]]));
+    expect(decisions.get('K-64'), 'K-64 açık kararı').toContain('G-116');
+    expect(decisions.get('K-64'), 'K-64 açık kararı').toContain('G-171');
+
+    const p2 = phases.find((p) => p.id === 'P2') as { exit?: string } | undefined;
+    expect(p2?.exit).toContain('KVKK veri işleyen sözleşmesi');
+    expect(p2?.exit).toContain('kendi VERBİS değerlendirmemiz');
+  });
+
   test('superseded names and hosts do not reappear in pages or requirements', () => {
     // Kaçışlı yazımlar (\\<kiracı\\>, &lt;kiracı&gt;) da yakalanır: metin önce normalleştirilir.
     const norm = (t: string) => t.replace(/\\([<>_])/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>');

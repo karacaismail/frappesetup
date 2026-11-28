@@ -72,3 +72,5 @@ Bu bölümün sahibi DevOps sorumlusudur.
 ## KVKK denetim ve saklama (G-52, G-64)
 
 enable\_telemetry=0, allow\_error\_traceback=0, log\_api\_requests=1. Logs To Clear: Activity Log 365, Access Log 365, API Request Log 90, Error Log 30, Email Queue 30, Scheduled Job Log 14, View Log 90, Route History 90, Integration Request 90, OAuth Bearer Token 30, Webhook Request Log 30, Prepared Report 14. Yönetici Permission Log ve Deleted Document temizliğini elle başlatır. Sistem 365 günü aşan kayıtları kalıcı siler (O-32). Personal Data Download/Deletion Request etkin, her uygulama `user_data_fields` tanımlar, satılan doctype'larda track\_changes=1. Saklama/legal hold matrisi ve rıza sürümleme Rail 6'da tanımlanır (SA-36).
+
+Kiracı sitedeki iş verilerinde müşteri veri sorumlusudur. Platform bu verilerde veri işleyendir. Buradaki teknik ayarlar 6698 sayılı Kanun m.12 güvenlik tedbirlerine temel olur. Uygulamaların `user_data_fields` tanımları ve saklama süreleri müşterinin veri envanteri özeti dışa aktarımına girdi verir (G-171). Rol ayrımı ve resmî kaynaklar [KVKK ve VERBİS](/frappesetup/kvkk-roller-verbis/) sayfasındadır.

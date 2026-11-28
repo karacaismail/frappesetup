@@ -19,7 +19,7 @@ Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine ku
 | K9 | **AI-first**: Press ve siteler MCP ile yönetilir. Ajan servisi ve model geçidi sağlayıcıdan bağımsızdır. Panelde sağda AI paneli bulunur. AI eylemleri aynı sunucu izinlerinden geçer. Yazma eylemleri önizleme ve onay gerektirir. Sistem her eylemi denetim kaydına yazar. | Tek tıkla aksiyon ve kararlı orkestrasyon. Proje sahibi her şeyin yapay zekâyla yönetilmesini ve sağlayıcıdan bağımsızlığı istedi (D-9, D-11) | Sisteme birden çok sağlayıcı, hesap ve API eklenir. Model adı kodda yazılmaz, model kaydında durur (O-10, O-13). Modelde onay alanı yoktur. Onay insan oturumundaki ayrı uçtan gelir. KVKK uyumu zorunludur |
 | K10 | Ürünler ayrı Frappe app'leri olarak satılır: **HRMS TR** önce, sonra **CRM**, **Webshop**; hepsi ortak **admin shell** çerçevesine uyar; modül etkinleştirme **Press Marketplace / App Plan** üzerinden | Zoho/Odoo tarzı "etkinleştir" deneyimi | Her app bu dokümandaki app çerçevesi şablonunu karşılar |
 
-K3 notu: Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; aktarım mekanizması hukukça belirlenir (G-90, G-116).
+K3 notu olarak Hetzner'in AB içinde olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz. Hetzner ve dış yapay zekâ sağlayıcıları için aktarım zinciri ve Standart Sözleşme seçimi 6698 m.9 uyarınca avukat incelemesiyle belirlenir (G-90, G-116, K-64). Ayrıntılar [KVKK ve VERBİS](/frappesetup/kvkk-roller-verbis/) sayfasındadır.
 
 K1 ve K9 notu: Bu iki satır 23 Kasım 2026 Pazartesi günü backend proje kaydına göre güncellendi. Kayıt `backend/PROJECT-RECORD.md` dosyasındadır. D ile başlayan kimlikler proje sahibinin kararlarıdır. O ile başlayan kimlikler orkestratörün kararlarıdır. Proje sahibi bu kararları orkestratöre bıraktı.
 
@@ -37,7 +37,7 @@ K1 ve K9 notu: Bu iki satır 23 Kasım 2026 Pazartesi günü backend proje kayd�
 | DevOps sorumlusu (kıdemli DevOps mühendisi) | Hetzner sunucuları, Press kurulumu, Keycloak, CI/CD, deploy ve rollback |
 | Alan adı sorumlusu | GoDaddy hesabı, domain ve DNS değişiklikleri (teknik gereksinimi DevOps sorumlusu hazırlar) |
 | Finans/Muhasebe ve mali müşavir | Vergi ve belge zamanlaması, finans olay–belge matrisi (K-13, SA-41) |
-| Hukuk | KVKK, rıza ve aktarım mekanizması, lisans değerlendirmesi (K-1, K-27, K-28) |
+| Hukuk | KVKK veri işleyen sözleşmesi, aktarım mekanizması, kendi VERBİS değerlendirmemiz, rıza ve lisans incelemesi (K-1, K-27, K-28, K-64, G-116, G-171) |
 
 ## Kapanan kararlar
 

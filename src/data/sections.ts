@@ -74,6 +74,11 @@ export const SECTIONS: Record<string, SectionMeta> = {
     icon: 'help',
     summary: 'Yardım kulakçığı, kendi kendine destek modu, tur ve keşif motoru.',
   },
+  'kvkk-roller-verbis': {
+    group: 'Sözleşmeler',
+    icon: 'shield',
+    summary: 'Veri sorumlusu ve veri işleyen rolleri, resmî kaynaklar, sözleşme maddesi ve VERBİS yardımı kararları.',
+  },
   gereksinimler: { group: 'Teslim', icon: 'list', summary: 'G ve SA serisi gereksinimlerin ana listesi, süzülebilir gezgin.' },
   'admin-shell': { group: 'Teslim', icon: 'sidebar', summary: 'Her SaaS admin shell için olmazsa olmazlar.' },
   'app-cercevesi': { group: 'Teslim', icon: 'apps', summary: 'Satılan her app için çerçeve şablonu.' },

@@ -1152,7 +1152,7 @@
  {
   "id": "G-116",
   "title": "KVKK programı ve kiracı ayrılış/silme SLA'sı",
-  "detail": "Her kiracıyla veri işleyen–veri sorumlusu sözleşmesi, VERBİS kaydı, veri envanteri (Hetzner DE/FI barındırma da Türkiye dışı aktarımdır; SMTP sağlayıcısı, GlitchTip, model sağlayıcıları ve etkinleştirilen ölçüm satıcıları dahil tüm yurt dışı alıcılar), Kurul standart sözleşmesi ve imzadan sonra 5 iş günü içinde Kurula bildirim (7499 sonrası KVKK duyurusu; uygulanabilirliği ve aktarım mekanizması hukuk teyidi), veri ihlali 72 saat runbook'u, panel ilk girişte aydınlatma kaydı, saklama/imha politikası (G-24, G-52 süreleriyle aynı). Ayrılış: `Site.archive(create_offsite_backup=True)` → sözleşmedeki saklama süresi (karar: 30 gün) sonunda `delete_offsite_backups(keep_latest=False)` + `delete_physical_backups`, Site Config'teki Password sırlarının temizliği, Hetzner nesnelerinin silindiğinin doğrulanması ve imzalı silme teyidi; Press'in kendi kişisel verileri (Team, Account Request, Site Activity) için ayrı süre; Team Deletion Request akışı belgelenir.",
+  "detail": "Rol ayrımı nettir: müşteri hesap, fatura, sözleşme, destek ve kendi personel verilerimizde veri sorumlusu biziz; müşterinin ürüne girdiği kendi çalışan ve iş verilerinde müşteri veri sorumlusudur, biz veri işleyeniz. Kendi veri sorumlusu olduğumuz veriler için VERBİS yükümlülüğümüz kendi çalışan sayımıza, mali bilançomuza ve ana işimize göre değerlendirilir (mevcut durumumuz \"doğrulanmadı\", avukat incelemesi gerekir). Veri işleyen olarak müşteri verisi için kendi adımıza VERBİS kaydı yapmayız; müşteriye hazırlık için düzenlenebilir veri envanteri özeti sunarız (G-171). Her kiracıyla veri işleyen sözleşmesi (veya ek protokol) yapılır. Veri envanteri tüm yurt dışı alıcıları kapsar: Hetzner DE/FI barındırma, SMTP sağlayıcısı, GlitchTip, etkinleştirilen dış yapay zekâ sağlayıcıları ve etkinleştirilen ölçüm satıcıları. Uygun Standart Sözleşme şablonu (2 veya 3 seçimi \"doğrulanmadı\") avukat onayıyla kesinleşir ve imzadan sonra 5 iş günü içinde Kuruma bildirilir (6698 m.9/5; bildirim cezası 6698 m.18/2 uyarınca veri işleyene de kesilebilir, K-64). Veri ihlali runbook'u en kısa sürede bildirim ilkesine göre hazırlanır (6698 m.12/5; 72 saatlik sürenin Kurul karar metni \"doğrulanmadı\", avukat teyidi gerekir). Panel ilk girişte aydınlatma kaydı ve saklama/imha politikası G-24 ve G-52 süreleriyle uyumludur. Ayrılış: `Site.archive(create_offsite_backup=True)` → sözleşmedeki saklama süresi (karar: 30 gün) sonunda `delete_offsite_backups(keep_latest=False)` + `delete_physical_backups`, Site Config'teki Password sırlarının temizliği, Hetzner nesnelerinin silindiğinin doğrulanması ve imzalı silme teyidi; Press'in kendi kişisel verileri (Team, Account Request, Site Activity) için ayrı süre; Team Deletion Request akışı belgelenir.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P2",
@@ -2138,5 +2138,15 @@
   "phase": "P1",
   "source": "develop",
   "owner": "Ürün sahibi"
+ },
+ {
+  "id": "G-171",
+  "title": "Müşteri için VERBİS ve veri envanteri hazırlık özeti dışa aktarımı",
+  "detail": "Kiracı yöneticisi panelden kendi sitesi için düzenlenebilir veri envanteri özeti dışa alır. Çıktı CSV ve JSON biçiminde üretilir. Özet altı başlık içerir: kurulu uygulamalardaki veri kategorileri ve kişi grupları, varsayılan işleme amaçları, platform saklama süreleri (G-24 ve G-52 ile uyumlu), bilinen alıcı grupları, yurt dışına aktarım yapılan alt işleyenler (Hetzner ve etkinse dış yapay zekâ, SMTP, ölçüm sağlayıcıları) ve platform güvenlik tedbirleri. Veri kategorisi listesi uygulamaların `user_data_fields` tanımlarından ve etkin modüllerden türetilir. Ürün müşteri adına VERBİS kaydı yapmaz. Ürün hukuki görüş vermez. Ekranda ve dosyada bunun yalnız taslak olduğu yazar. Nihai doğruluk ve VERBİS sorumluluğunun müşteride olduğu ve avukat incelemesi gerektiği de yazar. Kabul: yalnız kiracı yöneticisi özet alabilir, çıktı kurulu modül veya dış sağlayıcı değişince güncellenir, çıktıda başka kiracının verisi ve gerçek kişi kaydı bulunmaz.",
+  "rail": "Çapraz",
+  "priority": "SHOULD",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi; Hukuk (şablon onayı)"
  }
 ]
