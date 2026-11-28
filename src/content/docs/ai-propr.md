@@ -4,7 +4,7 @@ nav: "ProPR"
 order: 26
 ---
 
-Bu sayfa ProPR'ın bu projede nasıl kullanıldığını anlatır. Kurulum bilgileri 22 Kasım 2026 Pazar günü yerel kurulumda doğrulandı. Birleştirme kuralı 27 Kasım 2026 Cuma günü eklendi. Adım adım kurulum belgesi depoda [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
+Bu sayfa ProPR'ın bu projede nasıl kullanıldığını anlatır. Kurulum bilgileri 22 Kasım 2026 Pazar günü yerel kurulumda doğrulandı. Birleştirme kuralı 27 Kasım 2026 Cuma günü eklendi. Depo ayrımı 28 Kasım 2026 Cumartesi günü güncellendi. Adım adım kurulum belgesi depoda [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
 
 ## Kullanım amacı
 
@@ -12,21 +12,24 @@ ProPR, GitHub'daki PR'ları izleyen açık kaynak bir uygulamadır. ProPR bu bil
 
 ## Birleştirme kuralı
 
-Müşteri 27 Kasım 2026 Cuma günü bu kuralı koydu. Kural değişmez. Sitedeki karar kaydı K-64'tür.
+Müşteri 27 Kasım 2026 Cuma günü birleştirme ve commit kimliği kuralını koydu. Müşteri 28 Kasım 2026 Cumartesi günü depo ayrımını netleştirdi. Kural değişmez. Sitedeki karar kaydı K-64'tür.
 
-1. PR'ları ProPR birleştirir.
-2. ProPR'ın her commit'inde yazar ve committer `karacaismail` hesabı olur.
-3. GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı kabul etti.
+ProPR, `karacaismail/frappesetup` deposuna erişemiyor. ProPR yalnız `metafrappe` depolarında çalışır.
 
-Kural ProPR'ın üç commit türünü kapsar:
+1. `karacaismail/frappesetup` deposunda PR'ları orkestratör yerelde `--no-ff` ile birleştirir ve GitHub'a gönderir. Commit kimliği `karacaismail` olur. Yazar koruması açık kalır.
+2. `metafrappe` depolarında PR'ları ProPR birleştirir.
+3. `metafrappe` depolarında ProPR'ın her commit'inde yazar ve committer `karacaismail` hesabı olur.
+4. `metafrappe` depolarında GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı yalnız `metafrappe` depolarında kabul etti.
+
+ProPR kuralı `metafrappe` depolarında üç commit türünü kapsar:
 
 - ana dalı PR dalına birleştiren commit,
 - çakışma çözen commit,
 - ProPR'ın yazdığı düzeltme commit'i.
 
-Kimliği ProPR'ın iki ayar değişkeni verir. Değişkenlerin adı `PROPR_AGENT_COMMIT_AUTHOR_NAME` ve `PROPR_AGENT_COMMIT_AUTHOR_EMAIL` şeklindedir. Değişkenler boş bırakılmaz ve silinmez. Değerler kurulum belgesinde yazılıdır.
+`metafrappe` depolarında kimliği ProPR'ın iki ayar değişkeni verir. Değişkenlerin adı `PROPR_AGENT_COMMIT_AUTHOR_NAME` ve `PROPR_AGENT_COMMIT_AUTHOR_EMAIL` şeklindedir. Değişkenler boş bırakılmaz ve silinmez. Değerler kurulum belgesinde yazılıdır.
 
-ProPR Git'i hook'lar kapalı çalıştırır. Hook, Git'in her commit'te çalıştırdığı denetimdir. Bu yüzden yazar koruması ProPR commit'lerini denetlemez. Kimliği yalnız bu iki değişken korur. Committer her PR'da commit kimliğini ayrıca denetler.
+ProPR Git'i hook'lar kapalı çalıştırır. Hook, Git'in her commit'te çalıştırdığı denetimdir. Bu yüzden `metafrappe` depolarında yazar koruması ProPR commit'lerini denetlemez. Kimliği yalnız bu iki değişken korur. `karacaismail/frappesetup` deposunda yazar koruması açık kalır. Committer her PR'da commit kimliğini ayrıca denetler.
 
 ## Eski kurulum
 

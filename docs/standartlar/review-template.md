@@ -53,7 +53,7 @@ Committer aynı aykırılığı kendi yorumuna yazar. Committer dalı birleştir
 
 ## Commit kimliği denetimi
 
-Committer her PR'da commit kimliğini denetler. Bu kuralı müşteri 27 Kasım 2026 Cuma günü koydu. Kural `KARARLAR.md` dosyasında Karar 45 olarak yazılıdır.
+Committer her PR'da commit kimliğini denetler. Müşteri bu kuralı 27 Kasım 2026 Cuma günü koydu. Müşteri 28 Kasım 2026 Cumartesi günü depo ayrımını netleştirdi. Kural `KARARLAR.md` dosyasında Karar 45 olarak yazılıdır.
 
 PR'daki her commit'in iki kimlik alanı vardır. Yazar, değişikliği yazan kişidir. Committer, commit'i oluşturan kişidir. İki alan da şu değeri taşımalı:
 
@@ -61,9 +61,10 @@ PR'daki her commit'in iki kimlik alanı vardır. Yazar, değişikliği yazan ki�
 karacaismail <35493655+karacaismail@users.noreply.github.com>
 ```
 
-Kural ProPR'ın commit'lerini de kapsar. Örneğin ana dalı PR dalına birleştiren commit bu kapsamdadır. Çakışma çözen commit ve ProPR düzeltme commit'i de bu kapsamdadır.
+Depo ayrımı şöyledir:
 
-Tek istisna GitHub'ın son birleşme commit'idir. GitHub bu commit'in committer alanına GitHub yazar. Müşteri bu istisnayı kabul etti. Bu commit'in yazar alanı yine `karacaismail` olmalı.
+- `karacaismail/frappesetup` deposunda ProPR çalışmaz. Bu depoda PR'ları orkestratör yerelde `--no-ff` ile birleştirir ve GitHub'a gönderir. Commit kimliği `karacaismail` olur. Yazar koruması açık kalır. GitHub birleştirme servisi istisnası bu depoda geçerli değildir.
+- `metafrappe` depolarında PR'ları ProPR birleştirir. Karar 45'teki ProPR commit kimliği kuralı ve GitHub birleştirme servisi istisnası yalnız `metafrappe` depolarında geçerlidir. Ana dalı PR dalına birleştiren commit, çakışma çözen commit ve ProPR düzeltme commit'i bu kapsamdadır. Bu depolarda tek istisna GitHub'ın son birleşme commit'idir. GitHub bu commit'in committer alanına GitHub yazar. Müşteri bu istisnayı yalnız `metafrappe` depoları için kabul etti. Bu commit'in yazar alanı yine `karacaismail` olmalı.
 
 Committer kimliği şu komutla listeler:
 

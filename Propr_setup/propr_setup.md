@@ -31,23 +31,24 @@ Bu klasör depoda `Propr_setup` adıyla durur. Klasörde beş dosya vardır:
 
 ## 1. ProPR bizim kurulumumuzda ne yapar
 
-ProPR, `karacaismail/frappesetup` deposunu izler.
+ProPR yalnız `metafrappe` depolarında çalışır. ProPR, `karacaismail/frappesetup` deposuna erişemiyor.
 
-Müşteri 27 Kasım 2026 Cuma günü yeni bir kural koydu. Kural değişmez. Sitedeki karar kaydı K-64'tür. Kural şudur:
+Müşteri 27 Kasım 2026 Cuma günü birleştirme ve commit kimliği kuralını koydu (K-64). Müşteri 28 Kasım 2026 Cumartesi günü depo ayrımını netleştirdi (AJA-2553). Kural değişmez. Kural şudur:
 
-1. PR'ları ProPR birleştirir.
-2. ProPR'ın her commit'inde yazar ve committer `karacaismail <35493655+karacaismail@users.noreply.github.com>` olur.
-3. GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı kabul etti.
+1. `metafrappe` depolarında PR'ları ProPR birleştirir.
+2. `metafrappe` depolarında ProPR'ın her commit'inde yazar ve committer `karacaismail <35493655+karacaismail@users.noreply.github.com>` olur.
+3. `metafrappe` depolarında GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı yalnız `metafrappe` depoları için kabul etti.
+4. `karacaismail/frappesetup` deposunda PR'ları orkestratör yerelde `--no-ff` ile birleştirir ve GitHub'a gönderir. Commit kimliği `karacaismail` olur. Yazar koruması açık kalır.
 
-Kural ProPR'ın üç commit türünü kapsar:
+ProPR kuralı `metafrappe` depolarında ProPR'ın üç commit türünü kapsar:
 
 - ana dalı PR dalına birleştiren commit,
 - çakışma çözen commit,
 - ProPR'ın yazdığı düzeltme commit'i.
 
-### Commit kimliği değişkenleri
+### Commit kimliği değişkenleri (`metafrappe` depoları)
 
-Kimliği iki değişken verir. Değişkenler ProPR'ın `.env` dosyasındadır. Dosyanın yolu şudur:
+`metafrappe` depolarında kimliği iki değişken verir. Değişkenler ProPR'ın `.env` dosyasındadır. Dosyanın yolu şudur:
 
 ```text
 ~/Library/Application Support/ProPR Desktop/local-runtime/.env
@@ -62,17 +63,17 @@ PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com
 
 Bu iki değişkeni boş bırakmayın. Bu iki değişkeni silmeyin. Değişken boş kalırsa ProPR yazar alanına `propr-dev[bot]` yazar.
 
-ProPR Git'i hook'lar kapalı çalıştırır. Hook, Git'in her commit'te çalıştırdığı denetimdir. Bu yüzden yazar koruması ProPR commit'lerini denetlemez. Kimliği yalnız bu iki değişken korur.
+ProPR Git'i hook'lar kapalı çalıştırır. Hook, Git'in her commit'te çalıştırdığı denetimdir. Bu yüzden `metafrappe` depolarında yazar koruması ProPR commit'lerini denetlemez. Kimliği yalnız bu iki değişken korur. `karacaismail/frappesetup` deposunda birleştirmeyi orkestratör yerelde yapar. Bu depoda yazar koruması açık kalır.
 
 ### Eski kurulumdan kalan bölümler
 
-Bu belge önce 22 Kasım 2026 Pazar günü yazıldı. O gün ProPR yalnız gözlemciydi. Birleştirmeyi kapı betiği yapıyordu. Betiğin yolu şuydu:
+Bu belge önce 22 Kasım 2026 Pazar günü yazıldı. O gün ProPR `karacaismail/frappesetup` için yalnız gözlemci olarak kuruldu. Birleştirmeyi kapı betiği yapıyordu. Betiğin yolu şuydu:
 
 ```text
 ~/.config/frappesetup-pr/pr_gate.py
 ```
 
-Belgedeki GitHub izinleri o günkü kurulumu anlatır. "Yapmayın" bölümündeki birleştirme ve yazma izni maddeleri de o güne aittir. Bu maddeler yeni kurala göre henüz gözden geçirilmedi. Açık işler listesinin 7. maddesi bu işi anlatır.
+Belgedeki `karacaismail/frappesetup` GitHub izinleri ve depo seçimi o günkü kurulumu anlatır. "Yapmayın" bölümündeki birleştirme ve yazma izni maddeleri de o güne aittir. `metafrappe` depolarındaki ProPR izinleri yeni kurala göre henüz gözden geçirilmedi. Açık işler listesinin 7. maddesi bu işi anlatır.
 
 ## 2. Ön koşullar
 
@@ -679,7 +680,7 @@ LC_ALL=C sed -i '' -E '/(^|;)[0-9a-f]{40}$/d' ~/.zsh_history
 
 5. İndirilenler klasöründeki `.pem` dosyasını çöp kutusuna taşıyabilirsiniz. ProPR bu dosyanın kendi kopyasını sakladı.
 6. ProPR'da ajan tanımlı değildir. Bu durum bilinçli bir seçimdir.
-7. GitHub izinlerini ve "Yapmayın" bölümünü K-64 kuralına göre gözden geçirin. Bu belge değişkenlerin çalıştığını doğrulamaz. ProPR'ın gerçek bir commit'i denetlenmedi.
+7. `metafrappe` depoları için GitHub izinlerini ve "Yapmayın" bölümünü K-64 ile AJA-2553 kuralına göre gözden geçirin. `karacaismail/frappesetup` deposunda ProPR kullanılmaz; birleştirmeyi orkestratör yerelde `--no-ff` ile yapar ve yazar koruması açık kalır. Bu belge değişkenlerin çalıştığını doğrulamaz. ProPR'ın gerçek bir commit'i denetlenmedi.
 
 ## 11. Yapmayın
 

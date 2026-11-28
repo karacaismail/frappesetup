@@ -647,7 +647,7 @@ test.describe('content consistency', () => {
     expect(introduction).toContain('Son gün 27 Kasım 2026 Cuma günüdür.');
   });
 
-  test('ProPR merge and commit identity rule is recorded (AJA-1497)', () => {
+  test('ProPR merge and commit identity rule reflects AJA-2553 repo split (AJA-1497, AJA-2576)', () => {
     const identityVariables = [
       'PROPR_AGENT_COMMIT_AUTHOR_NAME=karacaismail',
       'PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com',
@@ -655,21 +655,54 @@ test.describe('content consistency', () => {
     const setup = read('Propr_setup/propr_setup.md');
     for (const variable of identityVariables) expect(setup, variable).toContain(variable);
     expect(setup).not.toContain('ProPR PR birleştirmez');
+    expect(setup).not.toContain('ProPR, `karacaismail/frappesetup` deposunu izler.');
+    expect(setup).not.toContain("1. PR'ları ProPR birleştirir.");
+    for (const reference of ['AJA-2553', 'metafrappe', 'karacaismail/frappesetup', '--no-ff'])
+      expect(setup, `propr_setup ${reference}`).toContain(reference);
+    expect(setup).toMatch(/orkestratör/i);
+    expect(setup).toMatch(/yazar koruması/i);
 
     const page = docs.find((d) => d.slug === 'ai-propr')?.text ?? '';
     expect(page).not.toContain('ProPR PR birleştirmez');
-    expect(page).toContain("PR'ları ProPR birleştirir.");
-    expect(page).toContain('K-64');
+    expect(page).not.toContain("1. PR'ları ProPR birleştirir.");
+    for (const reference of ['K-64', 'metafrappe', 'karacaismail/frappesetup', '--no-ff'])
+      expect(page, `ai-propr ${reference}`).toContain(reference);
+    expect(page).toMatch(/orkestratör/i);
+    expect(page).toMatch(/yazar koruması/i);
+    expect(page).toMatch(/metafrappe[\s\S]*ProPR birleştirir/i);
+
+    const k64 = (docs.find((d) => d.slug === 'kararlar')?.text ?? '')
+      .split('\n')
+      .find((line) => line.startsWith('| K-64 |')) ?? '';
+    for (const reference of ['28 Kasım 2026 Cumartesi', 'metafrappe', 'karacaismail/frappesetup', '--no-ff'])
+      expect(k64, `K-64 ${reference}`).toContain(reference);
+    expect(k64).toMatch(/orkestratör/i);
+    expect(k64).toMatch(/yazar koruması/i);
 
     const decisions = read('docs/standartlar/KARARLAR.md');
     const decision = decisions.split(/^### Karar 45\./m)[1]?.split(/^#{1,3} /m)[0] ?? '';
-    for (const reference of [...identityVariables, '27 Kasım 2026 Cuma günü', 'K-64', 'AJA-1489'])
-      expect(decision, reference).toContain(reference);
+    for (const reference of [
+      ...identityVariables,
+      '27 Kasım 2026 Cuma günü',
+      '28 Kasım 2026 Cumartesi',
+      'K-64',
+      'AJA-1489',
+      'AJA-2553',
+      'metafrappe',
+      'karacaismail/frappesetup',
+      '--no-ff',
+    ])
+      expect(decision, `Karar 45 ${reference}`).toContain(reference);
+    expect(decision).toMatch(/orkestratör/i);
+    expect(decision).toMatch(/yazar koruması/i);
     expect(decisions.indexOf('### Karar 45.')).toBeGreaterThan(decisions.indexOf('### Karar 44.'));
 
     const review = read('docs/standartlar/review-template.md');
-    expect(review).toContain('karacaismail');
+    for (const reference of ['karacaismail', 'Karar 45', 'metafrappe', 'karacaismail/frappesetup', '--no-ff'])
+      expect(review, `review-template ${reference}`).toContain(reference);
     expect(review).toMatch(/commit kimliğini denetler/);
+    expect(review).toMatch(/orkestratör/i);
+    expect(review).toMatch(/yazar koruması/i);
   });
 
   test('built pages have no table rows rendered as paragraphs', () => {
