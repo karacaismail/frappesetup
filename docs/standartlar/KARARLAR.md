@@ -942,6 +942,30 @@ Bu karar, Karar 43'teki varsayılan dili İngilizce yapmayı erteleme hükmünü
 Karar 43'ün GILT altyapısına ilişkin onayı geçerlidir.
 Bu karar üst yapının kapsamını belirlemez.
 
+### Karar 45. Depo ayrımına göre PR birleştirme ve commit kimliği
+
+Müşteri bu kuralı 27 Kasım 2026 Cuma günü koydu. Kural değişmez. Kuralı yalnız müşterinin açık yeni kararı değiştirir. İlk kararın kaydı AJA-1489 işindedir.
+
+Müşteri 28 Kasım 2026 Cumartesi günü depo ayrımını netleştirdi. Bu kararın kaydı AJA-2553 işindedir. ProPR, `karacaismail/frappesetup` deposuna erişemiyor. ProPR yalnız `metafrappe` depolarında çalışır.
+
+Karar şu altı kuralı içerir:
+
+1. `karacaismail/frappesetup` deposunda PR'ları orkestratör yerelde `--no-ff` ile birleştirir ve GitHub'a gönderir. Commit kimliği `karacaismail` olur. Yazar koruması açık kalır.
+2. `metafrappe` depolarında PR'ları ProPR birleştirir.
+3. `metafrappe` depolarında ProPR'ın her commit'inde yazar ve committer `karacaismail <35493655+karacaismail@users.noreply.github.com>` olur. Kural üç commit türünü kapsar. Bunlar ana dalı PR dalına birleştiren commit, çakışma çözen commit ve ProPR düzeltme commit'idir.
+4. `metafrappe` depolarında kimliği iki değişken verir. Değişkenler şunlardır: `PROPR_AGENT_COMMIT_AUTHOR_NAME=karacaismail` ve `PROPR_AGENT_COMMIT_AUTHOR_EMAIL=35493655+karacaismail@users.noreply.github.com`. Değişkenler boş bırakılmaz ve silinmez.
+5. `metafrappe` depolarında GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı yalnız `metafrappe` depolarında kabul etti.
+6. `metafrappe` depolarında ProPR Git'i hook'lar kapalı çalıştırır. Yazar koruması ProPR commit'lerini denetlemez. Kimliği değişkenler korur.
+
+Bu karar eski kuralın yerine geçer. Eski kurala göre ProPR yalnız gözlemciydi. Birleştirmeyi kapı betiği yapıyordu.
+
+Sitedeki karşılığı şudur:
+
+- Sitedeki karar kaydı K-64'tür. İş tanımı bu kararı K-62 diye anıyordu. K-62 ve K-63 numaraları sitede zaten kullanılıyordu.
+- Kuralı sitenin “ProPR” sayfası anlatır.
+- Kurulum adımları `Propr_setup/propr_setup.md` belgesindedir.
+- Committer'ın denetimi `review-template.md` dosyasındadır.
+
 ## Modellerin kararları
 
 Proje sahibi bu konuları cevapsız bıraktı ya da modellere bıraktı. Proje sahibi bu kararları değiştirebilir.

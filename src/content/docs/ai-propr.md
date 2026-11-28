@@ -4,29 +4,46 @@ nav: "ProPR"
 order: 26
 ---
 
-Bu sayfa ProPR'ın bu projede nasıl kullanıldığını anlatır. Bilgiler 22 Kasım 2026 Pazar günü yerel kurulumda doğrulandı. Adım adım kurulum belgesi depoda [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
+Bu sayfa ProPR'ın bu projede nasıl kullanıldığını anlatır. Kurulum bilgileri 22 Kasım 2026 Pazar günü yerel kurulumda doğrulandı. Birleştirme kuralı 27 Kasım 2026 Cuma günü eklendi. Depo ayrımı 28 Kasım 2026 Cumartesi günü güncellendi. Adım adım kurulum belgesi depoda [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
 
 ## Kullanım amacı
 
 ProPR, GitHub'daki PR'ları izleyen açık kaynak bir uygulamadır. ProPR bu bilgisayarda yerel olarak çalışır.
 
-Bu projede ProPR yalnız gözlemci olarak çalışır. ProPR şu üç işi yapar:
+## Birleştirme kuralı
+
+Müşteri 27 Kasım 2026 Cuma günü birleştirme ve commit kimliği kuralını koydu. Müşteri 28 Kasım 2026 Cumartesi günü depo ayrımını netleştirdi. Kural değişmez. Sitedeki karar kaydı K-64'tür.
+
+ProPR, `karacaismail/frappesetup` deposuna erişemiyor. ProPR yalnız `metafrappe` depolarında çalışır.
+
+1. `karacaismail/frappesetup` deposunda PR'ları orkestratör yerelde `--no-ff` ile birleştirir ve GitHub'a gönderir. Commit kimliği `karacaismail` olur. Yazar koruması açık kalır.
+2. `metafrappe` depolarında PR'ları ProPR birleştirir.
+3. `metafrappe` depolarında ProPR'ın her commit'inde yazar ve committer `karacaismail` hesabı olur.
+4. `metafrappe` depolarında GitHub'ın birleştirme servisi son birleşme commit'inin committer alanına GitHub yazar. Müşteri bu tek istisnayı yalnız `metafrappe` depolarında kabul etti.
+
+ProPR kuralı `metafrappe` depolarında üç commit türünü kapsar:
+
+- ana dalı PR dalına birleştiren commit,
+- çakışma çözen commit,
+- ProPR'ın yazdığı düzeltme commit'i.
+
+`metafrappe` depolarında kimliği ProPR'ın iki ayar değişkeni verir. Değişkenlerin adı `PROPR_AGENT_COMMIT_AUTHOR_NAME` ve `PROPR_AGENT_COMMIT_AUTHOR_EMAIL` şeklindedir. Değişkenler boş bırakılmaz ve silinmez. Değerler kurulum belgesinde yazılıdır.
+
+ProPR Git'i hook'lar kapalı çalıştırır. Hook, Git'in her commit'te çalıştırdığı denetimdir. Bu yüzden `metafrappe` depolarında yazar koruması ProPR commit'lerini denetlemez. Kimliği yalnız bu iki değişken korur. `karacaismail/frappesetup` deposunda yazar koruması açık kalır. Committer her PR'da commit kimliğini ayrıca denetler.
+
+## Eski kurulum
+
+Bu sayfanın kalan bölümleri 22 Kasım 2026 Pazar günkü kurulumu anlatır. O gün ProPR yalnız gözlemciydi. O gün ProPR şu üç işi yapıyordu:
 
 - `karacaismail/frappesetup` deposundaki PR'ları ve CI sonuçlarını okur.
 - Durumu kendi panosunda gösterir.
 - Yalnız depo sahibinin tetiklemesine izin verir.
 
-ProPR şu işleri yapmaz:
-
-- ProPR kod yazmaz ve commit atmaz.
-- ProPR PR birleştirmez.
-- ProPR CI hatasını kendiliğinden düzeltmeye çalışmaz.
-
-Bu sınırların nedeni yazar kuralıdır. Depodaki her commit'in yazarı ve committer'ı depo sahibi olmalı. ProPR'ın yazdığı bir commit bu kuralı bozardı.
+O kurulumda birleştirmeyi kapı betiği yapıyordu. GitHub izinleri ve güvenlik kararları yeni kurala göre henüz gözden geçirilmedi.
 
 ## PR akışı
 
-PR'lar `main` dalına şu sırayla girer:
+22 Kasım 2026 Pazar günü PR'lar `main` dalına şu sırayla giriyordu:
 
 1. Pane işçisi işi kendi dalında bitirir.
 2. Bağımsız bir inceleme dalı denetler. Karar `pass` olmalı.
@@ -36,8 +53,6 @@ PR'lar `main` dalına şu sırayla girer:
 6. Testler geçerse kapı betiği `main` dalını hızlı ileri alır.
 
 Son adımda yeni commit oluşmaz. `main` dalı yalnız PR'ın son commit'ine ilerler. GitHub bu PR'ı birleşmiş olarak gösterir.
-
-GitHub'ın birleştirme düğmesi kullanılmaz. Bu düğme committer alanına GitHub yazar. Otomatik birleştirme de kapalıdır.
 
 Testler kalırsa kapı betiği hatayı dalın çalışma klasörüne yazar. Pane işçisi hatayı düzeltir. Sonra iş yeniden incelenir.
 
@@ -151,6 +166,8 @@ Kurulum adımları depodaki [`Propr_setup`](https://github.com/karacaismail/frap
 
 ## Güvenlik kararları
 
+Bu liste 22 Kasım 2026 Pazar günkü kurulumu anlatır. Liste yeni birleştirme kuralına göre henüz gözden geçirilmedi.
+
 - ProPR'ın GitHub izinleri yalnız okumadır.
 - ProPR MCP kapsamı yalnız okumadır.
 - MCP vekili yalnız bu bilgisayardan açılır.
@@ -166,3 +183,4 @@ Kurulum adımları depodaki [`Propr_setup`](https://github.com/karacaismail/frap
 1. ProPR MCP için öteki Claude hesapları ve Codex hesapları bağlanmadı. Araçla okuma denemesi yapılmadı.
 2. `main` dalı için GitHub koruma kuralı yoktur. Kural önerisi DevOps sorumlusuna devredildi. Devir notu [`Propr_setup`](https://github.com/karacaismail/frappesetup/tree/main/Propr_setup) klasöründedir.
 3. Kapı betiği şimdilik yalnız site dallarını kabul eder.
+4. GitHub izinleri ve güvenlik kararları K-64 kuralına göre gözden geçirilmedi. ProPR'ın gerçek bir commit'i denetlenmedi.
