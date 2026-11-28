@@ -313,6 +313,22 @@ test.describe('content consistency', () => {
     }
   });
 
+  test('task board update note names a test file from its own merge', () => {
+    // The update note names its evidence: it mentions at least one test file path (AJA-464).
+    // Every file path in the note exists in the repository. If the commit is local, the test file changed in that merge.
+    const u: TaskBoard['update'] = JSON.parse(read('src/data/task-board.json')).update;
+    const paths = [...u.note.matchAll(/(?:[\w.-]+\/)+[\w.-]+\.(?:py|ts|tsx|mjs|js|json|ftl|yaml)\b/g)].map((m) => m[0]);
+    expect(paths.filter((p) => !existsSync(new URL(p, root))), 'notta adı geçen ama depoda olmayan dosya').toEqual([]);
+    const tests = paths.filter((p) => /(^|\/)tests?\/|\.spec\.ts$|(^|\/)test_[\w-]+\.py$/.test(p));
+    expect(tests.length, 'update.note en az bir test dosyasını adıyla anar').toBeGreaterThan(0);
+    if (hasCommit(u.commit)) {
+      const parents = git('rev-list', '--parents', '-n', '1', u.commit).split(' ');
+      const base = parents.length > 1 ? parents[1] : `${u.commit}^`;
+      const changed = new Set(git('diff', '--name-only', base, u.commit).split('\n'));
+      expect(tests.filter((p) => changed.has(p)).length, `notta ${u.commit} birleşmesinde değişen test dosyası`).toBeGreaterThan(0);
+    }
+  });
+
   test('brand merge review preserves released product evidence and incomplete delivery', () => {
     const board: TaskBoard = JSON.parse(read('src/data/task-board.json'));
     const product = board.items['G-157'];
