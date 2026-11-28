@@ -12,7 +12,7 @@ from .press_client import PressClient
 from .proposals import ProposalStore
 from .redaction import Redactor, envelope, envelope_exact
 from .schema import check_schema, validate
-from .util import utc_now
+from .util import canonical_json, sha256_hex, utc_now
 from .workspace import Workspace
 
 OP_ID = {"type": "string", "maxLength": 80, "pattern": r"[a-z][a-z_]*\.[a-z][a-z_]*"}
@@ -248,6 +248,10 @@ TOOLS = [
 ]
 
 
+PRESS_TOOLS = frozenset({"press_read", "press_triage_build", "press_propose", "press_execute", "press_track"})
+APP_TOOLS = frozenset({"app_inspect", "app_check", "app_propose_change", "app_apply"})
+
+
 class Toolbox:
     def __init__(self, ctx):
         self.ctx = ctx
@@ -260,9 +264,19 @@ class Toolbox:
     def has(self, name: str) -> bool:
         return name in self.tools
 
+    def configured(self, name: str) -> bool:
+        """A tool is listed only if its part is configured (G-84): Press tools need Press, app tools a workspace."""
+        if name in PRESS_TOOLS:
+            return self.ctx.config.press is not None
+        if name in APP_TOOLS:
+            return self.ctx.config.workspace is not None
+        return True
+
     def describe(self, protocol: str | None = None) -> list:
         out = []
         for name, tool in self.tools.items():
+            if not self.configured(name):
+                continue
             entry = {"name": name, "description": tool["description"], "inputSchema": tool["schema"]}
             if protocol and protocol != "2024-11-05":
                 entry["annotations"] = tool["annotations"]
@@ -278,7 +292,9 @@ class Toolbox:
             identity.audit(self.ctx, audit_name, "tool_started", arguments)
         try:
             return self._call(name, arguments, scoped)
-        except Exception:
+        except Exception as error:
+            if isinstance(error, KitError):
+                self.record_denial(audit_name if scoped else name, arguments, error.code)
             if scoped:
                 identity.audit(self.ctx, audit_name, "tool_failed", arguments)
             raise
@@ -296,3 +312,11 @@ class Toolbox:
         if scoped:
             identity.audit(self.ctx, name, "tool_completed", arguments)
         return result
+
+    def record_denial(self, name: str, arguments, reason: str) -> None:
+        """Every refusal lands in the audit log (G-85). The arguments are kept only as a digest."""
+        press = self.ctx.config.press
+        tool_name = self.ctx.redactor.text(str(name))[:80]
+        self.ctx.store.audit({"event": "denied", "tool": tool_name, "reason": reason,
+                              "principal": press.principal if press else None,
+                              "args_digest": sha256_hex(canonical_json(arguments))})

@@ -317,6 +317,18 @@ istekten önce `unknown/dispatching` sonucu yazılır; tüketilmiş ama sonucu o
 içeriği (`app_inspect {files}`, `proposal_get` ayrıntısı) desen maskelemesi olmadan birebir döner; yalnız yapılandırılmış
 kimlik değerleri maskelenir ve gizli değer gibi görünen metin `contains_secret_like_text` ile işaretlenir.
 
+Araç listesi yapılandırmaya göre daralır (G-84). Press bölümü yoksa `press_*` araçları listede görünmez. Workspace bölümü
+yoksa `app_*` araçları görünmez. Kontrat araçları her zaman görünür. Bir süreç tek kimlikle çalışır. Ticari işler `team`
+kimliğiyle, operasyon işleri `operator` kimliğiyle yürür. Bir kimlikle açılan öneri öteki kimlikle yürütülmez
+(`authority_changed`). Kiracı araçları bu pakette yoktur. Onlar kiracı sitesinde kullanıcının kısa ömürlü belirteciyle çalışır.
+
+Her ret `audit.jsonl` dosyasına `denied` olayı olarak yazılır (G-85). Olay araç adını, ret kodunu ve kimlik türünü taşır.
+Girdinin kendisi yazılmaz. Yalnız SHA-256 özeti (`args_digest`) yazılır. Bilinmeyen araç da kayda düşer.
+
+Saldırı örnekleri `evals/attacks.json` dosyasındadır (G-89). `tests/test_attack_eval.py` her örneği sahte Press'e karşı koşar.
+Her örnek beklenen ret koduyla biter ya da veriyi yalnız güvenilmeyen veri zarfında döner. Hiçbir örnek kuralı, araç listesini
+veya açık mutasyonları değiştirmez. Yeni saldırı örneği bu dosyanın sonuna eklenir.
+
 `app_propose_change.change.kind`: `new_app {app_name, app_title, publisher, email, description, license, target_frappe}`
 (lisans zorunlu, varsayılan yok), `new_doctype {module, doctype, fields[], istable?, naming_rule?, permissions[]}`,
 `add_child_table {module, parent_doctype, child_doctype, table_fieldname, label, fields[]}`,

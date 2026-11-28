@@ -43,6 +43,7 @@ Notlar: Assistant Core'un riskli yüzeyi `run_python_code` ve `run_database_quer
 ## Paketin sunucusu: `press-ai`
 
 - **Ne:** stdio MCP, Python 3.9+ yalnız stdlib, 14 araç. Bağlam: `kit_status`. Kontrat: `contract_search`, `contract_get`, `ui_reference_search`. Press okuma: `press_read`, `press_triage_build`. Press yazma akışı: `press_propose`, `proposal_get`, `press_execute`, `press_track`. Uygulama: `app_inspect`, `app_check`, `app_propose_change`, `app_apply`.
+- **Araç listesi:** liste yapılandırmaya göre daralır (G-84). Press bölümü yoksa `press_*` araçları görünmez. Çalışma alanı yoksa `app_*` araçları görünmez. Yapılandırmasız sunucu 5 araç listeler.
 - **Kimlik:** kullanıcının kendi Press API anahtarı (keychain ya da yalnız sahibinin okuyabildiği dosya); `team` ve `operator` rolleri. Mutasyonlar yapılandırmada açılmadıkça kapalıdır. `team` rolünde Press, üye olunmayan takım başlığında sessizce varsayılan takıma geçer; araç Press'in çözdüğü takımı yapılandırılanla karşılaştırır.
 - **Onay:** ayrı terminalde, sunucuyla aynı işletim sistemi hesabıyla verilir (`same_os_account`). Model MCP üzerinden onay veremez, ama aynı hesapta kabuk erişimi olan bir süreç onay CLI'sini çalıştırabilir: hız kesicidir, güvenlik sınırı değildir. Ayrı onaylayıcı hesabı desteklenmez.
 - **Yok:** onay aracı; `confirm`, `approved`, `force` alanı; kabuk, SSH, Server Script, ham SQL, ham Python. Eski özel SSH MCP'si ayrı kalır, değiştirilmez ve bu kararların yerine geçmez.
