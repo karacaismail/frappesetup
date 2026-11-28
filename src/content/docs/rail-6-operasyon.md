@@ -114,7 +114,7 @@ sequenceDiagram
     P->>S: Support Session kapat → bağlantılar kapanır, biletler iptal, temsil sonlanır
 ```
 
-**Denetim ve KVKK.** Support Access, Support Session, Team Member Impersonation, Site Activity, Activity Log, HD Ticket ve AI denetim kayıtları tek raporda; `Legal Document Acceptance` (belge, sürüm, içerik hash'i, kullanıcı, zaman) rızayı sürümler; saklama/legal hold matrisi silme işlerini (`Team Deletion Request`, yedek silme, anonimleştirme) durdurabilir.
+**Denetim ve KVKK.** Operasyon sitesi, Press faturalama, CRM ve Helpdesk kayıtlarında veri sorumlusu biziz. Müşterinin kiracı verisinde ve `Support Session` erişiminde veri işleyen biziz. Bu rol ayrımının resmî kaynakları ve kararları [KVKK ve VERBİS](/frappesetup/kvkk-roller-verbis/) sayfasındadır. `Support Access`, `Support Session`, `Team Member Impersonation`, `Site Activity`, `Activity Log`, `HD Ticket` ve AI denetim kayıtları tek raporda toplanır. `Legal Document Acceptance` kaydı belge, sürüm, içerik özeti, kullanıcı ve zamanla rızayı sürümler. Saklama ve yasal bekletme matrisi silme işlerini (`Team Deletion Request`, yedek silme ve anonimleştirme) durdurabilir (SA-36, G-116).
 
 ## Press'te kalan işler
 
@@ -201,6 +201,6 @@ Backend belgesi 16 engel sayar. Tam tablo `backend/docs/dagitim/ortamlar.md` dos
 | E-9 | Gerçek servislerle uçtan uca test yok | integration-e2e işi |
 | E-10 | Sunucular, Jenkins, Tailscale ve GHCR hesabı yok | DevOps sorumlusu |
 | E-11 | GoDaddy'nin çok katlı joker kaydı kabul ettiği doğrulanmadı | Alan adı sorumlusu |
-| E-14 | Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer. KVKK aktarım bildirimi ve VERBİS kaydı da bitmedi | Hukuk ve ürün sahibi |
+| E-14 | Gerçek müşteri verisi için karar yoktur. prod ortamına yalnız deneme verisi girer. KVKK veri işleyen sözleşmesi, aktarım bildirimi ve kendi VERBİS değerlendirmemiz bitmedi (K-64) | Hukuk ve ürün sahibi |
 
 Prod'a çıkmadan önce üç yaşam döngüsü testi de geçmelidir. Bu testler TLS aracısı olan hazırlık ortamında koşar (backend proje kaydı O-50).

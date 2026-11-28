@@ -23,7 +23,8 @@
    "G-167",
    "G-168",
    "G-169",
-   "G-170"
+   "G-170",
+   "G-171"
   ]
  },
  "update": {
@@ -1473,6 +1474,11 @@
    "epic": "access",
    "status": "unverified",
    "level": "mvp"
+  },
+  "G-171": {
+   "epic": "compliance",
+   "status": "unverified",
+   "level": "post-mvp"
   }
  }
 }
