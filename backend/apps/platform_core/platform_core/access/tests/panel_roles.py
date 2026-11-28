@@ -25,7 +25,8 @@ Contract chosen by QA for the reseller tests (AJA-833 may change it with the PO)
 - "Reseller Customer Link" has the fields `reseller_tenant` and `customer_tenant`.
 - "Reseller Customer Request" has the fields `reseller_tenant`, `customer_name` and `contact_email`.
 - A tenant is its own Frappe site. The reseller tenant of a request is the site that serves it.
-- `list_customers` (GET) returns a list. Each row has `customer_tenant`.
+- `list_customers` (GET) returns an object with `items`, `has_more`, `offset` and `page_size`.
+  Each row in `items` has `customer_tenant`.
 - `customer_status` (GET, `customer_tenant`) returns `customer_tenant` and `status`.
 - `request_customer` (POST, `customer_name`, `contact_email`) returns the `name` of the request.
 - `approve_customer_request` (POST, `request`) approves one request.

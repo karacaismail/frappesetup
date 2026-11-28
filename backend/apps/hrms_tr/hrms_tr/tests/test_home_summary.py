@@ -13,6 +13,7 @@ All people, companies and records are made up.
 import json
 import unittest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 try:
 	import frappe
@@ -87,42 +88,6 @@ def day(offset: int) -> str:
 	return str(add_days(today(), offset))
 
 
-def row(name, team, start, end, **values):
-	return {"name": name, "department": team, "from_date": start, "to_date": end, **values}
-
-
-@unittest.skipIf(frappe is None, "Needs Frappe.")
-class OverlapRuleTest(unittest.TestCase):
-	"""Two open or approved leaves of one team that share a day are one problem."""
-
-	def pairs(self, rows):
-		return [(first["name"], second["name"]) for first, second in home_summary.find_overlaps(rows)]
-
-	def test_shared_day_in_one_team_is_an_overlap(self):
-		rows = [row("L1", "A", "2026-12-07", "2026-12-08"), row("L2", "A", "2026-12-08", "2026-12-09")]
-		self.assertEqual(self.pairs(rows), [("L1", "L2")])
-
-	def test_days_next_to_each_other_do_not_overlap(self):
-		rows = [row("L1", "A", "2026-12-07", "2026-12-08"), row("L2", "A", "2026-12-09", "2026-12-10")]
-		self.assertEqual(self.pairs(rows), [])
-
-	def test_other_team_does_not_overlap(self):
-		rows = [row("L1", "A", "2026-12-07", "2026-12-08"), row("L2", "B", "2026-12-07", "2026-12-08")]
-		self.assertEqual(self.pairs(rows), [])
-
-	def test_leave_without_team_is_skipped(self):
-		rows = [row("L1", None, "2026-12-07", "2026-12-08"), row("L2", None, "2026-12-07", "2026-12-08")]
-		self.assertEqual(self.pairs(rows), [])
-
-	def test_long_leave_overlaps_each_later_leave_inside_it(self):
-		rows = [
-			row("L3", "A", "2026-12-10", "2026-12-10"),
-			row("L1", "A", "2026-12-01", "2026-12-20"),
-			row("L2", "A", "2026-12-05", "2026-12-05"),
-		]
-		self.assertEqual(self.pairs(rows), [("L1", "L2"), ("L1", "L3")])
-
-
 @unittest.skipIf(frappe is None, "Needs Frappe.")
 class ChangeActionRuleTest(unittest.TestCase):
 	"""What the person did to the leave in its last change."""
@@ -146,6 +111,17 @@ class ChangeActionRuleTest(unittest.TestCase):
 	def test_cancelled_leave_was_cancelled(self):
 		self.assertEqual(self.action(status="Cancelled", docstatus=2), "cancelled")
 		self.assertEqual(self.action(status="Approved", docstatus=2), "cancelled")
+
+
+@unittest.skipIf(frappe is None, "Needs Frappe installed.")
+class BoundedSummaryQueryTest(unittest.TestCase):
+	def test_employee_problem_query_has_an_explicit_positive_bound(self):
+		with patch.object(home_summary, "frappe") as fake:
+			fake.has_permission.return_value = True
+			fake.get_list.return_value = []
+			home_summary._employee_problems()
+		for call in fake.get_list.call_args_list:
+			self.assertGreater(call.kwargs.get("limit_page_length", call.kwargs.get("limit", 0)), 0)
 
 
 @unittest.skipIf(frappe is None, "Needs a Frappe test site with HRMS TR installed.")
@@ -515,6 +491,132 @@ class HomeSummaryRequestTest(IntegrationTestCase):
 				"problems": 1,
 			},
 		)
+
+	def test_summary_limits_queries_without_truncating_visible_counts(self):
+		# More than one displayed page, all visible to the manager.
+		added = home_summary.LIST_LIMIT + 5
+		names = []
+		try:
+			for index in range(added):
+				doc = frappe.copy_doc(frappe.get_doc(DOCTYPE, self.leaves["open_a"]))
+				doc.name = f"{self.prefix}-bulk-{index:03d}"
+				doc.from_date = day(40)
+				doc.to_date = day(40)
+				doc.db_insert()
+				names.append(doc.name)
+			frappe.set_user(self.users["manager"])
+			with patch.object(frappe, "get_list", wraps=frappe.get_list) as listed:
+				data = home_summary.get_summary()
+			self.assertEqual(data["counts"]["pending_approvals"], added + 3)
+			self.assertEqual(data["counts"]["opened_this_month"], added + 5)
+			self.assertEqual(data["counts"]["problems"], added * (added - 1) // 2 + 1)
+			self.assertEqual(len(data["pending_approvals"]), home_summary.LIST_LIMIT)
+			self.assertEqual(len(data["problems"]), home_summary.LIST_LIMIT)
+			for call in listed.call_args_list:
+				if call.args[0] not in (DOCTYPE, "Employee"):
+					continue
+				limit = call.kwargs.get("limit_page_length", call.kwargs.get("limit"))
+				self.assertIsNotNone(limit, call)
+				self.assertGreater(limit, 0, call)
+				self.assertLessEqual(limit, home_summary.LIST_LIMIT, call)
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.delete(DOCTYPE, {"name": ["in", names]})
+
+	def test_distinct_employees_and_missing_dates_count_beyond_the_list_limit(self):
+		added = home_summary.LIST_LIMIT + 5
+		employees, leaves = [], []
+		try:
+			for index in range(added):
+				employee = frappe.copy_doc(frappe.get_doc("Employee", self.employees["worker_a"]))
+				employee.name = f"{self.prefix}-bulk-employee-{index:03d}"
+				employee.user_id = None
+				employee.date_of_joining = None
+				employee.db_insert()
+				employees.append(employee.name)
+				for suffix in ("a", "b"):
+					doc = frappe.copy_doc(frappe.get_doc(DOCTYPE, self.leaves["approved_today"]))
+					doc.name = f"{self.prefix}-bulk-approved-{index:03d}-{suffix}"
+					doc.employee = employee.name
+					doc.department = None
+					doc.db_insert()
+					leaves.append(doc.name)
+			frappe.set_user(self.users["admin"])
+			with patch.object(frappe, "get_list", wraps=frappe.get_list) as listed:
+				data = home_summary.get_summary()
+			self.assertEqual(data["counts"]["on_leave_today"], added + 1)
+			self.assertEqual(data["counts"]["problems"], added + 2)
+			self.assertEqual(len(data["problems"]), home_summary.LIST_LIMIT)
+			for call in listed.call_args_list:
+				if call.args[0] not in (DOCTYPE, "Employee"):
+					continue
+				self.assertGreater(call.kwargs.get("limit_page_length", call.kwargs.get("limit", 0)), 0)
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.delete(DOCTYPE, {"name": ["in", leaves]})
+			frappe.db.delete("Employee", {"name": ["in", employees]})
+
+	def test_overlap_query_counts_nested_and_boundary_ranges_once(self):
+		names = []
+		try:
+			for suffix, first, last, team in (
+				("z-long", 50, 60, TEAM_A),
+				("a-inner", 52, 53, TEAM_A),
+				("b-boundary", 60, 61, TEAM_A),
+				("c-next", 62, 63, TEAM_A),
+				("d-other", 52, 53, TEAM_B),
+				("e-no-team", 52, 53, None),
+				("f-no-team", 52, 53, None),
+			):
+				doc = frappe.copy_doc(frappe.get_doc(DOCTYPE, self.leaves["open_a"]))
+				doc.name = f"{self.prefix}-range-{suffix}"
+				doc.from_date, doc.to_date = day(first), day(last)
+				doc.department = self.departments[team] if team else None
+				doc.db_insert()
+				names.append(doc.name)
+			frappe.set_user(self.users["manager"])
+			data = home_summary.get_summary()
+			self.assertEqual(data["counts"]["problems"], 3)
+			pairs = {frozenset(leave["name"] for leave in item["leaves"]) for item in data["problems"]}
+			self.assertEqual(
+				pairs,
+				{
+					frozenset((self.leaves["open_a"], self.leaves["open_b"])),
+					frozenset((names[0], names[1])),
+					frozenset((names[0], names[2])),
+				},
+			)
+			ordered_pairs = {
+				tuple(leave["name"] for leave in item["leaves"])
+				for item in data["problems"]
+				if any(leave["name"] in names for leave in item["leaves"])
+			}
+			self.assertEqual(ordered_pairs, {(names[0], names[1]), (names[0], names[2])})
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.delete(DOCTYPE, {"name": ["in", names]})
+
+	def test_overlap_query_orders_same_start_by_name(self):
+		names = []
+		try:
+			for suffix in ("z", "b", "a"):
+				doc = frappe.copy_doc(frappe.get_doc(DOCTYPE, self.leaves["open_a"]))
+				doc.name = f"{self.prefix}-same-start-{suffix}"
+				doc.from_date, doc.to_date = day(80), day(81)
+				doc.db_insert()
+				names.append(doc.name)
+			frappe.set_user(self.users["manager"])
+			data = home_summary.get_summary()
+			self.assertEqual(data["counts"]["problems"], 4)
+			pairs = [
+				tuple(leave["name"] for leave in item["leaves"])
+				for item in data["problems"]
+				if any(leave["name"] in names for leave in item["leaves"])
+			]
+			self.assertEqual(pairs, [(names[2], names[1]), (names[2], names[0]), (names[1], names[0])])
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.delete(DOCTYPE, {"name": ["in", names]})
 
 
 if __name__ == "__main__":

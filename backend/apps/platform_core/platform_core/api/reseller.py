@@ -9,9 +9,9 @@ from platform_core.reseller import customers
 
 
 @frappe.whitelist(methods=["GET"])
-def list_customers() -> list[dict]:
+def list_customers(offset: int | str = 0, page_size: int | str = customers.DEFAULT_PAGE_SIZE) -> dict:
 	"""Returns the customers linked to the reseller tenant. “Reseller Admin” and “Reseller Assistant”."""
-	return customers.list_customers()
+	return customers.list_customers(offset=offset, page_size=page_size)
 
 
 @frappe.whitelist(methods=["GET"])

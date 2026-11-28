@@ -5,6 +5,8 @@ A reseller sees only the customers linked to that site. The reseller never reads
 data of a customer tenant: these functions return the link fields only.
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, validate_email_address
@@ -16,6 +18,9 @@ RESELLER_ASSISTANT = "Reseller Assistant"
 PLATFORM_OPERATOR = "Platform Operator"
 READERS = (RESELLER_ADMIN, RESELLER_ASSISTANT)
 MAX_NAME = 140
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 100
+MAX_OFFSET = 2**63 - 1
 
 
 def reseller_tenant() -> str:
@@ -28,23 +33,48 @@ def require(roles: tuple[str, ...]) -> None:
 		frappe.throw(_("You are not permitted to do this."), frappe.PermissionError)
 
 
-def list_customers() -> list[dict]:
+def list_customers(offset: int | str = 0, page_size: int | str = DEFAULT_PAGE_SIZE) -> dict:
 	require(READERS)
+	# HTTP arguments arrive as strings; direct callers must obey the same integer contract.
+	values = []
+	for value, minimum in ((offset, 0), (page_size, 1)):
+		if isinstance(value, bool) or not isinstance(value, (str, int)):
+			frappe.throw(_("Enter a valid page offset and page size."))
+		if isinstance(value, str) and re.fullmatch(r"^\d+$", value) is None:
+			frappe.throw(_("Enter a valid page offset and page size."))
+		try:
+			value = int(value)
+		except (ValueError, TypeError):
+			frappe.throw(_("Enter a valid page offset and page size."))
+		if value < minimum:
+			frappe.throw(_("Enter a valid page offset and page size."))
+		values.append(value)
+	offset, page_size = values[0], min(values[1], MAX_PAGE_SIZE)
+	if offset > MAX_OFFSET:
+		frappe.throw(_("Enter a valid page offset and page size."))
 	rows = frappe.get_all(
 		LINK,
 		filters={"reseller_tenant": reseller_tenant()},
 		fields=["customer_tenant", "customer_name", "site_status"],
-		order_by="customer_tenant asc",
+		order_by="customer_tenant asc, name asc",
+		limit_start=offset,
+		limit_page_length=page_size + 1,
+		# Resellers cannot read Link documents directly. The role and serving site above scope this read.
 		ignore_permissions=True,
 	)
-	return [
-		{
-			"customer_tenant": row.customer_tenant,
-			"customer_name": row.customer_name,
-			"status": row.site_status,
-		}
-		for row in rows
-	]
+	return {
+		"items": [
+			{
+				"customer_tenant": row.customer_tenant,
+				"customer_name": row.customer_name,
+				"status": row.site_status,
+			}
+			for row in rows[:page_size]
+		],
+		"has_more": len(rows) > page_size,
+		"offset": offset,
+		"page_size": page_size,
+	}
 
 
 def customer_status(customer_tenant: str) -> dict:

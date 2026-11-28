@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core reseller customers
-  version: 0.1.0
+  version: 0.2.0
   summary: Endpoints for the customer list, the customer site status and new customer requests.
   description: |
     This contract describes the endpoints of the `platform_core.reseller` module (G-169, G-170).
@@ -48,15 +48,28 @@ paths:
       summary: Returns the customers linked to the reseller tenant.
       description: |
         The list holds only the customers linked to the serving site. It is sorted by `customer_tenant`.
-        An empty list means the reseller has no linked customer yet.
+        Use `offset` and `page_size` to request a page. The default page size is 50.
+        Requested sizes above 100 are clamped to 100. Invalid integers, negative offsets and
+        non-positive sizes return 417. Offsets above 9223372036854775807 also return 417. The response reports the effective size and `has_more`.
+        An empty `items` list means this offset has no linked customers.
+        Ordering uses `customer_tenant`, then the link name. Changes between requests may shift offsets.
         The endpoint does not change records.
 
         Only “Reseller Admin” and “Reseller Assistant” can call it. Every other role gets 403.
       security:
         - frappeSession: []
+      parameters:
+        - in: query
+          name: offset
+          description: Number of linked customers to skip.
+          schema: {type: integer, minimum: 0, maximum: 9223372036854775807, default: 0}
+        - in: query
+          name: page_size
+          description: Requested page size. Values above 100 are clamped to 100.
+          schema: {type: integer, minimum: 1, default: 50}
       responses:
         "200":
-          description: The linked customers.
+          description: One page of linked customers.
           content:
             application/json:
               schema:
@@ -64,19 +77,36 @@ paths:
                 required: [message]
                 properties:
                   message:
-                    type: array
-                    items: {$ref: "#/components/schemas/Customer"}
+                    type: object
+                    required: [items, has_more, offset, page_size]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 100
+                        items: {$ref: "#/components/schemas/Customer"}
+                      has_more:
+                        type: boolean
+                        description: Another linked customer exists after this page.
+                      offset: {type: integer, minimum: 0, maximum: 9223372036854775807}
+                      page_size: {type: integer, minimum: 1, maximum: 100}
               examples:
                 twoCustomers:
-                  summary: A reseller with two customers.
+                  summary: The complete first page of two customers.
                   value:
                     message:
-                      - customer_tenant: musteri-a.example.test
-                        customer_name: Örnek Müşteri A
-                        status: Active
-                      - customer_tenant: musteri-b.example.test
-                        customer_name: null
-                        status: Pending
+                      items:
+                        - customer_tenant: musteri-a.example.test
+                          customer_name: Örnek Müşteri A
+                          status: Active
+                        - customer_tenant: musteri-b.example.test
+                          customer_name: null
+                          status: Pending
+                      has_more: false
+                      offset: 0
+                      page_size: 50
+        "417":
+          description: Invalid pagination input.
         "401":
           $ref: "#/components/responses/SessionExpired"
         "403":
